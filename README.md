@@ -4,18 +4,20 @@ Plataforma web de ventas y gestión comercial desarrollada para **Ferrepatagonia
 
 El proyecto busca centralizar parte de la operación comercial de la empresa y habilitar la venta online tanto para clientes convencionales como para clientes empresariales que trabajan con cuenta corriente.
 
-- --
+---
 
 ## Equipo
 
-- *WebFaster**
+**WebFaster**
 
-- **Santiago Agustín Lehnert** — Backend
-- **Lucciano Perticarini** — Frontend
-- **Zahir Timm** — UX/UI
-- **Bruno Vagnola** — UX/UI
+El proyecto se desarrolla de manera colaborativa. Las asignaciones de tareas representan responsables de trabajos específicos y no roles técnicos permanentes dentro del equipo.
 
-- --
+- Santiago Agustín Lehnert
+- Lucciano Perticarini
+- Zahir Timm
+- Bruno Vagnola
+
+---
 
 ## Objetivo del proyecto
 
@@ -27,9 +29,9 @@ Una de las particularidades principales del negocio es que conviven distintos ti
 - clientes empresariales;
 - clientes autorizados para operar mediante cuenta corriente.
 
-La solución busca contemplar estas diferencias sin perder simplicidad en el MVP.
+La solución busca contemplar estas diferencias manteniendo un MVP simple, mantenible y extensible.
 
-- --
+---
 
 ## Alcance inicial del MVP
 
@@ -60,7 +62,7 @@ El MVP contempla actualmente las siguientes funcionalidades principales:
 
 Algunas reglas comerciales continúan sujetas a validación durante el desarrollo.
 
-- --
+---
 
 ## Estado actual del proyecto
 
@@ -78,9 +80,11 @@ El proyecto se encuentra en etapa de **diseño y definición técnica**.
 - construcción del modelo entidad-relación;
 - documentación del MER mediante Mermaid;
 - avance del diseño UX/UI;
-- preparación de las siguientes definiciones de arquitectura y autenticación.
+- definición de la arquitectura general del MVP;
+- análisis preliminar del stack tecnológico;
+- preparación de la definición de autenticación y roles.
 
-- --
+---
 
 ## Modelo de datos
 
@@ -101,11 +105,11 @@ El modelo actual contempla las siguientes entidades principales:
 
 ### Decisiones actuales del modelo
 
-### Para mantener el MVP simple
+Para mantener el MVP simple:
 
 - el stock se representa como información asociada al producto;
-- la condición de cliente fiel se representa dentro de Cliente;
-- el comprobante se mantiene asociado al pago;
+- la condición de cliente fiel se representa dentro de `Cliente`;
+- el comprobante se mantiene asociado a `Pago`;
 - la cotización del dólar se considera una configuración del sistema;
 - cada producto pertenece inicialmente a una categoría;
 - los pagos se registran inicialmente dentro de la operatoria de cuenta corriente;
@@ -113,13 +117,11 @@ El modelo actual contempla las siguientes entidades principales:
 
 La relación definitiva de `Usuario` con Cliente, administración y roles será completada durante la historia correspondiente a autenticación y autorización.
 
-- --
+---
 
 ## UX/UI
 
 El diseño visual del MVP se encuentra actualmente en desarrollo.
-
-### Las principales vistas contempladas son
 
 ### Sitio público
 
@@ -160,11 +162,68 @@ El diseño visual del MVP se encuentra actualmente en desarrollo.
 - Cuentas corrientes
 - Configuración
 
-- --
+---
+
+## Arquitectura
+
+El MVP utiliza una arquitectura web cliente-servidor organizada principalmente en frontend, backend y base de datos.
+
+```text
+Frontend
+   ↓
+API REST
+   ↓
+Backend
+   ↓
+Base de datos
+```
+
+La lógica de negocio, validaciones, autenticación, autorización y acceso a datos se concentrarán en el backend.
+
+REST será el mecanismo principal para ejecutar operaciones entre frontend y backend.
+
+También se contempla utilizar Socket.IO como mecanismo complementario para eventos que necesiten actualización en tiempo real.
+
+La arquitectura se mantiene independiente de algunas decisiones de implementación que todavía deberán confirmarse con la materia de Backend.
+
+[Ver arquitectura general del MVP](docs/arquitectura/arquitectura-general.md)
+
+---
+
+## Stack tecnológico
+
+El stack tecnológico definitivo se encuentra actualmente en análisis.
+
+Existe una propuesta preliminar para frontend, backend, base de datos, autenticación, validación, manejo de archivos y comunicación en tiempo real.
+
+Algunas decisiones permanecen pendientes de confirmación debido a que el backend del proyecto será utilizado también como trabajo final de la materia de Backend.
+
+Una vez confirmados dichos requerimientos se actualizará esta sección con el stack definitivo.
+
+---
+
+## Autenticación y roles
+
+La definición completa de roles, permisos y autenticación todavía se encuentra pendiente.
+
+Se deberá establecer:
+
+- roles existentes;
+- permisos por rol;
+- relación entre Usuario y Cliente;
+- representación de usuarios administrativos;
+- flujo de inicio de sesión;
+- manejo de sesión;
+- protección de endpoints;
+- protección de rutas del frontend.
+
+Una vez completada esta etapa, también podrá actualizarse el MER si resulta necesario.
+
+---
 
 ## Estrategia de ramas
 
-### El repositorio utiliza las siguientes ramas principales
+El repositorio utiliza las siguientes ramas principales:
 
 - `main` — versiones estables del proyecto.
 - `develop` — rama principal de integración.
@@ -178,59 +237,63 @@ feature/...   nuevas funcionalidades
 fix/...       correcciones
 docs/...      documentación
 refactor/...  refactorizaciones
+```
+
 Los cambios se integran mediante Pull Request.
-- Ejemplo:
-- develop
-- ↓
-- docs/modelo-datos-mermaid
-- ↓
-- Pull Request
-- ↓
-- develop
-Documentación técnica
-La documentación técnica versionada dentro del repositorio se encuentra dentro de:
-- docs/
-- └── modelo-datos/
-└── mer-ferrepatagonia.md
+
+Ejemplo:
+
+```text
+develop
+   ↓
+docs/arquitectura-general-mvp
+   ↓
+Pull Request
+   ↓
+develop
+```
+
+---
+
+## Documentación técnica
+
+La documentación técnica versionada actualmente dentro del repositorio se organiza de la siguiente manera:
+
+```text
+docs/
+├── modelo-datos/
+│   └── mer-ferrepatagonia.md
+└── arquitectura/
+    └── arquitectura-general.md
+```
+
+La propuesta preliminar del stack tecnológico se encuentra en proceso de revisión y será incorporada a `develop` una vez confirmadas las decisiones pendientes.
+
 El legajo completo del proyecto se mantiene adicionalmente en el espacio compartido del equipo e incluye:
+
 - relevamiento;
 - análisis del problema;
 - requerimientos;
 - propuesta de solución;
 - presupuesto;
 - documentación de diseño y desarrollo.
-- Arquitectura
-La arquitectura técnica definitiva del MVP todavía se encuentra en proceso de definición.
-Durante las siguientes tareas se documentarán:
-- stack tecnológico;
-- arquitectura frontend;
-- arquitectura backend;
-- base de datos;
-- comunicación entre frontend y backend;
-- autenticación;
-- autorización;
-- manejo de archivos;
-- estructura general del sistema.
-Esta sección se actualizará a medida que esas decisiones sean confirmadas.
-Autenticación y roles
-La definición completa de roles, permisos y autenticación todavía se encuentra pendiente.
-Se deberá establecer:
-- roles existentes;
-- permisos por rol;
-- relación entre Usuario y Cliente;
-- representación de usuarios administrativos;
-- flujo de inicio de sesión;
-- manejo de sesión;
-- protección de endpoints;
-- protección de rutas del frontend.
-Una vez completada esta etapa, también podrá actualizarse el MER si resulta necesario.
-Estado del Sprint
-Sprint 1 — En desarrollo
-Objetivo actual:
+
+---
+
+## Estado del Sprint
+
+**Sprint 1 — En desarrollo**
+
+Objetivos actuales:
+
 - completar el diseño UX/UI;
 - cerrar la documentación del modelo de datos;
 - definir arquitectura técnica;
 - definir roles y autenticación;
 - dejar preparada la base para comenzar la implementación.
-Proyecto académico
-Proyecto desarrollado dentro del marco de la carrera de Desarrollo de Software Full Stack.
+
+---
+
+## Proyecto académico
+
+Proyecto desarrollado dentro del marco de la carrera de **Desarrollo de Software Full Stack**.
