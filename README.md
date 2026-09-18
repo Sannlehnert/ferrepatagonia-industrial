@@ -10,10 +10,12 @@ El proyecto busca centralizar parte de la operación comercial de la empresa y h
 
 **WebFaster**
 
-- **Santiago Agustín Lehnert** — Backend
-- **Lucciano Perticarini** — Frontend
-- **Zahir Timm** — UX/UI
-- **Bruno Vagnola** — UX/UI
+El proyecto se desarrolla de manera colaborativa. Las asignaciones de tareas representan responsables de trabajos específicos y no roles técnicos permanentes dentro del equipo.
+
+- Santiago Agustín Lehnert
+- Lucciano Perticarini
+- Zahir Timm
+- Bruno Vagnola
 
 ---
 
@@ -78,7 +80,8 @@ El proyecto se encuentra en etapa de **diseño y definición técnica**.
 - construcción del modelo entidad-relación;
 - documentación del MER mediante Mermaid;
 - avance del diseño UX/UI;
-- inicio de la definición de arquitectura técnica;
+- definición de la arquitectura general del MVP;
+- análisis preliminar del stack tecnológico;
 - preparación de la definición de autenticación y roles.
 
 ---
@@ -161,42 +164,9 @@ El diseño visual del MVP se encuentra actualmente en desarrollo.
 
 ---
 
-## Stack tecnológico
-
-El stack tecnológico definitivo del MVP se encuentra actualmente en análisis.
-
-La propuesta preliminar contempla:
-
-- **Vue 3 + TypeScript** para frontend;
-- **Vite** como herramienta de desarrollo y compilación;
-- **Pinia** para estado global cuando sea necesario;
-- **Vue Router** para navegación;
-- **Tailwind CSS** para estilos;
-- **Node.js** para backend;
-- framework backend pendiente de confirmación;
-- **API REST** como mecanismo principal de comunicación;
-- **Socket.IO** para eventos seleccionados en tiempo real;
-- base de datos relacional pendiente de confirmación;
-- herramienta de acceso a datos pendiente de definición;
-- **JWT** para autenticación;
-- **bcrypt** para hash de contraseñas;
-- **Zod** para validación;
-- **Multer** para recepción de archivos;
-- **Nodemailer** como funcionalidad opcional;
-- **Swagger / OpenAPI** para documentación de la API;
-- **Git + GitHub** para control de versiones.
-
-La propuesta permanece sujeta a los requerimientos técnicos de la materia de Backend, ya que el backend del proyecto será utilizado también como trabajo final de dicha materia.
-
-[Ver propuesta completa del stack tecnológico](docs/arquitectura/stack-tecnologico.md)
-
----
-
 ## Arquitectura
 
-La arquitectura técnica definitiva del MVP todavía se encuentra en proceso de definición.
-
-Actualmente se plantea una separación general entre:
+El MVP utiliza una arquitectura web cliente-servidor organizada principalmente en frontend, backend y base de datos.
 
 ```text
 Frontend
@@ -208,19 +178,27 @@ Backend
 Base de datos
 ```
 
-Además, se evalúa incorporar Socket.IO para eventos donde una actualización en tiempo real aporte valor.
+La lógica de negocio, validaciones, autenticación, autorización y acceso a datos se concentrarán en el backend.
 
-Durante las siguientes tareas se documentarán:
+REST será el mecanismo principal para ejecutar operaciones entre frontend y backend.
 
-- responsabilidades del frontend;
-- responsabilidades del backend;
-- comunicación entre capas;
-- estructura de módulos;
-- autenticación;
-- autorización;
-- manejo de archivos;
-- eventos en tiempo real;
-- despliegue general del sistema.
+También se contempla utilizar Socket.IO como mecanismo complementario para eventos que necesiten actualización en tiempo real.
+
+La arquitectura se mantiene independiente de algunas decisiones de implementación que todavía deberán confirmarse con la materia de Backend.
+
+[Ver arquitectura general del MVP](docs/arquitectura/arquitectura-general.md)
+
+---
+
+## Stack tecnológico
+
+El stack tecnológico definitivo se encuentra actualmente en análisis.
+
+Existe una propuesta preliminar para frontend, backend, base de datos, autenticación, validación, manejo de archivos y comunicación en tiempo real.
+
+Algunas decisiones permanecen pendientes de confirmación debido a que el backend del proyecto será utilizado también como trabajo final de la materia de Backend.
+
+Una vez confirmados dichos requerimientos se actualizará esta sección con el stack definitivo.
 
 ---
 
@@ -268,7 +246,7 @@ Ejemplo:
 ```text
 develop
    ↓
-docs/modelo-datos-mermaid
+docs/arquitectura-general-mvp
    ↓
 Pull Request
    ↓
@@ -279,15 +257,17 @@ develop
 
 ## Documentación técnica
 
-La documentación técnica versionada dentro del repositorio se organiza actualmente de la siguiente manera:
+La documentación técnica versionada actualmente dentro del repositorio se organiza de la siguiente manera:
 
 ```text
 docs/
 ├── modelo-datos/
 │   └── mer-ferrepatagonia.md
 └── arquitectura/
-    └── stack-tecnologico.md
+    └── arquitectura-general.md
 ```
+
+La propuesta preliminar del stack tecnológico se encuentra en proceso de revisión y será incorporada a `develop` una vez confirmadas las decisiones pendientes.
 
 El legajo completo del proyecto se mantiene adicionalmente en el espacio compartido del equipo e incluye:
 
