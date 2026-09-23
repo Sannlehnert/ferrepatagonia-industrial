@@ -1,31 +1,9 @@
-# Modelo Entidad-Relación — Ferrepatagonia Industrial
+# Ferrepatagonia Industrial — Modelo entidad-relación
 
-Este documento contiene la representación actual del modelo de datos del MVP de Ferrepatagonia Industrial.
-
-El modelo fue construido a partir del relevamiento, las reglas del negocio y las definiciones realizadas durante el Sprint 1.
-
-La representación utiliza Mermaid para mantener el modelo versionado junto con el código fuente del proyecto.
-
-> Las definiciones relacionadas con usuarios, roles y autenticación podrán actualizarse durante la historia correspondiente.
-
-## MER
+> Propuesta de actualización de la tarea #98, basada en el MER previo y en las definiciones de acceso del MVP. Mantener el historial y las secciones adicionales del archivo original del repositorio si existieran.
 
 ```mermaid
 erDiagram
-
-    CLIENTE {
-        int id_cliente PK
-        string nombre_razon_social
-        string tipo_cliente
-        string cuit
-        string email
-        string telefono
-        string direccion
-        boolean es_fiel
-        boolean activo
-        datetime fecha_alta
-    }
-
     CATEGORIA {
         int id_categoria PK
         string nombre
@@ -44,6 +22,31 @@ erDiagram
         string imagen
         boolean activo
         datetime fecha_actualizacion
+    }
+
+    CLIENTE {
+        int id_cliente PK
+        string tipo_cliente
+        string nombre_razon_social
+        string doc_cliente
+        string cuit
+        string email
+        string telefono
+        string direccion
+        boolean es_fiel
+        boolean activo
+        datetime fecha_alta
+    }
+
+    USUARIO {
+        int id_usuario PK
+        int id_cliente FK,UK
+        string email
+        string password_hash
+        string rol
+        boolean activo
+        datetime fecha_creacion
+        datetime ultimo_acceso
     }
 
     PEDIDO {
@@ -79,6 +82,7 @@ erDiagram
 
     PAGO {
         int id_pago PK
+        int id_pedido FK
         int id_cuenta_corriente FK
         datetime fecha
         decimal monto
@@ -88,45 +92,34 @@ erDiagram
         string observaciones
     }
 
-    USUARIO {
-        int id_usuario PK
-        string email
-        string password_hash
-        boolean activo
-        datetime fecha_creacion
-        datetime ultimo_acceso
-    }
-
+    CATEGORIA ||--o{ PRODUCTO : agrupa
+    PRODUCTO ||--o{ DETALLE_PEDIDO : aparece_en
     CLIENTE ||--o{ PEDIDO : realiza
     PEDIDO ||--|{ DETALLE_PEDIDO : contiene
-    PRODUCTO ||--o{ DETALLE_PEDIDO : "aparece en"
-    CATEGORIA ||--o{ PRODUCTO : agrupa
     CLIENTE ||--o| CUENTA_CORRIENTE : posee
-    CUENTA_CORRIENTE ||--o{ PAGO : registra
+    CLIENTE o|--o| USUARIO : dispone_de_acceso
+    PEDIDO o|--o{ PAGO : recibe_pagos_directos
+    CUENTA_CORRIENTE o|--o{ PAGO : registra_pagos_de_cuenta
 ```
 
-## Decisiones del MVP
+## Reglas y alcance de la actualización
 
-- Un cliente puede realizar múltiples pedidos.
-- Un pedido confirmado contiene uno o más detalles.
-- `DETALLE_PEDIDO` resuelve la relación entre pedidos y productos y conserva los valores utilizados al momento de la operación.
-- Un cliente puede no poseer cuenta corriente o poseer una única cuenta.
-- Para el MVP cada producto pertenece a una categoría.
-- Una cuenta corriente puede registrar múltiples pagos.
-- El stock se mantiene como atributo de `PRODUCTO`.
-- La condición de cliente fiel se representa mediante `CLIENTE.es_fiel`.
-- El comprobante de pago se mantiene como referencia dentro de `PAGO`.
-- La cotización del dólar se considera una configuración del sistema y no una entidad independiente.
+**Identidad y roles (definición de la historia #68)**
 
-## Decisiones pendientes
+- `USUARIO.rol` admite `CLIENTE` o `ADMIN`. El visitante no necesita registro en `USUARIO`.
+- `CLIENTE.tipo_cliente` admite `PARTICULAR` o `EMPRESA`. Es una característica comercial, no un rol de autenticación.
+- Si `USUARIO.rol = CLIENTE`, `USUARIO.id_cliente` es obligatorio y referencia un único `CLIENTE`.
+- Si `USUARIO.rol = ADMIN`, `USUARIO.id_cliente` es nulo; no se crea una entidad `ADMINISTRADOR` para el MVP.
+- `USUARIO.id_cliente` es único cuando no es nulo, de modo que cada `CLIENTE` tiene cero o una cuenta de acceso. La notación del diagrama expresa la opcionalidad general; las reglas condicionales por rol deben implementarse como restricciones y/o validaciones de backend.
+- La cuenta corriente y la condición de cliente fiel no son roles. El acceso a operaciones de crédito requiere comprobar habilitación, propiedad y reglas comerciales vigentes.
 
-La entidad `USUARIO` se mantiene sin una relación definitiva dentro del MER hasta completar la definición de roles y autenticación.
+**Pagos y comprobantes (ajuste propuesto para representar compras convencionales)**
 
-Durante esa historia se deberá establecer:
+- `PAGO.id_pedido` referencia un pedido cuando el pago corresponde a una compra convencional, sea de un cliente particular o de una empresa.
+- `PAGO.id_cuenta_corriente` referencia una cuenta corriente cuando el pago corresponde a un abono de esa cuenta.
+- En el diseño inicial, **exactamente uno** entre `id_pedido` e `id_cuenta_corriente` tiene un valor por pago; ambos campos son individualmente anulables. El diagrama ER, por sí solo, no representa esta exclusividad: debe aplicarse con una restricción `CHECK` o validación transaccional.
+- Para un pago directo, el cliente autorizado se obtiene a partir de `PEDIDO.id_cliente`; para un abono de cuenta corriente, de `CUENTA_CORRIENTE.id_cliente`. En ambos casos, el backend comprueba la pertenencia antes de aceptar o mostrar comprobantes.
+- Subir un comprobante no implica que el pago esté validado: su estado se administra según el flujo de pagos.
+- **Supuesto de alcance por confirmar:** un pago de cuenta corriente se registra contra la cuenta, no se distribuye automáticamente entre múltiples pedidos. Si se necesita imputar un único abono a varias facturas/pedidos, hará falta modelar esa imputación por separado.
 
-- relación entre Usuario y Cliente;
-- representación de usuarios administrativos;
-- roles existentes;
-- permisos asociados a cada rol.
-
-El modelo podrá actualizarse posteriormente a partir de estas definiciones.
+**Nota de implementación:** verificar la sintaxis de tipos y claves con el motor de base de datos finalmente elegido. Mermaid es un modelo conceptual: la nulabilidad condicional, `UNIQUE`, `CHECK`, claves foráneas, dominios de valores y políticas de borrado se definirán en el esquema/migraciones SQL.
