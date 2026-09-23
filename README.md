@@ -2,7 +2,7 @@
 
 Plataforma web de ventas y gestión comercial desarrollada para **Ferrepatagonia Industrial** por el equipo **WebFaster**.
 
-El proyecto busca centralizar parte de la operación comercial de la empresa y habilitar la venta online tanto para clientes convencionales como para clientes empresariales que trabajan con cuenta corriente.
+El proyecto busca centralizar la gestión comercial de la empresa y ofrecer un canal de venta online para clientes particulares y empresariales, contemplando las condiciones específicas de aquellos que estén habilitados para operar mediante cuenta corriente.
 
 ---
 
@@ -21,243 +21,181 @@ El proyecto se desarrolla de manera colaborativa. Las asignaciones de tareas rep
 
 ## Objetivo del proyecto
 
-Ferrepatagonia Industrial necesita una plataforma que permita administrar su catálogo de productos y ofrecer un canal de venta online adaptado a su operatoria comercial.
+Ferrepatagonia Industrial necesita una plataforma que permita administrar su catálogo de productos, gestionar pedidos y ofrecer un canal de venta online adaptado a su operatoria comercial.
 
-Una de las particularidades principales del negocio es que conviven distintos tipos de clientes:
+El sistema contempla clientes particulares y empresariales. Las empresas podrán operar mediante las modalidades de pago que tengan habilitadas; registrarse como empresa no otorgará automáticamente cuenta corriente, crédito ni beneficios comerciales.
 
-- clientes convencionales;
-- clientes empresariales;
-- clientes autorizados para operar mediante cuenta corriente.
-
-La solución busca contemplar estas diferencias manteniendo un MVP simple, mantenible y extensible.
+La solución se plantea como un MVP mantenible y extensible, con una separación clara entre identidad de acceso, información comercial y permisos.
 
 ---
 
 ## Alcance inicial del MVP
 
-El MVP contempla actualmente las siguientes funcionalidades principales:
+El alcance funcional contempla:
 
-- catálogo de productos;
-- búsqueda de productos;
-- navegación por categorías;
-- visualización del detalle de producto;
-- carrito de compra;
-- generación de pedidos;
-- gestión de clientes;
-- clientes con cuenta corriente;
-- registro de pagos;
-- carga de comprobantes;
-- administración de productos;
-- administración de stock;
-- administración de categorías;
-- gestión de pedidos;
-- gestión de cuentas corrientes;
+- catálogo, búsqueda, categorías y detalle de productos;
+- carrito de compra y generación de pedidos;
+- registro y gestión de clientes particulares y empresariales;
+- área de cliente para consultar datos y pedidos propios;
+- condiciones comerciales y cuenta corriente para empresas habilitadas;
+- registro de pagos y carga de comprobantes cuando la modalidad de pago lo requiera;
+- administración de productos, categorías, precios y stock;
+- gestión administrativa de clientes, pedidos, pagos y cuentas corrientes;
+- autenticación de usuarios y control de acceso;
 - panel de administración;
-- autenticación de usuarios;
-- control de acceso según roles;
-- área de cliente;
-- área de cliente empresa;
-- sección de ayuda y preguntas frecuentes;
-- sección de contacto y quiénes somos.
+- información institucional, contacto, ayuda y preguntas frecuentes.
 
-Algunas reglas comerciales continúan sujetas a validación durante el desarrollo.
+Las reglas específicas de descuentos, crédito, vencimientos y otras condiciones comerciales continúan sujetas a validación funcional.
 
 ---
 
-## Estado actual del proyecto
+## Estado del proyecto
 
-El proyecto se encuentra en etapa de **diseño y definición técnica**.
+El proyecto se encuentra en etapa de **diseño, documentación y definición técnica del MVP**.
 
-### Durante el Sprint 1 se trabajó en
+Durante el Sprint 1 se trabajó en:
 
-- configuración inicial del repositorio;
-- definición de la estrategia de ramas;
-- relevamiento y análisis del negocio;
-- definición de entidades principales;
-- definición de atributos;
-- definición de relaciones y cardinalidades;
-- definición de restricciones del modelo;
-- construcción del modelo entidad-relación;
-- documentación del MER mediante Mermaid;
-- avance del diseño UX/UI;
-- definición de la arquitectura general del MVP;
-- análisis preliminar del stack tecnológico;
-- preparación de la definición de autenticación y roles.
+- relevamiento del negocio y definición del alcance inicial;
+- identificación de entidades, atributos, relaciones y restricciones;
+- construcción y actualización del modelo entidad-relación;
+- diseño UX/UI de las principales áreas de la plataforma;
+- definición de la arquitectura general;
+- propuesta de stack tecnológico;
+- identificación de perfiles de usuario, roles técnicos y permisos;
+- definición conceptual de autenticación, autorización y protección de rutas.
+
+La documentación describe las decisiones y propuestas de diseño. No implica que las funcionalidades del sistema ya se encuentren implementadas.
 
 ---
 
 ## Modelo de datos
 
-El modelo entidad-relación se encuentra documentado mediante **Mermaid** y versionado dentro del repositorio.
+El modelo entidad-relación se documenta mediante **Mermaid** y se versiona en el repositorio.
 
-[Ver MER de Ferrepatagonia Industrial](docs/modelo-datos/mer-ferrepatagonia.md)
+[Consultar el MER de Ferrepatagonia Industrial](docs/modelo-datos/mer-ferrepatagonia.md)
 
-El modelo actual contempla las siguientes entidades principales:
+### Entidades principales
 
-- `Cliente`
-- `Producto`
-- `Categoria`
-- `Pedido`
-- `DetallePedido`
-- `CuentaCorriente`
-- `Pago`
-- `Usuario`
+- `CLIENTE`
+- `USUARIO`
+- `PRODUCTO`
+- `CATEGORIA`
+- `PEDIDO`
+- `DETALLE_PEDIDO`
+- `CUENTA_CORRIENTE`
+- `PAGO`
 
-### Decisiones actuales del modelo
+### Decisiones del modelo
 
-Para mantener el MVP simple:
+- `USUARIO` representa la identidad utilizada para acceder a la plataforma.
+- Los usuarios autenticados tienen los roles técnicos `CLIENTE` o `ADMIN`.
+- `CLIENTE.tipo_cliente` distingue entre clientes `PARTICULAR` y `EMPRESA`.
+- Cada usuario con rol `CLIENTE` se vincula con un único cliente y cada cliente puede tener como máximo una cuenta de acceso en el MVP.
+- Los administradores no necesitan un registro comercial de `CLIENTE` para acceder a las funciones administrativas.
+- La cuenta corriente es una condición comercial asociada al cliente y no constituye un rol de acceso.
+- Los pagos convencionales deben poder registrarse sin exigir una cuenta corriente; el modelo contempla la vinculación del pago con el pedido y, cuando corresponda, con la cuenta corriente.
+- `DETALLE_PEDIDO` conserva los valores utilizados al momento de cada operación.
+- El stock se representa como información asociada al producto.
+- La condición de cliente fiel se mantiene como información comercial del cliente.
+- La cotización del dólar se considera una configuración administrada por el sistema.
 
-- el stock se representa como información asociada al producto;
-- la condición de cliente fiel se representa dentro de `Cliente`;
-- el comprobante se mantiene asociado a `Pago`;
-- la cotización del dólar se considera una configuración del sistema;
-- cada producto pertenece inicialmente a una categoría;
-- los pagos se registran inicialmente dentro de la operatoria de cuenta corriente;
-- `DetallePedido` conserva los valores utilizados al momento de cada operación.
+Las reglas de imputación de pagos, crédito y otras condiciones comerciales se precisarán durante el desarrollo de las funcionalidades correspondientes.
 
-La relación definitiva de `Usuario` con Cliente, administración y roles será completada durante la historia correspondiente a autenticación y autorización.
+---
+
+## Autenticación y control de acceso
+
+Se identifican cuatro perfiles funcionales de uso:
+
+| Perfil | Acceso |
+|---|---|
+| Visitante | Navegación pública sin iniciar sesión. |
+| Cliente particular | Operaciones y datos propios de un cliente particular. |
+| Cliente empresa | Operaciones y datos propios de una empresa, con acceso a las condiciones comerciales que tenga habilitadas. |
+| Administrador | Funciones administrativas autorizadas. |
+
+Estos cuatro perfiles no equivalen a cuatro roles almacenados en la base de datos. La implementación del MVP distingue los roles técnicos `CLIENTE` y `ADMIN`; el tipo de cliente se obtiene del registro comercial asociado.
+
+Para el MVP académico se define autenticación mediante JWT. El frontend conservará el token de acceso en `localStorage` y utilizará Pinia para gestionar el estado de sesión de la interfaz. La estrategia de almacenamiento se revisará desde el punto de vista de la seguridad antes del despliegue real.
+
+La autorización efectiva corresponde al backend. Cada operación protegida deberá comprobar la autenticación, los permisos, la pertenencia de los recursos y las condiciones comerciales aplicables.
+
+La documentación detallada de usuarios, permisos, autenticación y autorización se mantiene en el legajo compartido del proyecto.
 
 ---
 
 ## UX/UI
 
-El diseño visual del MVP se encuentra actualmente en desarrollo.
+El diseño del MVP contempla cuatro áreas principales:
 
-### Sitio público
+**Sitio público:** inicio, catálogo, detalle de producto, carrito, login, registro e información institucional.
 
-- Inicio
-- Catálogo
-- Detalle de producto
-- Carrito
-- Login
-- Registro de cliente
-- Registro de empresa
-- Ayuda
-- Preguntas frecuentes
-- Contacto
-- Quiénes somos
+**Área de cliente particular:** datos personales, pedidos e historial de compras.
 
-### Cliente
+**Área de cliente empresa:** datos empresariales, pedidos, condiciones comerciales y, cuando esté habilitada, cuenta corriente.
 
-- Resumen de cuenta
-- Mis pedidos
-- Mis datos
+**Administración:** dashboard, productos, categorías, stock, clientes, pedidos, pagos, cuentas corrientes y configuración.
 
-### Cliente empresa
-
-- Resumen
-- Pedidos
-- Cuenta corriente
-- Pagos y comprobantes
-- Datos de empresa
-
-### Administración
-
-- Dashboard
-- Productos
-- Categorías
-- Clientes
-- Pedidos
-- Pagos
-- Cuentas corrientes
-- Configuración
+Los prototipos y componentes visuales se mantienen en Figma. Los estados de autenticación y acceso se documentan en el legajo del proyecto.
 
 ---
 
 ## Arquitectura
 
-El MVP utiliza una arquitectura web cliente-servidor organizada principalmente en frontend, backend y base de datos.
+Se propone una arquitectura web cliente-servidor organizada en frontend, backend y base de datos.
 
 ```text
 Frontend
-   ↓
-API REST
-   ↓
+   |
+   | API REST
+   v
 Backend
-   ↓
+   |
+   v
 Base de datos
 ```
 
-La lógica de negocio, validaciones, autenticación, autorización y acceso a datos se concentrarán en el backend.
+El backend concentrará la lógica de negocio, las validaciones, la autenticación, la autorización y el acceso a los datos.
 
-REST será el mecanismo principal para ejecutar operaciones entre frontend y backend.
+REST será el mecanismo principal de comunicación. Se contempla Socket.IO como complemento para aquellos eventos que requieran actualizaciones en tiempo real.
 
-También se contempla utilizar Socket.IO como mecanismo complementario para eventos que necesiten actualización en tiempo real.
-
-La arquitectura se mantiene independiente de algunas decisiones de implementación que todavía deberán confirmarse con la materia de Backend.
-
-[Ver arquitectura general del MVP](docs/arquitectura/arquitectura-general.md)
+[Consultar la arquitectura general del MVP](docs/arquitectura/arquitectura-general.md)
 
 ---
 
 ## Stack tecnológico
 
-El stack tecnológico definitivo se encuentra actualmente en análisis.
+Existe una propuesta de stack para frontend, backend, base de datos, autenticación, validación, manejo de archivos y comunicación en tiempo real.
 
-Existe una propuesta preliminar para frontend, backend, base de datos, autenticación, validación, manejo de archivos y comunicación en tiempo real.
+La definición tecnológica completa permanece sujeta a la confirmación de los requisitos obligatorios de la materia de Backend, ya que el backend de Ferrepatagonia Industrial también se utilizará como trabajo final de esa materia.
 
-Algunas decisiones permanecen pendientes de confirmación debido a que el backend del proyecto será utilizado también como trabajo final de la materia de Backend.
-
-Una vez confirmados dichos requerimientos se actualizará esta sección con el stack definitivo.
-
----
-
-## Autenticación y roles
-
-La definición completa de roles, permisos y autenticación todavía se encuentra pendiente.
-
-Se deberá establecer:
-
-- roles existentes;
-- permisos por rol;
-- relación entre Usuario y Cliente;
-- representación de usuarios administrativos;
-- flujo de inicio de sesión;
-- manejo de sesión;
-- protección de endpoints;
-- protección de rutas del frontend.
-
-Una vez completada esta etapa, también podrá actualizarse el MER si resulta necesario.
+La documentación técnica se actualizará cuando dichas decisiones queden confirmadas.
 
 ---
 
 ## Estrategia de ramas
 
-El repositorio utiliza las siguientes ramas principales:
+El repositorio utiliza:
 
-- `main` — versiones estables del proyecto.
-- `develop` — rama principal de integración.
+- `main`: versiones estables del proyecto.
+- `develop`: rama principal de integración.
 
-Las tareas se desarrollan en ramas específicas creadas desde `develop`.
+Las tareas se desarrollan en ramas específicas creadas desde `develop` y se integran mediante Pull Request.
 
-### Convención utilizada
-
-```text
-feature/...   nuevas funcionalidades
-fix/...       correcciones
-docs/...      documentación
-refactor/...  refactorizaciones
-```
-
-Los cambios se integran mediante Pull Request.
-
-Ejemplo:
+Convenciones de nombres:
 
 ```text
-develop
-   ↓
-docs/arquitectura-general-mvp
-   ↓
-Pull Request
-   ↓
-develop
+feature/...   Nuevas funcionalidades
+fix/...       Correcciones
+docs/...      Documentación
+refactor/...  Refactorizaciones
 ```
 
 ---
 
-## Documentación técnica
+## Documentación del proyecto
 
-La documentación técnica versionada actualmente dentro del repositorio se organiza de la siguiente manera:
+La documentación técnica versionada en el repositorio se organiza de la siguiente manera:
 
 ```text
 docs/
@@ -267,33 +205,20 @@ docs/
     └── arquitectura-general.md
 ```
 
-La propuesta preliminar del stack tecnológico se encuentra en proceso de revisión y será incorporada a `develop` una vez confirmadas las decisiones pendientes.
+El legajo compartido del proyecto contiene, además:
 
-El legajo completo del proyecto se mantiene adicionalmente en el espacio compartido del equipo e incluye:
+- relevamiento y análisis del negocio;
+- requerimientos y reglas funcionales;
+- propuesta de solución y presupuesto;
+- documentación UX/UI;
+- definición de roles y matriz de permisos;
+- documentación de autenticación y autorización;
+- entregables de diseño y desarrollo.
 
-- relevamiento;
-- análisis del problema;
-- requerimientos;
-- propuesta de solución;
-- presupuesto;
-- documentación de diseño y desarrollo.
-
----
-
-## Estado del Sprint
-
-**Sprint 1 — En desarrollo**
-
-Objetivos actuales:
-
-- completar el diseño UX/UI;
-- cerrar la documentación del modelo de datos;
-- definir arquitectura técnica;
-- definir roles y autenticación;
-- dejar preparada la base para comenzar la implementación.
+Las tareas, responsables, avances y evidencias de trabajo se registran en Taiga.
 
 ---
 
 ## Proyecto académico
 
-Proyecto desarrollado dentro del marco de la carrera de **Desarrollo de Software Full Stack**.
+Proyecto desarrollado en el marco de la carrera de **Desarrollo de Software Full Stack**.
