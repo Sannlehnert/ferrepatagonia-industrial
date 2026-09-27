@@ -23,7 +23,7 @@ El proyecto se desarrolla de manera colaborativa. Las asignaciones de tareas rep
 
 Ferrepatagonia Industrial necesita una plataforma que permita administrar su catálogo de productos, gestionar pedidos y ofrecer un canal de venta online adaptado a su operatoria comercial.
 
-El sistema contempla clientes particulares y empresariales. Las empresas podrán operar mediante las modalidades de pago que tengan habilitadas; registrarse como empresa no otorgará automáticamente cuenta corriente, crédito ni beneficios comerciales.
+El sistema contempla clientes particulares y empresariales. Las empresas necesitarán aprobación administrativa antes de poder comprar y luego podrán operar mediante las modalidades de pago que tengan habilitadas. La aprobación empresarial, la cuenta corriente y la condición de cliente fiel son independientes: ni el registro ni la aprobación otorgan automáticamente crédito o beneficios comerciales.
 
 La solución se plantea como un MVP mantenible y extensible, con una separación clara entre identidad de acceso, información comercial y permisos.
 
@@ -35,13 +35,14 @@ El alcance funcional contempla:
 
 - catálogo, búsqueda, categorías y detalle de productos;
 - carrito de compra y generación de pedidos;
-- registro y gestión de clientes particulares y empresariales;
+- registro y gestión de clientes particulares y empresariales, con aprobación administrativa de las cuentas empresa antes de comprar;
 - área de cliente para consultar datos y pedidos propios;
 - condiciones comerciales y cuenta corriente para empresas habilitadas;
 - registro de pagos y carga de comprobantes cuando la modalidad de pago lo requiera;
 - administración de productos, categorías, precios y stock;
 - gestión administrativa de clientes, pedidos, pagos y cuentas corrientes;
-- autenticación de usuarios y control de acceso;
+- autenticación JWT mediante un único login, con llegada al Home para clientes y administradores;
+- CAPTCHA y rate limiting, con autorización efectiva en backend;
 - panel de administración;
 - información institucional, contacto, ayuda y preguntas frecuentes.
 
@@ -92,11 +93,12 @@ El modelo entidad-relación se documenta mediante **Mermaid** y se versiona en e
 - `CLIENTE.tipo_cliente` distingue entre clientes `PARTICULAR` y `EMPRESA`.
 - Cada usuario con rol `CLIENTE` se vincula con un único cliente y cada cliente puede tener como máximo una cuenta de acceso en el MVP.
 - Los administradores no necesitan un registro comercial de `CLIENTE` para acceder a las funciones administrativas.
-- La cuenta corriente es una condición comercial asociada al cliente y no constituye un rol de acceso.
+- `CLIENTE.estado_aprobacion_empresa` registra `PENDIENTE`, `APROBADA` o `RECHAZADA` para empresas; en particulares es nulo. Solo administración resuelve las solicitudes y el backend exige `APROBADA` para confirmar compras empresariales.
+- La cuenta corriente es una condición comercial asociada al cliente y no constituye un rol de acceso. Su habilitación es independiente de la aprobación empresarial.
 - Los pagos convencionales deben poder registrarse sin exigir una cuenta corriente; el modelo contempla la vinculación del pago con el pedido y, cuando corresponda, con la cuenta corriente.
 - `DETALLE_PEDIDO` conserva los valores utilizados al momento de cada operación.
 - El stock se representa como información asociada al producto.
-- La condición de cliente fiel se mantiene como información comercial del cliente.
+- La condición de cliente fiel (`es_fiel`) es información comercial independiente del tipo de cliente, de la aprobación empresarial y de la cuenta corriente.
 - La cotización del dólar se considera una configuración administrada por el sistema.
 
 Las reglas de imputación de pagos, crédito y otras condiciones comerciales se precisarán durante el desarrollo de las funcionalidades correspondientes.
@@ -111,14 +113,20 @@ Se identifican cuatro perfiles funcionales de uso:
 |---|---|
 | Visitante | Navegación pública sin iniciar sesión. |
 | Cliente particular | Operaciones y datos propios de un cliente particular. |
-| Cliente empresa | Operaciones y datos propios de una empresa, con acceso a las condiciones comerciales que tenga habilitadas. |
+| Cliente empresa | Datos y operaciones propios; compras solo tras aprobación administrativa y cuenta corriente solo si está habilitada. |
 | Administrador | Funciones administrativas autorizadas. |
 
 Estos cuatro perfiles no equivalen a cuatro roles almacenados en la base de datos. La implementación del MVP distingue los roles técnicos `CLIENTE` y `ADMIN`; el tipo de cliente se obtiene del registro comercial asociado.
 
-Para el MVP académico se define autenticación mediante JWT. El frontend conservará el token de acceso en `localStorage` y utilizará Pinia para gestionar el estado de sesión de la interfaz. La estrategia de almacenamiento se revisará desde el punto de vista de la seguridad antes del despliegue real.
+Se utilizará un único login (`/login`) con JWT para clientes y administradores. Todo inicio de sesión exitoso llevará al Home (`/`); solo `ADMIN` verá allí el botón de acceso al panel administrativo. Las opciones de cliente dependerán de sus condiciones comerciales vigentes.
 
-La autorización efectiva corresponde al backend. Cada operación protegida deberá comprobar la autenticación, los permisos, la pertenencia de los recursos y las condiciones comerciales aplicables.
+Pinia gestionará el estado de sesión de la interfaz. El almacenamiento/transporte de JWT, su expiración y renovación permanecen pendientes: la propuesta previa de `localStorage` no se considera una decisión definitiva.
+
+CAPTCHA se aplicará al login y ante actividad sospechosa, junto con rate limiting en backend. El proveedor y los umbrales se definirán durante la implementación.
+
+Vue Router administrará navegación y guardas de UX. La autorización efectiva corresponde al backend: cada operación protegida deberá comprobar autenticación, permisos, pertenencia de los recursos y condiciones comerciales, incluida la aprobación empresarial para comprar. Sin autenticación válida responderá `401`; con autenticación pero sin permiso, `403`.
+
+La experiencia de acceso de empresas pendientes o rechazadas sigue por definir. Si se permite iniciar sesión, llegarán al Home y no podrán comprar hasta ser aprobadas.
 
 La documentación detallada de usuarios, permisos, autenticación y autorización se mantiene en el legajo compartido del proyecto.
 
@@ -142,22 +150,22 @@ Los prototipos y componentes visuales se mantienen en Figma. Los estados de aute
 
 ## Arquitectura
 
-Se propone una arquitectura web cliente-servidor organizada en frontend, backend y base de datos.
+Se utilizará una arquitectura web cliente-servidor con backend propio. Medusa queda descartado.
 
 ```text
-Frontend
+Vue 3 + TypeScript
    |
-   | API REST
+   | API REST / HTTP
    v
-Backend
+Backend propio: Node.js + Express + TypeScript
    |
    v
-Base de datos
+MariaDB
 ```
 
 El backend concentrará la lógica de negocio, las validaciones, la autenticación, la autorización y el acceso a los datos.
 
-REST será el mecanismo principal de comunicación. Se contempla Socket.IO como complemento para aquellos eventos que requieran actualizaciones en tiempo real.
+REST será el mecanismo principal de comunicación. Nodemailer está propuesto para notificaciones, como solicitudes y resoluciones empresariales o revisión de comprobantes. Socket.IO es opcional para tiempo real; RabbitMQ es opcional para desacoplar tareas como el envío de correos. Estas integraciones complementan el sistema y no reemplazan REST ni las validaciones de negocio.
 
 [Consultar la arquitectura general del MVP](docs/arquitectura/arquitectura-general.md)
 
@@ -165,11 +173,20 @@ REST será el mecanismo principal de comunicación. Se contempla Socket.IO como 
 
 ## Stack tecnológico
 
-Existe una propuesta de stack para frontend, backend, base de datos, autenticación, validación, manejo de archivos y comunicación en tiempo real.
+| Área | Decisión vigente | Estado |
+|---|---|---|
+| Frontend | Vue 3 + TypeScript, Vite, Pinia, Vue Router y Tailwind CSS | Definido |
+| Backend propio | Node.js + Express + TypeScript | Definido |
+| Base de datos | MariaDB | Definido |
+| Comunicación principal | REST | Definido |
+| Autenticación | JWT y login único con llegada al Home | Definido |
+| Protección de acceso | CAPTCHA + rate limiting en backend | Definido; proveedor y umbrales pendientes |
+| Acceso a datos | Herramienta por elegir | Pendiente |
+| Correo electrónico | Nodemailer | Propuesto |
+| Tiempo real | Socket.IO | Opcional y complementario |
+| Mensajería asíncrona | RabbitMQ | Opcional y complementario |
 
-La definición tecnológica completa permanece sujeta a la confirmación de los requisitos obligatorios de la materia de Backend, ya que el backend de Ferrepatagonia Industrial también se utilizará como trabajo final de esa materia.
-
-La documentación técnica se actualizará cuando dichas decisiones queden confirmadas.
+Medusa está descartado. También quedan por concretar la gestión del token y el almacenamiento de archivos. La [arquitectura vigente](docs/arquitectura/arquitectura-general.md) detalla las decisiones abiertas.
 
 ---
 
@@ -202,8 +219,11 @@ docs/
 ├── modelo-datos/
 │   └── mer-ferrepatagonia.md
 └── arquitectura/
-    └── arquitectura-general.md
+    ├── arquitectura-general.md
+    └── stack-tecnologico.md
 ```
+
+El README, la arquitectura general y el MER son documentos vivos y reflejan las decisiones vigentes. Los entregables del Sprint 1 se conservan como evidencia histórica; no se reescriben retroactivamente. La [propuesta inicial de stack](docs/arquitectura/stack-tecnologico.md) permanece como referencia de esa etapa y puede contener decisiones superadas: ante diferencias, prevalecen el stack resumido aquí y la arquitectura vigente.
 
 El legajo compartido del proyecto contiene, además:
 
