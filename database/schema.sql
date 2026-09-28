@@ -1,29 +1,3 @@
--- Ferrepatagonia Industrial: esquema inicial para MariaDB.
--- Fuente: docs/modelo-datos/mer-ferrepatagonia.md.
--- Ejecutar sobre una base vacia previamente seleccionada con USE.
--- Requiere CHECKs efectivos (MariaDB >= 10.2.1), foreign_key_checks = 1
--- y check_constraint_checks = ON. Usar modo SQL estricto en la conexion.
--- No elimina datos ni modifica tablas existentes; no es una migracion incremental.
--- InnoDB, utf8mb4; identificadores INT y montos exactos DECIMAL(12,2).
--- Las longitudes son decisiones fisicas iniciales, no validaciones comerciales.
--- Los dominios cerrados usan colacion binaria para distinguir mayusculas.
--- Todas las FK usan RESTRICT: conservar referencias e historial y evitar cambios
--- en PK referenciadas. No hay borrados en cascada ni anulacion de referencias.
--- RESTRICT tambien permite CHECKs sobre FK anulables en MariaDB.
---
--- Responsabilidades del backend, dentro de las transacciones correspondientes:
--- * Registrar empresas como PENDIENTE; solo ADMIN aprueba o rechaza.
--- * Exigir EMPRESA APROBADA para cuenta corriente y comprobar habilitacion,
---   propiedad y condiciones comerciales al operar; no otorgar credito al aprobar.
--- * Impedir confirmar pedidos empresariales sin aprobacion vigente.
--- * Crear cada pedido con al menos un detalle (una FK no exige hijos al padre).
--- * Calcular totales/descuentos y validar pagos segun reglas aun por definir.
--- No se inventan listas de estados de pedido/pago, modalidades/metodos de pago,
--- formulas, porcentajes, vencimientos ni unicidad de codigo, documento o CUIT.
--- Se permite cero en cantidades y montos conforme al requisito no negativo.
--- Los booleanos y datos operativos obligatorios se proporcionan explicitamente;
--- no se asignan por defecto aprobacion, fidelidad, habilitacion ni estados.
-
 CREATE TABLE CATEGORIA (
     id_categoria INT NOT NULL AUTO_INCREMENT,
     nombre VARCHAR(150) NOT NULL,
