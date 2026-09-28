@@ -84,127 +84,161 @@ Sobre una base de datos nueva:
 
 ---
 
-## Ejemplo con MariaDB en Docker
+## Entorno oficial de desarrollo con Docker Compose
 
-### 1. Crear un contenedor de desarrollo
+El archivo [`compose.yml`](../compose.yml), ubicado en la raíz del repositorio, describe cómo levantar **MariaDB 11.4** con la misma base, credenciales, puerto y almacenamiento para todo el equipo. Esta es la forma oficial/recomendada de trabajar: cada integrante tiene su propia base local, pero todos siguen los mismos pasos y usan los mismos scripts.
 
-```bash
-docker run --name ferrepatagonia-mariadb \
-  -e MARIADB_ROOT_PASSWORD=root \
-  -e MARIADB_DATABASE=ferrepatagonia_test \
-  -p 3307:3306 \
-  -d mariadb:11.4
-```
+Por ahora Compose incluye únicamente MariaDB. No levanta backend, RabbitMQ ni otros servicios.
 
-La base quedará disponible localmente en:
+### Requisitos en Windows y Debian
 
-```text
-Host: localhost
-Puerto: 3307
-Base de datos: ferrepatagonia_test
-Usuario: root
-Contraseña: root
-```
+- **Windows:** Docker Desktop iniciado, con contenedores Linux (por ejemplo, mediante WSL 2).
+- **Debian:** Docker Engine y el plugin Docker Compose instalados, con el servicio Docker iniciado y permisos para ejecutar Docker. También puede usarse dentro de una máquina virtual Debian.
+- Comprobar la instalación con `docker --version` y `docker compose version`.
 
-Estas credenciales son únicamente un ejemplo para desarrollo local.
+Los comandos siguientes se ejecutan desde la **raíz del repositorio**, donde está `compose.yml`, y funcionan tanto en PowerShell como en Bash. No hace falta instalar MariaDB directamente en Windows o Debian.
 
-### 2. Copiar los scripts al contenedor
+### Configuración local compartida
 
-Desde la raíz del repositorio:
+| Parámetro | Valor |
+| --- | --- |
+| Imagen | `mariadb:11.4` |
+| Host | `127.0.0.1` |
+| Puerto del host | `3307` |
+| Puerto dentro del contenedor | `3306` |
+| Base de datos | `ferrepatagonia_dev` |
+| Usuario de desarrollo | `ferrepatagonia` |
+| Contraseña de desarrollo | `ferrepatagonia_dev_only` |
+| Contraseña de `root` (administración) | `root_dev_only` |
 
-```bash
-docker cp database/schema.sql ferrepatagonia-mariadb:/schema.sql
-docker cp database/seed.sql ferrepatagonia-mariadb:/seed.sql
-docker cp database/verify-seed.sql ferrepatagonia-mariadb:/verify-seed.sql
-```
+**Todas estas credenciales son públicas y exclusivas de desarrollo local. No deben reutilizarse en producción ni reemplazarse por secretos reales en este archivo.** En esta etapa no se necesita `.env`: los valores de desarrollo son explícitos para que el equipo pueda empezar sin configuración adicional. El usuario `ferrepatagonia` tiene permisos sobre la base de desarrollo y alcanza para ejecutar los tres scripts; no hace falta trabajar como `root`.
 
-### 3. Ejecutar el esquema
+El puerto se publica solamente en `127.0.0.1`, para acceder desde el mismo equipo que ejecuta Docker. Se usa `3307` para evitar conflictos con instalaciones locales que usen `3306`. Si Docker corre dentro de una VM Debian, ejecutar el cliente dentro de esa VM o usar un túnel SSH; `localhost` de Windows no es el de Debian.
 
-```bash
-docker exec ferrepatagonia-mariadb sh -c \
-'mariadb -uroot -proot ferrepatagonia_test < /schema.sql'
-```
+El volumen `mariadb_data` conserva los datos en `/var/lib/mysql` aunque el contenedor se detenga o se recree. Compose usa el nombre de proyecto `ferrepatagonia-dev`, por lo que el volumen se identifica normalmente como `ferrepatagonia-dev_mariadb_data`. Dos copias del repositorio en la misma computadora usan ese mismo entorno por defecto.
 
-### 4. Cargar los datos de desarrollo
+La política `unless-stopped` permite reiniciar el contenedor si se cae o al volver a iniciar Docker, salvo que se haya detenido voluntariamente. El healthcheck comprueba la conexión y que InnoDB terminó de inicializarse; no comprueba que ya se hayan cargado las tablas o el seed. Véase la [documentación de MariaDB sobre healthchecks](https://mariadb.com/docs/server/server-management/automated-mariadb-deployment-and-administration/docker-and-mariadb/using-healthcheck-sh).
+
+### 1. Validar y levantar MariaDB
 
 ```bash
-docker exec ferrepatagonia-mariadb sh -c \
-'mariadb -uroot -proot ferrepatagonia_test < /seed.sql'
+docker compose config
+docker compose up -d
 ```
 
-### 5. Verificar los fixtures
+La primera vez Docker descarga la imagen y crea una base vacía con las credenciales indicadas. La carpeta `database/` se monta como `/scripts` en modo de solo lectura: los scripts **no se ejecutan automáticamente**.
+
+### 2. Comprobar el estado
 
 ```bash
-docker exec ferrepatagonia-mariadb sh -c \
-'mariadb -uroot -proot ferrepatagonia_test < /verify-seed.sql'
+docker compose ps
+docker compose logs --tail=100 mariadb
 ```
 
-Si todo está correcto, la verificación deberá finalizar indicando:
+Esperar a que `docker compose ps` muestre `healthy` antes de cargar el esquema. También se puede esperar automáticamente:
+
+```bash
+docker compose up -d --wait --wait-timeout 180
+```
+
+Si queda en `unhealthy`, revisar los logs. Si aparece un error de conexión con Docker, iniciar Docker Desktop o el servicio Docker en Debian. Si el puerto `3307` está ocupado, revisar `docker ps` y detener el contenedor anterior si ya no se utiliza; evitar que cada integrante cambie el puerto sin acordarlo con el equipo.
+
+### 3. Ejecutar los scripts en orden
+
+Sobre la base recién creada y vacía, ejecutar cada comando por separado. Si alguno falla, detenerse y revisar el error antes de seguir.
+
+Crear las tablas:
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
+```
+
+Cargar los datos ficticios:
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/seed.sql'
+```
+
+Verificar los datos antes de modificarlos:
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/verify-seed.sql'
+```
+
+La redirección `<` se realiza dentro del contenedor, por eso los mismos comandos sirven en PowerShell y Bash. Si todo está correcto, la verificación termina indicando:
 
 ```text
 PASS: conteos, relaciones, importes y destinos de pago
 ```
 
----
+`schema.sql` requiere una base vacía y `seed.sql` requiere tablas vacías: no deben repetirse sobre una base ya cargada. Detener o reiniciar el contenedor no vacía la base. Para reconstruirla desde cero, usar el procedimiento de eliminación de datos indicado más abajo.
 
-## Acceder manualmente a MariaDB
+### 4. Conectarse desde DBeaver o la terminal
+
+**DBeaver es un cliente de base de datos; MariaDB es el motor que corre en el contenedor.** Usar DBeaver no reemplaza Docker ni crea otro motor: permite consultar y administrar la misma base.
+
+En DBeaver, crear una conexión de tipo **MariaDB**, completar host `127.0.0.1`, puerto `3307`, base `ferrepatagonia_dev`, usuario `ferrepatagonia` y contraseña `ferrepatagonia_dev_only`. Descargar el controlador si lo solicita y usar **Probar conexión**. MariaDB debe estar levantada. Después de cargar los scripts, actualizar la vista de tablas.
+
+Para trabajar desde la terminal:
 
 ```bash
-docker exec -it ferrepatagonia-mariadb \
-mariadb -uroot -proot ferrepatagonia_test
+docker compose exec mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -p ferrepatagonia_dev
 ```
 
-Ejemplos:
+Ingresar `ferrepatagonia_dev_only` cuando pida la contraseña. Ejemplos de consultas:
 
 ```sql
 SHOW TABLES;
-
 SELECT * FROM CLIENTE;
-
 SELECT * FROM USUARIO;
-
 SELECT * FROM PEDIDO;
 ```
 
-Para salir:
+Salir con `exit;`.
 
-```sql
-exit;
-```
+### 5. Detener, reanudar y reiniciar sin perder datos
 
----
-
-## Reiniciar el entorno de prueba
-
-Detener el contenedor:
+Detener:
 
 ```bash
-docker stop ferrepatagonia-mariadb
+docker compose stop
 ```
 
-Volver a iniciarlo:
+Volver a levantar:
 
 ```bash
-docker start ferrepatagonia-mariadb
+docker compose up -d
 ```
 
-Eliminarlo completamente:
+Reiniciar el servicio:
 
 ```bash
-docker rm -f ferrepatagonia-mariadb
+docker compose restart mariadb
 ```
 
-Después puede crearse nuevamente y volver a ejecutar:
+Eliminar el contenedor y la red de Compose, **conservando el volumen y los datos**:
 
-```text
-schema.sql
-↓
-seed.sql
-↓
-verify-seed.sql
+```bash
+docker compose down
 ```
 
-Esto permite comprobar que la base de desarrollo puede reconstruirse desde cero.
+Un siguiente `docker compose up -d` reutiliza los datos existentes. Las variables de base y contraseñas se aplican al inicializar un volumen vacío; editar esos valores en Compose no cambia las credenciales de una base ya creada.
+
+### 6. Destruir los datos y reconstruir desde cero
+
+**El siguiente comando elimina también el volumen y todos los datos de este entorno local. Usarlo solo si se acepta perder los datos de desarrollo.**
+
+```bash
+docker compose down -v
+```
+
+Para reconstruir:
+
+```bash
+docker compose up -d --wait --wait-timeout 180
+```
+
+Después ejecutar nuevamente los tres comandos del paso 3: `schema.sql`, `seed.sql` y `verify-seed.sql`, en ese orden. No es necesario borrar la imagen descargada.
 
 ---
 
