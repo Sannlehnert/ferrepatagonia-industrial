@@ -111,7 +111,7 @@ Los comandos siguientes se ejecutan desde la **raíz del repositorio**, donde es
 | Contraseña de desarrollo | `ferrepatagonia_dev_only` |
 | Contraseña de `root` (administración) | `root_dev_only` |
 
-**Todas estas credenciales son públicas y exclusivas de desarrollo local. No deben reutilizarse en producción ni reemplazarse por secretos reales en este archivo.** En esta etapa no se necesita `.env`: los valores de desarrollo son explícitos para que el equipo pueda empezar sin configuración adicional. El usuario `ferrepatagonia` tiene permisos sobre la base de desarrollo y alcanza para ejecutar los tres scripts; no hace falta trabajar como `root`.
+**Todas estas credenciales son públicas y exclusivas de desarrollo local. No deben reutilizarse en producción ni reemplazarse por secretos reales en este archivo.** Compose no necesita `.env`: los valores de desarrollo son explícitos. El backend sí usa `backend/.env`, preparado desde su `.env.example`, como explica la [guía del backend](../backend/README.md). El usuario `ferrepatagonia` tiene permisos sobre la base de desarrollo y alcanza para ejecutar los tres scripts; no hace falta trabajar como `root`.
 
 El puerto se publica solamente en `127.0.0.1`, para acceder desde el mismo equipo que ejecuta Docker. Se usa `3307` para evitar conflictos con instalaciones locales que usen `3306`. Si Docker corre dentro de una VM Debian, ejecutar el cliente dentro de esa VM o usar un túnel SSH; `localhost` de Windows no es el de Debian.
 

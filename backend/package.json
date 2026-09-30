@@ -1,0 +1,23 @@
+{
+  "name": "ferrepatagonia-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Base del backend de Ferrepatagonia Industrial",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js"
+  },
+  "engines": { "node": ">=22" },
+  "dependencies": {
+    "dotenv": "^17.2.0",
+    "express": "^5.1.0",
+    "mariadb": "^3.4.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^24.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.2"
+  }
+}
