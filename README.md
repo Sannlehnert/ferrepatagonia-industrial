@@ -52,7 +52,9 @@ Las reglas específicas de descuentos, crédito, vencimientos y otras condicione
 
 ## Estado del proyecto
 
-El proyecto se encuentra en etapa de **diseño, documentación y definición técnica del MVP**.
+El proyecto cuenta con el diseño inicial del MVP, scripts SQL, MariaDB con Docker Compose y una primera base de backend con Node.js, Express y TypeScript.
+
+Para levantar la base y ejecutar el servidor, consultar la [guía del backend](backend/README.md). Esta etapa implementa únicamente `GET /api/health`; las funcionalidades de negocio descriptas a continuación siguen pendientes.
 
 Durante el Sprint 1 se trabajó en:
 
