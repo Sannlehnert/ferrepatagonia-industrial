@@ -1,6 +1,6 @@
 import { Router, json, ErrorRequestHandler, Request, Response } from 'express';
 import { validateRegister } from '../validators/register.validator';
-import { prepareRegisterUser } from '../services/register.service';
+import { registerClient } from '../services/register.service';
 
 export const authRouter = Router();
 
@@ -9,6 +9,10 @@ authRouter.use(json());
 
 // Mantener el contrato { message } también para errores del lector JSON.
 const handleAuthError: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error.code === 'ER_DUP_ENTRY') {
+    res.status(409).json({ message: 'El email ya está registrado.' });
+    return;
+  }
   const status = Number(error.status);
   if (Number.isInteger(status) && status >= 400 && status < 500) {
     res.status(status).json({ message: 'Solicitud inválida.' });
@@ -24,12 +28,11 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     return;
   }
 
-  // #164 usará email, passwordHash y rol del resultado para insertar USUARIO.
-  // Por ahora se descarta: la persistencia transaccional sigue pendiente.
-  await prepareRegisterUser(result.data);
+  const user = await registerClient(result.data);
 
-  res.status(501).json({
-    message: 'Registro aún no disponible: datos válidos, pero la creación de la cuenta está pendiente.',
+  res.status(201).json({
+    message: 'Registro exitoso',
+    data: { user },
   });
 });
 

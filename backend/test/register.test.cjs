@@ -5,6 +5,8 @@ const express = require('express');
 const bcrypt = require('bcryptjs');
 const { authRouter } = require('../dist/routes/auth');
 const { prepareRegisterUser } = require('../dist/services/register.service');
+const registerService = require('../dist/services/register.service');
+const { pool } = require('../dist/config/database');
 const { validateRegister } = require('../dist/validators/register.validator');
 
 let server;
@@ -18,6 +20,7 @@ before(async () => {
 });
 after(async () => {
   if (server) await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  await pool.end();
 });
 
 for (const tipoCliente of ['PARTICULAR', 'EMPRESA']) {
@@ -57,15 +60,19 @@ for (const tipoCliente of ['PARTICULAR', 'EMPRESA']) {
     });
   }
 
-  test(`${tipoCliente}: registro válido sigue pendiente sin exponer datos de USUARIO`, async () => {
+  test(`${tipoCliente}: responde 201 con data.user sin credenciales ni cookie`, async (t) => {
+    const user = { id: 123, email: body.email, rol: 'CLIENTE', tipoCliente };
+    t.mock.method(registerService, 'registerClient', async () => user);
     const response = await fetch(`${baseUrl}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    assert.equal(response.status, 501);
+    assert.equal(response.status, 201);
+    assert.equal(response.headers.get('set-cookie'), null);
     assert.deepEqual(await response.json(), {
-      message: 'Registro aún no disponible: datos válidos, pero la creación de la cuenta está pendiente.',
+      message: 'Registro exitoso',
+      data: { user },
     });
   });
 }
