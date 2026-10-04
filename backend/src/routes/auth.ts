@@ -1,6 +1,6 @@
 import { Router, json, ErrorRequestHandler, Request, Response } from 'express';
 import { validateRegister } from '../validators/register.validator';
-import { hashPassword } from '../services/password.service';
+import { prepareRegisterUser } from '../services/register.service';
 
 export const authRouter = Router();
 
@@ -24,10 +24,9 @@ authRouter.post('/register', async (req: Request, res: Response) => {
     return;
   }
 
-  // #165: completar el hash antes de cualquier futura persistencia.
-  // #164 deberá usar el valor retornado para USUARIO.password_hash.
-  // Por ahora se descarta: faltan #166 (rol) y #164 (transacción).
-  await hashPassword(result.data.password);
+  // #164 usará email, passwordHash y rol del resultado para insertar USUARIO.
+  // Por ahora se descarta: la persistencia transaccional sigue pendiente.
+  await prepareRegisterUser(result.data);
 
   res.status(501).json({
     message: 'Registro aún no disponible: datos válidos, pero la creación de la cuenta está pendiente.',
