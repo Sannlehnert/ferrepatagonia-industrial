@@ -10,6 +10,7 @@
   },
   "engines": { "node": ">=22" },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "mariadb": "^3.4.0"

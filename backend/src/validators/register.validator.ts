@@ -61,7 +61,7 @@ export function validateRegister(body: unknown): ValidationResult {
     return { valid: false, message: 'password debe ser un texto no vacío.' };
   }
 
-  // No recortar ni devolver la contraseña al cliente. #165 definirá el hash.
+  // No recortar ni devolver la contraseña al cliente; se hashea en el servidor.
   return {
     valid: true,
     data: {
