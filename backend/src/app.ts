@@ -1,8 +1,11 @@
 import express, { ErrorRequestHandler } from 'express';
 import { healthRouter } from './routes/health';
+import { authRouter } from './routes/auth';
 
 export const app = express();
 
+// Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
+app.use('/api/auth', authRouter);
 app.use(express.json());
 app.use('/api', healthRouter);
 
