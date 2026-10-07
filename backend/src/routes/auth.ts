@@ -1,11 +1,16 @@
 import { Router, json, ErrorRequestHandler, Request, Response } from 'express';
 import { validateRegister } from '../validators/register.validator';
 import { registerClient } from '../services/register.service';
+import { login, logout } from '../controllers/auth.controller';
 
 export const authRouter = Router();
 
 // Todas las rutas de auth comparten el mismo lector JSON.
 authRouter.use(json());
+
+// Endpoints expuestos
+authRouter.post('/login', login);
+authRouter.post('/logout', logout);
 
 // Mantener el contrato { message } también para errores del lector JSON.
 const handleAuthError: ErrorRequestHandler = (error, _req, res, _next) => {

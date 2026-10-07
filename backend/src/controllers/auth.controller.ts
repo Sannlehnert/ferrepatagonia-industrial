@@ -36,3 +36,23 @@ export const login = async (req: Request, res: Response) => {
         return res.status(500).json({ message: "Error interno del servidor" });
     }
 };
+
+export const logout = (req: Request, res: Response) => {
+    try {
+        // Destruimos la cookie del JWT
+        res.clearCookie('jwt_token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict'
+        });
+
+        // Devolvemos la estructura de respuesta estandarizada
+        return res.status(200).json({ 
+            message: "Sesión cerrada correctamente" 
+        });
+
+    } catch (error) {
+        console.error("Error en logout:", error);
+        return res.status(500).json({ message: "Error interno del servidor" });
+    }
+};
