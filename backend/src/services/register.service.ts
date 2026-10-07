@@ -1,6 +1,6 @@
 import type { RegisterInput } from '../validators/register.validator';
 import { hashPassword } from './password.service';
-import { pool } from '../config/database';
+import { pool } from '../config/database.config';
 
 // Datos de USUARIO para el registro público; tipoCliente pertenece a CLIENTE.
 export async function prepareRegisterUser(input: Pick<RegisterInput, 'email' | 'password'>) {

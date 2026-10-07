@@ -1,6 +1,6 @@
 import { app } from './app';
-import { env } from './config/env';
-import { pool } from './config/database';
+import { env } from './config/env.config';
+import { pool } from './config/database.config';
 
 const server = app.listen(env.port);
 
