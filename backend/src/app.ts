@@ -1,6 +1,6 @@
 import express, { ErrorRequestHandler } from 'express';
-import { healthRouter } from './routes/health';
-import { authRouter } from './routes/auth';
+import { healthRouter } from './routes/health.routes';
+import { authRouter } from './routes/auth.routes';
 
 export const app = express();
 

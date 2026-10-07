@@ -1,5 +1,5 @@
 import mariadb from 'mariadb';
-import { env } from './env';
+import { env } from './env.config';
 
 // Driver provisional: la herramienta de acceso a datos se definirá en equipo.
 export const pool = mariadb.createPool({
