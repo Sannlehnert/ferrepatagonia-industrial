@@ -3,10 +3,10 @@ const { after, before, test } = require('node:test');
 const { once } = require('node:events');
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const { authRouter } = require('../dist/routes/auth');
+const { authRouter } = require('../dist/routes/auth.routes');
 const { prepareRegisterUser } = require('../dist/services/register.service');
 const registerService = require('../dist/services/register.service');
-const { pool } = require('../dist/config/database');
+const { pool } = require('../dist/config/database.config');
 const { validateRegister } = require('../dist/validators/register.validator');
 
 let server;
