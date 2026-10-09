@@ -14,11 +14,10 @@ process.env.DB_NAME = 'auth_test';
 process.env.DB_USER = 'test';
 process.env.DB_PASSWORD = 'test';
 const { signToken, verifyToken } = require('../dist/services/token.service');
-const { authenticate, authorizeRoles, AuthorizationDeniedError } = require('../dist/middlewares/auth.middleware');
+const { authenticate, authorizeRoles } = require('../dist/middlewares/auth.middleware');
 let server;
 let baseUrl;
 let handlerCalls = 0;
-let denial;
 
 before(async () => {
   const app = express();
@@ -27,11 +26,6 @@ before(async () => {
   app.get('/admin', authenticate, authorizeRoles('ADMIN'), (_req, res) => {
     handlerCalls++;
     res.json({ ok: true });
-  });
-  // Acuse exclusivo del test: no define el contrato HTTP productivo de #148.
-  app.use((error, _req, res, _next) => {
-    denial = error;
-    res.status(204).end();
   });
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -92,29 +86,77 @@ test('authenticate elimina un contexto previo si falla la autenticación', () =>
   assert.equal(req.auth, undefined);
 });
 
-test('authorizeRoles ADMIN continúa y CLIENTE propaga denegación sin ejecutar handler', async () => {
+test('authorizeRoles ADMIN devuelve 200 y ejecuta el handler', async () => {
+  const beforeCalls = handlerCalls;
   const allowed = await request(signToken({ id: 7, rol: 'ADMIN' }), '/admin');
   assert.equal(allowed.status, 200);
   assert.deepEqual(await allowed.json(), { ok: true });
-  assert.equal(handlerCalls, 1);
-  const denied = await request(signToken({ id: 7, rol: 'CLIENTE' }), '/admin');
-  await denied.arrayBuffer();
-  assert.equal(handlerCalls, 1);
-  assert.ok(denial instanceof AuthorizationDeniedError);
-  assert.equal(denial.status, undefined);
+  assert.equal(handlerCalls, beforeCalls + 1);
 });
+
+test('authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler', async () => {
+  const beforeCalls = handlerCalls;
+  const denied = await request(signToken({ id: 7, rol: 'CLIENTE' }), '/admin');
+  assert.equal(denied.status, 403);
+  assert.deepEqual(await denied.json(), { message: 'El rol autenticado no tiene permiso.' });
+  assert.equal(handlerCalls, beforeCalls);
+});
+
+for (const [label, token] of [
+  ['sin sesión', undefined],
+  ['token inválido', 'invalid'],
+  ['token expirado', rawToken({ id: 7, rol: 'ADMIN' }, { expiresIn: -1 })],
+]) {
+  test(`ruta ADMIN: ${label} devuelve 401 sin ejecutar handler`, async () => {
+    const beforeCalls = handlerCalls;
+    const response = await request(token, '/admin');
+    assert.equal(response.status, 401);
+    assert.deepEqual(await response.json(), { message: 'No autenticado.' });
+    assert.equal(handlerCalls, beforeCalls);
+  });
+}
 
 test('authorizeRoles no lee cookies ni vuelve a verificar JWT', (t) => {
   t.mock.method(jwt, 'verify', () => assert.fail('No debe verificar JWT'));
   for (const rol of ['ADMIN', 'CLIENTE']) {
     const req = { auth: { id: 7, rol }, get cookies() { assert.fail('No debe leer cookies'); } };
     let calls = 0;
-    authorizeRoles('ADMIN')(req, {}, error => {
+    let responses = 0;
+    const res = {
+      status(code) { assert.equal(code, 403); return this; },
+      json(body) {
+        assert.deepEqual(body, { message: 'El rol autenticado no tiene permiso.' });
+        responses++;
+      },
+    };
+    authorizeRoles('ADMIN')(req, res, error => {
       calls++;
-      if (rol === 'ADMIN') assert.equal(error, undefined);
-      else assert.ok(error instanceof AuthorizationDeniedError);
+      assert.equal(error, undefined);
+    });
+    assert.equal(calls, rol === 'ADMIN' ? 1 : 0);
+    assert.equal(responses, rol === 'ADMIN' ? 0 : 1);
+  }
+});
+
+test('authorizeRoles permite múltiples roles y sin argumentos devuelve 403', () => {
+  for (const rol of ['ADMIN', 'CLIENTE']) {
+    const req = { auth: { id: 7, rol } };
+    let calls = 0;
+    authorizeRoles('ADMIN', 'CLIENTE')(req, {}, error => {
+      assert.equal(error, undefined);
+      calls++;
     });
     assert.equal(calls, 1);
+    let responses = 0;
+    const res = {
+      status(code) { assert.equal(code, 403); return this; },
+      json(body) {
+        assert.deepEqual(body, { message: 'El rol autenticado no tiene permiso.' });
+        responses++;
+      },
+    };
+    authorizeRoles()(req, res, () => assert.fail('No debe continuar'));
+    assert.equal(responses, 1);
   }
 });
 

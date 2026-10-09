@@ -2,14 +2,6 @@ import type { RequestHandler } from 'express';
 import { verifyToken } from '../services/token.service';
 import type { Role } from '../types/auth';
 
-// #148 definirá la traducción de esta denegación al contrato HTTP 403.
-export class AuthorizationDeniedError extends Error {
-  constructor() {
-    super('El rol autenticado no tiene permiso.');
-    this.name = 'AuthorizationDeniedError';
-  }
-}
-
 export const authenticate: RequestHandler = (req, res, next) => {
   delete req.auth;
   const token: unknown = req.cookies?.jwt_token;
@@ -35,7 +27,7 @@ export function authorizeRoles(...roles: Role[]): RequestHandler {
       return;
     }
     if (!roles.includes(req.auth.rol)) {
-      next(new AuthorizationDeniedError());
+      res.status(403).json({ message: 'El rol autenticado no tiene permiso.' });
       return;
     }
     next();
