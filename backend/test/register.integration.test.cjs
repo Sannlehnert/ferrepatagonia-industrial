@@ -6,9 +6,9 @@ const bcrypt = require('bcryptjs');
 
 // Opt-in: crea datos identificados con UUID y elimina solo esos datos al terminar.
 test('registro transaccional en MariaDB', { skip: !process.env.REGISTER_TEST_DATABASE }, async (t) => {
-  const { env } = require('../dist/config/env');
+  const { env } = require('../dist/config/env.config');
   assert.equal(env.db.database, process.env.REGISTER_TEST_DATABASE, 'Confirmar la base de pruebas');
-  const { pool } = require('../dist/config/database');
+  const { pool } = require('../dist/config/database.config');
   const { app } = require('../dist/app');
   const server = app.listen(0, '127.0.0.1');
   const emails = [];

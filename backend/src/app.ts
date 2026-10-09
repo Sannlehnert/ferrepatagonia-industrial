@@ -1,8 +1,10 @@
 import express, { ErrorRequestHandler } from 'express';
+import cookieParser from 'cookie-parser';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
 
 export const app = express();
+app.use(cookieParser());
 
 // Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
 app.use('/api/auth', authRouter);
