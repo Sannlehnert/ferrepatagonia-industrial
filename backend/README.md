@@ -62,7 +62,8 @@ sigue funcionando y health responde HTTP **503**:
 
 Revisar `docker compose ps` desde la raíz y los valores de `.env`.
 Las variables de conexión faltantes o los puertos inválidos impiden el arranque.
-Las rutas inexistentes responden 404; el manejo básico de errores responde JSON
+Las rutas inexistentes responden 404 (bajo `/api/admin`, primero se exige sesión
+y rol ADMIN); el manejo básico de errores responde JSON
 sin enviar detalles internos al cliente.
 
 ## Scripts
@@ -332,12 +333,17 @@ WHERE u.rol = 'CLIENTE'
 ORDER BY u.fecha_creacion DESC, c.id_cliente DESC
 ```
 
-El acceso exige una cookie `jwt_token` válida con rol ADMIN. La ruta aplica
-`authenticate, authorizeRoles('ADMIN'), getClientes`, reutilizando los middlewares
-existentes. ADMIN recibe `200`; CLIENTE autenticado recibe
+El acceso exige una cookie `jwt_token` válida con rol ADMIN. Todo `adminRouter`
+está protegido globalmente mediante `adminRouter.use(authenticate, authorizeRoles('ADMIN'))`
+(#175), reutilizando los middlewares existentes una sola vez por request. Las rutas
+actuales y futuras declaradas después de esa protección la heredan automáticamente;
+`/clientes` registra únicamente `getClientes`. La autorización usa el contexto
+autenticado y no vuelve a verificar JWT. ADMIN recibe `200`; CLIENTE autenticado recibe
 `403 { "message": "El rol autenticado no tiene permiso." }`. Sin cookie o con
 token inválido/expirado responde `401 { "message": "No autenticado." }`.
-Los rechazos no ejecutan el controlador ni consultan el listado.
+Los rechazos no ejecutan el controlador ni consultan el listado. Una ruta
+inexistente bajo `/api/admin/*` responde 401 sin sesión, 403 con rol CLIENTE y
+404 con ADMIN válido.
 `id` y `nombreRazonSocial` provienen de CLIENTE. `email` y `fechaRegistro`
 provienen de USUARIO.email y USUARIO.fecha_creacion, respectivamente. Solo se
 incluyen clientes con una cuenta asociada de rol CLIENTE. `fechaRegistro`
@@ -356,7 +362,9 @@ node --test test/clientes.integration.test.cjs test/register.integration.test.cj
 
 Las pruebas de clientes sin BD verifican el contrato HTTP sobre la app real,
 acceso ADMIN, rechazos 401/403 sin ejecutar el controlador, mapeo, conservación
-del orden devuelto, SQL determinista y errores de BD/repositorio.
+del orden devuelto, SQL determinista y errores de BD/repositorio. También cubren
+una ruta auxiliar exclusiva de test que hereda las guardas, rutas administrativas
+inexistentes y ausencia de doble ejecución de guardas o verificación JWT.
 La integración de clientes requiere `CLIENTES_TEST_DATABASE` igual al `DB_NAME`
 de una base de pruebas configurada. Usa una sesión ADMIN válida y compara el
 endpoint con las cuentas reales
