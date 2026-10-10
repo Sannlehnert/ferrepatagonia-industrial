@@ -317,3 +317,35 @@ opcionales, email demasiado largo, rol/estado enviados y tamaño JSON excedido.
 Se comprobó `{ message }`, ausencia de cookies y de password en esas respuestas.
 Una comprobación directa del validador confirmó la normalización de textos y
 nulos sin modificar la contraseña. No hay scripts de test o lint en package.json.
+# Listado base de clientes — #177
+
+`GET /api/admin/clientes` consulta MariaDB mediante el pool existente y devuelve
+`200 { "message": "Clientes obtenidos correctamente", "data": { "clientes": [{ "id": 12, "nombreRazonSocial": "Constructora Sur" }] } }`.
+Sin filas devuelve el mismo contrato con `clientes: []`. Ante un error devuelve
+`500 { "message": "Error interno del servidor." }`, sin detalles internos.
+
+```sql
+SELECT id_cliente, nombre_razon_social
+FROM CLIENTE
+ORDER BY fecha_alta DESC, id_cliente DESC
+```
+
+El acceso todavía no exige autenticación: es temporal hasta #178, que agregará
+`authenticate` y `authorizeRoles('ADMIN')`. #179 completará los campos requeridos.
+Esta tarea no incorpora filtros, paginación ni cambios de esquema.
+
+Después de un build limpio, ejecutar desde `backend`:
+
+```sh
+node --test test/clientes.test.cjs
+node --test test/auth.middleware.test.cjs
+node --test test/register.test.cjs
+node --test test/clientes.integration.test.cjs test/register.integration.test.cjs
+```
+
+Las pruebas de clientes sin BD verifican el contrato HTTP sobre la app real,
+mapeo, conservación del orden devuelto, SQL determinista y errores de BD/repositorio.
+La integración de clientes es de solo lectura y requiere `CLIENTES_TEST_DATABASE`
+igual al `DB_NAME` de una base de pruebas configurada. Compara el endpoint con
+las filas reales ordenadas; no crea fixtures. Sin esa variable se omite.
+La integración de registro mantiene su activación con `REGISTER_TEST_DATABASE`.
