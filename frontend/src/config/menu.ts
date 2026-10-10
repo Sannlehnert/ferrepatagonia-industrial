@@ -24,6 +24,13 @@ export const accountMenu: readonly MenuItem[] = [
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
     },
     {
+        id: 'account-credit',
+        label: 'Cuenta corriente',
+        // Pendiente de implementar la pantalla de cuenta corriente.
+        routeName: null,
+        permission: PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT,
+    },
+    {
         id: 'account-details',
         label: 'Configuración de datos',
         routeName: 'cuenta-datos',
