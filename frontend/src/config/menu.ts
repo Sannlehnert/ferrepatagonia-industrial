@@ -13,7 +13,8 @@ export const accountMenu: readonly MenuItem[] = [
     {
         id: 'account-orders',
         label: 'Historial de pedidos',
-        routeName: 'cuenta-pedidos',
+        // La ruta existe, pero su componente todavía está vacío.
+        routeName: null,
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
     },
     {

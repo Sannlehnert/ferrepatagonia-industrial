@@ -46,15 +46,19 @@ con esa modalidad de pago.
 
 ## Estado actual
 
-Solo están configurados destinos existentes para:
+El único destino disponible desde el menú de cuenta es:
 
-- Historial de pedidos: `cuenta-pedidos`.
 - Configuración de datos: `cuenta-datos`.
+
+La ruta `cuenta-pedidos` está registrada en el router, pero
+`HistorialPedidos.vue` está vacío. La opción del menú mantiene
+`routeName: null` hasta integrar la pantalla de #169.
 
 Los demás destinos permanecen pendientes.
 
-La configuración todavía no está conectada con Pinia ni con los
-componentes visuales. Esa integración corresponde a la tarea #142.
+`AccountMenu.vue` renderiza las opciones mediante la configuración.
+El layout utiliza temporalmente un usuario simulado para verificar
+la interfaz. Falta conectarlo con el store de sesión para completar #142.
 
 ## Agregar o modificar opciones
 
