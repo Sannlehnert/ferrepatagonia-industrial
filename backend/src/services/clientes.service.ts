@@ -5,5 +5,7 @@ export async function listClientes() {
   return clientes.map((cliente) => ({
     id: Number(cliente.id_cliente),
     nombreRazonSocial: cliente.nombre_razon_social,
+    email: cliente.email,
+    fechaRegistro: cliente.fecha_creacion,
   }));
 }
