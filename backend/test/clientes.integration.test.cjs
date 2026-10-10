@@ -9,11 +9,13 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
   assert.equal(env.db.database, process.env.CLIENTES_TEST_DATABASE, 'Confirmar la base de pruebas');
   const { pool } = require('../dist/config/database.config');
   const { app } = require('../dist/app');
+  const { signToken } = require('../dist/services/token.service');
+  const adminCookie = `jwt_token=${encodeURIComponent(signToken({ id: 7, rol: 'ADMIN' }))}`;
   const server = app.listen(0, '127.0.0.1');
   try {
     await once(server, 'listening');
     const url = `http://127.0.0.1:${server.address().port}/api/admin/clientes`;
-    await t.test('coincide con las cuentas CLIENTE asociadas y su orden, sin autenticación', async () => {
+    await t.test('coincide con las cuentas CLIENTE asociadas y su orden, con sesión ADMIN', async () => {
       // Oráculo independiente: relacionar y ordenar en JS, sin repetir el JOIN probado.
       const clientes = await pool.query('SELECT id_cliente, nombre_razon_social FROM CLIENTE');
       const usuarios = await pool.query('SELECT id_cliente, email, rol, fecha_creacion FROM USUARIO');
@@ -24,7 +26,7 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
           id: Number(u.id_cliente), nombreRazonSocial: porId.get(Number(u.id_cliente)).nombre_razon_social,
           email: u.email, fechaRegistro: u.fecha_creacion.toISOString(),
         }));
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: { Cookie: adminCookie } });
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), {
         message: 'Clientes obtenidos correctamente', data: { clientes: expected },
@@ -67,7 +69,7 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
 
         // Ejecutar el SQL real del repositorio en la conexión de los fixtures sin confirmar datos.
         t.mock.method(pool, 'query', (...args) => connection.query(...args));
-        const response = await fetch(url);
+        const response = await fetch(url, { headers: { Cookie: adminCookie } });
         assert.equal(response.status, 200);
         const body = await response.json();
         assert.equal(body.message, 'Clientes obtenidos correctamente');

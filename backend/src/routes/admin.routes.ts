@@ -1,7 +1,7 @@
 import { Router } from 'express';
+import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 import { getClientes } from '../controllers/clientes.controller';
 
 export const adminRouter = Router();
 
-// #177: acceso sin autenticación temporal; #178 incorporará la restricción ADMIN.
-adminRouter.get('/clientes', getClientes);
+adminRouter.get('/clientes', authenticate, authorizeRoles('ADMIN'), getClientes);
