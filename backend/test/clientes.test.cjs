@@ -14,8 +14,28 @@ const { signToken } = require('../dist/services/token.service');
 // Capturar el controlador antes de que la ruta registre su referencia.
 const controller = require('../dist/controllers/clientes.controller');
 const handler = mock.method(controller, 'getClientes');
+// Espías que delegan en las guardas reales, instalados antes de cargar el router.
+const auth = require('../dist/middlewares/auth.middleware');
+const authenticate = mock.method(auth, 'authenticate');
+const authorizeRoles = auth.authorizeRoles;
+const authorizationGuards = [];
+mock.method(auth, 'authorizeRoles', (...roles) => {
+  const guard = mock.fn(authorizeRoles(...roles));
+  authorizationGuards.push(guard);
+  return guard;
+});
+const verify = mock.method(jwt, 'verify');
 const { app } = require('../dist/app');
-const request = token => fetch(url, {
+const { adminRouter } = require('../dist/routes/admin.routes');
+const auxiliaryHandler = mock.fn((_req, res) => res.json({ ok: true }));
+// Solo de test: se agrega al router real después de sus guardas globales.
+adminRouter.get('/test-only', auxiliaryHandler);
+const guardCounts = () => [
+  authenticate.mock.callCount(),
+  authorizationGuards.reduce((sum, guard) => sum + guard.mock.callCount(), 0),
+  verify.mock.callCount(),
+];
+const request = (token, path = '/clientes') => fetch(`${url}${path}`, {
   headers: token === undefined ? {} : { Cookie: `jwt_token=${encodeURIComponent(token)}` },
 });
 const adminRequest = () => request(signToken({ id: 7, rol: 'ADMIN' }));
@@ -27,7 +47,7 @@ let url;
 before(async () => {
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
-  url = `http://127.0.0.1:${server.address().port}/api/admin/clientes`;
+  url = `http://127.0.0.1:${server.address().port}/api/admin`;
 });
 after(async () => {
   if (server) await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
@@ -61,6 +81,37 @@ for (const [label, token, status, message] of [
     assert.equal(handler.mock.callCount(), beforeCalls);
     assert.equal(query.mock.callCount(), 0);
   });
+}
+
+// Cada request debe autenticar una vez; solo una autenticación exitosa llega al rol.
+for (const path of ['/clientes', '/test-only', '/inexistente']) {
+  for (const [label, token, expectedStatus, expectedBody, roleCalls, jwtCalls] of [
+    ['ADMIN', signToken({ id: 7, rol: 'ADMIN' }), path === '/inexistente' ? 404 : 200,
+      path === '/inexistente' ? { error: 'Ruta no encontrada' } :
+        path === '/test-only' ? { ok: true } :
+          { message: 'Clientes obtenidos correctamente', data: { clientes: [] } }, 1, 1],
+    ['CLIENTE', signToken({ id: 7, rol: 'CLIENTE' }), 403,
+      { message: 'El rol autenticado no tiene permiso.' }, 1, 1],
+    ['sin sesión', undefined, 401, { message: 'No autenticado.' }, 0, 0],
+    ['token inválido', 'invalid', 401, { message: 'No autenticado.' }, 0, 1],
+    ['token expirado', jwt.sign({ id: 7, rol: 'ADMIN' }, process.env.JWT_SECRET, {
+      algorithm: 'HS256', expiresIn: -1,
+    }), 401, { message: 'No autenticado.' }, 0, 1],
+  ]) {
+    test(`#175: ${path}, ${label}: protección global sin duplicar guardas ni JWT`, async (t) => {
+      const counts = guardCounts();
+      const handlerCalls = handler.mock.callCount();
+      const auxiliaryCalls = auxiliaryHandler.mock.callCount();
+      const query = t.mock.method(pool, 'query', async () => []);
+      const response = await request(token, path);
+      assert.equal(response.status, expectedStatus);
+      assert.deepEqual(await response.json(), expectedBody);
+      assert.deepEqual(guardCounts().map((count, i) => count - counts[i]), [1, roleCalls, jwtCalls]);
+      assert.equal(handler.mock.callCount() - handlerCalls, path === '/clientes' && expectedStatus === 200 ? 1 : 0);
+      assert.equal(auxiliaryHandler.mock.callCount() - auxiliaryCalls, path === '/test-only' && expectedStatus === 200 ? 1 : 0);
+      assert.equal(query.mock.callCount(), path === '/clientes' && expectedStatus === 200 ? 1 : 0);
+    });
+  }
 }
 
 test('#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB', async (t) => {
