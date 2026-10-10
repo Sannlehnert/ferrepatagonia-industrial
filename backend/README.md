@@ -317,3 +317,49 @@ opcionales, email demasiado largo, rol/estado enviados y tamaño JSON excedido.
 Se comprobó `{ message }`, ausencia de cookies y de password en esas respuestas.
 Una comprobación directa del validador confirmó la normalización de textos y
 nulos sin modificar la contraseña. No hay scripts de test o lint en package.json.
+# Listado de clientes — #177, #178 y #179
+
+`GET /api/admin/clientes` consulta MariaDB mediante el pool existente y devuelve
+`200 { "message": "Clientes obtenidos correctamente", "data": { "clientes": [{ "id": 12, "nombreRazonSocial": "Constructora Sur", "email": "comercial@example.test", "fechaRegistro": "2026-10-09T13:45:00.000Z" }] } }`.
+Sin filas devuelve el mismo contrato con `clientes: []`. Ante un error devuelve
+`500 { "message": "Error interno del servidor." }`, sin detalles internos.
+
+```sql
+SELECT c.id_cliente, c.nombre_razon_social, u.email, u.fecha_creacion
+FROM CLIENTE c
+INNER JOIN USUARIO u ON u.id_cliente = c.id_cliente
+WHERE u.rol = 'CLIENTE'
+ORDER BY u.fecha_creacion DESC, c.id_cliente DESC
+```
+
+El acceso exige una cookie `jwt_token` válida con rol ADMIN. La ruta aplica
+`authenticate, authorizeRoles('ADMIN'), getClientes`, reutilizando los middlewares
+existentes. ADMIN recibe `200`; CLIENTE autenticado recibe
+`403 { "message": "El rol autenticado no tiene permiso." }`. Sin cookie o con
+token inválido/expirado responde `401 { "message": "No autenticado." }`.
+Los rechazos no ejecutan el controlador ni consultan el listado.
+`id` y `nombreRazonSocial` provienen de CLIENTE. `email` y `fechaRegistro`
+provienen de USUARIO.email y USUARIO.fecha_creacion, respectivamente. Solo se
+incluyen clientes con una cuenta asociada de rol CLIENTE. `fechaRegistro`
+serializa el Date devuelto por el driver como ISO 8601 UTC en JSON, sin cambiar
+la configuración horaria existente.
+Esta tarea no incorpora filtros, paginación ni cambios de esquema.
+
+Después de un build limpio, ejecutar desde `backend`:
+
+```sh
+node --test test/clientes.test.cjs
+node --test test/auth.middleware.test.cjs
+node --test test/register.test.cjs
+node --test test/clientes.integration.test.cjs test/register.integration.test.cjs
+```
+
+Las pruebas de clientes sin BD verifican el contrato HTTP sobre la app real,
+acceso ADMIN, rechazos 401/403 sin ejecutar el controlador, mapeo, conservación
+del orden devuelto, SQL determinista y errores de BD/repositorio.
+La integración de clientes requiere `CLIENTES_TEST_DATABASE` igual al `DB_NAME`
+de una base de pruebas configurada. Usa una sesión ADMIN válida y compara el
+endpoint con las cuentas reales
+y valida fuentes, exclusión y orden con fixtures dentro de una transacción que
+se revierte al terminar. Sin esa variable se omite.
+La integración de registro mantiene su activación con `REGISTER_TEST_DATABASE`.
