@@ -5,6 +5,11 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/acceso-denegado',
+      name: 'access-denied',
+      component: () => import('@/views/AccessDeniedView.vue'),
+    },
+    {
       path: '/mi-cuenta',
       component: () => import('@/views/cuenta/MiCuentaLayout.vue'),
       // meta: { requiresAuth: true }, ← se activa en #171
