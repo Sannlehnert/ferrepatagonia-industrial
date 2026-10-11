@@ -1,6 +1,6 @@
 import { PERMISSIONS, type Permission } from './permissions'
 
-interface MenuItem {
+export interface MenuItem {
     id: string
     label: string
     // null indica que la ruta todavía no está implementada.

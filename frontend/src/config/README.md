@@ -8,6 +8,8 @@ La autorización de cada operación corresponde al backend.
 - `permissions.ts`: define permisos, asignaciones por rol y condiciones
   comerciales necesarias para resolver los permisos del usuario.
 - `menu.ts`: define las opciones públicas, de cuenta y de administración.
+- `../components/AccountMenu.vue`: renderiza el menú de cuenta
+  a partir de los permisos recibidos.
 
 ## Uso
 
@@ -50,15 +52,26 @@ El único destino disponible desde el menú de cuenta es:
 
 - Configuración de datos: `cuenta-datos`.
 
-La ruta `cuenta-pedidos` está registrada en el router, pero
-`HistorialPedidos.vue` está vacío. La opción del menú mantiene
-`routeName: null` hasta integrar la pantalla de #169.
+En la versión inspeccionada de esta rama, `HistorialPedidos.vue`
+está vacío aunque `cuenta-pedidos` está registrada en el router.
+La opción mantiene `routeName: null` hasta integrar la implementación
+de #169. La tarea figura terminada en Taiga; falta localizar e incorporar
+su código.
 
 Los demás destinos permanecen pendientes.
 
 `AccountMenu.vue` renderiza las opciones mediante la configuración.
 El layout utiliza temporalmente un usuario simulado para verificar
-la interfaz. Falta conectarlo con el store de sesión para completar #142.
+la interfaz. El renderizado está verificado de forma aislada.
+La integración de #142 con el usuario autenticado queda pendiente
+hasta disponer del store de sesión.
+
+Los menús de cuenta, público y administrativo utilizan el renderizador
+compartido NavigationMenu.vue. Solo el menú de cuenta está integrado
+en su layout; el montaje de los otros dos y sus destinos sigue pendiente.
+
+El renderizador compartido se probó con datos temporales en orientación
+horizontal y vertical, verificando permisos y exclusión de rutas pendientes.
 
 ## Agregar o modificar opciones
 
@@ -86,18 +99,35 @@ Estas comprobaciones fueron manuales, con datos simulados.
 No reemplazan las pruebas con una sesión real ni verifican
 la autorización del backend.
 
-## Pendientes antes de cerrar FER-4
+## Pendientes propios de FER-4
 
-- Conectar el usuario y sus estados comerciales con la sesión real.
-- Retirar el usuario simulado de MiCuentaLayout.vue.
-- Integrar el historial de #169 y restablecer cuenta-pedidos.
 - Acordar la visibilidad de Pedidos con cuenta corriente.
-- Revisar el alcance final de las opciones y sus destinos pendientes.
-- Verificar con sesión real Visitante, Particular, Empresa y ADMIN.
-- Verificar actualización del menú al iniciar y cerrar sesión.
-- Coordinar la protección de rutas con las tareas de autenticación.
-- Revisar que los componentes no contengan reglas de roles duplicadas.
+- Completar el renderizado de los menús público y administrativo.
+  Su inclusión en FER-4 fue confirmada con el equipo.
+  El visitante se representa mediante ausencia de usuario, sin agregar
+  un rol técnico nuevo.
+- Completar la evidencia de pruebas por perfil después de la integración.
+- Repetir la revisión de reglas en componentes tras conectar la sesión.
 - Actualizar Taiga y obtener revisión y aprobación del PR.
+
+El filtrado y la reactividad del menú de cuenta ya se comprobaron
+con datos simulados. La integración y las pruebas con sesión real
+siguen pendientes antes del cierre.
+
+## Integraciones pendientes con otras tareas
+
+- Conectar el usuario y sus estados comerciales con el store de sesión
+  cuando esté disponible, reemplazando el usuario simulado del layout.
+- Verificar el menú durante login, recuperación de sesión y logout.
+- Restablecer cuenta-pedidos cuando se integre la pantalla de #169.
+- Asignar los demás destinos cuando sus rutas y pantallas estén disponibles.
+
+FER-4 consume el estado de sesión y las rutas del proyecto.
+No implementa el login, los guards, la autorización del backend
+ni las pantallas de pedidos o administración.
+
+Estos pendientes deben coordinarse con sus responsables.
+La validación aislada del menú no equivale a una integración completa.
 
 ## Revisión de reglas en componentes — #143
 
