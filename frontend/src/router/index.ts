@@ -5,6 +5,11 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+    },
+    {
       path: '/acceso-denegado',
       name: 'access-denied',
       component: () => import('@/views/AccessDeniedView.vue'),

@@ -1,10 +1,5 @@
 <script setup lang="ts">
-import { RouterLink, useRouter } from 'vue-router'
-
-const router = useRouter()
-
-// La salida se habilita cuando exista una ruta de inicio real.
-const hasHomeRoute = router.getRoutes().some(route => route.path === '/')
+import { RouterLink } from 'vue-router'
 </script>
 
 <template>
@@ -20,10 +15,9 @@ const hasHomeRoute = router.getRoutes().some(route => route.path === '/')
             </p>
 
             <RouterLink
-                v-if="hasHomeRoute"
-                to="/"
+                :to="{ name: 'home' }"
                 class="access-denied__button"
-            >
+                >
                 Volver al inicio
             </RouterLink>
         </section>
