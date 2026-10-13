@@ -371,3 +371,47 @@ endpoint con las cuentas reales
 y valida fuentes, exclusión y orden con fixtures dentro de una transacción que
 se revierte al terminar. Sin esa variable se omite.
 La integración de registro mantiene su activación con `REGISTER_TEST_DATABASE`.
+
+## Restauración de sesión — FER-3
+
+`GET /api/auth/me` usa `authenticate` y la cookie HttpOnly `jwt_token` existente.
+Responde **200** exclusivamente con:
+
+```json
+{ "user": { "id": 12, "nombre": "Cliente", "email": "cliente@example.test", "rol": "CLIENTE", "tipo_cliente": "PARTICULAR" } }
+```
+
+`id` corresponde a `USUARIO.id_usuario`; `tipo_cliente` conserva snake_case y
+puede ser `PARTICULAR`, `EMPRESA` o `null`. Para ADMIN sin cliente asociado,
+`nombre` es `Administrador` y `tipo_cliente` es `null`.
+Se consulta por el ID autenticado con parámetros y `LEFT JOIN CLIENTE`, sin
+seleccionar hashes. Se exige `USUARIO.activo` y coincidencia del rol persistido
+con el JWT. Sin cookie, JWT inválido/expirado, usuario inexistente/inactivo o
+rol desactualizado: **401** `{ "message": "No autenticado." }`.
+Error de BD: **500** `{ "message": "Error interno del servidor." }`.
+No se emiten ni renuevan tokens o cookies; no se devuelven secretos.
+
+El login conserva su implementación y contrato `{ message, user }`. Como su
+mapeo público era inline, `/me` reproduce ese criterio; las pruebas de regresión
+comparan ambos contratos. Logout conserva la eliminación de cookie sin revocar
+el JWT: el cliente debe aplicar esa eliminación.
+
+Desde `backend`, después de un build limpio:
+
+```bash
+npm run build
+node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/register.test.cjs test/clientes.test.cjs
+```
+
+Integración real en la base de desarrollo con esquema cargado (PowerShell):
+
+```powershell
+$env:AUTH_ME_TEST_DATABASE = 'ferrepatagonia_dev'
+node --test test/auth.me.integration.test.cjs
+```
+
+La variable debe coincidir con `DB_NAME`; sin ella se omite la integración.
+Los fixtures PARTICULAR, EMPRESA y ADMIN se identifican mediante emails UUID y
+se eliminan al terminar. Los contadores AUTO_INCREMENT pueden avanzar. Se prueba
+login, contrato de sesión, usuario inactivo, rol desactualizado y logout aplicando
+la eliminación de cookie como un navegador. No usar una base de producción.
