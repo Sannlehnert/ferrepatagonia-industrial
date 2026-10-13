@@ -1,5 +1,17 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterView } from 'vue-router'
+import AdminMenu from '@/components/AdminMenu.vue'
+import { getPermissionsForRole, isRole } from '@/config/permissions'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+
+const permissions = computed(() => {
+    const role = auth.rol
+
+    return getPermissionsForRole(isRole(role) ? role : null)
+})
 </script>
 
 <template>
@@ -10,9 +22,8 @@ import { RouterView } from 'vue-router'
                 <span>INDUSTRIAL</span>
             </div>
 
-            <!-- #176: integrar AdminMenu desde FER-4, sin duplicar sus opciones. -->
             <div class="admin-layout__navigation">
-                <p>Panel administrativo</p>
+                <AdminMenu :permissions="permissions" />
             </div>
 
             <!-- Integrar el cierre de sesión cuando esté disponible el flujo real. -->
@@ -70,6 +81,31 @@ import { RouterView } from 'vue-router'
     padding: 32px;
 }
 
+.admin-layout__navigation :deep(.navigation-menu__link) {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 6px;
+    color: #fff;
+    text-decoration: none;
+}
+
+.admin-layout__navigation :deep(.navigation-menu__link:hover) {
+    background: #103a5c;
+}
+
+.admin-layout__navigation :deep(.navigation-menu__link.router-link-active) {
+    background: #145a8d;
+    font-weight: 700;
+}
+
+.admin-layout__navigation :deep(.navigation-menu__link:focus-visible) {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
 @media (max-width: 700px) {
     .admin-layout {
         grid-template-columns: 1fr;
@@ -80,7 +116,7 @@ import { RouterView } from 'vue-router'
     }
 
     .admin-layout__navigation {
-        padding: 0 20px 12px;
+        padding: 20px;
     }
 
     .admin-layout__content {
