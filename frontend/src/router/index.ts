@@ -14,11 +14,10 @@ const router = createRouter({
     {
       path: '/admin',
       component: () => import('@/views/admin/AdminLayout.vue'),
-      // #174: esta metadata debe ser aplicada por el guard de autenticación.
-      // Declararla no protege las rutas por sí sola.
+      // Las restricciones del panel también se aplican a sus rutas hijas.
       meta: {
         requiresAuth: true,
-        requiredRole: 'ADMIN',
+        roles: ['ADMIN'],
       },
       children: [
         {
@@ -110,10 +109,36 @@ const router = createRouter({
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
-  if (!auth.sessionChecked) await auth.fetchSession()
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+  if (!auth.sessionChecked) {
+    await auth.fetchSession()
+  }
+
+  const requiresAuth = to.matched.some(
+    (record) =>
+      record.meta.requiresAuth || record.meta.roles !== undefined,
+  )
+
+  if (requiresAuth && !auth.isAuthenticated) {
+    return {
+      name: 'login',
+      query: { redirect: to.fullPath },
+      replace: true,
+    }
+  }
+
+  // Comprueba las restricciones de cada ruta, incluyendo las del padre.
+  const lacksRequiredRole = to.matched.some((record) => {
+    const allowedRoles = record.meta.roles
+
+    return (
+      allowedRoles !== undefined &&
+      (auth.rol === null || !allowedRoles.includes(auth.rol))
+    )
+  })
+
+  if (lacksRequiredRole) {
+    return { name: 'access-denied', replace: true }
   }
 
   if (to.name === 'login' && auth.isAuthenticated) {
