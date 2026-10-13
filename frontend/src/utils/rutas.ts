@@ -1,11 +1,11 @@
 import type { Router, RouteLocationRaw } from 'vue-router'
 import type { Rol } from '@/types/auth'
 
-// Adónde va cada rol por defecto. Ajustar cuando existan la tienda y el panel admin.
+// Destino por defecto según el rol del usuario autenticado.
 export function rutaPorRol(rol: Rol | null): RouteLocationRaw {
   switch (rol) {
     case 'ADMIN':
-      return { path: '/' } // cambiar a { name: 'admin' } cuando exista el panel
+      return { name: 'admin-dashboard' }
     case 'CLIENTE':
       return { name: 'cuenta-datos' } // cambiar a la tienda si el equipo lo define
     default:
