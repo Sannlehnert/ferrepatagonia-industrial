@@ -1,5 +1,19 @@
-<!-- src/views/cuenta/MiCuentaLayout.vue -->
-<script setup lang="ts"></script>
+<script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+const router = useRouter()
+const saliendo = ref(false)
+
+async function cerrarSesion() {
+  saliendo.value = true
+  await auth.logout()
+  await router.replace({ name: 'login' }) // replace: "Atrás" no vuelve a lo privado
+  saliendo.value = false
+}
+</script>
 
 <template>
   <section class="cuenta">
@@ -8,6 +22,9 @@
       <nav>
         <RouterLink :to="{ name: 'cuenta-datos' }">Mis datos</RouterLink>
         <RouterLink :to="{ name: 'cuenta-pedidos' }">Mis pedidos</RouterLink>
+        <button type="button" :disabled="saliendo" @click="cerrarSesion">
+          {{ saliendo ? 'Saliendo...' : 'Cerrar sesión' }}
+        </button>
       </nav>
     </aside>
 

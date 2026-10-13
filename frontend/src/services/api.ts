@@ -13,7 +13,10 @@ api.interceptors.response.use(
       const { useAuthStore } = await import('@/stores/auth')
       const { default: router } = await import('@/router')
       useAuthStore().clear()
-      router.push({ name: 'login' })
+      const actual = router.currentRoute.value
+      if (actual.name !== 'login') {
+        router.push({ name: 'login', query: { redirect: actual.fullPath } })
+      }
     }
     return Promise.reject(err)
   },

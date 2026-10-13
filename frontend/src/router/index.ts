@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import type { Rol } from '@/types/auth'
+import { rutaPorRol } from '@/utils/rutas'
 
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
-    roles?: string[]
+    roles?: Rol[]
   }
 }
 
@@ -12,14 +14,19 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+  path: '/registro',
+  name: 'registro',
+  component: () => import('@/views/cuenta/RegistroView.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
-      component: () => import('@/views/LoginView.vue'),
+      component: () => import('@/views/cuenta/LoginView.vue'),
     },
     {
       path: '/mi-cuenta',
       component: () => import('@/views/cuenta/MiCuentaLayout.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ['CLIENTE'] },
       children: [
         { path: '', redirect: { name: 'cuenta-datos' } },
         {
@@ -44,9 +51,17 @@ router.beforeEach(async (to) => {
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
-  if (to.name === 'login' && auth.isAuthenticated) {
-    return { name: 'cuenta-datos' }
+  if (to.meta.roles && (!auth.rol || !to.meta.roles.includes(auth.rol))) {
+    return { path: '/' }
   }
+  if (to.name === 'login' && auth.isAuthenticated) {
+    return auth.rol === 'ADMIN' ? { path: '/' } : { name: 'cuenta-datos' }
+  }
+  if ((to.name === 'login' || to.name === 'registro') && auth.isAuthenticated) {
+  return auth.rol === 'ADMIN' ? { path: '/' } : { name: 'cuenta-datos' }
+  }
+  if ((to.name === 'login' || to.name === 'registro') && auth.isAuthenticated) {
+  return rutaPorRol(auth.rol)
+}
 })
-
 export default router
