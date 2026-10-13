@@ -1,10 +1,12 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import type { Rol } from '@/types/auth'
+import { rutaPorRol } from '@/utils/rutas'
 
 declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
-    roles?: string[]
+    roles?: Rol[]
   }
 }
 
@@ -72,6 +74,11 @@ const router = createRouter({
       ],
     },
     {
+      path: '/registro',
+      name: 'registro',
+      component: () => import('@/views/cuenta/RegistroView.vue'),
+    },
+    {
       path: '/',
       name: 'home',
       component: () => import('@/views/HomeView.vue'),
@@ -89,7 +96,7 @@ const router = createRouter({
     {
       path: '/mi-cuenta',
       component: () => import('@/views/cuenta/MiCuentaLayout.vue'),
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, roles: ['CLIENTE'] },
       children: [
         { path: '', redirect: { name: 'cuenta-datos' } },
         {
@@ -127,7 +134,7 @@ router.beforeEach(async (to) => {
     }
   }
 
-  // Comprueba las restricciones de cada ruta, incluyendo las del padre.
+  // Incluye las restricciones declaradas en las rutas padre.
   const lacksRequiredRole = to.matched.some((record) => {
     const allowedRoles = record.meta.roles
 
@@ -141,8 +148,11 @@ router.beforeEach(async (to) => {
     return { name: 'access-denied', replace: true }
   }
 
-  if (to.name === 'login' && auth.isAuthenticated) {
-    return { name: 'cuenta-datos' }
+  if (
+    (to.name === 'login' || to.name === 'registro') &&
+    auth.isAuthenticated
+  ) {
+    return rutaPorRol(auth.rol)
   }
 })
 
