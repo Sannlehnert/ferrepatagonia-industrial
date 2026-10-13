@@ -19,6 +19,16 @@ const router = createRouter({
   component: () => import('@/views/cuenta/RegistroView.vue'),
     },
     {
+      path: '/',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
+    },
+    {
+      path: '/acceso-denegado',
+      name: 'access-denied',
+      component: () => import('@/views/AccessDeniedView.vue'),
+    },
+    {
       path: '/login',
       name: 'login',
       component: () => import('@/views/cuenta/LoginView.vue'),
@@ -54,6 +64,7 @@ router.beforeEach(async (to) => {
   if (to.meta.roles && (!auth.rol || !to.meta.roles.includes(auth.rol))) {
     return { path: '/' }
   }
+
   if (to.name === 'login' && auth.isAuthenticated) {
     return auth.rol === 'ADMIN' ? { path: '/' } : { name: 'cuenta-datos' }
   }
