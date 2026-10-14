@@ -28,12 +28,14 @@ export const useAuthStore = defineStore('auth', {
       this.sessionChecked = true
     },
     async logout() {
-      try {
-        await api.post('/auth/logout')
-      } finally {
-        this.clear()
-      }
-    },
+  try {
+    await api.post('/auth/logout')
+  } catch {
+    // si el servidor falla, igual limpiamos lo local
+  } finally {
+    this.clear()
+  }
+},
     clear() {
       this.user = null
       this.sessionChecked = true

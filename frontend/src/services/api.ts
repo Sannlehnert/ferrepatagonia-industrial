@@ -20,10 +20,10 @@ api.interceptors.response.use(
       const { default: router } = await import('@/router')
 
       useAuthStore().clear()
-
-      void router.push({ name: 'login' }).catch((navigationError: unknown) => {
-        console.error('No se pudo abrir el inicio de sesión.', navigationError)
-      })
+      const actual = router.currentRoute.value
+      if (actual.name !== 'login') {
+        router.push({ name: 'login', query: { redirect: actual.fullPath } })
+      }
     }
 
     if (status === 403) {
