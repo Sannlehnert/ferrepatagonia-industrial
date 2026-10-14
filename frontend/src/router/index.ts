@@ -64,12 +64,7 @@ const router = createRouter({
         {
           path: 'clientes',
           name: 'admin-clients',
-          component: () =>
-            import('@/views/admin/AdminSectionPlaceholderView.vue'),
-          props: {
-            title: 'Clientes',
-            description: 'Consulta de clientes particulares y empresas.',
-          },
+          component: () => import('@/views/admin/AdminClientsView.vue'),
         },
       ],
     },
