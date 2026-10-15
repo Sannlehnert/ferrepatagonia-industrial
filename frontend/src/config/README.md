@@ -1,142 +1,89 @@
-# Configuración del menú por permisos
+# Menús por permisos — FER-4
 
-Esta configuración controla la visibilidad de la navegación.
-La autorización de cada operación corresponde al backend.
+La configuración controla la visibilidad de los enlaces.
+La autorización de rutas y operaciones corresponde al router y al backend.
 
-## Archivos
+## Organización
 
-- `permissions.ts`: define permisos, asignaciones por rol y condiciones
-  comerciales necesarias para resolver los permisos del usuario.
-- `menu.ts`: define las opciones públicas, de cuenta y de administración.
-- `../components/AccountMenu.vue`: renderiza el menú de cuenta
-  a partir de los permisos recibidos.
+- permissions.ts: permisos y reglas por rol y condición comercial.
+- menu.ts: opciones públicas, de cuenta y administrativas.
+- NavigationMenu.vue: renderizador compartido.
+- AccountMenu.vue, AdminMenu.vue y PublicMenu.vue: utilizan la configuración.
+- MiCuentaLayout.vue y HomeView.vue: calculan permisos desde la sesión real.
+- AdminLayout.vue: utiliza el rol del store para resolver permisos.
 
-## Uso
+Los componentes de menú no duplican reglas de roles ni condiciones comerciales.
+El visitante se representa mediante ausencia de usuario.
 
-1. Obtener los permisos con `getPermissionsForUser(user)`.
-2. Seleccionar `publicMenu`, `accountMenu` o `adminMenu`, según el área.
-3. Usar `getNavigableMenu(menu, permissions)` para obtener las opciones
-   permitidas que tienen un destino configurado.
+## Destinos
 
-`filterMenuByPermissions` filtra únicamente por permisos. Su resultado
-puede incluir opciones con rutas pendientes.
+- permission: null identifica una opción pública.
+- routeName: null identifica un destino pendiente.
+- getNavigableMenu excluye las opciones sin destino o sin permiso.
+- Si no hay enlaces disponibles, no se renderiza un nav vacío.
 
-## Convenciones
+Mi Cuenta permite navegar a Configuración de datos e Historial de pedidos.
+El panel dispone de Dashboard, Pedidos, Productos, Categorías y Clientes.
+La Home temporal integra PublicMenu y muestra el acceso al panel solo a ADMIN.
 
-- `permission: null` identifica una opción pública.
-- `routeName: null` identifica un destino pendiente y evita generar
-  un enlace mediante `getNavigableMenu`.
-- Un nombre de ruta debe coincidir con el registrado en Vue Router.
-  La configuración no comprueba automáticamente esa coincidencia.
-- Los permisos administrativos no incluyen las opciones de cuenta propia.
-- Particular y Empresa comparten el rol técnico `CLIENTE`.
+Catálogo, Categorías públicas, Quiénes somos y Preguntas frecuentes
+permanecen sin destino. La Home todavía no incluye un enlace al login.
+
+## Pedidos con cuenta corriente
+
+El permiso VIEW_OWN_CREDIT_ORDERS corresponde a CLIENTE de tipo EMPRESA.
+
+No depende de la aprobación ni de la habilitación actual de cuenta corriente:
+permite conservar la consulta histórica cuando se deshabilita esa modalidad.
+
+Su destino permanece null por acuerdo con el equipo, hasta disponer de
+la pantalla y los datos necesarios para distinguir esos pedidos.
 
 ## Cuenta corriente
 
-El permiso de consulta propia requiere:
+El permiso VIEW_OWN_CREDIT_ACCOUNT requiere:
 
-- Rol `CLIENTE`.
-- Tipo de cliente `EMPRESA`.
-- Estado de aprobación `APROBADA`.
-- Cuenta corriente habilitada.
+- Rol CLIENTE.
+- Tipo EMPRESA.
+- Estado de aprobación APROBADA.
+- Cuenta corriente habilitada explícitamente.
 
-Estos datos deben provenir del backend. Si las condiciones comerciales
-todavía no están disponibles, no se concede ese permiso.
+Aprobación, usuario activo/inactivo y habilitación de cuenta corriente
+son conceptos diferentes.
 
-Consultar cuenta corriente es distinto de consultar pedidos realizados
-con esa modalidad de pago.
+Actualmente /auth/me devuelve id, nombre, email, rol y tipo_cliente.
+No devuelve aprobación ni habilitación comercial. Por eso, la integración
+actual no concede este permiso ni inventa esos datos.
 
-## Estado actual
+La pantalla y su destino también permanecen pendientes por acuerdo del equipo.
 
-El único destino disponible desde el menú de cuenta es:
+## Validación realizada
 
-- Configuración de datos: `cuenta-datos`.
+- Build y comprobación de tipos sin errores.
+- git diff --check sin errores.
+- Visitante: Home sin acceso administrativo.
+- PARTICULAR: menú de cuenta correcto y sesión conservada con F5.
+- EMPRESA: menú de cuenta correcto y sesión conservada con F5.
+- ADMIN: acceso al panel desde Home, conservado después de F5.
+- Logout de PARTICULAR y EMPRESA: regreso al login.
+- Sin sesión: Mi Cuenta redirige al login conservando el destino solicitado.
 
-En la versión inspeccionada de esta rama, `HistorialPedidos.vue`
-está vacío aunque `cuenta-pedidos` está registrada en el router.
-La opción mantiene `routeName: null` hasta integrar la implementación
-de #169. La tarea figura terminada en Taiga; falta localizar e incorporar
-su código.
+Se probaron por separado ocho casos simulados de la función de permisos:
+visitante, particular, empresa sin datos comerciales, empresa aprobada
+habilitada, empresa aprobada deshabilitada, empresa pendiente,
+empresa rechazada y administrador. Todos dieron el resultado esperado.
 
-Los demás destinos permanecen pendientes.
+Estas simulaciones no modificaron la sesión ni se incorporaron como mocks
+a la aplicación. No equivalen a probar operaciones comerciales del backend.
 
-`AccountMenu.vue` renderiza las opciones mediante la configuración.
-El layout utiliza temporalmente un usuario simulado para verificar
-la interfaz. El renderizado está verificado de forma aislada.
-La integración de #142 con el usuario autenticado queda pendiente
-hasta disponer del store de sesión.
+## Límites y pendientes
 
-Los menús de cuenta, público y administrativo utilizan el renderizador
-compartido NavigationMenu.vue. Solo el menú de cuenta está integrado
-en su layout; el montaje de los otros dos y sus destinos sigue pendiente.
-
-El renderizador compartido se probó con datos temporales en orientación
-horizontal y vertical, verificando permisos y exclusión de rutas pendientes.
-
-## Agregar o modificar opciones
-
-- Para cambiar texto u orden, modificar la lista correspondiente.
-- Para habilitar un destino pendiente, asignar el nombre real de su ruta.
-- Para incorporar una acción nueva, definir su permiso y su asignación.
-- No agregar permisos ni condiciones comerciales sin contrastarlos
-  con la matriz acordada por el equipo.
-
-## Verificaciones realizadas durante el desarrollo
-
-- Comprobación de tipos con `npm run type-check`: sin errores.
-- Visitante: recibe las opciones públicas y no las de cuenta propia.
-- CLIENTE: recibe las opciones de cuenta propia y no las administrativas.
-- ADMIN: recibe las opciones administrativas y no las de cuenta propia.
-- Un único permiso de pedidos selecciona solo las opciones asociadas.
-- Cuenta corriente: requiere Empresa aprobada y habilitación explícita.
-- Empresa pendiente, rechazada o sin datos comerciales:
-  no recibe el permiso de cuenta corriente.
-- Las opciones con `routeName: null` se excluyen del menú navegable.
-- El componente actualiza los enlaces al cambiar el usuario simulado.
-- Configuración de datos: navegación y marcado del enlace activo verificados.
-
-Estas comprobaciones fueron manuales, con datos simulados.
-No reemplazan las pruebas con una sesión real ni verifican
-la autorización del backend.
-
-## Pendientes propios de FER-4
-
-- Acordar la visibilidad de Pedidos con cuenta corriente.
-- Completar el renderizado de los menús público y administrativo.
-  Su inclusión en FER-4 fue confirmada con el equipo.
-  El visitante se representa mediante ausencia de usuario, sin agregar
-  un rol técnico nuevo.
-- Completar la evidencia de pruebas por perfil después de la integración.
-- Repetir la revisión de reglas en componentes tras conectar la sesión.
-- Actualizar Taiga y obtener revisión y aprobación del PR.
-
-El filtrado y la reactividad del menú de cuenta ya se comprobaron
-con datos simulados. La integración y las pruebas con sesión real
-siguen pendientes antes del cierre.
-
-## Integraciones pendientes con otras tareas
-
-- Conectar el usuario y sus estados comerciales con el store de sesión
-  cuando esté disponible, reemplazando el usuario simulado del layout.
-- Verificar el menú durante login, recuperación de sesión y logout.
-- Restablecer cuenta-pedidos cuando se integre la pantalla de #169.
-- Asignar los demás destinos cuando sus rutas y pantallas estén disponibles.
-
-FER-4 consume el estado de sesión y las rutas del proyecto.
-No implementa el login, los guards, la autorización del backend
-ni las pantallas de pedidos o administración.
-
-Estos pendientes deben coordinarse con sus responsables.
-La validación aislada del menú no equivale a una integración completa.
-
-## Revisión de reglas en componentes — #143
-
-Las reglas de permisos del menú están centralizadas en permissions.ts.
-AccountMenu.vue no compara roles ni condiciones comerciales:
-recibe permisos y renderiza las opciones configuradas.
-
-MiCuentaLayout.vue delega el cálculo a getPermissionsForUser.
-Todavía contiene un usuario simulado, pendiente de reemplazo
-por el estado de sesión en #142.
-
-Repetir esta revisión al integrar la sesión real y otros menús.
+- Integrar los destinos públicos y comerciales cuando estén disponibles.
+- Incorporar los datos comerciales reales cuando exista el contrato de API.
+- Validar la navegación comercial al disponer de sus pantallas.
+- Los errores de carga de datos personales o pedidos se revisan por separado;
+  las pruebas del menú no validan esas funcionalidades.
+- Esta rama no cambia el destino después del login ni la política del JWT.
+  Esos ajustes se coordinan en #139/#153.
+- Solicitar revisión del PR y de las tareas #141, #142 y #144.
+  La tarea #143 ya fue validada y cerrada por Santi.

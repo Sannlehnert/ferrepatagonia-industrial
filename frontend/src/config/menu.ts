@@ -24,6 +24,13 @@ export const accountMenu: readonly MenuItem[] = [
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
     },
     {
+        id: 'account-credit-orders',
+        label: 'Pedidos con cuenta corriente',
+        // Destino pendiente hasta disponer de pantalla y datos específicos.
+        routeName: null,
+        permission: PERMISSIONS.VIEW_OWN_CREDIT_ORDERS,
+    },
+    {
         id: 'account-credit',
         label: 'Cuenta corriente',
         // Pendiente de implementar la pantalla de cuenta corriente.
@@ -73,6 +80,12 @@ export const adminMenu: readonly MenuItem[] = [
 ]
 
 export const publicMenu: readonly MenuItem[] = [
+    {
+        id: 'public-admin-panel',
+        label: 'Panel de administración',
+        routeName: 'admin-dashboard',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
     {
         id: 'public-catalog',
         label: 'Catálogo',
