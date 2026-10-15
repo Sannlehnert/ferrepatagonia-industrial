@@ -13,8 +13,7 @@ export const accountMenu: readonly MenuItem[] = [
     {
         id: 'account-orders',
         label: 'Historial de pedidos',
-        // La ruta existe, pero su componente todavía está vacío.
-        routeName: null,
+        routeName: 'cuenta-pedidos',
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
     },
     {
@@ -43,32 +42,32 @@ export const adminMenu: readonly MenuItem[] = [
     {
         id: 'admin-dashboard',
         label: 'Dashboard',
-        routeName: null,
+        routeName: 'admin-dashboard',
         permission: PERMISSIONS.VIEW_ADMIN_PANEL,
     },
     {
         id: 'admin-orders',
         label: 'Pedidos',
-        routeName: null,
+        routeName: 'admin-orders',
         permission: PERMISSIONS.VIEW_ALL_ORDERS,
     },
     {
         id: 'admin-products',
         label: 'Productos',
-        routeName: null,
+        routeName: 'admin-products',
         permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
     {
         id: 'admin-categories',
         label: 'Categorías',
-        routeName: null,
+        routeName: 'admin-categories',
         permission: PERMISSIONS.MANAGE_CATEGORIES,
     },
     {
         id: 'admin-clients',
         // La matriz incluye particulares y empresas en el listado administrativo.
         label: 'Clientes',
-        routeName: null,
+        routeName: 'admin-clients',
         permission: PERMISSIONS.VIEW_CLIENTS,
     },
 ]

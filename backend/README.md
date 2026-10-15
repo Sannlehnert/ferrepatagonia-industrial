@@ -62,7 +62,8 @@ sigue funcionando y health responde HTTP **503**:
 
 Revisar `docker compose ps` desde la raíz y los valores de `.env`.
 Las variables de conexión faltantes o los puertos inválidos impiden el arranque.
-Las rutas inexistentes responden 404; el manejo básico de errores responde JSON
+Las rutas inexistentes responden 404 (bajo `/api/admin`, primero se exige sesión
+y rol ADMIN); el manejo básico de errores responde JSON
 sin enviar detalles internos al cliente.
 
 ## Scripts
@@ -317,3 +318,100 @@ opcionales, email demasiado largo, rol/estado enviados y tamaño JSON excedido.
 Se comprobó `{ message }`, ausencia de cookies y de password en esas respuestas.
 Una comprobación directa del validador confirmó la normalización de textos y
 nulos sin modificar la contraseña. No hay scripts de test o lint en package.json.
+# Listado de clientes — #177, #178 y #179
+
+`GET /api/admin/clientes` consulta MariaDB mediante el pool existente y devuelve
+`200 { "message": "Clientes obtenidos correctamente", "data": { "clientes": [{ "id": 12, "nombreRazonSocial": "Constructora Sur", "email": "comercial@example.test", "fechaRegistro": "2026-10-09T13:45:00.000Z" }] } }`.
+Sin filas devuelve el mismo contrato con `clientes: []`. Ante un error devuelve
+`500 { "message": "Error interno del servidor." }`, sin detalles internos.
+
+```sql
+SELECT c.id_cliente, c.nombre_razon_social, u.email, u.fecha_creacion
+FROM CLIENTE c
+INNER JOIN USUARIO u ON u.id_cliente = c.id_cliente
+WHERE u.rol = 'CLIENTE'
+ORDER BY u.fecha_creacion DESC, c.id_cliente DESC
+```
+
+El acceso exige una cookie `jwt_token` válida con rol ADMIN. Todo `adminRouter`
+está protegido globalmente mediante `adminRouter.use(authenticate, authorizeRoles('ADMIN'))`
+(#175), reutilizando los middlewares existentes una sola vez por request. Las rutas
+actuales y futuras declaradas después de esa protección la heredan automáticamente;
+`/clientes` registra únicamente `getClientes`. La autorización usa el contexto
+autenticado y no vuelve a verificar JWT. ADMIN recibe `200`; CLIENTE autenticado recibe
+`403 { "message": "El rol autenticado no tiene permiso." }`. Sin cookie o con
+token inválido/expirado responde `401 { "message": "No autenticado." }`.
+Los rechazos no ejecutan el controlador ni consultan el listado. Una ruta
+inexistente bajo `/api/admin/*` responde 401 sin sesión, 403 con rol CLIENTE y
+404 con ADMIN válido.
+`id` y `nombreRazonSocial` provienen de CLIENTE. `email` y `fechaRegistro`
+provienen de USUARIO.email y USUARIO.fecha_creacion, respectivamente. Solo se
+incluyen clientes con una cuenta asociada de rol CLIENTE. `fechaRegistro`
+serializa el Date devuelto por el driver como ISO 8601 UTC en JSON, sin cambiar
+la configuración horaria existente.
+Esta tarea no incorpora filtros, paginación ni cambios de esquema.
+
+Después de un build limpio, ejecutar desde `backend`:
+
+```sh
+node --test test/clientes.test.cjs
+node --test test/auth.middleware.test.cjs
+node --test test/register.test.cjs
+node --test test/clientes.integration.test.cjs test/register.integration.test.cjs
+```
+
+Las pruebas de clientes sin BD verifican el contrato HTTP sobre la app real,
+acceso ADMIN, rechazos 401/403 sin ejecutar el controlador, mapeo, conservación
+del orden devuelto, SQL determinista y errores de BD/repositorio. También cubren
+una ruta auxiliar exclusiva de test que hereda las guardas, rutas administrativas
+inexistentes y ausencia de doble ejecución de guardas o verificación JWT.
+La integración de clientes requiere `CLIENTES_TEST_DATABASE` igual al `DB_NAME`
+de una base de pruebas configurada. Usa una sesión ADMIN válida y compara el
+endpoint con las cuentas reales
+y valida fuentes, exclusión y orden con fixtures dentro de una transacción que
+se revierte al terminar. Sin esa variable se omite.
+La integración de registro mantiene su activación con `REGISTER_TEST_DATABASE`.
+
+## Restauración de sesión — FER-3
+
+`GET /api/auth/me` usa `authenticate` y la cookie HttpOnly `jwt_token` existente.
+Responde **200** exclusivamente con:
+
+```json
+{ "user": { "id": 12, "nombre": "Cliente", "email": "cliente@example.test", "rol": "CLIENTE", "tipo_cliente": "PARTICULAR" } }
+```
+
+`id` corresponde a `USUARIO.id_usuario`; `tipo_cliente` conserva snake_case y
+puede ser `PARTICULAR`, `EMPRESA` o `null`. Para ADMIN sin cliente asociado,
+`nombre` es `Administrador` y `tipo_cliente` es `null`.
+Se consulta por el ID autenticado con parámetros y `LEFT JOIN CLIENTE`, sin
+seleccionar hashes. Se exige `USUARIO.activo` y coincidencia del rol persistido
+con el JWT. Sin cookie, JWT inválido/expirado, usuario inexistente/inactivo o
+rol desactualizado: **401** `{ "message": "No autenticado." }`.
+Error de BD: **500** `{ "message": "Error interno del servidor." }`.
+No se emiten ni renuevan tokens o cookies; no se devuelven secretos.
+
+El login conserva su implementación y contrato `{ message, user }`. Como su
+mapeo público era inline, `/me` reproduce ese criterio; las pruebas de regresión
+comparan ambos contratos. Logout conserva la eliminación de cookie sin revocar
+el JWT: el cliente debe aplicar esa eliminación.
+
+Desde `backend`, después de un build limpio:
+
+```bash
+npm run build
+node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/register.test.cjs test/clientes.test.cjs
+```
+
+Integración real en la base de desarrollo con esquema cargado (PowerShell):
+
+```powershell
+$env:AUTH_ME_TEST_DATABASE = 'ferrepatagonia_dev'
+node --test test/auth.me.integration.test.cjs
+```
+
+La variable debe coincidir con `DB_NAME`; sin ella se omite la integración.
+Los fixtures PARTICULAR, EMPRESA y ADMIN se identifican mediante emails UUID y
+se eliminan al terminar. Los contadores AUTO_INCREMENT pueden avanzar. Se prueba
+login, contrato de sesión, usuario inactivo, rol desactualizado y logout aplicando
+la eliminación de cookie como un navegador. No usar una base de producción.

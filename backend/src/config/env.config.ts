@@ -17,6 +17,7 @@ function port(name: string, fallback: number): number {
 }
 
 export const env = {
+  jwtSecret: required('JWT_SECRET'),
   port: port('PORT', 3000),
   db: {
     host: required('DB_HOST'),

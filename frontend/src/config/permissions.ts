@@ -28,6 +28,13 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
     ],
 }
 
+export function isRole(value: unknown): value is Role {
+    return (
+        typeof value === 'string' &&
+        Object.prototype.hasOwnProperty.call(ROLE_PERMISSIONS, value)
+    )
+}
+
 export function getPermissionsForRole(
     role: Role | null,
 ): ReadonlySet<Permission> {

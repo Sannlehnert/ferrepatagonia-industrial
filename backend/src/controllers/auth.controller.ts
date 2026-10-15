@@ -1,5 +1,17 @@
 import { Request, Response } from 'express';
-import { loginUsuario } from '../services/auth.services';
+import { loginUsuario, restoreUsuario } from '../services/auth.services';
+
+export const me = async (req: Request, res: Response) => {
+    try {
+        const user = req.auth ? await restoreUsuario(req.auth) : null;
+        if (!user) {
+            return res.status(401).json({ message: 'No autenticado.' });
+        }
+        return res.status(200).json({ user });
+    } catch {
+        return res.status(500).json({ message: 'Error interno del servidor.' });
+    }
+};
 
 export const login = async (req: Request, res: Response) => {
     try {
