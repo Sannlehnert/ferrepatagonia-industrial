@@ -1,11 +1,25 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { RouterView } from 'vue-router'
+import { computed, ref } from 'vue'
+import { RouterView, useRouter } from 'vue-router'
 import AdminMenu from '@/components/AdminMenu.vue'
 import { getPermissionsForRole, isRole } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
+const saliendo = ref(false)
+
+async function cerrarSesion() {
+    if (saliendo.value) return
+
+    saliendo.value = true
+    try {
+        await auth.logout()
+        await router.replace({ name: 'login' })
+    } finally {
+        saliendo.value = false
+    }
+}
 
 const permissions = computed(() => {
     const role = auth.rol
@@ -26,7 +40,16 @@ const permissions = computed(() => {
                 <AdminMenu :permissions="permissions" />
             </div>
 
-            <!-- Integrar el cierre de sesión cuando esté disponible el flujo real. -->
+            <div class="admin-layout__session">
+                <button
+                    type="button"
+                    class="admin-layout__logout"
+                    :disabled="saliendo"
+                    @click="cerrarSesion"
+                >
+                    {{ saliendo ? 'Saliendo...' : 'Cerrar sesión' }}
+                </button>
+            </div>
         </aside>
 
         <main class="admin-layout__content">
@@ -79,6 +102,39 @@ const permissions = computed(() => {
 .admin-layout__content {
     min-width: 0;
     padding: 32px;
+}
+
+.admin-layout__session {
+    padding: 20px;
+    border-top: 1px solid #33556f;
+}
+
+.admin-layout__logout {
+    width: 100%;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.admin-layout__logout:hover:not(:disabled) {
+    background: #103a5c;
+}
+
+.admin-layout__logout:focus-visible {
+    outline: 2px solid #fff;
+    outline-offset: 3px;
+}
+
+.admin-layout__logout:disabled {
+    opacity: 0.6;
+    cursor: wait;
 }
 
 .admin-layout__navigation :deep(.navigation-menu__link) {
