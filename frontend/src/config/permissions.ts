@@ -7,6 +7,7 @@ export const PERMISSIONS = {
     MANAGE_CATEGORIES: 'categories:manage',
     VIEW_CLIENTS: 'clients:view',
     VIEW_OWN_CREDIT_ACCOUNT: 'credit-account:view-own',
+    VIEW_OWN_CREDIT_ORDERS: 'orders:view-own-credit',
 } as const
 
 export type Permission =
@@ -58,6 +59,14 @@ export function getPermissionsForUser(
     const permissions = new Set(
         getPermissionsForRole(user?.rol ?? null),
     )
+
+    // La empresa conserva el historial aunque pierda la habilitación.
+    if (
+        user?.rol === 'CLIENTE' &&
+        user.tipoCliente === 'EMPRESA'
+    ) {
+        permissions.add(PERMISSIONS.VIEW_OWN_CREDIT_ORDERS)
+    }
 
     // La habilitación comercial debe provenir del backend.
     // Si todavía no se recibió, no se concede este permiso.

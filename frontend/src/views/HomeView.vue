@@ -1,8 +1,29 @@
+<script setup lang="ts">
+import { computed } from 'vue'
+import PublicMenu from '@/components/PublicMenu.vue'
+import { getPermissionsForUser } from '@/config/permissions'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
+
+const permissions = computed(() =>
+    getPermissionsForUser(
+        auth.user
+        ? {
+            rol: auth.user.rol,
+            tipoCliente: auth.user.tipo_cliente,
+            }
+        : null,
+    ),
+)
+</script>
+
 <template>
     <!-- Inicio temporal: reemplazar cuando se integre la Home definitiva. -->
     <main class="home" aria-labelledby="home-title">
         <section class="home__card">
             <p class="home__brand">FERREPATAGONIA INDUSTRIAL</p>
+            <PublicMenu :permissions="permissions" />
             <h1 id="home-title">Bienvenido a Ferrepatagonia</h1>
             <p class="home__message">
                 Estamos preparando nuestro sitio. Pronto vas a poder explorar

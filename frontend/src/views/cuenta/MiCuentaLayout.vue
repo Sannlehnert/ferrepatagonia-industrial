@@ -1,17 +1,34 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AccountMenu from '@/components/AccountMenu.vue'
+import { getPermissionsForUser } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
-const saliendo = ref(false)
+const isLoggingOut = ref(false)
 
-async function cerrarSesion() {
-  saliendo.value = true
-  await auth.logout()
-  await router.replace({ name: 'login' }) // replace: "Atrás" no vuelve a lo privado
-  saliendo.value = false
+const permissions = computed(() =>
+  getPermissionsForUser(
+    auth.user
+      ? {
+          rol: auth.user.rol,
+          tipoCliente: auth.user.tipo_cliente,
+        }
+      : null,
+  ),
+)
+
+async function logout() {
+  isLoggingOut.value = true
+
+  try {
+    await auth.logout()
+    await router.replace({ name: 'login' })
+  } finally {
+    isLoggingOut.value = false
+  }
 }
 </script>
 
@@ -19,13 +36,11 @@ async function cerrarSesion() {
   <section class="cuenta">
     <aside class="cuenta__menu">
       <h2>Mi Cuenta</h2>
-      <nav>
-        <RouterLink :to="{ name: 'cuenta-datos' }">Mis datos</RouterLink>
-        <RouterLink :to="{ name: 'cuenta-pedidos' }">Mis pedidos</RouterLink>
-        <button type="button" :disabled="saliendo" @click="cerrarSesion">
-          {{ saliendo ? 'Saliendo...' : 'Cerrar sesión' }}
-        </button>
-      </nav>
+      <AccountMenu :permissions="permissions" />
+
+      <button type="button" :disabled="isLoggingOut" @click="logout">
+        {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
+      </button>
     </aside>
 
     <main class="cuenta__contenido">
@@ -35,8 +50,16 @@ async function cerrarSesion() {
 </template>
 
 <style scoped>
-.cuenta { display: grid; grid-template-columns: 220px 1fr; gap: 2rem; padding: 2rem; }
-.cuenta__menu nav { display: flex; flex-direction: column; gap: .5rem; }
-.cuenta__menu a.router-link-active { font-weight: 600; }
-@media (max-width: 700px) { .cuenta { grid-template-columns: 1fr; } }
+.cuenta {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 2rem;
+  padding: 2rem;
+}
+
+@media (max-width: 700px) {
+  .cuenta {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

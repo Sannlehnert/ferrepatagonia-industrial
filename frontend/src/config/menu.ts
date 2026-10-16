@@ -13,8 +13,7 @@ export const accountMenu: readonly MenuItem[] = [
     {
         id: 'account-orders',
         label: 'Historial de pedidos',
-        // Pendiente de habilitar y validar el historial en la integración de FER-4.
-        routeName: null,
+        routeName: 'cuenta-pedidos',
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
     },
     {
@@ -23,6 +22,13 @@ export const accountMenu: readonly MenuItem[] = [
         // Pendiente de implementar el destino y el filtro correspondiente.
         routeName: null,
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
+    },
+    {
+        id: 'account-credit-orders',
+        label: 'Pedidos con cuenta corriente',
+        // Destino pendiente hasta disponer de pantalla y datos específicos.
+        routeName: null,
+        permission: PERMISSIONS.VIEW_OWN_CREDIT_ORDERS,
     },
     {
         id: 'account-credit',
@@ -74,6 +80,12 @@ export const adminMenu: readonly MenuItem[] = [
 ]
 
 export const publicMenu: readonly MenuItem[] = [
+    {
+        id: 'public-admin-panel',
+        label: 'Panel de administración',
+        routeName: 'admin-dashboard',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
     {
         id: 'public-catalog',
         label: 'Catálogo',

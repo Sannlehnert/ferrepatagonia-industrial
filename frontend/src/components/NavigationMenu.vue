@@ -26,6 +26,7 @@ const visibleItems = computed(() =>
 
 <template>
     <nav
+        v-if="visibleItems.length > 0"
         :aria-label="props.label"
         class="navigation-menu"
         :class="{
