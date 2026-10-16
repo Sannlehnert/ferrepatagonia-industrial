@@ -415,3 +415,10 @@ Los fixtures PARTICULAR, EMPRESA y ADMIN se identifican mediante emails UUID y
 se eliminan al terminar. Los contadores AUTO_INCREMENT pueden avanzar. Se prueba
 login, contrato de sesión, usuario inactivo, rol desactualizado y logout aplicando
 la eliminación de cookie como un navegador. No usar una base de producción.
+
+## Catálogo público paginado — FER-12 / #189
+
+`GET /api/catalogo` devuelve productos y categorías activos, con `page` y `limit`.
+El precio es provisional: `precio: null`, `estadoPrecio: "PENDIENTE_DEFINICION"`;
+la política comercial y moneda quedan pendientes de FER-15.
+Consultar el [contrato REST, decisiones y pruebas](../docs/api/catalogo.md).
