@@ -4,6 +4,8 @@ import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
 import { adminRouter } from './routes/admin.routes';
 
+import { catalogRouter } from './routes/catalog.routes';
+
 export const app = express();
 app.use(cookieParser());
 
@@ -11,6 +13,7 @@ app.use(cookieParser());
 app.use('/api/auth', authRouter);
 app.use(express.json());
 app.use('/api', healthRouter);
+app.use('/api', catalogRouter);
 app.use('/api/admin', adminRouter);
 
 app.use((_req, res) => {
