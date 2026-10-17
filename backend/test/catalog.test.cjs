@@ -41,7 +41,11 @@ for (const cookie of [undefined, 'jwt_token=invalido']) {
 for (const query of ['page=0', 'page=-1', 'page=1.5', 'page=1e2', 'page=01', 'page=', 'page=%20',
   'page=%2B1', 'page=1000001', 'page=9007199254740992', 'page=1&page=2', 'page[]=1',
   'page[x]=1', 'limit=0', 'limit=-1', 'limit=101', 'limit=1.5', 'limit=1&limit=2',
-  'limit=', 'limit=abc', 'limit=01', 'limit=1e2', 'q=taladro', 'categoria=1',
+  'limit=', 'limit=abc', 'limit=01', 'limit=1e2', 'q=taladro',
+  'categoria=0', 'categoria=-1', 'categoria=', 'categoria=01', 'categoria=1.5',
+  'categoria=1e2', 'categoria=%20', 'categoria=%2B1', 'categoria=abc',
+  'categoria=2147483648', 'categoria=9007199254740992', 'categoria=1&categoria=2',
+  'categoria[]=1', 'categoria[id]=1', 'categoria=1%20OR%201=1',
   'page=1%20OR%201=1']) {
   test(`400 sin consultar BD: ${query}`, async t => {
     const stub = t.mock.method(repository, 'findCatalogPage', async () => { throw Error('no ejecutar'); });
@@ -75,9 +79,54 @@ for (const [page, limit, total, length, next, previous] of [
 test('validador rechaza objetos y arrays, y admite límites mínimos', () => {
   for (const value of [null, [], {}, 1, true, ['1'], 'Infinity']) {
     assert.equal(parseCatalogPagination({ page: value }), null);
+    assert.equal(parseCatalogPagination({ categoria: value }), null);
   }
   assert.deepEqual(parseCatalogPagination({ page: '1', limit: '1' }), { page: 1, limit: 1, offset: 0 });
+  assert.deepEqual(parseCatalogPagination({ categoria: '2147483647' }),
+    { page: 1, limit: 20, offset: 0, categoria: 2147483647 });
 });
+
+for (const total of [0, 3]) {
+  test(`HTTP propaga categoría y paginación con total ${total}`, async t => {
+    const stub = t.mock.method(repository, 'findCatalogPage', async () => ({
+      rows: total ? [{ ...row, disponible: 0 }] : [], total,
+    }));
+    const response = await fetch(`${url}?categoria=2&page=2&limit=2`);
+    assert.equal(response.status, 200);
+    assert.deepEqual(stub.mock.calls[0].arguments, [{ page: 2, limit: 2, offset: 2, categoria: 2 }]);
+    const { data } = await response.json();
+    assert.deepEqual(data.pagination, { page: 2, limit: 2, total, totalPages: Math.ceil(total / 2),
+      hasNext: false, hasPrevious: total > 0 });
+    assert.equal(data.productos.length, total ? 1 : 0);
+    for (const product of data.productos) {
+      assert.equal(product.disponible, false);
+      assert.equal(product.precio, null);
+      assert.equal(product.estadoPrecio, 'PENDIENTE_DEFINICION');
+    }
+  });
+}
+
+for (const categoria of [undefined, 2, 2147483647]) {
+  test(`COUNT y SELECT comparten predicado y parámetros: categoría ${categoria}`, async t => {
+    const queries = [];
+    t.mock.method(pool, 'getConnection', async () => ({
+      query: async (query, values) => {
+        if (typeof query === 'string') return [];
+        queries.push({ sql: query.sql, values });
+        return query.sql.includes('COUNT(*)') ? [{ total: 0n }] : [];
+      },
+      commit: async () => {}, release: () => {},
+    }));
+    await repository.findCatalogPage({ page: 3, limit: 2, offset: 4, categoria });
+    const [count, select] = queries;
+    const predicate = sql => sql.match(/WHERE\s+(.+?)\s*(?:ORDER BY|$)/s)[1].trim();
+    assert.equal(predicate(count.sql), predicate(select.sql));
+    assert.equal(predicate(count.sql), 'p.activo = 1 AND c.activo = 1'
+      + (categoria === undefined ? '' : ' AND p.id_categoria = ?'));
+    assert.deepEqual(count.values, categoria === undefined ? [] : [categoria]);
+    assert.deepEqual(select.values, [...count.values, 2, 4]);
+  });
+}
 test('error interno no filtra detalles ni adopta status del driver', async t => {
   t.mock.method(repository, 'findCatalogPage', async () => { throw Object.assign(Error('SQL secreto'), { status: 401 }); });
   t.mock.method(console, 'error', () => {});

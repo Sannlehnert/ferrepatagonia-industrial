@@ -13,7 +13,7 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
   const categories = [], products = [];
   let server;
   try {
-    for (const active of [1, 0]) {
+    for (const active of [1, 0, 1, 1, 1]) {
       const result = await pool.query('INSERT INTO CATEGORIA (nombre, activo) VALUES (?, ?)', [prefix, active]);
       categories.push(Number(result.insertId));
     }
@@ -30,6 +30,8 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
     await addProduct(pool, categories[0], 1, 1);
     const inactiveProduct = await addProduct(pool, categories[0], 0, 8);
     const inactiveCategory = await addProduct(pool, categories[1], 1, 8);
+    await addProduct(pool, categories[3], 0, 8);
+    await addProduct(pool, categories[4], 1, 8);
     server = app.listen(0, '127.0.0.1');
     await once(server, 'listening');
     const url = `http://127.0.0.1:${server.address().port}/api/catalogo`;
@@ -61,6 +63,53 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
       assert.equal(collected.find(p => p.id === products[1]).disponible, false);
     });
 
+    await t.test('categoría activa: contrato HTTP y paginación sobre el subconjunto', async () => {
+      for (const page of [1, 2, 3, 4, 1000000]) {
+        const response = await fetch(`${url}?categoria=${categories[0]}&page=${page}&limit=2`);
+        assert.equal(response.status, 200);
+        const { data } = await response.json();
+        assert.deepEqual(data.productos, products.slice(0, 3).slice((page - 1) * 2, page * 2).map((id) => ({
+          id, nombre: 'Mismo nombre', codigo: prefix,
+          categoria: { id: categories[0], nombre: prefix },
+          disponible: id !== products[1], precio: null, estadoPrecio: 'PENDIENTE_DEFINICION',
+        })));
+        assert.deepEqual(data.pagination, { page, limit: 2, total: 3, totalPages: 2,
+          hasNext: page < 2, hasPrevious: page > 1 && page <= 3 });
+      }
+      const response = await fetch(`${url}?categoria=${categories[0]}`);
+      assert.equal(response.status, 200);
+      const { data } = await response.json();
+      assert.deepEqual(data.productos.map(p => p.id), products.slice(0, 3));
+      assert.deepEqual(data.pagination, { page: 1, limit: 20, total: 3, totalPages: 1,
+        hasNext: false, hasPrevious: false });
+    });
+
+    await t.test('categorías inactiva, vacía, solo productos inactivos e inexistente devuelven vacío', async () => {
+      // Reservar un ID propio y eliminarlo evita suponer que un ID fijo no existe.
+      const result = await pool.query('INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 1)', [prefix]);
+      const missing = Number(result.insertId);
+      categories.push(missing);
+      await pool.query('DELETE FROM CATEGORIA WHERE id_categoria = ?', [missing]);
+      for (const categoria of [categories[1], categories[2], categories[3], missing]) {
+        for (const page of [1, 2, 1000000]) {
+          const response = await fetch(`${url}?categoria=${categoria}&page=${page}&limit=2`);
+          assert.equal(response.status, 200);
+          assert.deepEqual(await response.json(), { data: { productos: [],
+            pagination: { page, limit: 2, total: 0, totalPages: 0, hasNext: false, hasPrevious: false },
+          } });
+        }
+      }
+    });
+
+    await t.test('categoría inválida rechazada por HTTP real', async () => {
+      for (const query of ['categoria=0', 'categoria=2147483648', 'categoria=1&categoria=2',
+        'categoria=1%20OR%201=1', 'categoria=1&limit=101', 'categoria=1&page=0']) {
+        const response = await fetch(`${url}?${query}`);
+        assert.equal(response.status, 400);
+        assert.deepEqual(Object.keys(await response.json()), ['message']);
+      }
+    });
+
     await t.test('catálogo vacío: ninguna página tiene anterior ni siguiente', async t => {
       const connection = await pool.getConnection();
       try {
@@ -90,7 +139,8 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
       }
     });
 
-    await t.test('inserción concurrente entre count y filas no cambia el snapshot', async t => {
+    for (const categoria of [undefined, categories[0]]) {
+    await t.test(`inserción concurrente conserva snapshot, categoría ${categoria}`, async t => {
       const reader = await pool.getConnection();
       const writer = await pool.getConnection();
       let inserted;
@@ -103,17 +153,21 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
           return result;
         });
         const connectionMock = t.mock.method(pool, 'getConnection', async () => reader);
-        const snapshot = await findCatalogPage({ page: 1, limit: 100, offset: 0 });
+        const snapshot = await findCatalogPage({ page: 1, limit: 100, offset: 0, categoria });
         connectionMock.mock.restore();
         assert.ok(!snapshot.rows.some(p => p.id_producto === inserted));
         const [now] = await writer.query(`SELECT COUNT(*) AS total FROM PRODUCTO p
-          INNER JOIN CATEGORIA c ON p.id_categoria = c.id_categoria WHERE p.activo = 1 AND c.activo = 1`);
+          INNER JOIN CATEGORIA c ON p.id_categoria = c.id_categoria WHERE p.activo = 1 AND c.activo = 1
+          ${categoria === undefined ? '' : 'AND p.id_categoria = ?'}`,
+          categoria === undefined ? [] : [categoria]);
         assert.equal(Number(now.total), snapshot.total + 1);
+        if (categoria !== undefined) assert.ok(snapshot.rows.every(p => p.id_categoria === categoria));
       } finally {
         t.mock.restoreAll();
         writer.release();
       }
     });
+    }
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
     try {
