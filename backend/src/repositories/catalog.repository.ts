@@ -10,7 +10,10 @@ type CatalogRow = {
   disponible: number;
 };
 
-export async function findCatalogPage({ limit, offset }: CatalogPagination) {
+export async function findCatalogPage({ limit, offset, categoria }: CatalogPagination) {
+  const where = 'p.activo = 1 AND c.activo = 1'
+    + (categoria === undefined ? '' : ' AND p.id_categoria = ?');
+  const parameters = categoria === undefined ? [] : [categoria];
   const connection = await pool.getConnection();
   let reusable = true;
   try {
@@ -20,16 +23,16 @@ export async function findCatalogPage({ limit, offset }: CatalogPagination) {
     const [count] = await connection.query<{ total: bigint }[]>({ sql: `
       SELECT COUNT(*) AS total
       FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
-      WHERE p.activo = 1 AND c.activo = 1
-    `, timeout: 5000 });
+      WHERE ${where}
+    `, timeout: 5000 }, parameters);
     const rows = await connection.query<CatalogRow[]>({ sql: `
       SELECT p.id_producto, p.nombre, p.codigo, c.id_categoria,
              c.nombre AS categoria_nombre, (p.stock > 0) AS disponible
       FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
-      WHERE p.activo = 1 AND c.activo = 1
+      WHERE ${where}
       ORDER BY p.id_producto ASC
       LIMIT ? OFFSET ?
-    `, timeout: 5000 }, [limit, offset]);
+    `, timeout: 5000 }, [...parameters, limit, offset]);
     await connection.commit();
     return { rows, total: Number(count.total) };
   } catch (error) {

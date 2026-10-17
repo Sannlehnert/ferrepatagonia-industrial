@@ -1,8 +1,8 @@
-export type CatalogPagination = { page: number; limit: number; offset: number };
+export type CatalogPagination = { page: number; limit: number; offset: number; categoria?: number };
 
 // Límites operativos del endpoint, no reglas comerciales.
 export function parseCatalogPagination(query: Record<string, unknown>): CatalogPagination | null {
-  if (Object.keys(query).some(key => key !== 'page' && key !== 'limit')) return null;
+  if (Object.keys(query).some(key => !['page', 'limit', 'categoria'].includes(key))) return null;
   const parse = (value: unknown, fallback: number, max: number): number | null => {
     if (value === undefined) return fallback;
     if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value)) return null;
@@ -12,5 +12,9 @@ export function parseCatalogPagination(query: Record<string, unknown>): CatalogP
   const page = parse(query.page, 1, 1_000_000);
   const limit = parse(query.limit, 20, 100);
   if (page === null || limit === null) return null;
-  return { page, limit, offset: (page - 1) * limit };
+  // CATEGORIA.id_categoria es INT con signo en MariaDB.
+  const categoria = parse(query.categoria, 1, 2_147_483_647);
+  if (categoria === null) return null;
+  return { page, limit, offset: (page - 1) * limit,
+    ...(query.categoria === undefined ? {} : { categoria }) };
 }
