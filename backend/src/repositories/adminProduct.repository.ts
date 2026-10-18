@@ -117,3 +117,11 @@ export const update = async (id: number, data: UpdateProductDTO): Promise<boolea
     );
     return result.affectedRows > 0;
 };
+
+export const deactivate = async (id: number): Promise<boolean> => {
+    const result = await pool.query(
+        'UPDATE PRODUCTO SET activo = 0 WHERE id_producto = ?',
+        [id]
+    );
+    return result.affectedRows > 0;
+};

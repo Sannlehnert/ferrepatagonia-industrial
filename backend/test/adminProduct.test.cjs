@@ -104,4 +104,39 @@ describe('Admin Products Endpoints (#197)', () => {
         const updatedBody = await updateRes.json();
         assert.equal(updatedBody.nombre, 'Taladro Test 197 Editado');
     });
+
+    it('should soft-delete (deactivate) a product idempotently', async () => {
+        // 1. Crear producto temporal para la prueba
+        const createRes = await fetch(`${BASE_URL}/admin/productos`, {
+            method: 'POST',
+            headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id_categoria: 1, 
+                codigo: `TEST-SKU-DEACT-${Date.now()}`,
+                nombre: 'Producto a desactivar',
+                precio: 100,
+                stock: 5,
+                activo: true
+            })
+        });
+        const createdId = (await createRes.json()).id_producto;
+
+        // 2. Desactivarlo por primera vez
+        const deactRes1 = await fetch(`${BASE_URL}/admin/productos/${createdId}/desactivar`, {
+            method: 'PATCH',
+            headers: { 'Cookie': adminCookie }
+        });
+        assert.equal(deactRes1.status, 200, 'Fallo la primera desactivacion');
+        
+        const body1 = await deactRes1.json();
+        // Dependiendo del driver, MariaDB devuelve 0 o false para el TINYINT(1)
+        assert.equal(Boolean(body1.product.activo), false, 'El producto sigue activo'); 
+
+        // 3. Desactivarlo de nuevo (Prueba de Idempotencia)
+        const deactRes2 = await fetch(`${BASE_URL}/admin/productos/${createdId}/desactivar`, {
+            method: 'PATCH',
+            headers: { 'Cookie': adminCookie }
+        });
+        assert.equal(deactRes2.status, 200, 'Fallo la idempotencia');
+    });
 });

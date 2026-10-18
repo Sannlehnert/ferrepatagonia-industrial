@@ -1,4 +1,4 @@
-import { findAllAdmin, findById, findByCodigo, categoryExists, create, update, CreateProductDTO, UpdateProductDTO } from '../repositories/adminProduct.repository';
+import { findAllAdmin, findById, findByCodigo, categoryExists, create, update, CreateProductDTO, UpdateProductDTO, deactivate } from '../repositories/adminProduct.repository';
 
 export class ValidationError extends Error {
     statusCode: number;
@@ -58,5 +58,18 @@ export const updateAdminProduct = async (id: number, payload: UpdateProductDTO) 
     
     await validateProductFields(payload, true, id);
     await update(id, payload);
+    return await findById(id);
+};
+
+export const deactivateAdminProduct = async (id: number) => {
+    const existing = await findById(id);
+    if (!existing) throw new ValidationError('Producto no encontrado.', 404);
+    
+    // Comportamiento idempotente: si ya está inactivo, retornamos sin hacer nada
+    if (existing.activo === 0 || existing.activo === false) {
+        return existing;
+    }
+    
+    await deactivate(id);
     return await findById(id);
 };
