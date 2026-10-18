@@ -5,8 +5,7 @@ export function parseCatalogPagination(query: Record<string, unknown>): CatalogP
   if (Object.keys(query).some(key => !['page', 'limit', 'categoria', 'busqueda'].includes(key))) return null;
   let busqueda: string | undefined;
   if (query.busqueda !== undefined) {
-    // #194 incorporará la combinación; no ignorar silenciosamente ningún filtro.
-    if (query.categoria !== undefined || typeof query.busqueda !== 'string') return null;
+    if (typeof query.busqueda !== 'string') return null;
     if ([...query.busqueda].length > 200 || /[\u0000-\u001f\u007f]/u.test(query.busqueda)) return null;
     busqueda = query.busqueda.trim();
     if (!busqueda) return null;

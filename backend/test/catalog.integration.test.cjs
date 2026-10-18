@@ -162,7 +162,10 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
       for (const suffix of ['%', '_', '!', '\\', "' OR 1=1 --", 'X']) {
         await add(token + suffix, token + suffix);
       }
-      const visible = fixtures.filter(p => p.active && p.category === categories[0]);
+      // Coincidencias por nombre y por código fuera de la categoría detectan un OR mal agrupado.
+      await add(token + ' externo', 'OTHER', 1, categories[4]);
+      await add('Externo', token + ' externo', 1, categories[4]);
+      const visible = fixtures.filter(p => p.active && [categories[0], categories[4]].includes(p.category));
       for (const [search, expected] of [
         [token.toUpperCase(), visible],
         ['  ' + token + ' taladro  doble  ', [fixtures[0]]],
@@ -173,55 +176,64 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
           visible.filter(p => p.nombre === token + suffix)]),
         ["' OR 1=1 -- " + token, []],
       ]) {
-        const pages = Math.ceil(expected.length / 2);
-        for (const page of [...Array.from({ length: pages + 2 }, (_, n) => n + 1), 1000000]) {
-          const response = await fetch(url + '?' + new URLSearchParams({ busqueda: search, page: String(page), limit: '2' }));
-          assert.equal(response.status, 200);
-          const { data } = await response.json();
-          assert.deepEqual(data.productos, expected.slice((page - 1) * 2, page * 2).map(p => ({
-            id: p.id, nombre: p.nombre, codigo: p.codigo,
-            categoria: { id: p.category, nombre: prefix }, disponible: p.stock > 0,
-            precio: null, estadoPrecio: 'PENDIENTE_DEFINICION',
-          })));
-          assert.deepEqual(data.pagination, { page, limit: 2, total: expected.length, totalPages: pages,
-            hasNext: page < pages, hasPrevious: page > 1 && page - 1 <= pages });
+        for (const categoria of [undefined, ...categories]) {
+          const filtered = expected.filter(p => categoria === undefined || p.category === categoria);
+          const pages = Math.ceil(filtered.length / 2);
+          for (const page of [...Array.from({ length: pages + 2 }, (_, n) => n + 1), 1000000]) {
+            const response = await fetch(url + '?' + new URLSearchParams({ busqueda: search, page: String(page), limit: '2',
+              ...(categoria === undefined ? {} : { categoria: String(categoria) }) }));
+            assert.equal(response.status, 200);
+            const { data } = await response.json();
+            assert.deepEqual(data.productos, filtered.slice((page - 1) * 2, page * 2).map(p => ({
+              id: p.id, nombre: p.nombre, codigo: p.codigo,
+              categoria: { id: p.category, nombre: prefix }, disponible: p.stock > 0,
+              precio: null, estadoPrecio: 'PENDIENTE_DEFINICION',
+            })));
+            assert.deepEqual(data.pagination, { page, limit: 2, total: filtered.length, totalPages: pages,
+              hasNext: page < pages, hasPrevious: page > 1 && page - 1 <= pages });
+          }
         }
       }
       for (const query of ['busqueda=', 'busqueda=%20', 'busqueda=a&busqueda=b',
         'busqueda[]=a', 'busqueda[x]=a', 'busqueda=%00', 'busqueda=' + 'a'.repeat(201),
-        'busqueda=a&categoria=' + categories[0]]) {
+        'busqueda=a&categoria=0', 'busqueda=%00&categoria=' + categories[0],
+        'busqueda=a&categoria=' + categories[0] + '&limit=101']) {
         assert.equal((await fetch(url + '?' + query)).status, 400);
       }
     });
 
     for (const categoria of [undefined, categories[0]]) {
-    await t.test(`inserción concurrente conserva snapshot, categoría ${categoria}`, async t => {
-      const reader = await pool.getConnection();
-      const writer = await pool.getConnection();
-      let inserted;
-      const originalQuery = reader.query.bind(reader);
-      try {
-        t.mock.method(reader, 'query', async (...args) => {
-          const result = await originalQuery(...args);
-          const sql = typeof args[0] === 'string' ? args[0] : args[0].sql;
-          if (sql.includes('COUNT(*)')) inserted = await addProduct(writer, categories[0], 1, 5);
-          return result;
+      for (const busqueda of [undefined, prefix]) {
+        await t.test(`inserción concurrente conserva snapshot, categoría ${categoria}, búsqueda ${busqueda}`, async t => {
+          const reader = await pool.getConnection();
+          const writer = await pool.getConnection();
+          let inserted;
+          const originalQuery = reader.query.bind(reader);
+          try {
+            t.mock.method(reader, 'query', async (...args) => {
+              const result = await originalQuery(...args);
+              const sql = typeof args[0] === 'string' ? args[0] : args[0].sql;
+              if (sql.includes('COUNT(*)')) inserted = await addProduct(writer, categories[0], 1, 5);
+              return result;
+            });
+            const connectionMock = t.mock.method(pool, 'getConnection', async () => reader);
+            const snapshot = await findCatalogPage({ page: 1, limit: 100, offset: 0, categoria, busqueda });
+            connectionMock.mock.restore();
+            assert.ok(!snapshot.rows.some(p => p.id_producto === inserted));
+            const [now] = await writer.query(`SELECT COUNT(*) AS total FROM PRODUCTO p
+              INNER JOIN CATEGORIA c ON p.id_categoria = c.id_categoria WHERE p.activo = 1 AND c.activo = 1
+              ${categoria === undefined ? '' : 'AND p.id_categoria = ?'}
+              ${busqueda === undefined ? '' : 'AND (p.nombre LIKE ? OR p.codigo LIKE ?)'}`,
+              [...(categoria === undefined ? [] : [categoria]),
+                ...(busqueda === undefined ? [] : ['%' + prefix + '%', '%' + prefix + '%'])]);
+            assert.equal(Number(now.total), snapshot.total + 1);
+            if (categoria !== undefined) assert.ok(snapshot.rows.every(p => p.id_categoria === categoria));
+          } finally {
+            t.mock.restoreAll();
+            writer.release();
+          }
         });
-        const connectionMock = t.mock.method(pool, 'getConnection', async () => reader);
-        const snapshot = await findCatalogPage({ page: 1, limit: 100, offset: 0, categoria });
-        connectionMock.mock.restore();
-        assert.ok(!snapshot.rows.some(p => p.id_producto === inserted));
-        const [now] = await writer.query(`SELECT COUNT(*) AS total FROM PRODUCTO p
-          INNER JOIN CATEGORIA c ON p.id_categoria = c.id_categoria WHERE p.activo = 1 AND c.activo = 1
-          ${categoria === undefined ? '' : 'AND p.id_categoria = ?'}`,
-          categoria === undefined ? [] : [categoria]);
-        assert.equal(Number(now.total), snapshot.total + 1);
-        if (categoria !== undefined) assert.ok(snapshot.rows.every(p => p.id_categoria === categoria));
-      } finally {
-        t.mock.restoreAll();
-        writer.release();
       }
-    });
     }
   } finally {
     if (server) await new Promise(resolve => server.close(resolve));
