@@ -10,10 +10,19 @@ type CatalogRow = {
   disponible: number;
 };
 
-export async function findCatalogPage({ limit, offset, categoria }: CatalogPagination) {
+export async function findCatalogPage({ limit, offset, categoria, busqueda }: CatalogPagination) {
+  if (categoria !== undefined && busqueda !== undefined) {
+    throw new Error('Combinar busqueda y categoria queda pendiente de #194.');
+  }
   const where = 'p.activo = 1 AND c.activo = 1'
-    + (categoria === undefined ? '' : ' AND p.id_categoria = ?');
-  const parameters = categoria === undefined ? [] : [categoria];
+    + (categoria === undefined ? '' : ' AND p.id_categoria = ?')
+    + (busqueda === undefined ? '' : " AND (p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE '!')");
+  const parameters: (string | number)[] = categoria === undefined ? [] : [categoria];
+  if (busqueda !== undefined) {
+    // Escape explícito: %, _ y el propio ! se buscan literalmente.
+    const pattern = `%${busqueda.replace(/[!%_]/g, '!$&')}%`;
+    parameters.push(pattern, pattern);
+  }
   const connection = await pool.getConnection();
   let reusable = true;
   try {
