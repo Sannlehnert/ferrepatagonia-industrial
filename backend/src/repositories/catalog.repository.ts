@@ -11,9 +11,6 @@ type CatalogRow = {
 };
 
 export async function findCatalogPage({ limit, offset, categoria, busqueda }: CatalogPagination) {
-  if (categoria !== undefined && busqueda !== undefined) {
-    throw new Error('Combinar busqueda y categoria queda pendiente de #194.');
-  }
   const where = 'p.activo = 1 AND c.activo = 1'
     + (categoria === undefined ? '' : ' AND p.id_categoria = ?')
     + (busqueda === undefined ? '' : " AND (p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE '!')");

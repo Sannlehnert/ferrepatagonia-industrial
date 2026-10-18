@@ -180,7 +180,8 @@ for (const failAt of [null, 'acquire', 'isolation', 'start', 'count', 'rows', 'c
 
 for (const query of ['busqueda=', 'busqueda=%20%20', 'busqueda=a&busqueda=b',
   'busqueda[]=a', 'busqueda[x]=a', 'busqueda=%00', 'busqueda=%09a',
-  'busqueda=' + 'a'.repeat(201), 'busqueda=a&categoria=2']) {
+  'busqueda=' + 'a'.repeat(201), 'busqueda=a&categoria=0', 'busqueda=a&categoria=2&categoria=3',
+  'busqueda=a&categoria=2&limit=101', 'busqueda=%00&categoria=2', 'busqueda=a&busqueda=b&categoria=2']) {
   test('busqueda invalida sin consultar BD: ' + query, async t => {
     const stub = t.mock.method(repository, 'findCatalogPage', async () => { throw Error('no ejecutar'); });
     assert.equal((await fetch(url + '?' + query)).status, 400);
@@ -206,8 +207,9 @@ for (const total of [0, 3]) {
     assert.deepEqual(data.pagination, { page: 2, limit: 2, total, totalPages: Math.ceil(total / 2), hasNext: false, hasPrevious: total > 0 });
   });
 }
+for (const categoria of [undefined, 2, 2147483647])
 for (const busqueda of ['Taladro', '%_!\\', "' OR 1=1 --"]) {
-  test('SQL parametrizado y escape literal: ' + busqueda, async t => {
+  test('SQL parametrizado y escape literal: ' + categoria + ' / ' + busqueda, async t => {
     const queries = [];
     t.mock.method(pool, 'getConnection', async () => ({
       query: async (query, values) => {
@@ -216,18 +218,45 @@ for (const busqueda of ['Taladro', '%_!\\', "' OR 1=1 --"]) {
         return query.sql.includes('COUNT(*)') ? [{ total: 0n }] : [];
       }, commit: async () => {}, release: () => {},
     }));
-    await repository.findCatalogPage({ page: 2, limit: 2, offset: 2, busqueda });
+    await repository.findCatalogPage({ page: 2, limit: 2, offset: 2, busqueda, categoria });
     const pattern = '%' + busqueda.replace(/[!%_]/g, '!$&') + '%';
-    assert.deepEqual(queries[0].values, [pattern, pattern]);
-    assert.deepEqual(queries[1].values, [pattern, pattern, 2, 2]);
+    const params = [...(categoria === undefined ? [] : [categoria]), pattern, pattern];
+    assert.deepEqual(queries[0].values, params);
+    const predicate = sql => sql.match(/WHERE\s+(.+?)\s*(?:ORDER BY|$)/s)[1].trim();
+    assert.equal(predicate(queries[0].sql), predicate(queries[1].sql));
+    assert.equal(predicate(queries[0].sql), 'p.activo = 1 AND c.activo = 1'
+      + (categoria === undefined ? '' : ' AND p.id_categoria = ?')
+      + " AND (p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE '!')");
+    assert.deepEqual(queries[1].values, [...params, 2, 2]);
     for (const query of queries) {
       assert.ok(query.sql.includes("AND (p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE '!')"));
       assert.ok(!query.sql.includes(busqueda));
     }
   });
 }
-test('repositorio tambien rechaza combinacion pendiente de #194', async t => {
-  const stub = t.mock.method(pool, 'getConnection', async () => { throw Error('no ejecutar'); });
-  await assert.rejects(repository.findCatalogPage({ page: 1, limit: 20, offset: 0, busqueda: 'a', categoria: 1 }), /#194/);
-  assert.equal(stub.mock.callCount(), 0);
+test('validador combina filtros sin omitir validaciones individuales', () => {
+  assert.deepEqual(parseCatalogPagination({ busqueda: '  Taladro  ', categoria: '2', page: '2', limit: '2' }),
+    { page: 2, limit: 2, offset: 2, categoria: 2, busqueda: 'Taladro' });
+  for (const value of [null, [], {}, 1, true, ['a']]) {
+    assert.equal(parseCatalogPagination({ busqueda: value, categoria: '2' }), null);
+    assert.equal(parseCatalogPagination({ busqueda: 'a', categoria: value }), null);
+  }
 });
+for (const [page, total, length] of [[1, 3, 2], [2, 3, 1], [3, 3, 0], [4, 3, 0], [1000000, 3, 0], [1, 0, 0], [2, 0, 0]]) {
+  test('HTTP combina filtros y pagina: ' + page + '/' + total, async t => {
+    const stub = t.mock.method(repository, 'findCatalogPage', async () => ({ rows: Array.from({length}, () => row), total }));
+    const response = await fetch(url + '?busqueda=%20Taladro%20&categoria=2&limit=2&page=' + page);
+    assert.equal(response.status, 200);
+    assert.deepEqual(stub.mock.calls[0].arguments, [{ page, limit: 2, offset: (page - 1) * 2, categoria: 2, busqueda: 'Taladro' }]);
+    const { data } = await response.json();
+    assert.equal(data.productos.length, length);
+    assert.deepEqual(data.pagination, { page, limit: 2, total, totalPages: Math.ceil(total / 2),
+      hasNext: page < Math.ceil(total / 2), hasPrevious: page > 1 && page - 1 <= Math.ceil(total / 2) });
+    for (const p of data.productos) {
+      assert.equal(p.precio, null);
+      assert.equal(p.estadoPrecio, 'PENDIENTE_DEFINICION');
+      assert.equal(typeof p.disponible, 'boolean');
+      assert.equal('stock' in p, false);
+    }
+  });
+}
