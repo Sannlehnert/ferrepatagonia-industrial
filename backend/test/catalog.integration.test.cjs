@@ -139,6 +139,61 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
       }
     });
 
+    await t.test('busqueda real: nombre/codigo, collation, literales y paginacion', async () => {
+      const columns = await pool.query('SHOW FULL COLUMNS FROM PRODUCTO');
+      for (const field of ['nombre', 'codigo']) {
+        assert.equal(columns.find(c => c.Field === field).Collation, 'utf8mb4_unicode_ci');
+      }
+      const token = randomUUID();
+      const fixtures = [];
+      const add = async (nombre, codigo, active = 1, category = categories[0], stock = 1) => {
+        const result = await pool.query(
+          'INSERT INTO PRODUCTO (id_categoria, nombre, codigo, precio, stock, activo) VALUES (?, ?, ?, 10, ?, ?)',
+          [category, nombre, codigo, stock, active]);
+        const id = Number(result.insertId);
+        products.push(id);
+        fixtures.push({ id, nombre, codigo, active, category, stock });
+      };
+      await add(token + ' Taládro  doble', 'OTHER', 1, categories[0], 0);
+      await add('Otro', token + ' ABC');
+      await add(token + ' Mixto', token + ' MIX');
+      await add(token + ' inactivo', token, 0);
+      await add(token + ' categoria inactiva', token, 1, categories[1]);
+      for (const suffix of ['%', '_', '!', '\\', "' OR 1=1 --", 'X']) {
+        await add(token + suffix, token + suffix);
+      }
+      const visible = fixtures.filter(p => p.active && p.category === categories[0]);
+      for (const [search, expected] of [
+        [token.toUpperCase(), visible],
+        ['  ' + token + ' taladro  doble  ', [fixtures[0]]],
+        [token + ' abc', [fixtures[1]]],
+        [token + ' mix', [fixtures[2]]],
+        [token + ' missing', []],
+        ...['%', '_', '!', '\\', "' OR 1=1 --"].map(suffix => [token + suffix,
+          visible.filter(p => p.nombre === token + suffix)]),
+        ["' OR 1=1 -- " + token, []],
+      ]) {
+        const pages = Math.ceil(expected.length / 2);
+        for (const page of [...Array.from({ length: pages + 2 }, (_, n) => n + 1), 1000000]) {
+          const response = await fetch(url + '?' + new URLSearchParams({ busqueda: search, page: String(page), limit: '2' }));
+          assert.equal(response.status, 200);
+          const { data } = await response.json();
+          assert.deepEqual(data.productos, expected.slice((page - 1) * 2, page * 2).map(p => ({
+            id: p.id, nombre: p.nombre, codigo: p.codigo,
+            categoria: { id: p.category, nombre: prefix }, disponible: p.stock > 0,
+            precio: null, estadoPrecio: 'PENDIENTE_DEFINICION',
+          })));
+          assert.deepEqual(data.pagination, { page, limit: 2, total: expected.length, totalPages: pages,
+            hasNext: page < pages, hasPrevious: page > 1 && page - 1 <= pages });
+        }
+      }
+      for (const query of ['busqueda=', 'busqueda=%20', 'busqueda=a&busqueda=b',
+        'busqueda[]=a', 'busqueda[x]=a', 'busqueda=%00', 'busqueda=' + 'a'.repeat(201),
+        'busqueda=a&categoria=' + categories[0]]) {
+        assert.equal((await fetch(url + '?' + query)).status, 400);
+      }
+    });
+
     for (const categoria of [undefined, categories[0]]) {
     await t.test(`inserción concurrente conserva snapshot, categoría ${categoria}`, async t => {
       const reader = await pool.getConnection();

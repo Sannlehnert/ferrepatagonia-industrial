@@ -177,3 +177,57 @@ for (const failAt of [null, 'acquire', 'isolation', 'start', 'count', 'rows', 'c
     }
   });
 }
+
+for (const query of ['busqueda=', 'busqueda=%20%20', 'busqueda=a&busqueda=b',
+  'busqueda[]=a', 'busqueda[x]=a', 'busqueda=%00', 'busqueda=%09a',
+  'busqueda=' + 'a'.repeat(201), 'busqueda=a&categoria=2']) {
+  test('busqueda invalida sin consultar BD: ' + query, async t => {
+    const stub = t.mock.method(repository, 'findCatalogPage', async () => { throw Error('no ejecutar'); });
+    assert.equal((await fetch(url + '?' + query)).status, 400);
+    assert.equal(stub.mock.callCount(), 0);
+  });
+}
+test('valida tipo, longitud Unicode, espacios y controles de busqueda', () => {
+  for (const busqueda of [null, [], {}, 1, true, ['a'], '\n', 'a'.repeat(201)]) {
+    assert.equal(parseCatalogPagination({ busqueda }), null);
+  }
+  for (const busqueda of ['a', 'a'.repeat(200), '\u{1F600}'.repeat(200), '%_!\\', "' OR 1=1 --"]) {
+    assert.equal(parseCatalogPagination({ busqueda }).busqueda, busqueda);
+  }
+  assert.equal(parseCatalogPagination({ busqueda: '  taladro  doble  ' }).busqueda, 'taladro  doble');
+});
+for (const total of [0, 3]) {
+  test('HTTP busqueda normalizada y metadatos: ' + total, async t => {
+    const stub = t.mock.method(repository, 'findCatalogPage', async () => ({ rows: total ? [row] : [], total }));
+    const response = await fetch(url + '?busqueda=%20Taladro%20&page=2&limit=2');
+    assert.equal(response.status, 200);
+    assert.deepEqual(stub.mock.calls[0].arguments, [{ page: 2, limit: 2, offset: 2, busqueda: 'Taladro' }]);
+    const { data } = await response.json();
+    assert.deepEqual(data.pagination, { page: 2, limit: 2, total, totalPages: Math.ceil(total / 2), hasNext: false, hasPrevious: total > 0 });
+  });
+}
+for (const busqueda of ['Taladro', '%_!\\', "' OR 1=1 --"]) {
+  test('SQL parametrizado y escape literal: ' + busqueda, async t => {
+    const queries = [];
+    t.mock.method(pool, 'getConnection', async () => ({
+      query: async (query, values) => {
+        if (typeof query === 'string') return [];
+        queries.push({ sql: query.sql, values });
+        return query.sql.includes('COUNT(*)') ? [{ total: 0n }] : [];
+      }, commit: async () => {}, release: () => {},
+    }));
+    await repository.findCatalogPage({ page: 2, limit: 2, offset: 2, busqueda });
+    const pattern = '%' + busqueda.replace(/[!%_]/g, '!$&') + '%';
+    assert.deepEqual(queries[0].values, [pattern, pattern]);
+    assert.deepEqual(queries[1].values, [pattern, pattern, 2, 2]);
+    for (const query of queries) {
+      assert.ok(query.sql.includes("AND (p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE '!')"));
+      assert.ok(!query.sql.includes(busqueda));
+    }
+  });
+}
+test('repositorio tambien rechaza combinacion pendiente de #194', async t => {
+  const stub = t.mock.method(pool, 'getConnection', async () => { throw Error('no ejecutar'); });
+  await assert.rejects(repository.findCatalogPage({ page: 1, limit: 20, offset: 0, busqueda: 'a', categoria: 1 }), /#194/);
+  assert.equal(stub.mock.callCount(), 0);
+});
