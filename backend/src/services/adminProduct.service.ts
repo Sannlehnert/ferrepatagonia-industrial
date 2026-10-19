@@ -1,4 +1,4 @@
-import { findAllAdmin, findById, findByCodigo, categoryExists, create, update, CreateProductDTO, UpdateProductDTO, deactivate } from '../repositories/adminProduct.repository';
+import { findAllAdmin, findById, findByCodigo, categoryExists, create, update, CreateProductDTO, UpdateProductDTO, deactivate, updateStock } from '../repositories/adminProduct.repository';
 
 export class ValidationError extends Error {
     statusCode: number;
@@ -71,5 +71,18 @@ export const deactivateAdminProduct = async (id: number) => {
     }
     
     await deactivate(id);
+    return await findById(id);
+};
+
+export const updateAdminProductStock = async (id: number, stock: any) => {
+    const existing = await findById(id);
+    if (!existing) throw new ValidationError('Producto no encontrado.', 404);
+
+    const numStock = Number(stock);
+    if (!Number.isInteger(numStock) || numStock < 0) {
+        throw new ValidationError('El stock debe ser un número entero mayor o igual a 0.');
+    }
+
+    await updateStock(id, numStock);
     return await findById(id);
 };

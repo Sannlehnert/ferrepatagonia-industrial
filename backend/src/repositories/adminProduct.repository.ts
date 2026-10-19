@@ -125,3 +125,11 @@ export const deactivate = async (id: number): Promise<boolean> => {
     );
     return result.affectedRows > 0;
 };
+
+export const updateStock = async (id: number, stock: number): Promise<boolean> => {
+    const result = await pool.query(
+        'UPDATE PRODUCTO SET stock = ? WHERE id_producto = ?',
+        [stock, id]
+    );
+    return result.affectedRows > 0;
+};

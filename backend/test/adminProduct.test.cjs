@@ -10,16 +10,15 @@ describe('Admin Products Endpoints (#197)', () => {
     let clientCookie = '';
 
     before(() => {
-        // 1. Obtenemos el secreto real de tu .env
+        // Obtenemos el secreto real de tu .env
         const secret = process.env.JWT_SECRET;
         if (!secret) throw new Error("No se encontró JWT_SECRET en el entorno.");
 
-        // 2. Forjamos el token de ADMIN directamente (ID 4 según tu esquema)
-        // ¡Adiós a depender de contraseñas de la base de datos!
+        // Forjamos el token de ADMIN directamente
         const adminToken = jwt.sign({ id: 4, rol: 'ADMIN' }, secret, { expiresIn: '2h' });
         adminCookie = `jwt_token=${adminToken}`;
 
-        // 3. Forjamos el token de CLIENTE (ID 1)
+        // Forjamos el token de CLIENTE (ID 1)
         const clientToken = jwt.sign({ id: 1, rol: 'CLIENTE' }, secret, { expiresIn: '2h' });
         clientCookie = `jwt_token=${clientToken}`;
     });
@@ -66,7 +65,7 @@ describe('Admin Products Endpoints (#197)', () => {
     });
 
     it('should create and update a product as ADMIN', async () => {
-        // 1. Crear producto
+        // Crear producto
         const createRes = await fetch(`${BASE_URL}/admin/productos`, {
             method: 'POST',
             headers: { 
@@ -87,7 +86,7 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(createRes.status, 201, `Fallo creacion: ${createdBody.message || ''}`);
         const createdId = createdBody.id_producto;
 
-        // 2. Editar producto
+        // Editar producto
         const updateRes = await fetch(`${BASE_URL}/admin/productos/${createdId}`, {
             method: 'PUT',
             headers: { 
@@ -106,7 +105,7 @@ describe('Admin Products Endpoints (#197)', () => {
     });
 
     it('should soft-delete (deactivate) a product idempotently', async () => {
-        // 1. Crear producto temporal para la prueba
+        // Crear producto temporal para la prueba
         const createRes = await fetch(`${BASE_URL}/admin/productos`, {
             method: 'POST',
             headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
@@ -121,7 +120,7 @@ describe('Admin Products Endpoints (#197)', () => {
         });
         const createdId = (await createRes.json()).id_producto;
 
-        // 2. Desactivarlo por primera vez
+        // Desactivarlo por primera vez
         const deactRes1 = await fetch(`${BASE_URL}/admin/productos/${createdId}/desactivar`, {
             method: 'PATCH',
             headers: { 'Cookie': adminCookie }
@@ -129,14 +128,52 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(deactRes1.status, 200, 'Fallo la primera desactivacion');
         
         const body1 = await deactRes1.json();
-        // Dependiendo del driver, MariaDB devuelve 0 o false para el TINYINT(1)
         assert.equal(Boolean(body1.product.activo), false, 'El producto sigue activo'); 
 
-        // 3. Desactivarlo de nuevo (Prueba de Idempotencia)
+        // Desactivarlo de nuevo (Prueba de Idempotencia)
         const deactRes2 = await fetch(`${BASE_URL}/admin/productos/${createdId}/desactivar`, {
             method: 'PATCH',
             headers: { 'Cookie': adminCookie }
         });
         assert.equal(deactRes2.status, 200, 'Fallo la idempotencia');
+    });
+
+    it('should update product stock successfully', async () => {
+        // Creamos un producto temporal
+        const createRes = await fetch(`${BASE_URL}/admin/productos`, {
+            method: 'POST',
+            headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                id_categoria: 1, 
+                codigo: `TEST-SKU-STOCK-${Date.now()}`,
+                nombre: 'Producto para Stock',
+                precio: 100,
+                stock: 5,
+                activo: true
+            })
+        });
+        const createdId = (await createRes.json()).id_producto;
+
+        // Le cambiamos el stock de 5 a 25
+        const updateRes = await fetch(`${BASE_URL}/admin/productos/${createdId}/stock`, {
+            method: 'PATCH',
+            headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock: 25 })
+        });
+        
+        assert.equal(updateRes.status, 200, 'Fallo la actualización de stock');
+        const body = await updateRes.json();
+        assert.equal(body.product.stock, 25);
+    });
+
+    it('should return 400 when updating with negative stock', async () => {
+        // Usamos el ID 1
+        const updateRes = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+            method: 'PATCH',
+            headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stock: -10 })
+        });
+        
+        assert.equal(updateRes.status, 400);
     });
 });
