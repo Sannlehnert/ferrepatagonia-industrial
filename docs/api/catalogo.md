@@ -1,4 +1,4 @@
-# Catálogo público — FER-12 (#189, #190) y FER-13 (#193)
+# Catálogo público — FER-12 (#189, #190) y FER-13 (#193, #194)
 
 ## Alcance y decisiones autorizadas
 
@@ -24,6 +24,7 @@ GET /api/catalogo?page=1&limit=20
 GET /api/catalogo?categoria=2&page=1&limit=20
 GET /api/catalogo?busqueda=taladro&page=1&limit=20
 GET /api/catalogo?busqueda=T-7
+GET /api/catalogo?busqueda=taladro&categoria=2&page=1&limit=20
 ```
 
 | Parámetro | Predeterminado | Valores aceptados |
@@ -67,15 +68,21 @@ vez. Ejemplo: `?busqueda=100%25` busca `100%`, no cualquier sufijo de `100`.
 Las comillas también son datos, nunca SQL. Referencia:
 [LIKE de MariaDB](https://mariadb.com/docs/server/reference/sql-functions/string-functions/like).
 
-**Separación de #194:** `?busqueda=taladro&categoria=2` devuelve **400**.
-No se combina ni se ignora ningún filtro. `categoria` sola conserva su contrato.
+**Combinación (#194):** `?busqueda=taladro&categoria=2` devuelve **200** y
+selecciona únicamente coincidencias dentro de esa categoría. Se aplica
+`p.id_categoria = ? AND (p.nombre LIKE ? OR p.codigo LIKE ?)` con el escape
+literal descrito arriba y exigiendo producto y categoría activos.
+COUNT y SELECT comparten condiciones y parámetros: categoría, patrón de nombre,
+patrón de código; SELECT agrega limit y offset. Cada parámetro conserva sus
+validaciones individuales; la combinación válida ya no es motivo de 400.
 Sin `busqueda` se conserva el comportamiento anterior. Sin coincidencias responde
 **200**, con productos `[]`, total y totalPages en 0 y ambos indicadores en false;
 se conservan page y limit. Un producto que coincide en ambos campos aparece una vez.
 
 ## Response 200
 
-Ejemplo ilustrativo para un catálogo de un producto:
+Ejemplo ilustrativo para `GET /api/catalogo?busqueda=taladro&categoria=2`,
+con un producto coincidente en esa categoría:
 
 ```json
 {
@@ -109,7 +116,7 @@ Se mapean explícitamente estos campos; no se exponen columnas adicionales,
 descripciones, flags internos, fechas, cantidades, precios almacenados ni datos de clientes.
 
 Orden estable: `PRODUCTO.id_producto ASC`. `total` cuenta únicamente productos
-elegibles para la búsqueda o categoría solicitada, o todo el catálogo sin filtros;
+elegibles para la búsqueda, categoría o intersección solicitada, o todo el catálogo sin filtros;
 `totalPages = ceil(total / limit)`. `hasNext = page < totalPages`.
 `hasPrevious = page > 1 && page - 1 <= totalPages` indica que la página
 inmediatamente anterior existe entre 1 y totalPages. En la página 1 es false;
@@ -136,7 +143,7 @@ Ambos casos responden 200, no 404 ni 204. El GET no necesita body.
 
 | HTTP | Situación | Respuesta |
 | --- | --- | --- |
-| 400 | Query inválida | `{"message":"Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. No se admiten parámetros desconocidos, repetidos ni busqueda junto con categoria."}` |
+| 400 | Query inválida | `{"message":"Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. No se admiten parámetros desconocidos ni repetidos."}` |
 | 500 | Fallo interno, incluido error de BD | `{"message":"Error interno del servidor."}` |
 
 Los errores del driver no determinan el HTTP ni se exponen en el body o log del
@@ -193,7 +200,7 @@ Incluye HTTP real, paginación completa contra un oráculo independiente, estado
 de producto/categoría, stock cero y una escritura concurrente entre COUNT y SELECT.
 También cubre paginación de una categoría con exclusión de otras, categoría inactiva,
 vacía, con solo productos inactivos e inexistente; defaults e inputs inválidos.
-La escritura concurrente se prueba con y sin categoría.
+La escritura concurrente se prueba sin filtros, con cada filtro y con ambos.
 Verifica página 1, última, totalPages+1, totalPages+2 y 1000000. El caso vacío
 usa tablas temporales en una conexión dedicada, sin alterar tablas existentes;
 requiere permiso CREATE TEMPORARY TABLES y destruye la conexión al terminar.
@@ -208,7 +215,9 @@ de categoría, incluyendo el ID máximo admitido y la ausencia de filtro.
 La cobertura de #193 agrega nombre/código parciales, mayúsculas y acentos,
 coincidencia en ambos campos sin duplicar, espacios, límites Unicode, comodines
 literales, comillas/inyección, búsqueda vacía, páginas fuera de rango, inactivos,
-metadatos, tipos inválidos y rechazo de combinación con categoría.
+metadatos y tipos inválidos. #194 agrega combinación válida, paginación y vacíos
+con categorías activas, inactivas, vacías, inexistentes o con solo productos inactivos;
+exclusión de coincidencias por nombre/código de otra categoría, literales e inyección.
 
 ## Prueba manual
 
@@ -225,6 +234,8 @@ curl.exe -i 'http://localhost:3000/api/catalogo?page=1&page=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?categoria=1'
 curl.exe -i 'http://localhost:3000/api/catalogo?categoria=1&page=2&limit=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?categoria=0'
+curl.exe -i 'http://localhost:3000/api/catalogo?busqueda=taladro&categoria=2&page=1&limit=2'
+curl.exe -i 'http://localhost:3000/api/catalogo?busqueda=taladro&categoria=0'
 curl.exe -i -H 'Cookie: jwt_token=invalido' 'http://localhost:3000/api/catalogo'
 curl.exe -i 'http://localhost:3000/api/health'
 ```
