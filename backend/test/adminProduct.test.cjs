@@ -1,5 +1,5 @@
-require('dotenv/config'); // Carga tu .env automáticamente
-const { describe, it, before } = require('node:test');
+require('dotenv/config'); // Carga el .env automáticamente
+const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 
@@ -10,7 +10,7 @@ describe('Admin Products Endpoints (#197)', () => {
     let clientCookie = '';
 
     before(() => {
-        // Obtenemos el secreto real de tu .env
+        // Obtenemos el secreto real del .env
         const secret = process.env.JWT_SECRET;
         if (!secret) throw new Error("No se encontró JWT_SECRET en el entorno.");
 
@@ -175,5 +175,17 @@ describe('Admin Products Endpoints (#197)', () => {
         });
         
         assert.equal(updateRes.status, 400);
+    });
+
+    // Limpiar la BD y cerrar conexión
+    after(async () => {
+        const { pool } = require('../dist/config/database.config.js');
+        if (pool) {
+            // Borra solo los productos que crearon los tests
+            await pool.query("DELETE FROM PRODUCTO WHERE codigo LIKE 'TEST-SKU-%'");
+            
+            // Apaga el pool para liberar la terminal
+            await pool.end(); 
+        }
     });
 });
