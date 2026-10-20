@@ -114,11 +114,16 @@ export const updateAdminProductStock = async (id: number, stock: any) => {
     const existing = await findById(id);
     if (!existing) throw new ValidationError('Producto no encontrado.', 404);
 
-    const numStock = Number(stock);
-    if (!Number.isInteger(numStock) || numStock < 0) {
-        throw new ValidationError('El stock debe ser un número entero mayor o igual a 0.');
+    // Rechaza booleanos, nulos, arrays y strings
+    if (typeof stock !== 'number') {
+        throw new ValidationError('El stock debe ser un valor numérico estricto.');
     }
 
-    await updateStock(id, numStock);
+    // Bloqueo de decimales, negativos y desbordamiento SQL (Max INT en MariaDB)
+    if (!Number.isInteger(stock) || stock < 0 || stock > 2147483647) {
+        throw new ValidationError('El stock debe ser un número entero válido entre 0 y 2147483647.');
+    }
+
+    await updateStock(id, stock);
     return await findById(id);
 };

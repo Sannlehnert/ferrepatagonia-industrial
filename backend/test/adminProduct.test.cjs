@@ -177,6 +177,34 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(updateRes.status, 400);
     });
 
+    it('should return 400 when updating stock with invalid data types or out of range', async () => {
+        const invalidStocks = [
+            true,          // booleano
+            false,         // booleano
+            null,          // nulo
+            [5],           // array
+            "10",          // string
+            3000000000     // overflow INT MariaDB
+        ];
+
+        for (const badStock of invalidStocks) {
+            const res = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+                method: 'PATCH',
+                headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stock: badStock })
+            });
+            assert.equal(res.status, 400, `Falló validando el valor: ${JSON.stringify(badStock)}`);
+        }
+    });
+
+    it('should return 400 when updating stock without a body', async () => {
+        const res = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+            method: 'PATCH',
+            headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' }
+        });
+        assert.equal(res.status, 400);
+    });
+
     // Limpiar la BD y cerrar conexión
     after(async () => {
         const { pool } = require('../dist/config/database.config.js');

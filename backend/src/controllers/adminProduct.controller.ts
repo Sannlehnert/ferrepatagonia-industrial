@@ -71,17 +71,14 @@ export const updateProductStock = async (req: Request, res: Response) => {
             return res.status(400).json({ message: 'ID inválido' });
         }
         
-        const { stock } = req.body;
-        if (stock === undefined) {
+        // Evita el error 500
+        if (!req.body || !('stock' in req.body)) {
             return res.status(400).json({ message: 'El campo stock es requerido' });
         }
 
-        const product = await updateAdminProductStock(id, stock);
-        return res.status(200).json({ 
-            message: 'Stock actualizado exitosamente', 
-            product 
-        });
-    } catch (error) {
+        const product = await updateAdminProductStock(id, req.body.stock);
+        return res.status(200).json({ message: 'Stock actualizado exitosamente', product });
+    } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
         console.error('Error al actualizar stock:', error);
         return res.status(500).json({ message: 'Error interno del servidor' });
