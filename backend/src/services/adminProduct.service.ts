@@ -1,4 +1,4 @@
-import { findAllAdmin, findById, findByCodigo, categoryExists, create, update, CreateProductDTO, UpdateProductDTO, deactivate, updateStock } from '../repositories/adminProduct.repository';
+import { findAllAdmin, findById, findByCodigo, categoryExists, create, update, updateStock,CreateProductDTO, UpdateProductDTO } from '../repositories/adminProduct.repository';
 
 export class ValidationError extends Error {
     statusCode: number;
@@ -8,31 +8,55 @@ export class ValidationError extends Error {
     }
 }
 
-// Validación magra e independiente
+// Candado en memoria para bloquear altas simultáneas (Race Conditions)
+const activeSkuLocks = new Set<string>();
+
 const validateProductFields = async (data: any, isUpdate = false, productId?: number) => {
+    // Nombre
     if (!isUpdate || data.nombre !== undefined) {
-        if (!data.nombre || String(data.nombre).trim() === '') {
-            throw new ValidationError('El nombre del producto es obligatorio.');
+        if (typeof data.nombre !== 'string' || data.nombre.trim() === '') {
+            throw new ValidationError('El nombre del producto es obligatorio y debe ser texto.');
         }
     }
+    // SKU
     if (!isUpdate || data.codigo !== undefined) {
-        if (!data.codigo || String(data.codigo).trim() === '') {
-            throw new ValidationError('El código SKU es obligatorio.');
+        if (typeof data.codigo !== 'string' || data.codigo.trim() === '') {
+            throw new ValidationError('El código SKU es obligatorio y debe ser texto.');
         }
-        const existingSku = await findByCodigo(String(data.codigo).trim(), productId);
+        const sku = data.codigo.trim();
+        const existingSku = await findByCodigo(sku, productId);
         if (existingSku) {
             throw new ValidationError('El código SKU ya está registrado.', 409);
         }
     }
+    // Categoría
     if (!isUpdate || data.id_categoria !== undefined) {
-        const exists = await categoryExists(Number(data.id_categoria));
+        const catId = Number(data.id_categoria);
+        if (!Number.isInteger(catId) || catId <= 0) {
+            throw new ValidationError('La categoría debe ser un número entero válido.');
+        }
+        const exists = await categoryExists(catId);
         if (!exists) throw new ValidationError('La categoría no existe.', 404);
     }
-    if (data.precio !== undefined && Number(data.precio) < 0) {
-        throw new ValidationError('El precio no puede ser negativo.');
+    // Precio
+    if (!isUpdate || data.precio !== undefined) {
+        const precio = Number(data.precio);
+        if (isNaN(precio) || precio < 0) {
+            throw new ValidationError('El precio debe ser un número mayor o igual a 0.');
+        }
     }
-    if (data.stock !== undefined && Number(data.stock) < 0) {
-        throw new ValidationError('El stock no puede ser negativo.');
+    // Stock (Bloqueo explícito de decimales)
+    if (!isUpdate || data.stock !== undefined) {
+        const stock = Number(data.stock);
+        if (!Number.isInteger(stock) || stock < 0) {
+            throw new ValidationError('El stock debe ser un número entero mayor o igual a 0 (no se permiten decimales).');
+        }
+    }
+    // Activo (Bloqueo de formatos raros)
+    if (data.activo !== undefined) {
+        if (typeof data.activo !== 'boolean' && data.activo !== 1 && data.activo !== 0) {
+            throw new ValidationError('El campo activo debe ser explícitamente booleano (true/false).');
+        }
     }
 };
 
@@ -47,9 +71,24 @@ export const getAdminProductById = async (id: number) => {
 };
 
 export const createAdminProduct = async (payload: CreateProductDTO) => {
-    await validateProductFields(payload, false);
-    const insertId = await create(payload);
-    return await findById(insertId);
+    const sku = typeof payload.codigo === 'string' ? payload.codigo.trim() : '';
+
+    // Si el SKU está siendo procesado en este milisegundo por otro clic, lo rebotamos (Evita duplicados)
+    if (sku && activeSkuLocks.has(sku)) {
+        throw new ValidationError('Procesando solicitud. Por favor, evite hacer doble clic.', 409);
+    }
+    
+    // Bloqueamos el SKU
+    if (sku) activeSkuLocks.add(sku);
+
+    try {
+        await validateProductFields(payload, false);
+        const insertId = await create(payload);
+        return await findById(insertId);
+    } finally {
+        // Liberamos el SKU sin importar si falló o fue exitoso
+        if (sku) activeSkuLocks.delete(sku);
+    }
 };
 
 export const updateAdminProduct = async (id: number, payload: UpdateProductDTO) => {
@@ -65,12 +104,9 @@ export const deactivateAdminProduct = async (id: number) => {
     const existing = await findById(id);
     if (!existing) throw new ValidationError('Producto no encontrado.', 404);
     
-    // Comportamiento idempotente: si ya está inactivo, retornamos sin hacer nada
-    if (existing.activo === 0 || existing.activo === false) {
-        return existing;
-    }
+    if (existing.activo === 0 || existing.activo === false) return existing;
     
-    await deactivate(id);
+    await update(id, { activo: false });
     return await findById(id);
 };
 
@@ -78,11 +114,16 @@ export const updateAdminProductStock = async (id: number, stock: any) => {
     const existing = await findById(id);
     if (!existing) throw new ValidationError('Producto no encontrado.', 404);
 
-    const numStock = Number(stock);
-    if (!Number.isInteger(numStock) || numStock < 0) {
-        throw new ValidationError('El stock debe ser un número entero mayor o igual a 0.');
+    // Rechaza booleanos, nulos, arrays y strings
+    if (typeof stock !== 'number') {
+        throw new ValidationError('El stock debe ser un valor numérico estricto.');
     }
 
-    await updateStock(id, numStock);
+    // Bloqueo de decimales, negativos y desbordamiento SQL (Max INT en MariaDB)
+    if (!Number.isInteger(stock) || stock < 0 || stock > 2147483647) {
+        throw new ValidationError('El stock debe ser un número entero válido entre 0 y 2147483647.');
+    }
+
+    await updateStock(id, stock);
     return await findById(id);
 };

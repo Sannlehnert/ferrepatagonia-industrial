@@ -1,5 +1,5 @@
-require('dotenv/config'); // Carga tu .env automáticamente
-const { describe, it, before } = require('node:test');
+require('dotenv/config'); // Carga el .env automáticamente
+const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
 
@@ -10,7 +10,7 @@ describe('Admin Products Endpoints (#197)', () => {
     let clientCookie = '';
 
     before(() => {
-        // Obtenemos el secreto real de tu .env
+        // Obtenemos el secreto real del .env
         const secret = process.env.JWT_SECRET;
         if (!secret) throw new Error("No se encontró JWT_SECRET en el entorno.");
 
@@ -175,5 +175,45 @@ describe('Admin Products Endpoints (#197)', () => {
         });
         
         assert.equal(updateRes.status, 400);
+    });
+
+    it('should return 400 when updating stock with invalid data types or out of range', async () => {
+        const invalidStocks = [
+            true,          // booleano
+            false,         // booleano
+            null,          // nulo
+            [5],           // array
+            "10",          // string
+            3000000000     // overflow INT MariaDB
+        ];
+
+        for (const badStock of invalidStocks) {
+            const res = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+                method: 'PATCH',
+                headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stock: badStock })
+            });
+            assert.equal(res.status, 400, `Falló validando el valor: ${JSON.stringify(badStock)}`);
+        }
+    });
+
+    it('should return 400 when updating stock without a body', async () => {
+        const res = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+            method: 'PATCH',
+            headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' }
+        });
+        assert.equal(res.status, 400);
+    });
+
+    // Limpiar la BD y cerrar conexión
+    after(async () => {
+        const { pool } = require('../dist/config/database.config.js');
+        if (pool) {
+            // Borra solo los productos que crearon los tests
+            await pool.query("DELETE FROM PRODUCTO WHERE codigo LIKE 'TEST-SKU-%'");
+            
+            // Apaga el pool para liberar la terminal
+            await pool.end(); 
+        }
     });
 });
