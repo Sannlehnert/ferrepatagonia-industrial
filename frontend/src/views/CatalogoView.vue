@@ -15,17 +15,19 @@ const total = ref(0)
 const cargando = ref(true)
 const error = ref<string | null>(null)
 
-// Número entero positivo a partir de un parámetro de la URL, o undefined
+// Número entero positivo a partir de un parámetro de la URL, o undefined.
 function entero(v: unknown): number | undefined {
   const raw = Array.isArray(v) ? v[0] : v
   const n = Number(raw)
   return typeof raw === 'string' && raw && Number.isInteger(n) && n > 0 ? n : undefined
 }
 
+// Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
-const pagina = computed(() => entero(route.query.page) ?? 1) // ?page=abc o 0 → página 1
+const pagina = computed(() => entero(route.query.page) ?? 1)
 
-// Provisorio hasta tener el endpoint de categorías (Santi)
+// Provisorio: junta las categorías de los productos que van llegando.
+// Reemplazar por el endpoint de categorías cuando Santi lo tenga.
 const categorias = ref(new Map<number, string>())
 const listaCategorias = computed(() =>
   [...categorias.value]
@@ -36,19 +38,21 @@ const nombreCategoria = computed(() =>
   categoriaId.value ? (categorias.value.get(categoriaId.value) ?? 'Categoría') : null,
 )
 
-// Conserva el resto de la query (categoría, y los filtros de Bruno más adelante)
+// Conserva el resto de la query al cambiar de página, incluidos futuros filtros.
 function irAPagina(n: number, reemplazar = false) {
   const query = { ...route.query }
   if (n > 1) query.page = String(n)
   else delete query.page
+
   const destino = { name: 'catalogo', query }
   return reemplazar ? router.replace(destino) : router.push(destino)
 }
 
-// Paginación desde los botones: solo páginas válidas, sin recargar la app
+// Paginación desde los botones: solo páginas válidas, sin recargar la app.
 function cambiarPagina(n: number) {
   const p = pagination.value
   if (!p || cargando.value || n < 1 || n > p.totalPages || n === pagina.value) return
+
   irAPagina(n)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -61,6 +65,8 @@ async function cargar() {
   controlador = actual
   cargando.value = true
   error.value = null
+  let redirigido = false
+
   try {
     const data = await getCatalog(
       { page: pagina.value, limit: LIMITE, categoria: categoriaId.value },
@@ -68,8 +74,9 @@ async function cargar() {
     )
     const pag = data.pagination
 
-    // Página fuera de rango escrita a mano en la URL: ir a la última
+    // Si se escribió una página fuera de rango en la URL, ir a la última.
     if (pag.totalPages > 0 && pagina.value > pag.totalPages) {
+      redirigido = true
       irAPagina(pag.totalPages, true)
       return
     }
@@ -77,12 +84,15 @@ async function cargar() {
     productos.value = data.productos
     pagination.value = pag
     total.value = pag.total
-    for (const p of data.productos) categorias.value.set(p.categoria.id, p.categoria.nombre)
+    for (const p of data.productos) {
+      categorias.value.set(p.categoria.id, p.categoria.nombre)
+    }
   } catch (e) {
     if (axios.isCancel(e)) return
     error.value = 'No se pudo cargar el catálogo.'
   } finally {
-    if (controlador === actual) cargando.value = false
+    // No apagar el estado de carga si una redirección va a disparar otra consulta.
+    if (controlador === actual && !redirigido) cargando.value = false
   }
 }
 
@@ -105,6 +115,7 @@ onBeforeUnmount(() => controlador?.abort())
         <h1>{{ nombreCategoria ?? 'Catálogo' }}</h1>
         <p class="total">{{ total }} productos</p>
       </div>
+      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado. -->
       <select class="orden" disabled aria-label="Ordenar productos">
         <option>Ordenar: Relevancia</option>
       </select>
@@ -112,11 +123,73 @@ onBeforeUnmount(() => controlador?.abort())
 
     <div class="cuerpo">
       <aside class="filtros" aria-label="Filtros">
-        <!-- igual que en #191: título, grupo "Categoría" y la lista de enlaces -->
+        <h2>Filtros</h2>
+
+        <h3 class="grupo">Categoría</h3>
+        <ul class="cats">
+          <li>
+            <RouterLink
+              :to="{ name: 'catalogo' }"
+              :class="{ activa: !categoriaId }"
+            >
+              Todas
+            </RouterLink>
+          </li>
+          <li v-for="c in listaCategorias" :key="c.id">
+            <RouterLink
+              :to="{ name: 'catalogo', query: { categoria: c.id } }"
+              :class="{ activa: c.id === categoriaId }"
+            >
+              {{ c.nombre }}
+            </RouterLink>
+          </li>
+        </ul>
+        <!-- Acá se integra <CatalogFilters /> de Bruno (#195). -->
       </aside>
 
       <section>
-        <!-- igual que en #191: cargando, error, vacío y grilla de tarjetas -->
+        <p v-if="cargando">Cargando productos...</p>
+
+        <p v-else-if="error" role="alert">
+          {{ error }}
+          <button type="button" class="reintentar" @click="cargar">Reintentar</button>
+        </p>
+
+        <div v-else-if="!productos.length" class="vacio" role="status">
+          <p>
+            {{
+              categoriaId
+                ? 'No hay productos en esta categoría por el momento.'
+                : 'Todavía no hay productos en el catálogo.'
+            }}
+          </p>
+          <RouterLink v-if="categoriaId" :to="{ name: 'catalogo' }">
+            Ver todo el catálogo
+          </RouterLink>
+        </div>
+
+        <template v-else>
+          <ul class="grilla">
+            <li v-for="p in productos" :key="p.id" class="tarjeta">
+              <!-- CatalogProduct no tiene imagen todavía. -->
+              <div class="imagen" aria-hidden="true"><span>Sin imagen</span></div>
+
+              <p class="codigo">COD. {{ p.codigo }}</p>
+              <h3>{{ p.nombre }}</h3>
+              <p class="precio">Precio a confirmar</p>
+
+              <div class="pie">
+                <span class="stock" :class="{ 'stock--no': !p.disponible }">
+                  {{ p.disponible ? 'Disponible' : 'No disponible' }}
+                </span>
+                <!-- Conectar al carrito cuando exista. -->
+                <button type="button" class="agregar" :disabled="!p.disponible">
+                  Agregar
+                </button>
+              </div>
+            </li>
+          </ul>
+        </template>
 
         <nav
           v-if="!error && pagination && pagination.totalPages > 1"
@@ -130,7 +203,9 @@ onBeforeUnmount(() => controlador?.abort())
           >
             Anterior
           </button>
-          <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
+          <span aria-live="polite">
+            Página {{ pagination.page }} de {{ pagination.totalPages }}
+          </span>
           <button
             type="button"
             :disabled="cargando || !pagination.hasNext"
@@ -143,6 +218,7 @@ onBeforeUnmount(() => controlador?.abort())
     </div>
   </main>
 </template>
+
 <style scoped>
 .catalogo {
   --navy: #0b2438;
@@ -161,6 +237,7 @@ onBeforeUnmount(() => controlador?.abort())
 }
 
 .migas { margin: 0 0 .5rem; font-size: .8rem; color: var(--apagado); }
+.migas a { color: var(--azul-texto); }
 
 .cabecera {
   display: flex;
@@ -189,6 +266,18 @@ onBeforeUnmount(() => controlador?.abort())
   min-height: 260px;
 }
 .filtros h2 { margin: 0; font-size: 1rem; }
+.grupo { margin: 1rem 0 .5rem; font-size: .85rem; font-weight: 600; }
+.cats { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .25rem; }
+.cats a {
+  display: block;
+  padding: .3rem .5rem;
+  border-radius: 6px;
+  font-size: .85rem;
+  color: var(--azul-texto);
+  text-decoration: none;
+}
+.cats a:hover { background: #f1f5f9; }
+.cats a.activa { background: #e6eff6; font-weight: 600; }
 
 .grilla {
   display: grid;
@@ -244,25 +333,8 @@ onBeforeUnmount(() => controlador?.abort())
 }
 .agregar:disabled { background: #b8c4d0; cursor: not-allowed; }
 .reintentar { margin-left: .5rem; }
-
-@media (max-width: 800px) {
-  .cuerpo { grid-template-columns: 1fr; }
-  .filtros { min-height: 0; }
-}
-.migas a { color: var(--azul-texto); }
-.grupo { margin: 1rem 0 .5rem; font-size: .85rem; font-weight: 600; }
-.cats { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .25rem; }
-.cats a {
-  display: block;
-  padding: .3rem .5rem;
-  border-radius: 6px;
-  font-size: .85rem;
-  color: var(--azul-texto);
-  text-decoration: none;
-}
-.cats a:hover { background: #f1f5f9; }
-.cats a.activa { background: #e6eff6; font-weight: 600; }
 .vacio { padding: 2rem 0; color: var(--apagado); }
+
 .paginacion {
   display: flex;
   justify-content: center;
@@ -273,7 +345,7 @@ onBeforeUnmount(() => controlador?.abort())
 }
 .paginacion button {
   min-width: 110px;
-  min-height: 44px; /* tamaño táctil */
+  min-height: 44px;
   border: 1px solid var(--azul);
   border-radius: 6px;
   background: #fff;
@@ -286,6 +358,8 @@ onBeforeUnmount(() => controlador?.abort())
 .paginacion button:disabled { border-color: var(--borde); color: #9aa8b6; cursor: not-allowed; }
 
 @media (max-width: 800px) {
+  .cuerpo { grid-template-columns: 1fr; }
+  .filtros { min-height: 0; }
   .cabecera { flex-direction: column; }
   .cats { flex-direction: row; flex-wrap: wrap; }
   .cats a { border: 1px solid var(--borde); }
