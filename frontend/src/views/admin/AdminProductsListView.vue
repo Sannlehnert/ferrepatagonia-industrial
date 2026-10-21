@@ -72,19 +72,37 @@ const closeModal = () => {
     selectedProduct.value = null;
 };
 
-// Desactivación rápida desde la grilla (Soft Delete idempotente)
-const toggleActivo = async (id: number) => {
+// Activación y desactivación rápida desde la grilla
+const toggleStatus = async (prod: any) => {
     try {
-        const res = await fetch(`${API_URL}/admin/productos/${id}/desactivar`, {
-            method: 'PATCH',
-            credentials: 'include'
-        });
-        if (res.ok) {
-            // Recargar la grilla para reflejar el cambio de estado
-            await fetchProductos();
+        if (prod.activo) {
+            // PATCH para desactivar
+            const res = await fetch(`${API_URL}/admin/productos/${prod.id_producto}/desactivar`, {
+                method: 'PATCH',
+                credentials: 'include'
+            });
+            if (res.ok) await fetchProductos();
+        } else {
+            // PUT parcial para activar
+            // Enviamos SOLO el campo que queremos cambiar para no disparar validaciones de otros campos
+            const payload = { activo: true };
+            
+            const res = await fetch(`${API_URL}/admin/productos/${prod.id_producto}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify(payload)
+            });
+            
+            if (res.ok) {
+                await fetchProductos();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                console.error('El backend rechazó la reactivación:', err.message || res.status);
+            }
         }
     } catch (error) {
-        console.error('Error al cambiar el estado del producto:', error);
+        console.error('Error de red al cambiar el estado del producto:', error);
     }
 };
 
@@ -165,10 +183,20 @@ onMounted(() => {
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </button>
                     <button 
-                        @click="toggleActivo(prod.id_producto)" 
-                        class="p-1.5 bg-white text-[#64748B] hover:text-amber-600 border border-[#E2E8F0] rounded-md shadow-sm flex items-center justify-center transition-colors"
-                        title="Desactivar">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg>
+                        @click.stop.prevent="toggleStatus(prod)" 
+                        class="p-1.5 bg-white border border-[#E2E8F0] rounded-md shadow-sm flex items-center justify-center transition-colors"
+                        :class="prod.activo ? 'text-[#64748B] hover:text-amber-600' : 'text-amber-600 hover:text-emerald-600'"
+                        :title="prod.activo ? 'Desactivar' : 'Activar'">
+
+                        <!-- Ícono Desactivar (Ban/Block) -->
+                        <svg v-if="prod.activo" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                        </svg>
+
+                        <!-- Ícono Reactivar (Check Circle) -->
+                        <svg v-else class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
                     </button>
                 </div>
             </div>
