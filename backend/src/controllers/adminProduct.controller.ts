@@ -28,9 +28,15 @@ export const getProductById = async (req: Request, res: Response) => {
 export const createProduct = async (req: Request, res: Response) => {
     try {
         const newProduct = await createAdminProduct(req.body);
+        // Si el insert funcionó pero no lo pudo leer, igual devuelve 201
+        if (!newProduct) {
+            return res.status(201).json({ message: 'Producto creado, pero no se pudo recuperar la información inmediatamente.' });
+        }
         return res.status(201).json(newProduct);
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
+        if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'El código SKU ya está registrado.' });
+        console.error('Error al crear producto:', error);
         return res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
@@ -43,8 +49,9 @@ export const updateProduct = async (req: Request, res: Response) => {
         }
         const updatedProduct = await updateAdminProduct(id, req.body);
         return res.status(200).json(updatedProduct);
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
+        if (error.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'El código SKU ya está registrado.' });
         return res.status(500).json({ message: 'Error interno del servidor' });
     }
 };
