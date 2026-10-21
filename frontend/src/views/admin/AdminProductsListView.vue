@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
-import { useRouter } from 'vue-router';
-
-const router = useRouter();
+import ProductFormModal from './ProductFormModal.vue';
 
 // Variable de entorno para la URL de la API
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -11,6 +9,10 @@ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 const productos = ref<any[]>([]);
 const searchQuery = ref('');
 const isLoading = ref(true);
+
+// Estado del Modal (Alta y Edición)
+const isModalOpen = ref(false);
+const selectedProduct = ref<any | null>(null);
 
 // Obtener productos consumiendo el endpoint backend
 const fetchProductos = async () => {
@@ -40,12 +42,35 @@ const productosFiltrados = computed(() => {
     return productos.value.filter(p => p.nombre.toLowerCase().includes(query) || p.codigo.toLowerCase().includes(query));
 });
 
+// Categorías disponibles extraídas del catálogo actual
+const categoriasDisponibles = computed(() => {
+    const map = new Map<number, string>();
+    for (const p of productos.value) {
+        if (p.id_categoria && p.categoria_nombre) {
+            map.set(Number(p.id_categoria), p.categoria_nombre);
+        }
+    }
+    return Array.from(map.entries()).map(([id_categoria, nombre]) => ({ id_categoria, nombre }));
+});
+
 // Formateador de dólares
 const formatPrice = (value: number) => new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-// Navegación hacia las pantallas de Creación y Edición
-const goToAddProduct = () => router.push('/admin/productos/nuevo');
-const goToEditProduct = (id: number) => router.push(`/admin/productos/${id}/editar`);
+// Apertura del modal para Creación y Edición
+const openCreateModal = () => {
+    selectedProduct.value = null;
+    isModalOpen.value = true;
+};
+
+const openEditModal = (prod: any) => {
+    selectedProduct.value = { ...prod };
+    isModalOpen.value = true;
+};
+
+const closeModal = () => {
+    isModalOpen.value = false;
+    selectedProduct.value = null;
+};
 
 // Desactivación rápida desde la grilla (Soft Delete idempotente)
 const toggleActivo = async (id: number) => {
@@ -84,7 +109,7 @@ onMounted(() => {
         <!-- Estado de Carga -->
         <div v-if="isLoading" class="flex-1 flex justify-center items-center text-[#64748B]">
             <svg class="animate-spin h-8 w-8 text-[#103A5C] mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                Cargando catálogo corporativo...
+            Cargando catálogo corporativo...
         </div>
         <!-- Estado Vacío -->
         <div v-else-if="productosFiltrados.length === 0" class="flex-1 flex flex-col justify-center items-center text-[#64748B]">
@@ -99,7 +124,7 @@ onMounted(() => {
                 class="bg-white border border-[#E2E8F0] rounded-lg shadow-sm overflow-hidden flex flex-col relative group transition-all hover:shadow-md"
                 :class="{'opacity-75 grayscale-[30%]': !prod.activo}"
             >
-            <!-- Imagen Placeholder y Badge de Estado -->
+                <!-- Imagen Placeholder y Badge de Estado -->
                 <div class="h-40 bg-[#F8FAFC] flex items-center justify-center text-[#94A3B8] relative border-b border-[#E2E8F0]">
                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
                 
@@ -134,7 +159,7 @@ onMounted(() => {
                 <!-- Acciones Hover -->
                 <div class="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
-                        @click="goToEditProduct(prod.id_producto)" 
+                        @click="openEditModal(prod)" 
                         class="p-1.5 bg-white text-[#64748B] hover:text-[#103A5C] border border-[#E2E8F0] rounded-md shadow-sm flex items-center justify-center transition-colors"
                         title="Editar Producto">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
@@ -154,9 +179,18 @@ onMounted(() => {
             <div class="text-sm text-[#64748B] font-medium">
                 Mostrando {{ productosFiltrados.length }} productos
             </div>
-            <button @click="goToAddProduct" class="bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md">
+            <button @click="openCreateModal" class="bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md">
                 + Nuevo Producto
             </button>
         </div>
+
+        <!-- Modal Reutilizable de Alta y Edición -->
+        <ProductFormModal
+            :is-open="isModalOpen"
+            :product="selectedProduct"
+            :categories="categoriasDisponibles"
+            @close="closeModal"
+            @saved="fetchProductos"
+        />
     </div>
 </template>
