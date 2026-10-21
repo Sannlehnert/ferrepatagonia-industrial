@@ -2,6 +2,8 @@ require('dotenv/config'); // Carga el .env automáticamente
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const jwt = require('jsonwebtoken');
+const RUN_ID = Date.now();
+const TEST_PREFIX = `TEST-RUN-${RUN_ID}-SKU-`;
 
 const BASE_URL = 'http://localhost:3000/api';
 
@@ -74,7 +76,7 @@ describe('Admin Products Endpoints (#197)', () => {
             },
             body: JSON.stringify({
                 id_categoria: 1, 
-                codigo: `TEST-SKU-${Date.now()}`, 
+                codigo: `${TEST_PREFIX}1`, 
                 nombre: 'Taladro Test 197',
                 precio: 1500.50,
                 stock: 10,
@@ -111,7 +113,7 @@ describe('Admin Products Endpoints (#197)', () => {
             headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 id_categoria: 1, 
-                codigo: `TEST-SKU-DEACT-${Date.now()}`,
+                codigo: `${TEST_PREFIX}DEACT`,
                 nombre: 'Producto a desactivar',
                 precio: 100,
                 stock: 5,
@@ -145,7 +147,7 @@ describe('Admin Products Endpoints (#197)', () => {
             headers: { 'Cookie': adminCookie, 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 id_categoria: 1, 
-                codigo: `TEST-SKU-STOCK-${Date.now()}`,
+                codigo: `${TEST_PREFIX}STOCK`,
                 nombre: 'Producto para Stock',
                 precio: 100,
                 stock: 5,
@@ -209,11 +211,8 @@ describe('Admin Products Endpoints (#197)', () => {
     after(async () => {
         const { pool } = require('../dist/config/database.config.js');
         if (pool) {
-            // Borra solo los productos que crearon los tests
-            await pool.query("DELETE FROM PRODUCTO WHERE codigo LIKE 'TEST-SKU-%'");
-            
-            // Apaga el pool para liberar la terminal
-            await pool.end(); 
+            await pool.query("DELETE FROM PRODUCTO WHERE codigo LIKE ?", [`${TEST_PREFIX}%`]);
+            await pool.end();
         }
     });
 });

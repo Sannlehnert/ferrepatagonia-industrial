@@ -12,52 +12,44 @@ export class ValidationError extends Error {
 const activeSkuLocks = new Set<string>();
 
 const validateProductFields = async (data: any, isUpdate = false, productId?: number) => {
-    // Nombre
     if (!isUpdate || data.nombre !== undefined) {
         if (typeof data.nombre !== 'string' || data.nombre.trim() === '') {
             throw new ValidationError('El nombre del producto es obligatorio y debe ser texto.');
         }
     }
-    // SKU
+
     if (!isUpdate || data.codigo !== undefined) {
         if (typeof data.codigo !== 'string' || data.codigo.trim() === '') {
             throw new ValidationError('El código SKU es obligatorio y debe ser texto.');
         }
-        const sku = data.codigo.trim();
-        const existingSku = await findByCodigo(sku, productId);
-        if (existingSku) {
-            throw new ValidationError('El código SKU ya está registrado.', 409);
-        }
     }
-    // Categoría
+
     if (!isUpdate || data.id_categoria !== undefined) {
-        const catId = Number(data.id_categoria);
-        if (!Number.isInteger(catId) || catId <= 0) {
-            throw new ValidationError('La categoría debe ser un número entero válido.');
+        if (typeof data.id_categoria !== 'number' || !Number.isInteger(data.id_categoria) || data.id_categoria <= 0) {
+            throw new ValidationError('La categoría debe ser un número entero válido mayor a 0.');
         }
-        const exists = await categoryExists(catId);
+        const exists = await categoryExists(data.id_categoria);
         if (!exists) throw new ValidationError('La categoría no existe.', 404);
     }
-    // Precio
+
     if (!isUpdate || data.precio !== undefined) {
-        const precio = Number(data.precio);
-        if (isNaN(precio) || precio < 0) {
-            throw new ValidationError('El precio debe ser un número mayor o igual a 0.');
+        if (typeof data.precio !== 'number' || data.precio < 0 || data.precio > 9999999999.99) {
+            throw new ValidationError('El precio debe ser un valor numérico válido mayor o igual a 0.');
         }
     }
-    // Stock (Bloqueo explícito de decimales)
+
     if (!isUpdate || data.stock !== undefined) {
-        const stock = Number(data.stock);
-        if (!Number.isInteger(stock) || stock < 0) {
-            throw new ValidationError('El stock debe ser un número entero mayor o igual a 0 (no se permiten decimales).');
+        if (typeof data.stock !== 'number' || !Number.isInteger(data.stock) || data.stock < 0 || data.stock > 2147483647) {
+            throw new ValidationError('El stock debe ser un número entero estricto entre 0 y 2147483647.');
         }
     }
-    // Activo (Bloqueo de formatos raros)
+
     if (data.activo !== undefined) {
-        if (typeof data.activo !== 'boolean' && data.activo !== 1 && data.activo !== 0) {
-            throw new ValidationError('El campo activo debe ser explícitamente booleano (true/false).');
+        if (typeof data.activo !== 'boolean') {
+            throw new ValidationError('El campo activo debe ser estrictamente booleano (true/false).');
         }
     }
+    
 };
 
 export const listAdminProducts = async () => {
