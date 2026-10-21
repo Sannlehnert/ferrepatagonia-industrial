@@ -15,7 +15,7 @@ const total = ref(0)
 const cargando = ref(true)
 const error = ref<string | null>(null)
 
-// Número entero positivo a partir de un parámetro de la URL, o undefined.
+// Número entero positivo a partir de un parámetro de la URL, o undefined
 function entero(v: unknown): number | undefined {
   const raw = Array.isArray(v) ? v[0] : v
   const n = Number(raw)
@@ -24,7 +24,7 @@ function entero(v: unknown): number | undefined {
 
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
-const pagina = computed(() => entero(route.query.page) ?? 1)
+const pagina = computed(() => entero(route.query.page) ?? 1) // ?page=abc o 0 → página 1
 
 // Provisorio: junta las categorías de los productos que van llegando.
 // Reemplazar por el endpoint de categorías cuando Santi lo tenga.
@@ -38,63 +38,109 @@ const nombreCategoria = computed(() =>
   categoriaId.value ? (categorias.value.get(categoriaId.value) ?? 'Categoría') : null,
 )
 
-// Conserva el resto de la query al cambiar de página, incluidos futuros filtros.
+// Conserva el resto de la query (categoría y, más adelante, búsqueda y filtros)
 function irAPagina(n: number, reemplazar = false) {
   const query = { ...route.query }
   if (n > 1) query.page = String(n)
   else delete query.page
-
   const destino = { name: 'catalogo', query }
   return reemplazar ? router.replace(destino) : router.push(destino)
 }
 
-// Paginación desde los botones: solo páginas válidas, sin recargar la app.
+// Paginación desde los botones: solo páginas válidas, sin recargar la app
 function cambiarPagina(n: number) {
   const p = pagination.value
   if (!p || cargando.value || n < 1 || n > p.totalPages || n === pagina.value) return
-
   irAPagina(n)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 let controlador: AbortController | null = null
 
+
 async function cargar() {
+  // Normalizar el parámetro page en la URL:
+  // page=abc, page=0 y page=1 se convierten en la URL sin page.
+  // Los números positivos mayores que 1 se conservan en formato canónico.
+  const paginaSolicitada = pagina.value
+  const pageCanonica =
+    paginaSolicitada > 1 ? String(paginaSolicitada) : undefined
+  const pageActual = route.query.page
+
+  const urlCanonica =
+    pageCanonica === undefined
+      ? pageActual === undefined
+      : typeof pageActual === 'string' && pageActual === pageCanonica
+
+  if (!urlCanonica) {
+    const query = { ...route.query }
+
+    if (pageCanonica === undefined) {
+      delete query.page
+    } else {
+      query.page = pageCanonica
+    }
+
+    await router.replace({ name: 'catalogo', query })
+    return cargar()
+  }
+
   controlador?.abort()
+
   const actual = new AbortController()
   controlador = actual
   cargando.value = true
   error.value = null
+
   let redirigido = false
 
   try {
     const data = await getCatalog(
-      { page: pagina.value, limit: LIMITE, categoria: categoriaId.value },
+      {
+        page: pagina.value,
+        limit: LIMITE,
+        categoria: categoriaId.value,
+      },
       actual.signal,
     )
+
+    if (controlador !== actual) return
+
     const pag = data.pagination
 
-    // Si se escribió una página fuera de rango en la URL, ir a la última.
+    // Si hay productos, redirigir a la última página válida.
     if (pag.totalPages > 0 && pagina.value > pag.totalPages) {
       redirigido = true
       irAPagina(pag.totalPages, true)
       return
     }
 
+    // Si no hay resultados y se pidió una página superior a 1,
+    // volver a la primera página para evitar una URL inválida.
+    if (pag.totalPages === 0 && pagina.value > 1) {
+      redirigido = true
+      irAPagina(1, true)
+      return
+    }
+
     productos.value = data.productos
     pagination.value = pag
     total.value = pag.total
+
     for (const p of data.productos) {
       categorias.value.set(p.categoria.id, p.categoria.nombre)
     }
   } catch (e) {
     if (axios.isCancel(e)) return
+
     error.value = 'No se pudo cargar el catálogo.'
   } finally {
-    // No apagar el estado de carga si una redirección va a disparar otra consulta.
-    if (controlador === actual && !redirigido) cargando.value = false
+    if (controlador === actual && !redirigido) {
+      cargando.value = false
+    }
   }
 }
+
 
 watch([categoriaId, pagina], cargar)
 onMounted(cargar)
@@ -115,7 +161,7 @@ onBeforeUnmount(() => controlador?.abort())
         <h1>{{ nombreCategoria ?? 'Catálogo' }}</h1>
         <p class="total">{{ total }} productos</p>
       </div>
-      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado. -->
+      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
       <select class="orden" disabled aria-label="Ordenar productos">
         <option>Ordenar: Relevancia</option>
       </select>
@@ -128,10 +174,7 @@ onBeforeUnmount(() => controlador?.abort())
         <h3 class="grupo">Categoría</h3>
         <ul class="cats">
           <li>
-            <RouterLink
-              :to="{ name: 'catalogo' }"
-              :class="{ activa: !categoriaId }"
-            >
+            <RouterLink :to="{ name: 'catalogo' }" :class="{ activa: !categoriaId }">
               Todas
             </RouterLink>
           </li>
@@ -144,7 +187,7 @@ onBeforeUnmount(() => controlador?.abort())
             </RouterLink>
           </li>
         </ul>
-        <!-- Acá se integra <CatalogFilters /> de Bruno (#195). -->
+        <!-- Acá se integra <CatalogFilters /> de Bruno (#195) -->
       </aside>
 
       <section>
@@ -168,28 +211,24 @@ onBeforeUnmount(() => controlador?.abort())
           </RouterLink>
         </div>
 
-        <template v-else>
-          <ul class="grilla">
-            <li v-for="p in productos" :key="p.id" class="tarjeta">
-              <!-- CatalogProduct no tiene imagen todavía. -->
-              <div class="imagen" aria-hidden="true"><span>Sin imagen</span></div>
+        <ul v-else class="grilla">
+          <li v-for="p in productos" :key="p.id" class="tarjeta">
+            <!-- CatalogProduct no tiene imagen todavía -->
+            <div class="imagen" aria-hidden="true"><span>Sin imagen</span></div>
 
-              <p class="codigo">COD. {{ p.codigo }}</p>
-              <h3>{{ p.nombre }}</h3>
-              <p class="precio">Precio a confirmar</p>
+            <p class="codigo">COD. {{ p.codigo }}</p>
+            <h3>{{ p.nombre }}</h3>
+            <p class="precio">Precio a confirmar</p>
 
-              <div class="pie">
-                <span class="stock" :class="{ 'stock--no': !p.disponible }">
-                  {{ p.disponible ? 'Disponible' : 'No disponible' }}
-                </span>
-                <!-- Conectar al carrito cuando exista. -->
-                <button type="button" class="agregar" :disabled="!p.disponible">
-                  Agregar
-                </button>
-              </div>
-            </li>
-          </ul>
-        </template>
+            <div class="pie">
+              <span class="stock" :class="{ 'stock--no': !p.disponible }">
+                {{ p.disponible ? 'Disponible' : 'No disponible' }}
+              </span>
+              <!-- Conectar al carrito cuando exista -->
+              <button type="button" class="agregar" :disabled="!p.disponible">Agregar</button>
+            </div>
+          </li>
+        </ul>
 
         <nav
           v-if="!error && pagination && pagination.totalPages > 1"
@@ -203,9 +242,7 @@ onBeforeUnmount(() => controlador?.abort())
           >
             Anterior
           </button>
-          <span aria-live="polite">
-            Página {{ pagination.page }} de {{ pagination.totalPages }}
-          </span>
+          <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
             :disabled="cargando || !pagination.hasNext"
@@ -257,7 +294,16 @@ onBeforeUnmount(() => controlador?.abort())
   font-size: .9rem;
 }
 
-.cuerpo { display: grid; grid-template-columns: 190px 1fr; gap: 1.25rem; align-items: start; }
+.cuerpo {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.cuerpo > section {
+  min-width: 0;
+}
 
 .filtros {
   border: 1px solid var(--borde);
@@ -281,16 +327,20 @@ onBeforeUnmount(() => controlador?.abort())
 
 .grilla {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
   gap: 1rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  min-width: 0;
 }
+
 
 .tarjeta {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--borde);
   border-radius: 8px;
   padding: 1rem;
@@ -306,8 +356,19 @@ onBeforeUnmount(() => controlador?.abort())
   color: var(--apagado);
   font-size: .8rem;
 }
-.codigo { margin: 0; font-size: .7rem; color: var(--apagado); }
-.tarjeta h3 { margin: .25rem 0 .5rem; font-size: .9rem; font-weight: 600; color: var(--texto); }
+.codigo {
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--apagado);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.tarjeta h3 {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .precio { margin: 0 0 .5rem; font-size: .95rem; color: var(--texto); }
 
 .pie {
@@ -345,7 +406,7 @@ onBeforeUnmount(() => controlador?.abort())
 }
 .paginacion button {
   min-width: 110px;
-  min-height: 44px;
+  min-height: 44px; /* tamaño táctil */
   border: 1px solid var(--azul);
   border-radius: 6px;
   background: #fff;
@@ -367,7 +428,7 @@ onBeforeUnmount(() => controlador?.abort())
 
 @media (max-width: 560px) {
   .catalogo { padding: 1rem .75rem 2rem; }
-  .grilla { grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+  .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;}
   .tarjeta { padding: .75rem; }
   .imagen { height: 110px; }
   .pie { flex-direction: column; align-items: stretch; }
