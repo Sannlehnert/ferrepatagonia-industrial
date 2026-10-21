@@ -2,10 +2,15 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { getCatalog } from '@/services/catalogService'
-import type { CatalogProduct, CatalogPagination } from '@/types/catalog'
 import CatalogFilters from '@/components/CatalogFilters.vue'
-import type { CatalogFiltersValue } from '@/types/catalog'
+import { getCatalog, getCatalogCategories } from '@/services/catalogService'
+import type {
+  CatalogProduct,
+  CatalogPagination,
+  CatalogFiltersValue,
+  CatalogCategory,
+} from '@/types/catalog'
+
 
 const LIMITE = 12
 const route = useRoute()
@@ -53,17 +58,50 @@ function aplicarFiltros(filters: CatalogFiltersValue) {
   return router.push({ name: 'catalogo', query })
 }
 
-// Provisorio: junta las categorías de los productos que van llegando.
-// Reemplazar por el endpoint de categorías cuando Santi lo tenga.
-const categorias = ref(new Map<number, string>())
-const listaCategorias = computed(() =>
-  [...categorias.value]
-    .map(([id, nombre]) => ({ id, nombre }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
-)
+const listaCategorias = ref<CatalogCategory[]>([])
+const cargandoCategorias = ref(true)
+const errorCategorias = ref<string | null>(null)
+let controladorCategorias: AbortController | null = null
+
 const nombreCategoria = computed(() =>
-  categoriaId.value ? (categorias.value.get(categoriaId.value) ?? 'Categoría') : null,
+  categoriaId.value
+    ? (
+        listaCategorias.value.find(
+          (category) => category.id === categoriaId.value,
+        )?.nombre ?? 'Categoría'
+      )
+    : null,
 )
+
+async function cargarCategorias() {
+  controladorCategorias?.abort()
+  const actual = new AbortController()
+  controladorCategorias = actual
+
+  cargandoCategorias.value = true
+  errorCategorias.value = null
+
+  try {
+    const categories = await getCatalogCategories(actual.signal)
+
+    if (controladorCategorias !== actual || actual.signal.aborted) return
+
+    listaCategorias.value = categories
+  } catch (e) {
+    if (
+      axios.isCancel(e) ||
+      actual.signal.aborted ||
+      controladorCategorias !== actual
+    ) return
+
+    errorCategorias.value =
+      'No se pudieron cargar las categorías. Podés reintentar.'
+  } finally {
+    if (controladorCategorias === actual) {
+      cargandoCategorias.value = false
+    }
+  }
+}
 
 // Conserva el resto de la query al cambiar de página, incluidos futuros filtros.
 function irAPagina(n: number, reemplazar = false) {
@@ -116,9 +154,6 @@ async function cargar() {
     productos.value = data.productos
     pagination.value = pag
     total.value = pag.total
-    for (const p of data.productos) {
-      categorias.value.set(p.categoria.id, p.categoria.nombre)
-    }
   } catch (e) {
     if (axios.isCancel(e)) return
     error.value = 'No se pudo cargar el catálogo.'
@@ -129,8 +164,15 @@ async function cargar() {
 }
 
 watch([categoriaId, pagina, busqueda], cargar)
-onMounted(cargar)
-onBeforeUnmount(() => controlador?.abort())
+onMounted(() => {
+  void cargar()
+  void cargarCategorias()
+})
+
+onBeforeUnmount(() => {
+  controlador?.abort()
+  controladorCategorias?.abort()
+})
 </script>
 
 <template>
@@ -160,7 +202,10 @@ onBeforeUnmount(() => controlador?.abort())
         <CatalogFilters
           :model-value="filtrosAplicados"
           :categories="listaCategorias"
+          :categories-loading="cargandoCategorias"
+          :categories-error="errorCategorias"
           @apply="aplicarFiltros"
+          @retry-categories="cargarCategorias"
         />
       </aside>
 
