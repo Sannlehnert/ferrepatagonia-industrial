@@ -7,6 +7,8 @@ const TEST_PREFIX = `TEST-RUN-${RUN_ID}-SKU-`;
 
 const BASE_URL = 'http://localhost:3000/api';
 
+const createdProductIds = [];
+
 describe('Admin Products Endpoints (#197)', () => {
     let adminCookie = '';
     let clientCookie = '';
@@ -47,7 +49,8 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(Array.isArray(body), true);
     });
 
-    it('should return 400 on invalid product creation data', async () => {
+    it('should return 400 on invalid product creation data, missing body, or fields exceeding max length', async () => {
+        // Datos inválidos básicos
         const res = await fetch(`${BASE_URL}/admin/productos`, {
             method: 'POST',
             headers: { 
@@ -62,8 +65,44 @@ describe('Admin Products Endpoints (#197)', () => {
                 stock: -1
             })
         });
-        
         assert.equal(res.status, 400);
+
+        // POST sin body
+        const emptyPostRes = await fetch(`${BASE_URL}/admin/productos`, {
+            method: 'POST',
+            headers: {
+                'Cookie': adminCookie,
+                'Content-Type': 'application/json'
+            }
+        });
+        assert.equal(emptyPostRes.status, 400);
+
+        // PUT sin body
+        const emptyPutRes = await fetch(`${BASE_URL}/admin/productos/1`, {
+            method: 'PUT',
+            headers: {
+                'Cookie': adminCookie,
+                'Content-Type': 'application/json'
+            }
+        });
+        assert.equal(emptyPutRes.status, 400);
+
+        // Campos que superan la longitud máxima (codigo > 100, nombre > 200)
+        const tooLongRes = await fetch(`${BASE_URL}/admin/productos`, {
+            method: 'POST',
+            headers: {
+                'Cookie': adminCookie,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id_categoria: 1,
+                codigo: 'A'.repeat(101),
+                nombre: 'B'.repeat(201),
+                precio: 100,
+                stock: 10
+            })
+        });
+        assert.equal(tooLongRes.status, 400);
     });
 
     it('should create and update a product as ADMIN', async () => {
@@ -83,8 +122,11 @@ describe('Admin Products Endpoints (#197)', () => {
                 activo: true
             })
         });
-        
+
         const createdBody = await createRes.json();
+        if (createdBody && createdBody.id_producto) {
+            createdProductIds.push(createdBody.id_producto);
+        }
         assert.equal(createRes.status, 201, `Fallo creacion: ${createdBody.message || ''}`);
         const createdId = createdBody.id_producto;
 
@@ -120,7 +162,12 @@ describe('Admin Products Endpoints (#197)', () => {
                 activo: true
             })
         });
-        const createdId = (await createRes.json()).id_producto;
+        const createdBody = await createRes.json();
+        if (createdBody && createdBody.id_producto) {
+            createdProductIds.push(createdBody.id_producto);
+        }
+        assert.equal(createRes.status, 201, `Fallo creacion: ${createdBody.message || ''}`);
+        const createdId = createdBody.id_producto;
 
         // Desactivarlo por primera vez
         const deactRes1 = await fetch(`${BASE_URL}/admin/productos/${createdId}/desactivar`, {
@@ -154,7 +201,12 @@ describe('Admin Products Endpoints (#197)', () => {
                 activo: true
             })
         });
-        const createdId = (await createRes.json()).id_producto;
+        const createdBody = await createRes.json();
+        if (createdBody && createdBody.id_producto) {
+            createdProductIds.push(createdBody.id_producto);
+        }
+        assert.equal(createRes.status, 201, `Fallo creacion: ${createdBody.message || ''}`);
+        const createdId = createdBody.id_producto;
 
         // Le cambiamos el stock de 5 a 25
         const updateRes = await fetch(`${BASE_URL}/admin/productos/${createdId}/stock`, {
@@ -207,12 +259,21 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(res.status, 400);
     });
 
-    // Limpiar la BD y cerrar conexión
+    // Limpiar la BD exclusivamente por los IDs creados y cerrar conexión siempre
     after(async () => {
         const { pool } = require('../dist/config/database.config.js');
         if (pool) {
-            await pool.query("DELETE FROM PRODUCTO WHERE codigo LIKE ?", [`${TEST_PREFIX}%`]);
-            await pool.end();
+            try {
+                if (createdProductIds.length > 0) {
+                    const placeholders = createdProductIds.map(() => '?').join(', ');
+                    await pool.query(
+                        `DELETE FROM PRODUCTO WHERE id_producto IN (${placeholders})`,
+                        createdProductIds
+                    );
+                }
+            } finally {
+                await pool.end();
+            }
         }
     });
 });
