@@ -23,11 +23,14 @@ const permissions = computed(() =>
     <main class="home" aria-labelledby="home-title">
         <section class="home__card">
             <p class="home__brand">FERREPATAGONIA INDUSTRIAL</p>
-            <PublicMenu :permissions="permissions" />
             <h1 id="home-title">Bienvenido a Ferrepatagonia</h1>
+
+            <div class="home__actions">
+                <PublicMenu :permissions="permissions" />
+            </div>
+
             <p class="home__message">
-                Estamos preparando nuestro sitio. Pronto vas a poder explorar
-                nuestros productos y servicios desde acá.
+                Estamos preparando nuestro sitio. Ya podés explorar nuestro catálogo.
             </p>
         </section>
     </main>
@@ -72,5 +75,32 @@ h1 {
     margin: 0;
     color: #475569;
     line-height: 1.6;
+}
+
+.home__actions {
+    margin-bottom: 20px;
+}
+
+.home__actions :deep(.navigation-menu__link) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 12px 24px;
+    border-radius: 6px;
+    background: #145a8d;
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.home__actions :deep(.navigation-menu__link:hover) {
+    background: #0b426b;
+}
+
+.home__actions :deep(.navigation-menu__link:focus-visible) {
+    outline: 3px solid #145a8d;
+    outline-offset: 3px;
 }
 </style>

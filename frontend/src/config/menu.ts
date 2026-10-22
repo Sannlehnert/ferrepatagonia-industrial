@@ -89,7 +89,7 @@ export const publicMenu: readonly MenuItem[] = [
     {
         id: 'public-catalog',
         label: 'Catálogo',
-        routeName: null,
+        routeName: 'catalogo',
         permission: null,
     },
     {
