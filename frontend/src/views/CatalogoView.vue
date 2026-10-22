@@ -31,7 +31,14 @@ function entero(v: unknown): number | undefined {
 
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
-const pagina = computed(() => entero(route.query.page) ?? 1) // ?page=abc o 0 → página 1
+const MAX_PAGINA = 1_000_000
+const pagina = computed(() => {
+  const raw = route.query.page
+  // Mismo formato y límite que parseCatalogPagination del backend.
+  if (typeof raw !== 'string' || !/^[1-9][0-9]*$/.test(raw)) return 1
+  const n = Number(raw)
+  return Number.isSafeInteger(n) && n <= MAX_PAGINA ? n : 1
+})
 
 const busqueda = computed(() => {
   const value = route.query.busqueda
@@ -115,7 +122,7 @@ function irAPagina(n: number, reemplazar = false) {
 // Paginación desde los botones: solo páginas válidas, sin recargar la app
 function cambiarPagina(n: number) {
   const p = pagination.value
-  if (!p || cargando.value || n < 1 || n > p.totalPages || n === pagina.value) return
+  if (!p || cargando.value || !Number.isSafeInteger(n) || n < 1 || n > MAX_PAGINA || n > p.totalPages || n === pagina.value) return
   irAPagina(n)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -124,6 +131,11 @@ let controlador: AbortController | null = null
 
 
 async function cargar() {
+  controlador?.abort()
+  controlador = null
+  cargando.value = true
+  error.value = null
+
   // Normalizar el parámetro page en la URL:
   // page=abc, page=0 y page=1 se convierten en la URL sin page.
   // Los números positivos mayores que 1 se conservan en formato canónico.
@@ -147,15 +159,12 @@ async function cargar() {
     }
 
     await router.replace({ name: 'catalogo', query })
-    return cargar()
+    // El watcher de la query continúa la carga con la URL normalizada.
+    return
   }
-
-  controlador?.abort()
 
   const actual = new AbortController()
   controlador = actual
-  cargando.value = true
-  error.value = null
 
   let redirigido = false
 
@@ -193,7 +202,7 @@ async function cargar() {
     pagination.value = pag
     total.value = pag.total
   } catch (e) {
-    if (axios.isCancel(e)) return
+    if (axios.isCancel(e) || actual.signal.aborted || controlador !== actual) return
 
     error.value = 'No se pudo cargar el catálogo.'
   } finally {
@@ -203,7 +212,8 @@ async function cargar() {
   }
 }
 
-watch([categoriaId, pagina, busqueda], cargar)
+// Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
+watch([categoriaId, () => route.query.page, busqueda], cargar)
 onMounted(() => {
   void cargar()
   void cargarCategorias()
