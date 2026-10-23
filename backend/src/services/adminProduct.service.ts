@@ -1,13 +1,4 @@
-import {
-    findAllAdmin,
-    findById,
-    categoryExists,
-    create,
-    update,
-    updateStock,
-    CreateProductDTO,
-    UpdateProductDTO
-} from '../repositories/adminProduct.repository';
+import {findAllAdmin,findById,categoryExists,create,update,updateStock,CreateProductDTO,UpdateProductDTO} from '../repositories/adminProduct.repository';
 
 export class ValidationError extends Error {
     statusCode: number;
@@ -19,6 +10,12 @@ export class ValidationError extends Error {
 
 // Candado en memoria complementario al UNIQUE de MariaDB
 const activeSkuLocks = new Set<string>();
+
+// Redondeo half-away-from-zero a 2 decimales idéntico a DECIMAL(12,2) de MariaDB
+const roundSqlDecimal2 = (value: number): number => {
+    const sign = value < 0 ? -1 : 1;
+    return (sign * Math.round((Math.abs(value) + Number.EPSILON) * 100)) / 100;
+};
 
 const validateProductFields = async (data: any, isUpdate = false) => {
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
@@ -95,7 +92,7 @@ const validateProductFields = async (data: any, isUpdate = false) => {
             typeof data.precio !== 'number' ||
             !Number.isFinite(data.precio) ||
             data.precio < 0 ||
-            data.precio > 9999999999.99
+            roundSqlDecimal2(data.precio) > 9999999999.99
         ) {
             throw new ValidationError('El precio debe ser un valor numérico válido entre 0 y 9999999999.99.');
         }
@@ -146,9 +143,18 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
 
     try {
         await validateProductFields(payload, false);
-        const insertId = await create(payload);
 
-        // Si el INSERT fue exitoso pero falla el SELECT posterior, devolvemos un fallback controlado (evita 500)
+        const normalizedPrice = roundSqlDecimal2(payload.precio);
+        const normalizedPayload: CreateProductDTO = {
+            ...payload,
+            codigo: payload.codigo.trim(),
+            nombre: payload.nombre.trim(),
+            precio: normalizedPrice
+        };
+
+        const insertId = await create(normalizedPayload);
+
+        // Si el INSERT fue exitoso pero falla el SELECT posterior, devolvemos un fallback consistente con MariaDB
         try {
             const createdProduct = await findById(insertId);
             if (createdProduct) return createdProduct;
@@ -158,14 +164,14 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
 
         return {
             id_producto: insertId,
-            id_categoria: payload.id_categoria,
-            codigo: payload.codigo.trim(),
-            nombre: payload.nombre.trim(),
-            descripcion: payload.descripcion ?? null,
-            precio: payload.precio,
-            stock: payload.stock,
-            imagen: payload.imagen ?? null,
-            activo: payload.activo !== undefined ? (payload.activo ? 1 : 0) : 1
+            id_categoria: normalizedPayload.id_categoria,
+            codigo: normalizedPayload.codigo,
+            nombre: normalizedPayload.nombre,
+            descripcion: normalizedPayload.descripcion ?? null,
+            precio: normalizedPrice.toFixed(2) as unknown as number,
+            stock: normalizedPayload.stock,
+            imagen: normalizedPayload.imagen ?? null,
+            activo: normalizedPayload.activo !== undefined ? (normalizedPayload.activo ? 1 : 0) : 1
         };
     } finally {
         if (sku) activeSkuLocks.delete(sku);
@@ -181,7 +187,15 @@ export const updateAdminProduct = async (id: number, payload: UpdateProductDTO) 
     if (!existing) throw new ValidationError('Producto no encontrado.', 404);
 
     await validateProductFields(payload, true);
-    await update(id, payload);
+
+    const normalizedPayload: UpdateProductDTO = {
+        ...payload,
+        ...(payload.codigo !== undefined ? { codigo: payload.codigo.trim() } : {}),
+        ...(payload.nombre !== undefined ? { nombre: payload.nombre.trim() } : {}),
+        ...(payload.precio !== undefined ? { precio: roundSqlDecimal2(payload.precio) } : {})
+    };
+
+    await update(id, normalizedPayload);
     return await findById(id);
 };
 
