@@ -11,6 +11,7 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
   const { findCatalogPage } = require('../dist/repositories/catalog.repository');
   const prefix = `catalog-${randomUUID()}`;
   const categories = [], products = [];
+  const productCodes = new Map();
   let server;
   try {
     for (const active of [1, 0, 1, 1, 1]) {
@@ -18,11 +19,13 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
       categories.push(Number(result.insertId));
     }
     const addProduct = async (connection, category, active, stock) => {
+      const codigo = `${prefix}-${products.length + 1}`;
       const result = await connection.query(`INSERT INTO PRODUCTO
         (id_categoria, codigo, nombre, precio, stock, activo) VALUES (?, ?, ?, 987654.32, ?, ?)`,
-        [category, prefix, 'Mismo nombre', stock, active]);
+        [category, codigo, 'Mismo nombre', stock, active]);
       const id = Number(result.insertId);
       products.push(id);
+      productCodes.set(id, codigo);
       return id;
     };
     await addProduct(pool, categories[0], 1, 8);
@@ -69,7 +72,7 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
         assert.equal(response.status, 200);
         const { data } = await response.json();
         assert.deepEqual(data.productos, products.slice(0, 3).slice((page - 1) * 2, page * 2).map((id) => ({
-          id, nombre: 'Mismo nombre', codigo: prefix,
+          id, nombre: 'Mismo nombre', codigo: productCodes.get(id),
           categoria: { id: categories[0], nombre: prefix },
           disponible: id !== products[1], precio: null, estadoPrecio: 'PENDIENTE_DEFINICION',
         })));
@@ -145,6 +148,7 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
         assert.equal(columns.find(c => c.Field === field).Collation, 'utf8mb4_unicode_ci');
       }
       const token = randomUUID();
+      const otherPrefix = `OTHER-${randomUUID()}`;
       const fixtures = [];
       const add = async (nombre, codigo, active = 1, category = categories[0], stock = 1) => {
         const result = await pool.query(
@@ -154,16 +158,16 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
         products.push(id);
         fixtures.push({ id, nombre, codigo, active, category, stock });
       };
-      await add(token + ' Taládro  doble', 'OTHER', 1, categories[0], 0);
+      await add(token + ' Taládro  doble', `${otherPrefix}-1`, 1, categories[0], 0);
       await add('Otro', token + ' ABC');
       await add(token + ' Mixto', token + ' MIX');
-      await add(token + ' inactivo', token, 0);
-      await add(token + ' categoria inactiva', token, 1, categories[1]);
+      await add(token + ' inactivo', token + ' INACTIVO', 0);
+      await add(token + ' categoria inactiva', token + ' CAT-INACTIVA', 1, categories[1]);
       for (const suffix of ['%', '_', '!', '\\', "' OR 1=1 --", 'X']) {
         await add(token + suffix, token + suffix);
       }
       // Coincidencias por nombre y por código fuera de la categoría detectan un OR mal agrupado.
-      await add(token + ' externo', 'OTHER', 1, categories[4]);
+      await add(token + ' externo', `${otherPrefix}-2`, 1, categories[4]);
       await add('Externo', token + ' externo', 1, categories[4]);
       const visible = fixtures.filter(p => p.active && [categories[0], categories[4]].includes(p.category));
       for (const [search, expected] of [
