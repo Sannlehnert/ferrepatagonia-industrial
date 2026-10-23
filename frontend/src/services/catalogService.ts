@@ -1,5 +1,7 @@
 import api from '@/services/api'
 import type {
+    CatalogCategory,
+    CatalogCategoriesResponse,
     CatalogData,
     CatalogQuery,
     CatalogResponse,
@@ -35,4 +37,15 @@ export async function getCatalog(
     })
 
     return response.data.data
+}
+
+export async function getCatalogCategories(
+    signal?: AbortSignal,
+): Promise<CatalogCategory[]> {
+    const response = await api.get<CatalogCategoriesResponse>(
+        '/categorias',
+        { signal },
+    )
+
+    return response.data.data.categorias
 }

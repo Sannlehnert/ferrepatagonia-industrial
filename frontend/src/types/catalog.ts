@@ -37,3 +37,14 @@ export interface CatalogQuery {
     categoria?: number
     busqueda?: string
 }
+
+export interface CatalogFiltersValue {
+    search: string
+    categoryId: number | null
+}
+
+export interface CatalogCategoriesResponse {
+    data: {
+        categorias: CatalogCategory[]
+    }
+}

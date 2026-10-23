@@ -2,8 +2,15 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { getCatalog } from '@/services/catalogService'
-import type { CatalogProduct, CatalogPagination } from '@/types/catalog'
+import CatalogFilters from '@/components/CatalogFilters.vue'
+import { getCatalog, getCatalogCategories } from '@/services/catalogService'
+import type {
+  CatalogProduct,
+  CatalogPagination,
+  CatalogFiltersValue,
+  CatalogCategory,
+} from '@/types/catalog'
+
 
 const LIMITE = 12
 const route = useRoute()
@@ -15,7 +22,7 @@ const total = ref(0)
 const cargando = ref(true)
 const error = ref<string | null>(null)
 
-// Número entero positivo a partir de un parámetro de la URL, o undefined.
+// Número entero positivo a partir de un parámetro de la URL, o undefined
 function entero(v: unknown): number | undefined {
   const raw = Array.isArray(v) ? v[0] : v
   const n = Number(raw)
@@ -24,81 +31,198 @@ function entero(v: unknown): number | undefined {
 
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
-const pagina = computed(() => entero(route.query.page) ?? 1)
+const MAX_PAGINA = 1_000_000
+const pagina = computed(() => {
+  const raw = route.query.page
+  // Mismo formato y límite que parseCatalogPagination del backend.
+  if (typeof raw !== 'string' || !/^[1-9][0-9]*$/.test(raw)) return 1
+  const n = Number(raw)
+  return Number.isSafeInteger(n) && n <= MAX_PAGINA ? n : 1
+})
 
-// Provisorio: junta las categorías de los productos que van llegando.
-// Reemplazar por el endpoint de categorías cuando Santi lo tenga.
-const categorias = ref(new Map<number, string>())
-const listaCategorias = computed(() =>
-  [...categorias.value]
-    .map(([id, nombre]) => ({ id, nombre }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
-)
+const busqueda = computed(() => {
+  const value = route.query.busqueda
+  return typeof value === 'string' ? value : ''
+})
+
+const filtrosAplicados = computed<CatalogFiltersValue>(() => ({
+  search: busqueda.value,
+  categoryId: categoriaId.value ?? null,
+}))
+
+function aplicarFiltros(filters: CatalogFiltersValue) {
+  const query = { ...route.query }
+
+  delete query.page
+  delete query.busqueda
+  delete query.categoria
+
+  if (filters.search) query.busqueda = filters.search
+  if (filters.categoryId !== null) {
+    query.categoria = String(filters.categoryId)
+  }
+
+  return router.push({ name: 'catalogo', query })
+}
+
+const listaCategorias = ref<CatalogCategory[]>([])
+const cargandoCategorias = ref(true)
+const errorCategorias = ref<string | null>(null)
+let controladorCategorias: AbortController | null = null
+
 const nombreCategoria = computed(() =>
-  categoriaId.value ? (categorias.value.get(categoriaId.value) ?? 'Categoría') : null,
+  categoriaId.value
+    ? (
+        listaCategorias.value.find(
+          (category) => category.id === categoriaId.value,
+        )?.nombre ?? 'Categoría'
+      )
+    : null,
 )
+
+async function cargarCategorias() {
+  controladorCategorias?.abort()
+  const actual = new AbortController()
+  controladorCategorias = actual
+
+  cargandoCategorias.value = true
+  errorCategorias.value = null
+
+  try {
+    const categories = await getCatalogCategories(actual.signal)
+
+    if (controladorCategorias !== actual || actual.signal.aborted) return
+
+    listaCategorias.value = categories
+  } catch (e) {
+    if (
+      axios.isCancel(e) ||
+      actual.signal.aborted ||
+      controladorCategorias !== actual
+    ) return
+
+    errorCategorias.value =
+      'No se pudieron cargar las categorías. Podés reintentar.'
+  } finally {
+    if (controladorCategorias === actual) {
+      cargandoCategorias.value = false
+    }
+  }
+}
 
 // Conserva el resto de la query al cambiar de página, incluidos futuros filtros.
 function irAPagina(n: number, reemplazar = false) {
   const query = { ...route.query }
   if (n > 1) query.page = String(n)
   else delete query.page
-
   const destino = { name: 'catalogo', query }
   return reemplazar ? router.replace(destino) : router.push(destino)
 }
 
-// Paginación desde los botones: solo páginas válidas, sin recargar la app.
+// Paginación desde los botones: solo páginas válidas, sin recargar la app
 function cambiarPagina(n: number) {
   const p = pagination.value
-  if (!p || cargando.value || n < 1 || n > p.totalPages || n === pagina.value) return
-
+  if (!p || cargando.value || !Number.isSafeInteger(n) || n < 1 || n > MAX_PAGINA || n > p.totalPages || n === pagina.value) return
   irAPagina(n)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 let controlador: AbortController | null = null
 
+
 async function cargar() {
   controlador?.abort()
-  const actual = new AbortController()
-  controlador = actual
+  controlador = null
   cargando.value = true
   error.value = null
+
+  // Normalizar el parámetro page en la URL:
+  // page=abc, page=0 y page=1 se convierten en la URL sin page.
+  // Los números positivos mayores que 1 se conservan en formato canónico.
+  const paginaSolicitada = pagina.value
+  const pageCanonica =
+    paginaSolicitada > 1 ? String(paginaSolicitada) : undefined
+  const pageActual = route.query.page
+
+  const urlCanonica =
+    pageCanonica === undefined
+      ? pageActual === undefined
+      : typeof pageActual === 'string' && pageActual === pageCanonica
+
+  if (!urlCanonica) {
+    const query = { ...route.query }
+
+    if (pageCanonica === undefined) {
+      delete query.page
+    } else {
+      query.page = pageCanonica
+    }
+
+    await router.replace({ name: 'catalogo', query })
+    // El watcher de la query continúa la carga con la URL normalizada.
+    return
+  }
+
+  const actual = new AbortController()
+  controlador = actual
+
   let redirigido = false
 
   try {
     const data = await getCatalog(
-      { page: pagina.value, limit: LIMITE, categoria: categoriaId.value },
+      {
+        page: pagina.value,
+        limit: LIMITE,
+        categoria: categoriaId.value,
+        busqueda: busqueda.value,
+      },
       actual.signal,
     )
+
+    if (controlador !== actual) return
+
     const pag = data.pagination
 
-    // Si se escribió una página fuera de rango en la URL, ir a la última.
+    // Si hay productos, redirigir a la última página válida.
     if (pag.totalPages > 0 && pagina.value > pag.totalPages) {
       redirigido = true
       irAPagina(pag.totalPages, true)
       return
     }
 
+    // Si no hay resultados y se pidió una página superior a 1,
+    // volver a la primera página para evitar una URL inválida.
+    if (pag.totalPages === 0 && pagina.value > 1) {
+      redirigido = true
+      irAPagina(1, true)
+      return
+    }
+
     productos.value = data.productos
     pagination.value = pag
     total.value = pag.total
-    for (const p of data.productos) {
-      categorias.value.set(p.categoria.id, p.categoria.nombre)
-    }
   } catch (e) {
-    if (axios.isCancel(e)) return
+    if (axios.isCancel(e) || actual.signal.aborted || controlador !== actual) return
+
     error.value = 'No se pudo cargar el catálogo.'
   } finally {
-    // No apagar el estado de carga si una redirección va a disparar otra consulta.
-    if (controlador === actual && !redirigido) cargando.value = false
+    if (controlador === actual && !redirigido) {
+      cargando.value = false
+    }
   }
 }
 
-watch([categoriaId, pagina], cargar)
-onMounted(cargar)
-onBeforeUnmount(() => controlador?.abort())
+// Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
+watch([categoriaId, () => route.query.page, busqueda], cargar)
+onMounted(() => {
+  void cargar()
+  void cargarCategorias()
+})
+
+onBeforeUnmount(() => {
+  controlador?.abort()
+  controladorCategorias?.abort()
+})
 </script>
 
 <template>
@@ -115,7 +239,7 @@ onBeforeUnmount(() => controlador?.abort())
         <h1>{{ nombreCategoria ?? 'Catálogo' }}</h1>
         <p class="total">{{ total }} productos</p>
       </div>
-      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado. -->
+      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
       <select class="orden" disabled aria-label="Ordenar productos">
         <option>Ordenar: Relevancia</option>
       </select>
@@ -125,26 +249,14 @@ onBeforeUnmount(() => controlador?.abort())
       <aside class="filtros" aria-label="Filtros">
         <h2>Filtros</h2>
 
-        <h3 class="grupo">Categoría</h3>
-        <ul class="cats">
-          <li>
-            <RouterLink
-              :to="{ name: 'catalogo' }"
-              :class="{ activa: !categoriaId }"
-            >
-              Todas
-            </RouterLink>
-          </li>
-          <li v-for="c in listaCategorias" :key="c.id">
-            <RouterLink
-              :to="{ name: 'catalogo', query: { categoria: c.id } }"
-              :class="{ activa: c.id === categoriaId }"
-            >
-              {{ c.nombre }}
-            </RouterLink>
-          </li>
-        </ul>
-        <!-- Acá se integra <CatalogFilters /> de Bruno (#195). -->
+        <CatalogFilters
+          :model-value="filtrosAplicados"
+          :categories="listaCategorias"
+          :categories-loading="cargandoCategorias"
+          :categories-error="errorCategorias"
+          @apply="aplicarFiltros"
+          @retry-categories="cargarCategorias"
+        />
       </aside>
 
       <section>
@@ -158,38 +270,39 @@ onBeforeUnmount(() => controlador?.abort())
         <div v-else-if="!productos.length" class="vacio" role="status">
           <p>
             {{
-              categoriaId
-                ? 'No hay productos en esta categoría por el momento.'
+              busqueda || categoriaId
+                ? 'No encontramos productos con esos filtros.'
                 : 'Todavía no hay productos en el catálogo.'
             }}
           </p>
-          <RouterLink v-if="categoriaId" :to="{ name: 'catalogo' }">
-            Ver todo el catálogo
-          </RouterLink>
+
+          <button
+            v-if="busqueda || categoriaId"
+            type="button"
+            @click="aplicarFiltros({ search: '', categoryId: null })"
+          >
+            Limpiar filtros
+          </button>
         </div>
 
-        <template v-else>
-          <ul class="grilla">
-            <li v-for="p in productos" :key="p.id" class="tarjeta">
-              <!-- CatalogProduct no tiene imagen todavía. -->
-              <div class="imagen" aria-hidden="true"><span>Sin imagen</span></div>
+        <ul v-else class="grilla">
+          <li v-for="p in productos" :key="p.id" class="tarjeta">
+            <!-- CatalogProduct no tiene imagen todavía -->
+            <div class="imagen" aria-hidden="true"><span>Sin imagen</span></div>
 
-              <p class="codigo">COD. {{ p.codigo }}</p>
-              <h3>{{ p.nombre }}</h3>
-              <p class="precio">Precio a confirmar</p>
+            <p class="codigo">COD. {{ p.codigo }}</p>
+            <h3>{{ p.nombre }}</h3>
+            <p class="precio">Precio a confirmar</p>
 
-              <div class="pie">
-                <span class="stock" :class="{ 'stock--no': !p.disponible }">
-                  {{ p.disponible ? 'Disponible' : 'No disponible' }}
-                </span>
-                <!-- Conectar al carrito cuando exista. -->
-                <button type="button" class="agregar" :disabled="!p.disponible">
-                  Agregar
-                </button>
-              </div>
-            </li>
-          </ul>
-        </template>
+            <div class="pie">
+              <span class="stock" :class="{ 'stock--no': !p.disponible }">
+                {{ p.disponible ? 'Disponible' : 'No disponible' }}
+              </span>
+              <!-- Conectar al carrito cuando exista -->
+              <button type="button" class="agregar" :disabled="!p.disponible">Agregar</button>
+            </div>
+          </li>
+        </ul>
 
         <nav
           v-if="!error && pagination && pagination.totalPages > 1"
@@ -203,9 +316,7 @@ onBeforeUnmount(() => controlador?.abort())
           >
             Anterior
           </button>
-          <span aria-live="polite">
-            Página {{ pagination.page }} de {{ pagination.totalPages }}
-          </span>
+          <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
             :disabled="cargando || !pagination.hasNext"
@@ -257,7 +368,16 @@ onBeforeUnmount(() => controlador?.abort())
   font-size: .9rem;
 }
 
-.cuerpo { display: grid; grid-template-columns: 190px 1fr; gap: 1.25rem; align-items: start; }
+.cuerpo {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+.cuerpo > section {
+  min-width: 0;
+}
 
 .filtros {
   border: 1px solid var(--borde);
@@ -281,16 +401,20 @@ onBeforeUnmount(() => controlador?.abort())
 
 .grilla {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
   gap: 1rem;
   margin: 0;
   padding: 0;
   list-style: none;
+  min-width: 0;
 }
+
 
 .tarjeta {
   display: flex;
   flex-direction: column;
+  min-width: 0;
+  box-sizing: border-box;
   border: 1px solid var(--borde);
   border-radius: 8px;
   padding: 1rem;
@@ -306,8 +430,23 @@ onBeforeUnmount(() => controlador?.abort())
   color: var(--apagado);
   font-size: .8rem;
 }
-.codigo { margin: 0; font-size: .7rem; color: var(--apagado); }
-.tarjeta h3 { margin: .25rem 0 .5rem; font-size: .9rem; font-weight: 600; color: var(--texto); }
+.codigo {
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.7rem;
+  color: var(--apagado);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.tarjeta h3 {
+  margin: .25rem 0 .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--texto);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
 .precio { margin: 0 0 .5rem; font-size: .95rem; color: var(--texto); }
 
 .pie {
@@ -345,7 +484,7 @@ onBeforeUnmount(() => controlador?.abort())
 }
 .paginacion button {
   min-width: 110px;
-  min-height: 44px;
+  min-height: 44px; /* tamaño táctil */
   border: 1px solid var(--azul);
   border-radius: 6px;
   background: #fff;
@@ -367,7 +506,7 @@ onBeforeUnmount(() => controlador?.abort())
 
 @media (max-width: 560px) {
   .catalogo { padding: 1rem .75rem 2rem; }
-  .grilla { grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+  .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;}
   .tarjeta { padding: .75rem; }
   .imagen { height: 110px; }
   .pie { flex-direction: column; align-items: stretch; }

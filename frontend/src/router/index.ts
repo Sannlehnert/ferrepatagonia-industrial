@@ -69,6 +69,11 @@ const router = createRouter({
       ],
     },
     {
+      path: '/catalogo',
+      name: 'catalogo',
+      component: () => import('@/views/CatalogoView.vue'),
+    },
+    {
       path: '/registro',
       name: 'registro',
       component: () => import('@/views/cuenta/RegistroView.vue'),
