@@ -4,11 +4,18 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const jwt = require('jsonwebtoken');
+const { once } = require('node:events');
+
+// Esta suite altera índices y ejecuta UPDATE sobre toda PRODUCTO. Fallar antes
+// de importar el pool o enviar HTTP si no se confirmó una base desechable.
+assert.match(process.env.ADMIN_PRODUCTS_TEST_DATABASE || '', /^admin_products_test_[a-f0-9]{32}$/,
+    'Use test/helpers/run-admin-products-mariadb.cjs: se requiere una base desechable');
+assert.equal(process.env.DB_NAME, process.env.ADMIN_PRODUCTS_TEST_DATABASE);
 
 const RUN_ID = Date.now();
 const TEST_PREFIX = `TEST-RUN-${RUN_ID}-SKU-`;
 
-const BASE_URL = 'http://localhost:3000/api';
+let BASE_URL;
 
 const createdProductIds = [];
 
@@ -24,8 +31,11 @@ const runMigrationSql = async (pool) => {
 describe('Admin Products Endpoints (#197)', () => {
     let adminCookie = '';
     let clientCookie = '';
+    let server;
+    let categoryCreated = false;
+    let fixtureProductId;
 
-    before(() => {
+    before(async () => {
         const secret = process.env.JWT_SECRET;
         if (!secret) throw new Error('No se encontró JWT_SECRET en el entorno.');
 
@@ -34,6 +44,22 @@ describe('Admin Products Endpoints (#197)', () => {
 
         const clientToken = jwt.sign({ id: 1, rol: 'CLIENTE' }, secret, { expiresIn: '2h' });
         clientCookie = `jwt_token=${clientToken}`;
+        const { pool } = require('../dist/config/database.config.js');
+        const { app } = require('../dist/app.js');
+        const [identity] = await pool.query('SELECT DATABASE() AS name');
+        assert.equal(identity.name, process.env.ADMIN_PRODUCTS_TEST_DATABASE);
+        const [count] = await pool.query('SELECT COUNT(*) AS total FROM CATEGORIA');
+        assert.equal(Number(count.total), 0, 'Se requiere esquema nuevo, sin seed ni datos compartidos');
+        await pool.query("INSERT INTO CATEGORIA (id_categoria, nombre, activo) VALUES (1, 'Test #197', 1)");
+        categoryCreated = true;
+        const fixture = await pool.query(
+            "INSERT INTO PRODUCTO (id_categoria, codigo, nombre, precio, stock, activo) VALUES (1, ?, 'Validation fixture', 1, 1, 1)",
+            [`${TEST_PREFIX}VALIDATION`]);
+        fixtureProductId = Number(fixture.insertId);
+        createdProductIds.push(fixtureProductId);
+        server = app.listen(0, '127.0.0.1');
+        await once(server, 'listening');
+        BASE_URL = `http://127.0.0.1:${server.address().port}/api`;
     });
 
     it('should return 401 when unauthenticated', async () => {
@@ -84,7 +110,7 @@ describe('Admin Products Endpoints (#197)', () => {
         });
         assert.equal(emptyPostRes.status, 400);
 
-        const emptyPutRes = await fetch(`${BASE_URL}/admin/productos/1`, {
+        const emptyPutRes = await fetch(`${BASE_URL}/admin/productos/${fixtureProductId}`, {
             method: 'PUT',
             headers: {
                 Cookie: adminCookie,
@@ -142,13 +168,20 @@ describe('Admin Products Endpoints (#197)', () => {
             },
             body: JSON.stringify({
                 nombre: 'Taladro Test 197 Editado',
-                precio: 1800.00
+                precio: 1.239
             })
         });
 
         assert.equal(updateRes.status, 200, 'Fallo la actualizacion del producto');
         const updatedBody = await updateRes.json();
         assert.equal(updatedBody.nombre, 'Taladro Test 197 Editado');
+        const { pool } = require('../dist/config/database.config.js');
+        const [persisted] = await pool.query('SELECT precio FROM PRODUCTO WHERE id_producto = ?', [createdId]);
+        assert.equal(Number(persisted.precio), 1.24);
+        assert.equal(updatedBody.precio, persisted.precio);
+        const readRes = await fetch(`${BASE_URL}/admin/productos/${createdId}`, { headers: { Cookie: adminCookie } });
+        assert.equal(readRes.status, 200);
+        assert.equal((await readRes.json()).precio, persisted.precio);
     });
 
     it('should soft-delete (deactivate) a product idempotently', async () => {
@@ -219,7 +252,7 @@ describe('Admin Products Endpoints (#197)', () => {
     });
 
     it('should return 400 when updating with negative stock', async () => {
-        const updateRes = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+        const updateRes = await fetch(`${BASE_URL}/admin/productos/${fixtureProductId}/stock`, {
             method: 'PATCH',
             headers: { Cookie: adminCookie, 'Content-Type': 'application/json' },
             body: JSON.stringify({ stock: -10 })
@@ -239,7 +272,7 @@ describe('Admin Products Endpoints (#197)', () => {
         ];
 
         for (const badStock of invalidStocks) {
-            const res = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+            const res = await fetch(`${BASE_URL}/admin/productos/${fixtureProductId}/stock`, {
                 method: 'PATCH',
                 headers: { Cookie: adminCookie, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ stock: badStock })
@@ -249,7 +282,7 @@ describe('Admin Products Endpoints (#197)', () => {
     });
 
     it('should return 400 when updating stock without a body', async () => {
-        const res = await fetch(`${BASE_URL}/admin/productos/1/stock`, {
+        const res = await fetch(`${BASE_URL}/admin/productos/${fixtureProductId}/stock`, {
             method: 'PATCH',
             headers: { Cookie: adminCookie, 'Content-Type': 'application/json' }
         });
@@ -347,6 +380,46 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(indexStats.length, 1);
         assert.equal(Number(indexStats[0].NON_UNIQUE), 0);
         assert.equal(indexStats[0].COLUMN_NAME, 'codigo');
+        assert.equal(Number(indexStats[0].SEQ_IN_INDEX), 1);
+        assert.equal(indexStats[0].SUB_PART, null);
+    });
+
+    it('migration rejects blank and duplicate normalized SKUs before changing data or indexes', async () => {
+        const { pool } = require('../dist/config/database.config.js');
+        const snapshot = async () => ({
+            rows: Array.from(await pool.query('SELECT * FROM PRODUCTO ORDER BY id_producto')),
+            indexes: Array.from(await pool.query('SHOW INDEX FROM PRODUCTO')),
+        });
+        const cases = [
+            { codes: [''], message: /codigo nulo o vacio/ },
+            { codes: ['   '], message: /codigo nulo o vacio/ },
+            { codes: ['DUP', 'DUP'], message: /SKU duplicados/ },
+            { codes: [' DUP', 'DUP '], message: /SKU duplicados/ },
+            { codes: ['caf\u00e9', 'CAFE'], message: /SKU duplicados/ },
+        ];
+        for (const { codes, message } of cases) {
+            const ids = [];
+            await pool.query('ALTER TABLE PRODUCTO DROP INDEX uq_producto_codigo');
+            try {
+                // El centinela también debe conservar espacios al abortar.
+                for (const codigo of [...codes, `${TEST_PREFIX} UNTRIMMED `]) {
+                    const result = await pool.query(
+                        "INSERT INTO PRODUCTO (id_categoria, codigo, nombre, precio, stock, activo) VALUES (1, ?, 'Migration rejection', 1, 1, 1)", [codigo]);
+                    ids.push(Number(result.insertId));
+                    createdProductIds.push(Number(result.insertId));
+                }
+                const before = await snapshot();
+                await assert.rejects(runMigrationSql(pool), error => {
+                    assert.equal(error.sqlState, '45000');
+                    assert.match(error.message, message);
+                    return true;
+                });
+                assert.deepEqual(await snapshot(), before, 'El rechazo no debe modificar filas ni índices');
+            } finally {
+                if (ids.length) await pool.query(`DELETE FROM PRODUCTO WHERE id_producto IN (${ids.map(() => '?').join(',')})`, ids);
+                await runMigrationSql(pool);
+            }
+        }
     });
 
     // Limpiar la BD exclusivamente por los IDs creados y cerrar conexión siempre
@@ -361,8 +434,13 @@ describe('Admin Products Endpoints (#197)', () => {
                         createdProductIds
                     );
                 }
+                if (categoryCreated) await pool.query('DELETE FROM CATEGORIA WHERE id_categoria = 1');
             } finally {
-                await pool.end();
+                try {
+                    if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+                } finally {
+                    await pool.end();
+                }
             }
         }
     });
