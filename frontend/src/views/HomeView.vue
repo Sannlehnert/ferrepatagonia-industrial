@@ -26,9 +26,11 @@ const permissions = computed(() =>
             <PublicMenu :permissions="permissions" />
             <h1 id="home-title">Bienvenido a Ferrepatagonia</h1>
             <p class="home__message">
-                Estamos preparando nuestro sitio. Pronto vas a poder explorar
-                nuestros productos y servicios desde acá.
+                Explorá nuestro catálogo de productos y consultá su disponibilidad.
             </p>
+            <RouterLink class="home__catalog-link" :to="{ name: 'catalogo' }">
+                Ver catálogo
+            </RouterLink>
         </section>
     </main>
 </template>
@@ -72,5 +74,20 @@ h1 {
     margin: 0;
     color: #475569;
     line-height: 1.6;
+}
+
+.home__catalog-link {
+    display: inline-block;
+    margin-top: 24px;
+    padding: 12px 18px;
+    border-radius: 6px;
+    background: #145a8d;
+    color: #fff;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.home__catalog-link:hover {
+    background: #103a5c;
 }
 </style>

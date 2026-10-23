@@ -15,7 +15,10 @@ un precio cero ni un producto gratuito. No se consulta ni publica `PRODUCTO.prec
 No se devuelve moneda ni se hacen cálculos, descuentos o conversiones.
 FER-15 debe definir con el equipo y el cliente la política pública, moneda y
 contrato definitivo. El criterio de precio de #189 queda **parcialmente pendiente**.
-El frontend debe mostrar un estado pendiente, nunca convertir null a cero.
+En la vista de catálogo, el frontend muestra temporalmente **"Precio a confirmar"**
+en cada producto; es una etiqueta informativa, no una cotización ni un compromiso
+comercial. Debe mantenerse hasta que se definan las reglas comerciales y el contrato
+de precios; nunca se debe convertir `null` a cero.
 
 ## Request
 
