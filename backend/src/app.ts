@@ -1,5 +1,4 @@
 import express, { ErrorRequestHandler } from 'express';
-import cors from 'cors'; // <-- 1. IMPORTAR CORS
 import cookieParser from 'cookie-parser';
 import { healthRouter } from './routes/health.routes';
 import { authRouter } from './routes/auth.routes';
@@ -9,11 +8,6 @@ import { catalogRouter } from './routes/catalog.routes';
 import { categoryRouter } from './routes/category.routes';
 
 export const app = express();
-
-app.use(cors({
-  origin: 'http://localhost:5173',
-  credentials: true
-}));
 
 app.use(cookieParser());
 
