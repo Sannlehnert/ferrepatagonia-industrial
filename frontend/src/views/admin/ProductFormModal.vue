@@ -117,19 +117,30 @@ const validateForm = (): boolean => {
     return Object.keys(errors).length === 0;
 };
 
-// Envío unificado para Alta (POST) y Edición (PUT)
+// Alta, edición general y actualización exclusiva de stock.
 const handleSubmit = async () => {
+    if (isSubmitting.value) return;
+
     backendError.value = '';
     if (!validateForm()) return;
 
+    const willDeactivate =
+        isEditMode.value &&
+        Boolean(props.product?.activo) &&
+        !form.value.activo;
+
+    if (
+        willDeactivate &&
+        !window.confirm(
+            `¿Desactivar "${props.product!.nombre}" (${props.product!.codigo})?\n` +
+            'Dejará de estar disponible en el catálogo público.'
+        )
+    ) {
+        return;
+    }
+
     isSubmitting.value = true;
     try {
-        const url = isEditMode.value
-            ? `${API_URL}/admin/productos/${props.product!.id_producto}`
-            : `${API_URL}/admin/productos`;
-
-        const method = isEditMode.value ? 'PUT' : 'POST';
-
         const payload = {
             nombre: form.value.nombre.trim(),
             codigo: form.value.codigo.trim(),
@@ -141,11 +152,43 @@ const handleSubmit = async () => {
             activo: Boolean(form.value.activo)
         };
 
+        const original = props.product;
+
+        const onlyStockChanged =
+            isEditMode.value &&
+            original !== null &&
+            payload.stock !== Number(original.stock) &&
+            payload.nombre === original.nombre.trim() &&
+            payload.codigo === original.codigo.trim() &&
+            payload.id_categoria === Number(original.id_categoria) &&
+            payload.precio === Number(original.precio) &&
+            payload.descripcion === (original.descripcion?.trim() || null) &&
+            payload.imagen === (original.imagen?.trim() || null) &&
+            payload.activo === Boolean(original.activo);
+
+        const productUrl = isEditMode.value
+            ? `${API_URL}/admin/productos/${original!.id_producto}`
+            : `${API_URL}/admin/productos`;
+
+        const url = onlyStockChanged
+            ? `${productUrl}/stock`
+            : productUrl;
+
+        const method = onlyStockChanged
+            ? 'PATCH'
+            : isEditMode.value
+                ? 'PUT'
+                : 'POST';
+
+        const requestBody = onlyStockChanged
+            ? { stock: payload.stock }
+            : payload;
+
         const res = await fetch(url, {
             method,
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
-            body: JSON.stringify(payload)
+            body: JSON.stringify(requestBody)
         });
 
         const data = await res.json().catch(() => null);
@@ -164,13 +207,18 @@ const handleSubmit = async () => {
         isSubmitting.value = false;
     }
 };
+
+const requestClose = () => {
+    if (isSubmitting.value) return;
+    emit('close');
+};
 </script>
 
 <template>
     <div
         v-if="isOpen"
         class="fixed inset-0 bg-[#0B2438]/75 flex items-center justify-center z-50 p-4"
-        @click.self="emit('close')"
+        @click.self="requestClose"
     >
         <div class="bg-[#F8FAFC] w-full max-w-4xl rounded-lg shadow-xl border border-[#E2E8F0] flex flex-col max-h-[90vh]">
             <!-- Encabezado del Modal -->
@@ -185,16 +233,18 @@ const handleSubmit = async () => {
                 </div>
                 <button
                     type="button"
-                    @click="emit('close')"
+                    @click="requestClose"
                     class="text-[#64748B] hover:text-[#0B2438] text-2xl leading-none px-2"
                     title="Cerrar"
+                    :disabled="isSubmitting"
+                    aria-label="Cerrar formulario"
                 >
                     ×
                 </button>
             </div>
 
             <!-- Cuerpo del Formulario -->
-            <form @submit.prevent="handleSubmit" novalidate class="p-6 overflow-y-auto flex-1 space-y-5">
+            <form @submit.prevent="handleSubmit" novalidate class="p-4 sm:p-6 min-h-0 overflow-y-auto flex-1 space-y-5">
                 <!-- Banner de Error del Backend -->
                 <div
                     v-if="backendError"
@@ -227,7 +277,7 @@ const handleSubmit = async () => {
                     </div>
 
                     <!-- Columna Derecha: Campos del Producto -->
-                    <div class="col-span-2 space-y-4">
+                    <div class="min-w-0 col-span-1 md:col-span-2 space-y-4">
                         <!-- Nombre -->
                         <div>
                             <label class="block text-xs font-semibold uppercase text-[#64748B] mb-1">Nombre del Producto *</label>
@@ -339,10 +389,10 @@ const handleSubmit = async () => {
                 </div>
 
                 <!-- Pie del Modal / Botones -->
-                <div class="pt-4 border-t border-[#E2E8F0] flex justify-end gap-3">
+                <div class="pt-4 border-t border-[#E2E8F0] flex flex-col sm:flex-row sm:justify-end gap-3">
                     <button
                         type="button"
-                        @click="emit('close')"
+                        @click="requestClose"
                         :disabled="isSubmitting"
                         class="px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] transition-colors disabled:opacity-50"
                     >
