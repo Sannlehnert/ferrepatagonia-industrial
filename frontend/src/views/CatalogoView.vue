@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import { getCatalog } from '@/services/catalogService'
+import { normalizarQueryPagina } from '@/utils/catalogPagination'
 import type { CatalogProduct, CatalogPagination } from '@/types/catalog'
 
 const LIMITE = 12
@@ -24,7 +25,7 @@ function entero(v: unknown): number | undefined {
 
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
-const pagina = computed(() => entero(route.query.page) ?? 1) // ?page=abc o 0 → página 1
+const pagina = computed(() => normalizarQueryPagina(route.query).pagina)
 
 // Provisorio: junta las categorías de los productos que van llegando.
 // Reemplazar por el endpoint de categorías cuando Santi lo tenga.
@@ -59,29 +60,12 @@ let controlador: AbortController | null = null
 
 
 async function cargar() {
-  // Normalizar el parámetro page en la URL:
-  // page=abc, page=0 y page=1 se convierten en la URL sin page.
-  // Los números positivos mayores que 1 se conservan en formato canónico.
-  const paginaSolicitada = pagina.value
-  const pageCanonica =
-    paginaSolicitada > 1 ? String(paginaSolicitada) : undefined
-  const pageActual = route.query.page
-
-  const urlCanonica =
-    pageCanonica === undefined
-      ? pageActual === undefined
-      : typeof pageActual === 'string' && pageActual === pageCanonica
-
-  if (!urlCanonica) {
-    const query = { ...route.query }
-
-    if (pageCanonica === undefined) {
-      delete query.page
-    } else {
-      query.page = pageCanonica
-    }
-
-    await router.replace({ name: 'catalogo', query })
+  const paginaNormalizada = normalizarQueryPagina(route.query)
+  if (!paginaNormalizada.esCanonica) {
+    await router.replace({
+      name: 'catalogo',
+      query: paginaNormalizada.query,
+    })
     return cargar()
   }
 
@@ -97,7 +81,7 @@ async function cargar() {
   try {
     const data = await getCatalog(
       {
-        page: pagina.value,
+        page: paginaNormalizada.pagina,
         limit: LIMITE,
         categoria: categoriaId.value,
       },
@@ -109,7 +93,7 @@ async function cargar() {
     const pag = data.pagination
 
     // Si hay productos, redirigir a la última página válida.
-    if (pag.totalPages > 0 && pagina.value > pag.totalPages) {
+    if (pag.totalPages > 0 && paginaNormalizada.pagina > pag.totalPages) {
       redirigido = true
       irAPagina(pag.totalPages, true)
       return
@@ -117,7 +101,7 @@ async function cargar() {
 
     // Si no hay resultados y se pidió una página superior a 1,
     // volver a la primera página para evitar una URL inválida.
-    if (pag.totalPages === 0 && pagina.value > 1) {
+    if (pag.totalPages === 0 && paginaNormalizada.pagina > 1) {
       redirigido = true
       irAPagina(1, true)
       return
