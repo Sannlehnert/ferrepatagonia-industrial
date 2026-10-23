@@ -2,9 +2,18 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
-import { getCatalog } from '@/services/catalogService'
-import { normalizarQueryPagina } from '@/utils/catalogPagination'
-import type { CatalogProduct, CatalogPagination } from '@/types/catalog'
+import CatalogFilters from '@/components/CatalogFilters.vue'
+import { getCatalog, getCatalogCategories } from '@/services/catalogService'
+import {
+  MAX_PAGINA_CATALOGO,
+  normalizarQueryPagina,
+} from '@/utils/catalogPagination'
+import type {
+  CatalogProduct,
+  CatalogPagination,
+  CatalogFiltersValue,
+  CatalogCategory,
+} from '@/types/catalog'
 
 const LIMITE = 12
 const route = useRoute()
@@ -27,19 +36,77 @@ function entero(v: unknown): number | undefined {
 const categoriaId = computed(() => entero(route.query.categoria))
 const pagina = computed(() => normalizarQueryPagina(route.query).pagina)
 
-// Provisorio: junta las categorías de los productos que van llegando.
-// Reemplazar por el endpoint de categorías cuando Santi lo tenga.
-const categorias = ref(new Map<number, string>())
-const listaCategorias = computed(() =>
-  [...categorias.value]
-    .map(([id, nombre]) => ({ id, nombre }))
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
-)
+const busqueda = computed(() => {
+  const value = route.query.busqueda
+  return typeof value === 'string' ? value : ''
+})
+
+const filtrosAplicados = computed<CatalogFiltersValue>(() => ({
+  search: busqueda.value,
+  categoryId: categoriaId.value ?? null,
+}))
+
+function aplicarFiltros(filters: CatalogFiltersValue) {
+  const query = { ...route.query }
+
+  delete query.page
+  delete query.busqueda
+  delete query.categoria
+
+  if (filters.search) query.busqueda = filters.search
+  if (filters.categoryId !== null) {
+    query.categoria = String(filters.categoryId)
+  }
+
+  return router.push({ name: 'catalogo', query })
+}
+
+const listaCategorias = ref<CatalogCategory[]>([])
+const cargandoCategorias = ref(true)
+const errorCategorias = ref<string | null>(null)
+let controladorCategorias: AbortController | null = null
+
 const nombreCategoria = computed(() =>
-  categoriaId.value ? (categorias.value.get(categoriaId.value) ?? 'Categoría') : null,
+  categoriaId.value
+    ? (
+        listaCategorias.value.find(
+          (category) => category.id === categoriaId.value,
+        )?.nombre ?? 'Categoría'
+      )
+    : null,
 )
 
-// Conserva el resto de la query (categoría y, más adelante, búsqueda y filtros)
+async function cargarCategorias() {
+  controladorCategorias?.abort()
+  const actual = new AbortController()
+  controladorCategorias = actual
+
+  cargandoCategorias.value = true
+  errorCategorias.value = null
+
+  try {
+    const categories = await getCatalogCategories(actual.signal)
+
+    if (controladorCategorias !== actual || actual.signal.aborted) return
+
+    listaCategorias.value = categories
+  } catch (e) {
+    if (
+      axios.isCancel(e) ||
+      actual.signal.aborted ||
+      controladorCategorias !== actual
+    ) return
+
+    errorCategorias.value =
+      'No se pudieron cargar las categorías. Podés reintentar.'
+  } finally {
+    if (controladorCategorias === actual) {
+      cargandoCategorias.value = false
+    }
+  }
+}
+
+// Conserva el resto de la query al cambiar de página, incluidos futuros filtros.
 function irAPagina(n: number, reemplazar = false) {
   const query = { ...route.query }
   if (n > 1) query.page = String(n)
@@ -51,7 +118,7 @@ function irAPagina(n: number, reemplazar = false) {
 // Paginación desde los botones: solo páginas válidas, sin recargar la app
 function cambiarPagina(n: number) {
   const p = pagination.value
-  if (!p || cargando.value || n < 1 || n > p.totalPages || n === pagina.value) return
+  if (!p || cargando.value || !Number.isSafeInteger(n) || n < 1 || n > MAX_PAGINA_CATALOGO || n > p.totalPages || n === pagina.value) return
   irAPagina(n)
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
@@ -60,21 +127,22 @@ let controlador: AbortController | null = null
 
 
 async function cargar() {
+  controlador?.abort()
+  controlador = null
+  cargando.value = true
+  error.value = null
+
   const paginaNormalizada = normalizarQueryPagina(route.query)
   if (!paginaNormalizada.esCanonica) {
     await router.replace({
       name: 'catalogo',
       query: paginaNormalizada.query,
     })
-    return cargar()
+    return
   }
-
-  controlador?.abort()
 
   const actual = new AbortController()
   controlador = actual
-  cargando.value = true
-  error.value = null
 
   let redirigido = false
 
@@ -84,6 +152,7 @@ async function cargar() {
         page: paginaNormalizada.pagina,
         limit: LIMITE,
         categoria: categoriaId.value,
+        busqueda: busqueda.value,
       },
       actual.signal,
     )
@@ -110,12 +179,8 @@ async function cargar() {
     productos.value = data.productos
     pagination.value = pag
     total.value = pag.total
-
-    for (const p of data.productos) {
-      categorias.value.set(p.categoria.id, p.categoria.nombre)
-    }
   } catch (e) {
-    if (axios.isCancel(e)) return
+    if (axios.isCancel(e) || actual.signal.aborted || controlador !== actual) return
 
     error.value = 'No se pudo cargar el catálogo.'
   } finally {
@@ -125,10 +190,17 @@ async function cargar() {
   }
 }
 
+// Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
+watch([categoriaId, () => route.query.page, busqueda], cargar)
+onMounted(() => {
+  void cargar()
+  void cargarCategorias()
+})
 
-watch([categoriaId, pagina], cargar)
-onMounted(cargar)
-onBeforeUnmount(() => controlador?.abort())
+onBeforeUnmount(() => {
+  controlador?.abort()
+  controladorCategorias?.abort()
+})
 </script>
 
 <template>
@@ -155,23 +227,14 @@ onBeforeUnmount(() => controlador?.abort())
       <aside class="filtros" aria-label="Filtros">
         <h2>Filtros</h2>
 
-        <h3 class="grupo">Categoría</h3>
-        <ul class="cats">
-          <li>
-            <RouterLink :to="{ name: 'catalogo' }" :class="{ activa: !categoriaId }">
-              Todas
-            </RouterLink>
-          </li>
-          <li v-for="c in listaCategorias" :key="c.id">
-            <RouterLink
-              :to="{ name: 'catalogo', query: { categoria: c.id } }"
-              :class="{ activa: c.id === categoriaId }"
-            >
-              {{ c.nombre }}
-            </RouterLink>
-          </li>
-        </ul>
-        <!-- Acá se integra <CatalogFilters /> de Bruno (#195) -->
+        <CatalogFilters
+          :model-value="filtrosAplicados"
+          :categories="listaCategorias"
+          :categories-loading="cargandoCategorias"
+          :categories-error="errorCategorias"
+          @apply="aplicarFiltros"
+          @retry-categories="cargarCategorias"
+        />
       </aside>
 
       <section>
@@ -185,14 +248,19 @@ onBeforeUnmount(() => controlador?.abort())
         <div v-else-if="!productos.length" class="vacio" role="status">
           <p>
             {{
-              categoriaId
-                ? 'No hay productos en esta categoría por el momento.'
+              busqueda || categoriaId
+                ? 'No encontramos productos con esos filtros.'
                 : 'Todavía no hay productos en el catálogo.'
             }}
           </p>
-          <RouterLink v-if="categoriaId" :to="{ name: 'catalogo' }">
-            Ver todo el catálogo
-          </RouterLink>
+
+          <button
+            v-if="busqueda || categoriaId"
+            type="button"
+            @click="aplicarFiltros({ search: '', categoryId: null })"
+          >
+            Limpiar filtros
+          </button>
         </div>
 
         <ul v-else class="grilla">
@@ -350,6 +418,10 @@ onBeforeUnmount(() => controlador?.abort())
   word-break: break-word;
 }
 .tarjeta h3 {
+  margin: .25rem 0 .5rem;
+  font-size: .9rem;
+  font-weight: 600;
+  color: var(--texto);
   overflow-wrap: anywhere;
   word-break: break-word;
 }

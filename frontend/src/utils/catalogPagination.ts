@@ -3,14 +3,16 @@ import type { LocationQuery, LocationQueryRaw } from 'vue-router'
 export const MAX_PAGINA_CATALOGO = 1_000_000
 
 function parsearPagina(value: unknown): number {
-  const raw = Array.isArray(value) ? value[0] : value
+  if (typeof value !== 'string' || !/^[1-9][0-9]*$/.test(value)) return 1
 
-  if (typeof raw !== 'string' || !/^\d+$/.test(raw)) return 1
+  const page = Number(value)
+  if (
+    !Number.isSafeInteger(page) ||
+    page < 1 ||
+    page > MAX_PAGINA_CATALOGO
+  ) return 1
 
-  const page = Number(raw)
-  if (!Number.isSafeInteger(page) || page < 1) return 1
-
-  return Math.min(page, MAX_PAGINA_CATALOGO)
+  return page
 }
 
 export function normalizarQueryPagina(query: LocationQuery): {

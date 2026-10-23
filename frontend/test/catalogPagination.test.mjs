@@ -12,18 +12,17 @@ test('normaliza páginas inválidas antes de solicitar el catálogo', () => {
   }
 })
 
-test('limita páginas por encima del máximo sin perder filtros ni categoría', () => {
+test('normaliza páginas por encima del máximo y conserva filtros y categoría', () => {
   const result = normalizarQueryPagina({
     categoria: '5',
     busqueda: 'taladro',
     page: '1000001',
   })
 
-  assert.equal(result.pagina, 1_000_000)
+  assert.equal(result.pagina, 1)
   assert.deepEqual(result.query, {
     categoria: '5',
     busqueda: 'taladro',
-    page: '1000000',
   })
   assert.equal(result.esCanonica, false)
 })

@@ -20,6 +20,7 @@ CREATE TABLE PRODUCTO (
     fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id_producto),
+    UNIQUE KEY uq_producto_codigo (codigo),
     KEY idx_producto_categoria (id_categoria),
     CONSTRAINT fk_producto_categoria FOREIGN KEY (id_categoria)
         REFERENCES CATEGORIA (id_categoria) ON DELETE RESTRICT ON UPDATE RESTRICT,

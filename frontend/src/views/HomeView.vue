@@ -23,14 +23,15 @@ const permissions = computed(() =>
     <main class="home" aria-labelledby="home-title">
         <section class="home__card">
             <p class="home__brand">FERREPATAGONIA INDUSTRIAL</p>
-            <PublicMenu :permissions="permissions" />
             <h1 id="home-title">Bienvenido a Ferrepatagonia</h1>
+
+            <div class="home__actions">
+                <PublicMenu :permissions="permissions" />
+            </div>
+
             <p class="home__message">
-                Explorá nuestro catálogo de productos y consultá su disponibilidad.
+                Estamos preparando nuestro sitio. Ya podés explorar nuestro catálogo.
             </p>
-            <RouterLink class="home__catalog-link" :to="{ name: 'catalogo' }">
-                Ver catálogo
-            </RouterLink>
         </section>
     </main>
 </template>
@@ -76,10 +77,17 @@ h1 {
     line-height: 1.6;
 }
 
-.home__catalog-link {
-    display: inline-block;
-    margin-top: 24px;
-    padding: 12px 18px;
+.home__actions {
+    margin-bottom: 20px;
+}
+
+.home__actions :deep(.navigation-menu__link) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-height: 44px;
+    padding: 12px 24px;
     border-radius: 6px;
     background: #145a8d;
     color: #fff;
@@ -87,7 +95,12 @@ h1 {
     text-decoration: none;
 }
 
-.home__catalog-link:hover {
-    background: #103a5c;
+.home__actions :deep(.navigation-menu__link:hover) {
+    background: #0b426b;
+}
+
+.home__actions :deep(.navigation-menu__link:focus-visible) {
+    outline: 3px solid #145a8d;
+    outline-offset: 3px;
 }
 </style>
