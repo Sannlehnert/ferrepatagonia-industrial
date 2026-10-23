@@ -45,7 +45,7 @@ const router = createRouter({
           path: 'productos',
           name: 'admin-products',
           component: () =>
-            import('@/views/admin/AdminProductsListView.vue'),
+            import('@/views/admin/AdminSectionPlaceholderView.vue'),
           props: {
             title: 'Productos',
             description: 'Administración del catálogo, precios y stock.',
