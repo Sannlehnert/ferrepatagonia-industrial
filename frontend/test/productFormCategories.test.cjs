@@ -16,6 +16,7 @@ const code = ts.transpileModule(script.content, {
 const compiled = { exports: {} }
 new Function('require', 'module', 'exports', code)(name => {
   if (name === '../../services/adminProductService') return { saveAdminProduct() {} }
+  if (name === '../../services/adminMutationError') return require('../src/services/adminMutationError.ts')
   return require(name)
 }, compiled, compiled.exports)
 

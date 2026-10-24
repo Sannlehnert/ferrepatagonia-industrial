@@ -33,12 +33,22 @@ export interface ProductPayload {
 export async function getAdminProducts(): Promise<AdminProduct[]> {
     const response = await api.get<any>('/admin/productos');
     const raw = response.data;
-    
+
     if (Array.isArray(raw)) return raw;
     if (Array.isArray(raw?.data)) return raw.data;
     if (Array.isArray(raw?.productos)) return raw.productos;
     if (Array.isArray(raw?.data?.productos)) return raw.data.productos;
-    return [];
+    // An invalid response must not unlock mutations after an uncertain save.
+    throw new Error('La respuesta del listado de productos no es válida.');
+}
+
+export async function setAdminProductActive(productId: number, active: boolean): Promise<void> {
+    if (active) await api.put(`/admin/productos/${productId}`, { activo: true });
+    else await api.patch(`/admin/productos/${productId}/desactivar`);
+}
+
+export async function updateAdminProductStock(productId: number, stock: number): Promise<void> {
+    await api.patch(`/admin/productos/${productId}/stock`, { stock });
 }
 
 export async function getActiveCategories(): Promise<CategoryOption[]> {

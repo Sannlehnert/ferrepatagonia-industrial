@@ -5,10 +5,13 @@ import axios from 'axios';
 import ProductFormModal from './ProductFormModal.vue';
 import {
     getAdminProducts,
+    setAdminProductActive,
     getActiveCategories,
     type AdminProduct,
     type CategoryOption
 } from '../../services/adminProductService';
+
+import { isMutationResultUncertain, adminMutationErrorMessage, uncertainMutationMessage } from '../../services/adminMutationError';
 
 const router = useRouter();
 
@@ -22,17 +25,27 @@ const isLoading = ref(true);
 const loadError = ref('');
 const isSessionExpired = ref(false);
 const saveMessage = ref('');
+const actionError = ref('');
+const processingId = ref<number | null>(null);
+const needsReload = ref(false);
+const actionsDisabled = computed(() => isLoading.value || processingId.value !== null || needsReload.value || Boolean(loadError.value));
 
 const isModalOpen = ref(false);
 const selectedProduct = ref<AdminProduct | null>(null);
 
+let initialLoad = true;
 const fetchProductos = async () => {
+    if (isLoading.value && !initialLoad) return;
+    initialLoad = false;
     isLoading.value = true;
     loadError.value = '';
     isSessionExpired.value = false;
 
     try {
         productos.value = await getAdminProducts();
+        if (needsReload.value) isModalOpen.value = false;
+        needsReload.value = false;
+        actionError.value = '';
     } catch (error: unknown) {
         if (axios.isAxiosError(error)) {
             if (error.response?.status === 401) {
@@ -80,6 +93,7 @@ const formatPrice = (value: number) =>
     new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
 const openCreateModal = () => {
+    if (actionsDisabled.value) return;
     saveMessage.value = '';
     selectedProduct.value = null;
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
@@ -89,6 +103,7 @@ const openCreateModal = () => {
 };
 
 const openEditModal = (prod: AdminProduct) => {
+    if (actionsDisabled.value) return;
     saveMessage.value = '';
     selectedProduct.value = { ...prod };
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
@@ -99,7 +114,35 @@ const openEditModal = (prod: AdminProduct) => {
 
 const handleSaved = async (msg: string) => {
     saveMessage.value = msg;
+    needsReload.value = true;
     await fetchProductos();
+};
+
+const handleUncertain = () => {
+    needsReload.value = true;
+    actionError.value = uncertainMutationMessage;
+};
+
+const toggleStatus = async (prod: AdminProduct) => {
+    if (actionsDisabled.value || isModalOpen.value) return;
+    const deactivate = Boolean(prod.activo);
+    if (deactivate && !window.confirm(
+        `¿Desactivar "${prod.nombre}" (${prod.codigo})?\nDejará de estar disponible en el catálogo público.`
+    )) return;
+    processingId.value = prod.id_producto;
+    actionError.value = '';
+    saveMessage.value = '';
+    try {
+        await setAdminProductActive(prod.id_producto, !deactivate);
+        needsReload.value = true;
+        saveMessage.value = `"${prod.nombre}" se ${deactivate ? 'desactivó' : 'activó'} correctamente.`;
+        await fetchProductos();
+    } catch (error: unknown) {
+        if (isMutationResultUncertain(error)) handleUncertain();
+        else actionError.value = adminMutationErrorMessage(error);
+    } finally {
+        processingId.value = null;
+    }
 };
 
 onMounted(() => {
@@ -129,6 +172,12 @@ onMounted(() => {
         >
             {{ saveMessage }}
         </p>
+
+        <p v-if="processingId !== null" role="status" class="mb-4">Actualizando estado del producto...</p>
+        <div v-if="actionError || needsReload" role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
+            <p>{{ actionError || 'Recargá el listado para confirmar los datos antes de modificar productos.' }}</p>
+            <button type="button" :disabled="isLoading || processingId !== null" class="min-h-11 underline disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
+        </div>
 
         <!-- Estado de Carga -->
         <div v-if="isLoading" class="flex-1 flex justify-center items-center py-12 text-[#64748B]">
@@ -180,6 +229,7 @@ onMounted(() => {
                     <button
                         type="button"
                         @click="openEditModal(prod)"
+                        :disabled="actionsDisabled"
                         :aria-label="`Editar ${prod.nombre}`"
                         title="Editar Producto"
                         class="min-h-11 min-w-11 [@media(pointer:fine)]:min-h-8 [@media(pointer:fine)]:min-w-8 p-1.5 bg-white text-[#64748B] hover:text-[#103A5C] border border-[#E2E8F0] rounded-md shadow-sm flex items-center justify-center transition-colors"
@@ -187,6 +237,14 @@ onMounted(() => {
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
                     </button>
                 </div>
+
+                <button
+                    type="button"
+                    @click.stop.prevent="toggleStatus(prod)"
+                    :disabled="actionsDisabled"
+                    :aria-label="`${prod.activo ? 'Desactivar' : 'Activar'} ${prod.nombre}`"
+                    class="absolute top-16 right-2 z-10 min-h-11 px-3 bg-white border border-[#E2E8F0] rounded-md shadow-sm text-sm text-[#103A5C] disabled:opacity-50"
+                >{{ prod.activo ? 'Desactivar' : 'Activar' }}</button>
 
                 <!-- Imagen Placeholder y Estado -->
                 <div class="h-32 bg-[#F8FAFC] flex items-center justify-center text-[#94A3B8] relative border-b border-[#E2E8F0]">
@@ -235,7 +293,7 @@ onMounted(() => {
             <button
                 type="button"
                 @click="openCreateModal"
-                :disabled="isLoading"
+                :disabled="actionsDisabled"
                 class="min-h-11 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md disabled:opacity-50 w-full sm:w-auto"
             >
                 + Nuevo Producto
@@ -246,6 +304,10 @@ onMounted(() => {
             :is-open="isModalOpen"
             :product="selectedProduct"
             :categories="categorias"
+            :mutation-blocked="needsReload"
+            :is-reloading="isLoading"
+            @uncertain="handleUncertain"
+            @reload="fetchProductos"
             :is-loading-categories="isLoadingCategories"
             :categories-error="categoriesError"
             @retry-categories="fetchCategorias"
