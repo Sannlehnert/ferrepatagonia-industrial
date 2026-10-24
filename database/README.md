@@ -11,6 +11,7 @@ database/
 ├── schema.sql
 ├── seed.sql
 ├── verify-seed.sql
+├── migrate-uq-producto-codigo.sql
 └── README.md
 ```
 
@@ -241,6 +242,104 @@ docker compose up -d --wait --wait-timeout 180
 Después ejecutar nuevamente los tres comandos del paso 3: `schema.sql`, `seed.sql` y `verify-seed.sql`, en ese orden. No es necesario borrar la imagen descargada.
 
 ---
+
+## Migrar SKU en una base existente (#197)
+
+`migrate-uq-producto-codigo.sql` normaliza espacios laterales y garantiza un
+índice UNIQUE de una sola columna completa sobre `PRODUCTO.codigo`. Usar MariaDB
+11.4 y el esquema del proyecto (`codigo VARCHAR(100) NOT NULL`,
+`utf8mb4_unicode_ci`); comprobar `SHOW CREATE TABLE PRODUCTO` y disponer de permisos
+SELECT, UPDATE y ALTER. No volver a ejecutar `schema.sql` ni `seed.sql`.
+
+1. Confirmar host, puerto y `SELECT DATABASE(), VERSION()` en el destino elegido.
+   Reservar una ventana de mantenimiento: detener todos los escritores, incluidos
+   backend, importadores y otras sesiones. Mantenerlos detenidos hasta verificar.
+2. Hacer un backup completo con `mariadb-dump` y comprobar su restauración en una
+   base aparte antes de modificar datos. La migración contiene DDL con commits
+   implícitos: **no es una transacción reversible con ROLLBACK**. Si falla después
+   de normalizar o eliminar un índice, inspeccionar el estado antes de continuar;
+   restaurar el backup si es necesario.
+3. Buscar datos que impedirían migrar (las dos consultas deben devolver cero filas):
+
+```sql
+SELECT id_producto, codigo FROM PRODUCTO
+WHERE codigo IS NULL OR CHAR_LENGTH(TRIM(codigo)) = 0;
+
+SELECT TRIM(codigo) COLLATE utf8mb4_unicode_ci AS sku, COUNT(*) AS cantidad,
+       GROUP_CONCAT(id_producto ORDER BY id_producto) AS ids
+FROM PRODUCTO GROUP BY TRIM(codigo) COLLATE utf8mb4_unicode_ci
+HAVING COUNT(*) > 1;
+```
+
+Asignar SKU válidos y únicos a los productos afectados según el criterio del
+negocio. La comparación ignora mayúsculas y acentos; `café` y `CAFE` colisionan.
+No borrar productos ni inventar sufijos automáticamente: pueden tener referencias
+en pedidos. El script aborta ante vacíos/duplicados antes de modificar datos;
+no los corrige. Repetir las consultas tras resolverlos.
+
+4. Desde el cliente `mariadb`, conectado explícitamente a la base elegida con
+   `--default-character-set=utf8mb4`, ejecutar desde la raíz del repositorio:
+
+```sql
+SOURCE database/migrate-uq-producto-codigo.sql;
+```
+
+En el cliente dentro de Compose, la ruta de solo lectura es
+`SOURCE /scripts/migrate-uq-producto-codigo.sql;`. No usar `--force` para ignorar errores.
+
+5. Verificar ausencia de espacios y definición completa del índice:
+
+```sql
+SELECT COUNT(*) AS sku_con_espacios FROM PRODUCTO
+WHERE BINARY codigo <> BINARY TRIM(codigo)
+   OR CHAR_LENGTH(codigo) <> CHAR_LENGTH(TRIM(codigo));
+
+SELECT INDEX_NAME, NON_UNIQUE, SEQ_IN_INDEX, COLUMN_NAME, SUB_PART
+FROM INFORMATION_SCHEMA.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'PRODUCTO'
+ORDER BY INDEX_NAME, SEQ_IN_INDEX;
+```
+
+El conteo debe ser 0. Debe existir un índice con **exactamente una fila**:
+`NON_UNIQUE=0`, `SEQ_IN_INDEX=1`, `COLUMN_NAME=codigo`, `SUB_PART=NULL`.
+Normalmente se llama `uq_producto_codigo`; un UNIQUE equivalente con otro nombre
+también es aceptado por el script. Un índice compuesto o de prefijo no alcanza.
+Reejecutar la migración y estas verificaciones en la misma ventana: debe finalizar
+sin error, conservar los SKU normalizados y la definición del índice. Reanudar
+escritores solo después de validar ambos resultados.
+
+### Pruebas destructivas en MariaDB desechable
+
+Desde `backend/`, con Node >=22 y Docker iniciado:
+
+```bash
+npm ci
+npm run build
+node test/helpers/run-admin-products-mariadb.cjs
+```
+
+El helper sigue el flujo Docker desechable de categorías: crea un contenedor
+MariaDB 11.4 sin volúmenes, credenciales aleatorias, puerto aleatorio en loopback y
+un esquema nuevo sin seed. Ejecuta admin y catálogo en serie y elimina el
+contenedor al terminar. No utiliza Compose ni su volumen de desarrollo.
+Si Docker no está disponible, detenerse; no sustituirlo por `ferrepatagonia_dev`.
+
+`adminProduct.test.cjs` exige `ADMIN_PRODUCTS_TEST_DATABASE` con formato
+`admin_products_test_<32 caracteres hexadecimales>` y coincidencia exacta con
+`DB_NAME`, verifica el nombre conectado y una tabla CATEGORIA vacía, y levanta su
+propio servidor HTTP en un puerto aleatorio. No apunta a `localhost:3000`.
+El nombre es una confirmación explícita, no una prueba de aislamiento físico:
+usar el helper y nunca renombrar una base compartida para eludir la guarda.
+La suite altera índices y normaliza toda PRODUCTO; no ejecutarla en paralelo con
+otros consumidores de esa base. Si se interrumpe el proceso abruptamente, eliminar
+únicamente el contenedor `admin-products-test-...` de esa corrida.
+
+La cobertura comprueba vacíos, espacios, duplicados exactos/normalizados y por
+mayúsculas/acentos, aborto sin cambios, UNIQUE completo, reejecución y precisión
+del precio en PUT y fallback. NULL no se inserta como fixture porque el esquema
+oficial lo rechaza con NOT NULL; no se altera esa restricción para simular otro
+esquema. Estas pruebas no certifican migraciones con escritores concurrentes ni
+esquemas distintos al oficial.
 
 ## Consideraciones
 

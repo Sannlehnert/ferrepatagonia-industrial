@@ -109,7 +109,7 @@ onMounted(() => {
 </script>
 
 <template>
-    <div class="p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
+    <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
         <!-- Barra Superior -->
         <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 sticky top-0 bg-[#F1F5F9] py-4 z-20">
             <h2 class="text-2xl font-bold text-[#0B2438]">Catálogo de Productos</h2>

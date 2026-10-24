@@ -249,14 +249,14 @@ const requestClose = () => {
                             <div v-if="isLoadingCategories" class="border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#64748B] bg-[#F1F5F9]">
                                 Cargando categorías...
                             </div>
-                            <div v-else-if="categoriesError && availableCategories.length === 0" class="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
+                            <div v-if="categoriesError" role="alert" class="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
                                 <p>{{ categoriesError }}</p>
                                 <button type="button" @click="emit('retry-categories')" class="mt-1 font-semibold underline">
                                     Reintentar
                                 </button>
                             </div>
                             <select
-                                v-else
+                                v-if="!isLoadingCategories"
                                 v-model.number="form.id_categoria"
                                 :disabled="isSubmitting || availableCategories.length === 0"
                                 class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
