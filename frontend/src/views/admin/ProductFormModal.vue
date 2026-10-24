@@ -3,9 +3,12 @@ import { ref, computed, watch } from 'vue';
 import axios from 'axios';
 import {
     saveAdminProduct,
+    updateAdminProductStock,
     type AdminProduct,
     type CategoryOption
 } from '../../services/adminProductService';
+
+import { isMutationResultUncertain, uncertainMutationMessage, adminMutationErrorMessage } from '../../services/adminMutationError';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -13,17 +16,23 @@ const props = defineProps<{
     categories?: CategoryOption[];
     isLoadingCategories?: boolean;
     categoriesError?: string;
+    mutationBlocked?: boolean;
+    isReloading?: boolean;
 }>();
 
 const emit = defineEmits<{
     (e: 'close'): void;
     (e: 'saved', message: string): void;
     (e: 'retry-categories'): void;
+    (e: 'uncertain'): void;
+    (e: 'reload'): void;
 }>();
 
 const isEditMode = computed(() => Boolean(props.product?.id_producto));
 const isSubmitting = ref(false);
 const backendError = ref('');
+const uncertain = ref(false);
+const formDisabled = computed(() => isSubmitting.value || uncertain.value || props.mutationBlocked);
 const fieldErrors = ref<Record<string, string>>({});
 
 const form = ref({
@@ -61,6 +70,7 @@ watch(
     (isOpen, wasOpen) => {
         if (!isOpen || wasOpen) return;
         backendError.value = '';
+        uncertain.value = false;
         fieldErrors.value = {};
 
         if (props.product) {
@@ -132,9 +142,12 @@ const validateForm = (): boolean => {
 };
 
 const handleSubmit = async () => {
-    if (isSubmitting.value) return;
+    if (formDisabled.value) return;
     backendError.value = '';
     if (!validateForm()) return;
+
+    if (isEditMode.value && Boolean(props.product?.activo) && !form.value.activo &&
+        !window.confirm(`¿Desactivar "${props.product!.nombre}" (${props.product!.codigo})?\nDejará de estar disponible en el catálogo público.`)) return;
 
     isSubmitting.value = true;
     try {
@@ -149,7 +162,14 @@ const handleSubmit = async () => {
             activo: Boolean(form.value.activo)
         };
 
-        await saveAdminProduct(payload, props.product?.id_producto);
+        const original = props.product;
+        const onlyStockChanged = original !== null && payload.stock !== Number(original.stock) &&
+            payload.nombre === original.nombre.trim() && payload.codigo === original.codigo.trim() &&
+            payload.id_categoria === Number(original.id_categoria) && payload.precio === Number(original.precio) &&
+            payload.descripcion === (original.descripcion?.trim() || null) &&
+            payload.imagen === (original.imagen?.trim() || null) && payload.activo === Boolean(original.activo);
+        if (onlyStockChanged) await updateAdminProductStock(original!.id_producto, payload.stock);
+        else await saveAdminProduct(payload, props.product?.id_producto);
 
         emit(
             'saved',
@@ -169,7 +189,12 @@ const handleSubmit = async () => {
             msg = error.message;
         }
 
-        backendError.value = msg;
+        backendError.value = adminMutationErrorMessage(error);
+        if (isMutationResultUncertain(error)) {
+            uncertain.value = true;
+            backendError.value = uncertainMutationMessage;
+            emit('uncertain');
+        }
 
         if (status === 409) {
             fieldErrors.value = { ...fieldErrors.value, codigo: msg };
@@ -180,7 +205,7 @@ const handleSubmit = async () => {
 };
 
 const requestClose = () => {
-    if (!isSubmitting.value) emit('close');
+    if (!isSubmitting.value && !props.isReloading) emit('close');
 };
 </script>
 
@@ -199,7 +224,7 @@ const requestClose = () => {
                 <button
                     type="button"
                     @click="requestClose"
-                    :disabled="isSubmitting"
+                    :disabled="isSubmitting || isReloading"
                     aria-label="Cerrar formulario"
                     class="min-h-11 min-w-11 flex items-center justify-center text-[#64748B] hover:text-[#0B2438] text-2xl"
                 >
@@ -210,8 +235,12 @@ const requestClose = () => {
             <!-- Formulario con cuerpo scrollable y botones fijos abajo -->
             <form @submit.prevent="handleSubmit" novalidate class="flex flex-col flex-1 min-h-0">
                 <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                    <div v-if="uncertain || mutationBlocked" role="alert" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        <p>{{ uncertainMutationMessage }}</p>
+                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="min-h-11 underline">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
+                    </div>
                     <div
-                        v-if="backendError"
+                        v-if="backendError && !uncertain"
                         role="alert"
                         class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-center justify-between"
                     >
@@ -224,7 +253,7 @@ const requestClose = () => {
                         <input
                             v-model="form.nombre"
                             type="text"
-                            :disabled="isSubmitting"
+                            :disabled="formDisabled"
                             class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                             :class="fieldErrors.nombre ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                         >
@@ -237,7 +266,7 @@ const requestClose = () => {
                             <input
                                 v-model="form.codigo"
                                 type="text"
-                                :disabled="isSubmitting"
+                                :disabled="formDisabled"
                                 class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
                                 :class="fieldErrors.codigo ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
@@ -258,7 +287,7 @@ const requestClose = () => {
                             <select
                                 v-if="!isLoadingCategories"
                                 v-model.number="form.id_categoria"
-                                :disabled="isSubmitting || availableCategories.length === 0"
+                                :disabled="formDisabled || availableCategories.length === 0"
                                 class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.id_categoria ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
@@ -279,7 +308,7 @@ const requestClose = () => {
                                 type="number"
                                 min="0"
                                 step="0.01"
-                                :disabled="isSubmitting"
+                                :disabled="formDisabled"
                                 class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.precio ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
@@ -293,7 +322,7 @@ const requestClose = () => {
                                 type="number"
                                 min="0"
                                 step="1"
-                                :disabled="isSubmitting"
+                                :disabled="formDisabled"
                                 class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.stock ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
@@ -307,7 +336,7 @@ const requestClose = () => {
                             v-model="form.imagen"
                             type="text"
                             placeholder="https://..."
-                            :disabled="isSubmitting"
+                            :disabled="formDisabled"
                             class="w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438]"
                         >
                     </div>
@@ -317,7 +346,7 @@ const requestClose = () => {
                         <textarea
                             v-model="form.descripcion"
                             rows="3"
-                            :disabled="isSubmitting"
+                            :disabled="formDisabled"
                             class="w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438] resize-none"
                         ></textarea>
                     </div>
@@ -327,7 +356,7 @@ const requestClose = () => {
                             id="producto-activo"
                             v-model="form.activo"
                             type="checkbox"
-                            :disabled="isSubmitting"
+                            :disabled="formDisabled"
                             class="w-4 h-4 text-[#103A5C] border-[#CBD5E1] rounded"
                         >
                         <label for="producto-activo" class="text-sm font-medium text-[#0B2438] cursor-pointer">
@@ -341,14 +370,14 @@ const requestClose = () => {
                     <button
                         type="button"
                         @click="requestClose"
-                        :disabled="isSubmitting"
+                        :disabled="isSubmitting || isReloading"
                         class="min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
-                        :disabled="isSubmitting"
+                        :disabled="formDisabled"
                         class="min-h-11 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
                     >
                         {{ isSubmitting ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Crear Producto') }}
