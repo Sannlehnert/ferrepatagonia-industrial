@@ -1,0 +1,67 @@
+
+> ferrepatagonia@0.0.0 test
+> node --test
+
+✔ status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation (132.1889ms)
+✔ status: pending mutation prevents duplicate and opening any modal (22.6493ms)
+✔ uncertain status undefined: failed reload retains lock; successful reload unlocks (15.3255ms)
+✔ uncertain status 500: failed reload retains lock; successful reload unlocks (13.8241ms)
+✔ uncertain status 502: failed reload retains lock; successful reload unlocks (10.6814ms)
+✔ successful mutation or modal save followed by failed read stays locked (10.8008ms)
+✔ known rejection 400 does not count as uncertain (13.9949ms)
+✔ known rejection 401 does not count as uncertain (10.4754ms)
+✔ known rejection 403 does not count as uncertain (9.8237ms)
+✔ known rejection 404 does not count as uncertain (8.3162ms)
+✔ known rejection 409 does not count as uncertain (11.2696ms)
+✔ known rejection 422 does not count as uncertain (8.1637ms)
+✔ stock zero uses stock-only operation and preserves all original fields (28.5013ms)
+✔ general edit preserves description, image and category (12.43ms)
+✔ modal deactivation cancel preserves draft without request (10.7773ms)
+✔ invalid stock "" sends nothing (9.992ms)
+✔ invalid stock -1 sends nothing (12.6041ms)
+✔ invalid stock 1.5 sends nothing (8.8476ms)
+✔ invalid stock 2147483648 sends nothing (8.672ms)
+✔ modal pending request prevents double submit and closing (8.3496ms)
+✔ modal uncertain result retains draft, emits parent lock and blocks resubmission (9.3806ms)
+✔ SKU conflict retains data and permits correction (9.0929ms)
+✔ parent lock survives closing uncertain modal and successful reload closes stale form (9.6402ms)
+✔ service calls shared Axios with real route methods and minimal payloads (6.3436ms)
+✔ invalid/noncanonical page "0" recovers before request (106.4981ms)
+✔ invalid/noncanonical page "-1" recovers before request (2.1297ms)
+✔ invalid/noncanonical page "1.5" recovers before request (1.2498ms)
+✔ invalid/noncanonical page "abc" recovers before request (1.1067ms)
+✔ invalid/noncanonical page "1000001" recovers before request (1.2646ms)
+✔ invalid/noncanonical page "1e3" recovers before request (0.9562ms)
+✔ invalid/noncanonical page "1e6" recovers before request (0.9257ms)
+✔ invalid/noncanonical page "9007199254740993" recovers before request (0.9266ms)
+✔ invalid/noncanonical page "99999999999999999999999999999999" recovers before request (1.0678ms)
+✔ invalid/noncanonical page ["2","3"] recovers before request (1.1165ms)
+✔ invalid/noncanonical page ["2","2"] recovers before request (0.7739ms)
+✔ invalid/noncanonical page "" recovers before request (0.8046ms)
+✔ invalid/noncanonical page null recovers before request (0.7284ms)
+✔ invalid/noncanonical page " 2 " recovers before request (0.8903ms)
+✔ invalid/noncanonical page "+2" recovers before request (0.8283ms)
+✔ invalid/noncanonical page "02" recovers before request (0.7683ms)
+✔ invalid/noncanonical page "1" recovers before request (0.7373ms)
+✔ valid page 999 recovers to last result page preserving filters (1.209ms)
+✔ valid page 1000000 recovers to last result page preserving filters (1.3444ms)
+✔ maximum page is accepted when available (0.7527ms)
+✔ zero totalPages recovers to page 1 without a loop (0.8636ms)
+✔ normalization replaces history; page buttons push; back/forward and filters survive (2.7413ms)
+✔ loading, error and retry after invalid page recovery (1.0376ms)
+✔ stale request cannot overwrite recovered page or error state (1.0231ms)
+✔ el catálogo está disponible en el menú público sin permisos (3.6669ms)
+✔ Inicio conserva el menú público que da acceso al catálogo (0.8782ms)
+✔ normaliza páginas inválidas antes de solicitar el catálogo (0.7617ms)
+✔ normaliza páginas por encima del máximo y conserva filtros y categoría (0.5469ms)
+✔ mantiene como canónica una página válida dentro del rango (0.1203ms)
+✔ error y reintento de categorías siguen visibles junto a la categoría actual (8.0755ms)
+✔ crear sin categorías muestra error y reintento sin habilitar el selector (0.7686ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 55
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 850.1698

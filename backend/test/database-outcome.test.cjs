@@ -13,8 +13,8 @@ let server,url;
 before(async()=>{server=app.listen(0,'127.0.0.1');await once(server,'listening');url='http://127.0.0.1:'+server.address().port;});
 after(async()=>{await new Promise(r=>server.close(r));await destroyDatabase();});
 for(const [method,path,target,key,body] of [
- ['POST','/api/admin/productos',products,'createAdminProduct',{}],
- ['PUT','/api/admin/productos/1',products,'updateAdminProduct',{}],
+ ['POST','/api/admin/productos',products,'createAdminProduct',{nombre:'Producto',codigo:'SKU',id_categoria:1,precio:1,stock:0}],
+ ['PUT','/api/admin/productos/1',products,'updateAdminProduct',{nombre:'Producto'}],
  ['PATCH','/api/admin/productos/1/stock',products,'updateAdminProductStock',{stock:9}],
  ['PATCH','/api/admin/productos/1/desactivar',products,'deactivateAdminProduct',{}],
  ['POST','/api/auth/register',register,'registerClient',{tipoCliente:'PARTICULAR',nombreRazonSocial:'Prueba',email:'test@example.test',password:'Clave segura 123'}],
