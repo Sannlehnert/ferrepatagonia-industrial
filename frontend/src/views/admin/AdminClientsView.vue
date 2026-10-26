@@ -47,147 +47,51 @@ onMounted(() => {
 </script>
 
 <template>
-    <section class="clients" aria-labelledby="clients-title">
-        <header class="clients__header">
-            <h1 id="clients-title">Clientes</h1>
-            <p>Listado de clientes particulares y empresas registrados.</p>
+    <section class="min-w-0 text-[#0b2438]" aria-labelledby="clients-title">
+        <header class="mb-6">
+            <h1 id="clients-title" class="m-0 mb-3 text-[28px] font-semibold">Clientes</h1>
+            <p class="m-0 leading-6 text-slate-600">Listado de clientes particulares y empresas registrados.</p>
         </header>
 
-        <p v-if="isLoading" role="status">Cargando clientes…</p>
+        <p v-if="isLoading" role="status" class="text-slate-600">Cargando clientes…</p>
 
-        <div v-else-if="errorMessage" class="clients__message">
-            <p role="alert">{{ errorMessage }}</p>
-            <button type="button" @click="loadClients">
+        <div v-else-if="errorMessage" class="rounded-lg border border-slate-200 bg-slate-50 p-5">
+            <p class="m-0 mb-4 leading-6" role="alert">{{ errorMessage }}</p>
+            <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-5 py-2 font-bold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="button" @click="loadClients">
                 Reintentar
             </button>
         </div>
 
-        <p v-else-if="clients.length === 0" role="status">
+        <p v-else-if="clients.length === 0" class="text-slate-600" role="status">
             Todavía no hay clientes registrados.
         </p>
 
         <div
             v-else
-            class="clients__table-wrapper"
+            class="overflow-x-auto rounded-lg border border-slate-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
             role="region"
             aria-label="Listado de clientes; desplazamiento horizontal disponible"
             tabindex="0"
         >
-            <table>
-                <caption class="clients__caption">
+            <table class="w-full min-w-[600px] border-collapse text-left">
+                <caption class="p-4 text-left font-bold">
                     Clientes registrados: {{ clients.length }}
                 </caption>
                 <thead>
                     <tr>
-                        <th scope="col">Nombre o razón social</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Fecha de registro</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Nombre o razón social</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Email</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Fecha de registro</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr v-for="client in clients" :key="client.id">
-                        <td>{{ client.nombreRazonSocial }}</td>
-                        <td>{{ client.email }}</td>
-                        <td>{{ formatDate(client.fechaRegistro) }}</td>
+                        <td class="break-words border-b border-slate-200 p-4 align-top leading-6">{{ client.nombreRazonSocial }}</td>
+                        <td class="break-words border-b border-slate-200 p-4 align-top leading-6">{{ client.email }}</td>
+                        <td class="break-words border-b border-slate-200 p-4 align-top leading-6">{{ formatDate(client.fechaRegistro) }}</td>
                     </tr>
                 </tbody>
             </table>
         </div>
     </section>
 </template>
-
-<style scoped>
-.clients {
-    min-width: 0;
-    color: #0b2438;
-    font-family: Arial, sans-serif;
-}
-
-.clients__header {
-    margin-bottom: 24px;
-}
-
-h1 {
-    margin: 0 0 12px;
-    font-size: 28px;
-}
-
-.clients__header p {
-    margin: 0;
-    color: #475569;
-    line-height: 1.5;
-}
-
-.clients__table-wrapper {
-    overflow-x: auto;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-}
-
-table {
-    width: 100%;
-    min-width: 600px;
-    border-collapse: collapse;
-    text-align: left;
-}
-
-.clients__caption {
-    padding: 16px;
-    text-align: left;
-    font-weight: 700;
-}
-
-th,
-td {
-    padding: 16px;
-    border-bottom: 1px solid #e2e8f0;
-    vertical-align: top;
-    line-height: 1.5;
-}
-
-th {
-    background: #f4f7fa;
-}
-
-td {
-    overflow-wrap: anywhere;
-}
-
-tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.clients__message {
-    padding: 20px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #f8fafc;
-}
-
-.clients__message p {
-    margin: 0 0 16px;
-    line-height: 1.5;
-}
-
-button {
-    min-height: 44px;
-    padding: 10px 20px;
-    border: 0;
-    border-radius: 6px;
-    background: #145a8d;
-    color: #fff;
-    font: inherit;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-button:hover {
-    background: #103a5c;
-}
-
-button:focus-visible,
-.clients__table-wrapper:focus-visible {
-    outline: 3px solid #145a8d;
-    outline-offset: 3px;
-}
-</style>

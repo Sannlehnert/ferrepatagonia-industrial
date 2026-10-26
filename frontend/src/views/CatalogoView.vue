@@ -226,28 +226,28 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="catalogo">
-    <p class="migas">
+  <main class="mx-auto max-w-7xl px-3 py-4 text-slate-900 sm:px-5 sm:py-6">
+    <p class="m-0 mb-2 text-xs text-slate-500">
       Inicio /
-      <RouterLink v-if="categoriaId" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
+      <RouterLink v-if="categoriaId" class="text-[#103a5c]" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
       <template v-else>Catálogo</template>
       <template v-if="categoriaId"> / {{ nombreCategoria }}</template>
     </p>
 
-    <header class="cabecera">
+    <header class="mb-5 flex flex-col items-start justify-between gap-4 min-[801px]:flex-row">
       <div>
-        <h1>{{ nombreCategoria ?? 'Catálogo' }}</h1>
-        <p class="total">{{ total }} productos</p>
+        <h1 class="m-0 text-2xl uppercase text-slate-900">{{ nombreCategoria ?? 'Catálogo' }}</h1>
+        <p class="m-0 mt-1 text-xs text-slate-500">{{ total }} productos</p>
       </div>
       <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
-      <select class="orden" disabled aria-label="Ordenar productos">
+      <select class="box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" disabled aria-label="Ordenar productos">
         <option>Ordenar: Relevancia</option>
       </select>
     </header>
 
-    <div class="cuerpo">
-      <aside class="filtros" aria-label="Filtros">
-        <h2>Filtros</h2>
+    <div class="grid grid-cols-1 items-start gap-5 min-[801px]:grid-cols-[190px_minmax(0,1fr)]">
+      <aside class="min-h-0 rounded-lg border border-slate-200 p-4 min-[801px]:min-h-[260px]" aria-label="Filtros">
+        <h2 class="m-0 text-base">Filtros</h2>
 
         <CatalogFilters
           :model-value="filtrosAplicados"
@@ -262,13 +262,13 @@ onBeforeUnmount(() => {
       <section>
         <p v-if="cargando">Cargando productos...</p>
 
-        <p v-else-if="error" role="alert">
+        <p v-else-if="error" class="m-0" role="alert">
           {{ error }}
-          <button type="button" class="reintentar" @click="cargar">Reintentar</button>
+          <button type="button" class="ml-2 underline" @click="cargar">Reintentar</button>
         </p>
 
-        <div v-else-if="!productos.length" class="vacio" role="status">
-          <p>
+        <div v-else-if="!productos.length" class="py-8 text-slate-500" role="status">
+          <p class="m-0">
             {{
               busqueda || categoriaId
                 ? 'No encontramos productos con esos filtros.'
@@ -279,38 +279,40 @@ onBeforeUnmount(() => {
           <button
             v-if="busqueda || categoriaId"
             type="button"
+            class="mt-2 min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 font-semibold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
             @click="aplicarFiltros({ search: '', categoryId: null })"
           >
             Limpiar filtros
           </button>
         </div>
 
-        <ul v-else class="grilla">
-          <li v-for="p in productos" :key="p.id" class="tarjeta">
+        <ul v-else class="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-4 m-0 list-none p-0 max-[560px]:grid-cols-2 max-[560px]:gap-3">
+          <li v-for="p in productos" :key="p.id" class="box-border flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 max-[560px]:p-3">
             <!-- CatalogProduct no tiene imagen todavía -->
-            <div class="imagen" aria-hidden="true"><span>Sin imagen</span></div>
+            <div class="mb-3 grid h-[140px] place-items-center rounded-md bg-slate-100 text-xs text-slate-500 max-[560px]:h-[110px]" aria-hidden="true"><span>Sin imagen</span></div>
 
-            <p class="codigo">COD. {{ p.codigo }}</p>
-            <h3>{{ p.nombre }}</h3>
-            <p class="precio">Precio a confirmar</p>
+            <p class="m-0 min-w-0 max-w-full break-all text-[.7rem] text-slate-500">COD. {{ p.codigo }}</p>
+            <h3 class="my-1 break-all text-sm font-semibold text-slate-900">{{ p.nombre }}</h3>
+            <p class="m-0 mb-2 text-[.95rem]">Precio a confirmar</p>
 
-            <div class="pie">
-              <span class="stock" :class="{ 'stock--no': !p.disponible }">
+            <div class="mt-auto flex items-center justify-between gap-2 max-[560px]:flex-col max-[560px]:items-stretch">
+              <span class="text-sm text-green-600" :class="{ 'text-red-700': !p.disponible }">
                 {{ p.disponible ? 'Disponible' : 'No disponible' }}
               </span>
               <!-- Conectar al carrito cuando exista -->
-              <button type="button" class="agregar" :disabled="!p.disponible">Agregar</button>
+              <button type="button" class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] disabled:cursor-not-allowed disabled:bg-slate-400 max-[560px]:w-full" :disabled="!p.disponible">Agregar</button>
             </div>
           </li>
         </ul>
 
         <nav
           v-if="!error && pagination && pagination.totalPages > 1"
-          class="paginacion"
+          class="mt-6 flex items-center justify-center gap-4 text-sm max-[560px]:gap-2"
           aria-label="Paginación del catálogo"
         >
           <button
             type="button"
+            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 max-[560px]:min-w-0 max-[560px]:flex-1"
             :disabled="cargando || !pagination.hasPrevious"
             @click="cambiarPagina(pagina - 1)"
           >
@@ -319,6 +321,7 @@ onBeforeUnmount(() => {
           <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
+            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 max-[560px]:min-w-0 max-[560px]:flex-1"
             :disabled="cargando || !pagination.hasNext"
             @click="cambiarPagina(pagina + 1)"
           >
@@ -329,189 +332,3 @@ onBeforeUnmount(() => {
     </div>
   </main>
 </template>
-
-<style scoped>
-.catalogo {
-  --navy: #0b2438;
-  --azul: #145a8d;
-  --azul-texto: #103a5c;
-  --texto: #13293a;
-  --apagado: #6b7a8a;
-  --borde: #e2e8f0;
-  --verde: #16a34a;
-  --rojo: #b42318;
-
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 1.5rem 1.25rem 3rem;
-  color: var(--texto);
-}
-
-.migas { margin: 0 0 .5rem; font-size: .8rem; color: var(--apagado); }
-.migas a { color: var(--azul-texto); }
-
-.cabecera {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 1rem;
-  margin-bottom: 1.25rem;
-}
-.cabecera h1 { margin: 0; font-size: 1.5rem; text-transform: uppercase; color: var(--texto); }
-.total { margin: .25rem 0 0; font-size: .8rem; color: var(--apagado); }
-.orden {
-  padding: .5rem .75rem;
-  border: 1px solid var(--borde);
-  border-radius: 6px;
-  background: #fff;
-  font: inherit;
-  font-size: .9rem;
-}
-
-.cuerpo {
-  display: grid;
-  grid-template-columns: 190px minmax(0, 1fr);
-  gap: 1.25rem;
-  align-items: start;
-}
-
-.cuerpo > section {
-  min-width: 0;
-}
-
-.filtros {
-  border: 1px solid var(--borde);
-  border-radius: 8px;
-  padding: 1rem;
-  min-height: 260px;
-}
-.filtros h2 { margin: 0; font-size: 1rem; }
-.grupo { margin: 1rem 0 .5rem; font-size: .85rem; font-weight: 600; }
-.cats { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: .25rem; }
-.cats a {
-  display: block;
-  padding: .3rem .5rem;
-  border-radius: 6px;
-  font-size: .85rem;
-  color: var(--azul-texto);
-  text-decoration: none;
-}
-.cats a:hover { background: #f1f5f9; }
-.cats a.activa { background: #e6eff6; font-weight: 600; }
-
-.grilla {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
-  gap: 1rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  min-width: 0;
-}
-
-
-.tarjeta {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  box-sizing: border-box;
-  border: 1px solid var(--borde);
-  border-radius: 8px;
-  padding: 1rem;
-  background: #fff;
-}
-.imagen {
-  display: grid;
-  place-items: center;
-  height: 140px;
-  margin-bottom: .75rem;
-  border-radius: 6px;
-  background: #f1f5f9;
-  color: var(--apagado);
-  font-size: .8rem;
-}
-.codigo {
-  max-width: 100%;
-  min-width: 0;
-  margin: 0;
-  font-size: 0.7rem;
-  color: var(--apagado);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.tarjeta h3 {
-  margin: .25rem 0 .5rem;
-  font-size: .9rem;
-  font-weight: 600;
-  color: var(--texto);
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.precio { margin: 0 0 .5rem; font-size: .95rem; color: var(--texto); }
-
-.pie {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: .5rem;
-  margin-top: auto;
-}
-.stock { font-size: .85rem; color: var(--verde); }
-.stock--no { color: var(--rojo); }
-
-.agregar {
-  padding: .5rem 1rem;
-  border: 0;
-  border-radius: 6px;
-  background: var(--azul);
-  color: #fff;
-  font: inherit;
-  font-size: .85rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-.agregar:disabled { background: #b8c4d0; cursor: not-allowed; }
-.reintentar { margin-left: .5rem; }
-.vacio { padding: 2rem 0; color: var(--apagado); }
-
-.paginacion {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  font-size: .9rem;
-}
-.paginacion button {
-  min-width: 110px;
-  min-height: 44px; /* tamaño táctil */
-  border: 1px solid var(--azul);
-  border-radius: 6px;
-  background: #fff;
-  color: var(--azul);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-.paginacion button:hover:not(:disabled) { background: var(--azul); color: #fff; }
-.paginacion button:disabled { border-color: var(--borde); color: #9aa8b6; cursor: not-allowed; }
-
-@media (max-width: 800px) {
-  .cuerpo { grid-template-columns: 1fr; }
-  .filtros { min-height: 0; }
-  .cabecera { flex-direction: column; }
-  .cats { flex-direction: row; flex-wrap: wrap; }
-  .cats a { border: 1px solid var(--borde); }
-}
-
-@media (max-width: 560px) {
-  .catalogo { padding: 1rem .75rem 2rem; }
-  .grilla { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem;}
-  .tarjeta { padding: .75rem; }
-  .imagen { height: 110px; }
-  .pie { flex-direction: column; align-items: stretch; }
-  .agregar { width: 100%; min-height: 40px; }
-  .paginacion { gap: .5rem; }
-  .paginacion button { min-width: 0; flex: 1; }
-}
-</style>

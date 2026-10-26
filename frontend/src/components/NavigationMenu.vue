@@ -13,24 +13,42 @@ const props = withDefaults(
         permissions: ReadonlySet<Permission>
         label: string
         orientation?: 'vertical' | 'horizontal'
+        variant?: 'default' | 'admin' | 'account' | 'public'
     }>(),
     {
         orientation: 'vertical',
+        variant: 'default',
     },
 )
 
 const visibleItems = computed(() =>
     getNavigableMenu(props.items, props.permissions),
 )
+
+const linkClasses = computed(() => {
+    const base =
+        'flex min-h-11 items-center rounded-md px-3 py-2 no-underline focus-visible:outline-2 focus-visible:outline-offset-2'
+
+    switch (props.variant) {
+        case 'admin':
+            return `${base} text-white hover:bg-[#103a5c] focus-visible:outline-white [&.router-link-active]:bg-[#145a8d] [&.router-link-active]:font-bold`
+        case 'account':
+            return `${base} text-[#103a5c] hover:bg-slate-100 focus-visible:outline-[#145a8d] [&.router-link-active]:bg-[#e6eff6] [&.router-link-active]:font-semibold`
+        case 'public':
+            return `${base} inline-flex justify-center bg-[#145a8d] text-white hover:bg-[#0b426b] focus-visible:outline-[#145a8d]`
+        default:
+            return `${base} text-inherit hover:bg-slate-100 focus-visible:outline-[#145a8d] [&.router-link-active]:font-semibold`
+    }
+})
 </script>
 
 <template>
     <nav
         v-if="visibleItems.length > 0"
         :aria-label="props.label"
-        class="navigation-menu"
+        class="flex flex-col gap-2"
         :class="{
-            'navigation-menu--horizontal': props.orientation === 'horizontal',
+            'flex-row flex-wrap gap-4': props.orientation === 'horizontal',
         }"
     >
         <RouterLink
@@ -38,26 +56,9 @@ const visibleItems = computed(() =>
             :key="item.id"
             :to="{ name: item.routeName }"
             class="navigation-menu__link"
+            :class="linkClasses"
         >
             {{ item.label }}
         </RouterLink>
     </nav>
 </template>
-
-<style scoped>
-.navigation-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
-
-.navigation-menu--horizontal {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 1rem;
-}
-
-.navigation-menu__link.router-link-active {
-    font-weight: 600;
-}
-</style>

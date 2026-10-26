@@ -20,21 +20,15 @@ onMounted(async () => {
 </script>
 
 <template>
-  <h3>Mis datos</h3>
+  <h3 class="m-0 mb-4 text-lg font-semibold text-[#0b2438]">Mis datos</h3>
 
-  <p v-if="cargando">Cargando...</p>
-  <p v-else-if="error">{{ error }}</p>
+  <p v-if="cargando" class="text-slate-600">Cargando...</p>
+  <p v-else-if="error" class="text-red-800">{{ error }}</p>
 
-  <dl v-else-if="cliente" class="datos">
-    <dt>Nombre</dt><dd>{{ cliente.nombre }}</dd>
-    <dt>Email</dt><dd>{{ cliente.email }}</dd>
-    <dt>Teléfono</dt><dd>{{ cliente.telefono }}</dd>
-    <dt>Dirección</dt><dd>{{ cliente.direccion }}</dd>
+  <dl v-else-if="cliente" class="grid grid-cols-[120px_minmax(0,1fr)] gap-x-4 gap-y-2 max-[420px]:grid-cols-1">
+    <dt class="font-semibold">Nombre</dt><dd class="m-0 break-words">{{ cliente.nombre }}</dd>
+    <dt class="font-semibold">Email</dt><dd class="m-0 break-words">{{ cliente.email }}</dd>
+    <dt class="font-semibold">Teléfono</dt><dd class="m-0 break-words">{{ cliente.telefono }}</dd>
+    <dt class="font-semibold">Dirección</dt><dd class="m-0 break-words">{{ cliente.direccion }}</dd>
   </dl>
 </template>
-
-<style scoped>
-.datos { display: grid; grid-template-columns: 120px 1fr; gap: .5rem 1rem; }
-dt { font-weight: 600; }
-dd { margin: 0; }
-</style>

@@ -29,6 +29,18 @@ See [Vite Configuration Reference](https://vite.dev/config/).
 npm install
 ```
 
+### Estilos
+
+El frontend usa Tailwind CSS v4 mediante el plugin de Vite. `src/assets/main.css`
+importa únicamente el tema y las utilidades; se omite Preflight para no aplicar
+un reset global. El margen y la tipografía de `body` son las únicas reglas
+globales necesarias.
+
+Las vistas de catálogo, autenticación, cuenta y administración, junto con la
+navegación compartida, usan utilidades de Tailwind. `src/views/HomeView.vue`
+conserva temporalmente sus estilos existentes: su rediseño se integra por
+separado y debe validarse visualmente junto con estas pantallas antes del release.
+
 ### Compile and Hot-Reload for Development
 
 ```sh

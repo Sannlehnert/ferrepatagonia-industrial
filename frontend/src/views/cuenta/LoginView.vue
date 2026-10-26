@@ -56,42 +56,34 @@ async function enviar() {
 </script>
 
 <template>
-  <section class="login">
-    <h2>Iniciar sesión</h2>
+  <section class="mx-auto my-8 max-w-[380px] px-4">
+    <h2 class="m-0 mb-5 text-2xl font-semibold text-[#0b2438]">Iniciar sesión</h2>
 
-    <form novalidate @submit.prevent="enviar">
-      <label>Email
-        <input v-model="email" type="email" autocomplete="email" />
-        <small v-if="intentado && errEmail" class="error">{{ errEmail }}</small>
+    <form class="flex flex-col gap-4" novalidate @submit.prevent="enviar">
+      <label class="flex flex-col gap-1 text-sm">Email
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="email" type="email" autocomplete="email" />
+        <small v-if="intentado && errEmail" class="text-sm text-[#842029]">{{ errEmail }}</small>
       </label>
 
-      <label>Contraseña
-        <span class="pass">
+      <label class="flex flex-col gap-1 text-sm">Contraseña
+        <span class="flex gap-2">
           <input
             v-model="password"
             :type="verPassword ? 'text' : 'password'"
             autocomplete="current-password"
+            class="box-border min-h-11 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
           />
-          <button type="button" @click="verPassword = !verPassword">
+          <button class="min-h-11 rounded-md border border-slate-300 bg-white px-3 hover:bg-slate-100" type="button" @click="verPassword = !verPassword">
             {{ verPassword ? 'Ocultar' : 'Mostrar' }}
           </button>
         </span>
-        <small v-if="intentado && errPassword" class="error">{{ errPassword }}</small>
+        <small v-if="intentado && errPassword" class="text-sm text-[#842029]">{{ errPassword }}</small>
       </label>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="error" class="m-0 text-sm text-[#842029]" role="alert">{{ error }}</p>
 
-      <button :disabled="enviando">{{ enviando ? 'Ingresando...' : 'Ingresar' }}</button>
-      <p>¿No tenés cuenta? <RouterLink :to="{ name: 'registro' }">Creá una</RouterLink></p>
+      <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 font-semibold text-white hover:bg-[#103a5c] disabled:cursor-wait disabled:opacity-60" :disabled="enviando">{{ enviando ? 'Ingresando...' : 'Ingresar' }}</button>
+      <p class="m-0 text-sm">¿No tenés cuenta? <RouterLink class="text-[#145a8d] underline" :to="{ name: 'registro' }">Creá una</RouterLink></p>
     </form>
   </section>
 </template>
-
-<style scoped>
-.login { max-width: 380px; margin: 2rem auto; padding: 0 1rem; }
-form { display: flex; flex-direction: column; gap: 1rem; }
-label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; }
-.pass { display: flex; gap: .5rem; }
-.pass input { flex: 1; }
-.error { color: #842029; }
-</style>

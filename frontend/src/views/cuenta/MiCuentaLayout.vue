@@ -33,33 +33,18 @@ async function logout() {
 </script>
 
 <template>
-  <section class="cuenta">
-    <aside class="cuenta__menu">
-      <h2>Mi Cuenta</h2>
+  <section class="grid grid-cols-1 gap-8 p-4 min-[701px]:grid-cols-[220px_minmax(0,1fr)] min-[701px]:p-8">
+    <aside>
+      <h2 class="mb-4 text-xl font-semibold text-[#0b2438]">Mi Cuenta</h2>
       <AccountMenu :permissions="permissions" />
 
-      <button type="button" :disabled="isLoggingOut" @click="logout">
+      <button class="mt-4 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#103a5c] hover:bg-slate-100 disabled:opacity-60" type="button" :disabled="isLoggingOut" @click="logout">
         {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
       </button>
     </aside>
 
-    <main class="cuenta__contenido">
+    <main class="min-w-0">
       <RouterView />
     </main>
   </section>
 </template>
-
-<style scoped>
-.cuenta {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  gap: 2rem;
-  padding: 2rem;
-}
-
-@media (max-width: 700px) {
-  .cuenta {
-    grid-template-columns: 1fr;
-  }
-}
-</style>
