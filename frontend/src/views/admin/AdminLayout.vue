@@ -43,7 +43,7 @@ const permissions = computed(() => {
             <div class="border-t border-[#33556f] p-5">
                 <button
                     type="button"
-                    class="min-h-11 w-full cursor-pointer rounded-md bg-transparent px-3 py-2 text-left text-sm text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60"
+                    class="box-border min-h-11 w-full cursor-pointer rounded-md border-0 bg-transparent px-3 py-2 text-left text-sm text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60"
                     :disabled="saliendo"
                     @click="cerrarSesion"
                 >

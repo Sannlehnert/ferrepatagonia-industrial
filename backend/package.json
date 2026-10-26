@@ -6,7 +6,10 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test:unit": "node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs",
+    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs",
+    "test": "npm run build && npm run test:unit && npm run test:integration"
   },
   "engines": {
     "node": ">=22"
@@ -18,7 +21,10 @@
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "jsonwebtoken": "^9.0.3",
-    "mariadb": "^3.4.0"
+    "mariadb": "^3.4.0",
+    "mysql2": "3.24.6",
+    "reflect-metadata": "0.2.2",
+    "typeorm": "0.3.31"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",

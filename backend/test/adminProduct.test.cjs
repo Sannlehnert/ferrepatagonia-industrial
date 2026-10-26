@@ -1,3 +1,4 @@
+require('./helpers/integration-lifecycle.cjs');
 require('dotenv/config'); // Carga el .env automáticamente
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
@@ -44,7 +45,7 @@ describe('Admin Products Endpoints (#197)', () => {
 
         const clientToken = jwt.sign({ id: 1, rol: 'CLIENTE' }, secret, { expiresIn: '2h' });
         clientCookie = `jwt_token=${clientToken}`;
-        const { pool } = require('../dist/config/database.config.js');
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
         const { app } = require('../dist/app.js');
         const [identity] = await pool.query('SELECT DATABASE() AS name');
         assert.equal(identity.name, process.env.ADMIN_PRODUCTS_TEST_DATABASE);
@@ -175,7 +176,7 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(updateRes.status, 200, 'Fallo la actualizacion del producto');
         const updatedBody = await updateRes.json();
         assert.equal(updatedBody.nombre, 'Taladro Test 197 Editado');
-        const { pool } = require('../dist/config/database.config.js');
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
         const [persisted] = await pool.query('SELECT precio FROM PRODUCTO WHERE id_producto = ?', [createdId]);
         assert.equal(Number(persisted.precio), 1.24);
         assert.equal(updatedBody.precio, persisted.precio);
@@ -321,7 +322,7 @@ describe('Admin Products Endpoints (#197)', () => {
     });
 
     it('migration should trim leading and trailing spaces in SKU, validate UNIQUE index definition, and be idempotent', async () => {
-        const { pool } = require('../dist/config/database.config.js');
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
         const baseLeadSku = `${TEST_PREFIX}MIG-LEAD`;
         const baseTrailSku = `${TEST_PREFIX}MIG-TRAIL`;
         const baseBothSku = `${TEST_PREFIX}MIG-BOTH`;
@@ -385,7 +386,7 @@ describe('Admin Products Endpoints (#197)', () => {
     });
 
     it('migration rejects blank and duplicate normalized SKUs before changing data or indexes', async () => {
-        const { pool } = require('../dist/config/database.config.js');
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
         const snapshot = async () => ({
             rows: Array.from(await pool.query('SELECT * FROM PRODUCTO ORDER BY id_producto')),
             indexes: Array.from(await pool.query('SHOW INDEX FROM PRODUCTO')),
@@ -424,7 +425,7 @@ describe('Admin Products Endpoints (#197)', () => {
 
     // Limpiar la BD exclusivamente por los IDs creados y cerrar conexión siempre
     after(async () => {
-        const { pool } = require('../dist/config/database.config.js');
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
         if (pool) {
             try {
                 if (createdProductIds.length > 0) {

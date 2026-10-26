@@ -27,7 +27,7 @@ const visibleItems = computed(() =>
 
 const linkClasses = computed(() => {
     const base =
-        'flex min-h-11 items-center rounded-md px-3 py-2 no-underline focus-visible:outline-2 focus-visible:outline-offset-2'
+        'box-border flex min-h-11 items-center rounded-md px-3 py-2 no-underline focus-visible:outline-2 focus-visible:outline-offset-2'
 
     switch (props.variant) {
         case 'admin':
@@ -35,7 +35,7 @@ const linkClasses = computed(() => {
         case 'account':
             return `${base} text-[#103a5c] hover:bg-slate-100 focus-visible:outline-[#145a8d] [&.router-link-active]:bg-[#e6eff6] [&.router-link-active]:font-semibold`
         case 'public':
-            return `${base} inline-flex justify-center bg-[#145a8d] text-white hover:bg-[#0b426b] focus-visible:outline-[#145a8d]`
+            return `${base} inline-flex justify-center bg-[#145a8d] px-6 text-white hover:bg-[#0b426b] focus-visible:outline-[#145a8d]`
         default:
             return `${base} text-inherit hover:bg-slate-100 focus-visible:outline-[#145a8d] [&.router-link-active]:font-semibold`
     }

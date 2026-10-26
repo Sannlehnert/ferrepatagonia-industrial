@@ -1,3 +1,4 @@
+import { mutationErrorMessage } from '../config/database-policy';
 import { Request, Response } from 'express';
 import {
     listAdminProducts,
@@ -14,8 +15,8 @@ export const getProducts = async (_req: Request, res: Response) => {
         const products = await listAdminProducts();
         return res.status(200).json(products);
     } catch (error) {
-        console.error('Error al listar productos:', error);
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        console.error('Error al listar productos:');
+        return res.status(500).json({ message: mutationErrorMessage(error) });
     }
 };
 
@@ -29,7 +30,7 @@ export const getProductById = async (req: Request, res: Response) => {
         return res.status(200).json(product);
     } catch (error) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        return res.status(500).json({ message: mutationErrorMessage(error) });
     }
 };
 
@@ -47,8 +48,8 @@ export const createProduct = async (req: Request, res: Response) => {
         if (error?.code === 'ER_DATA_TOO_LONG' || error?.code === 'ER_WARN_DATA_OUT_OF_RANGE') {
             return res.status(400).json({ message: 'Uno o más campos superan el límite permitido.' });
         }
-        console.error('Error al crear producto:', error);
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        console.error('Error al crear producto:');
+        return res.status(500).json({ message: mutationErrorMessage(error) });
     }
 };
 
@@ -71,7 +72,7 @@ export const updateProduct = async (req: Request, res: Response) => {
         if (error?.code === 'ER_DATA_TOO_LONG' || error?.code === 'ER_WARN_DATA_OUT_OF_RANGE') {
             return res.status(400).json({ message: 'Uno o más campos superan el límite permitido.' });
         }
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        return res.status(500).json({ message: mutationErrorMessage(error) });
     }
 };
 
@@ -85,8 +86,8 @@ export const deactivateProduct = async (req: Request, res: Response) => {
         return res.status(200).json({ message: 'Producto desactivado exitosamente', product });
     } catch (error) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
-        console.error('Error al desactivar producto:', error);
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        console.error('Error al desactivar producto:');
+        return res.status(500).json({ message: mutationErrorMessage(error) });
     }
 };
 
@@ -105,7 +106,7 @@ export const updateProductStock = async (req: Request, res: Response) => {
         return res.status(200).json({ message: 'Stock actualizado exitosamente', product });
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
-        console.error('Error al actualizar stock:', error);
-        return res.status(500).json({ message: 'Error interno del servidor' });
+        console.error('Error al actualizar stock:');
+        return res.status(500).json({ message: mutationErrorMessage(error) });
     }
 };

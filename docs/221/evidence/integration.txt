@@ -1,0 +1,65 @@
+{"database":"admin_products_test_749d05fa2cab49a1aea37dc4305d874b","port":51777,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ Admin Products Endpoints (#197)
+  ✔ should return 401 when unauthenticated (25.4773ms)
+  ✔ should return 403 when authenticated as CLIENTE (3.4727ms)
+  ✔ should list all products for ADMIN (9.5001ms)
+  ✔ should return 400 on invalid product creation data, missing body, or fields exceeding max length (12.0547ms)
+  ✔ should create and update a product as ADMIN (22.7706ms)
+  ✔ should soft-delete (deactivate) a product idempotently (14.566ms)
+  ✔ should update product stock successfully (10.5017ms)
+  ✔ should return 400 when updating with negative stock (2.1981ms)
+  ✔ should return 400 when updating stock with invalid data types or out of range (10.9745ms)
+  ✔ should return 400 when updating stock without a body (0.9447ms)
+Error al leer el producto tras el INSERT, devolviendo datos persistidos: Error: Fallo simulado de lectura post-INSERT
+    at <checkout>\backend\test\adminProduct.test.cjs:299:19
+    at Object.apply (node:internal/test_runner/mock/mock:757:20)
+    at createAdminProduct (<checkout>\backend\dist\services\adminProduct.service.js:139:81)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async TestContext.<anonymous> (<checkout>\backend\test\adminProduct.test.cjs:302:32)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:787:7)
+  ✔ should return persisted price precision (1.24 for 1.239) in fallback when post-INSERT SELECT fails (4.8915ms)
+  ✔ migration should trim leading and trailing spaces in SKU, validate UNIQUE index definition, and be idempotent (139.3834ms)
+  ✔ migration rejects blank and duplicate normalized SKUs before changing data or indexes (279.8899ms)
+✔ Admin Products Endpoints (#197) (661.821ms)
+▶ /auth/me en MariaDB: login, restauración, estado persistido y logout
+  ✔ PARTICULAR (67.4424ms)
+  ✔ EMPRESA (25.5527ms)
+  ✔ ADMIN sin cliente (14.8761ms)
+✔ /auth/me en MariaDB: login, restauración, estado persistido y logout (247.6404ms)
+▶ catálogo público real en MariaDB
+  ✔ filtra activos, conserva sin stock y pagina sin duplicar ni omitir productos (53.8771ms)
+  ✔ categoría activa: contrato HTTP y paginación sobre el subconjunto (26.5985ms)
+  ✔ categorías inactiva, vacía, solo productos inactivos e inexistente devuelven vacío (50.8309ms)
+  ✔ categoría inválida rechazada por HTTP real (3.6107ms)
+  ✔ catálogo vacío: ninguna página tiene anterior ni siguiente (16.5753ms)
+  ✔ busqueda real: nombre/codigo, collation, literales y paginacion (929.8368ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda undefined (11.9883ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda catalog-d32381b9-d3c7-4527-829f-f5829ca7844b (5.8917ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda undefined (5.5492ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda catalog-d32381b9-d3c7-4527-829f-f5829ca7844b (5.4789ms)
+✔ catálogo público real en MariaDB (1326.2775ms)
+▶ listado HTTP de cuentas registradas en MariaDB
+  ✔ coincide con las cuentas CLIENTE asociadas y su orden, con sesión ADMIN (36.5253ms)
+  ✔ usa datos de cuenta, excluye clientes sin usuario y ADMIN, y desempata por id (13.8649ms)
+✔ listado HTTP de cuentas registradas en MariaDB (187.007ms)
+✔ schema metadata mirrors every active column, CHECK, index and FK (39.3009ms)
+✔ all DDL automation stays disabled and password is hidden by default (1.8692ms)
+✔ real repository decimal, nullable fields and relations retain their shape (34.0047ms)
+▶ registro transaccional en MariaDB
+  ✔ PARTICULAR: persiste ambas filas y revierte un duplicado (749.9707ms)
+  ✔ EMPRESA: persiste ambas filas y revierte un duplicado (695.084ms)
+  ✔ error en INSERT USUARIO revierte CLIENTE y devuelve 500 genérico (230.4166ms)
+  ✔ dos registros simultáneos del mismo email crean solo un par (462.5473ms)
+  ✔ rol ADMIN y contraseña excesiva no crean filas (5.5085ms)
+  ✔ health sigue 200 después de las transacciones (2.7449ms)
+✔ registro transaccional en MariaDB (2297.4899ms)
+ℹ tests 41
+ℹ suites 1
+ℹ pass 41
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 6851.5901
+{"schemaBefore":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","schemaAfter":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","unchanged":true}

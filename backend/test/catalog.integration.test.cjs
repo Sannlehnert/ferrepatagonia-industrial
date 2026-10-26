@@ -1,3 +1,4 @@
+require('./helpers/integration-lifecycle.cjs');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { once } = require('node:events');
@@ -6,7 +7,7 @@ const { randomUUID } = require('node:crypto');
 test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DATABASE }, async t => {
   const { env } = require('../dist/config/env.config');
   assert.equal(env.db.database, process.env.CATALOG_TEST_DATABASE, 'Confirmar base de desarrollo');
-  const { pool } = require('../dist/config/database.config');
+  const { pool } = require('../dist/config/catalog-snapshot.config');
   const { app } = require('../dist/app');
   const { findCatalogPage } = require('../dist/repositories/catalog.repository');
   const prefix = `catalog-${randomUUID()}`;

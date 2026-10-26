@@ -1,3 +1,4 @@
+Object.assign(process.env, { JWT_SECRET: require('node:crypto').randomUUID(), DB_HOST: '127.0.0.1', DB_PORT: '1', DB_NAME: 'unit', DB_USER: 'unit', DB_PASSWORD: 'unit' });
 const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const { once } = require('node:events');
@@ -6,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const { authRouter } = require('../dist/routes/auth.routes');
 const { prepareRegisterUser } = require('../dist/services/register.service');
 const registerService = require('../dist/services/register.service');
-const { pool } = require('../dist/config/database.config');
+const { pool } = require('../dist/config/catalog-snapshot.config');
 const { validateRegister } = require('../dist/validators/register.validator');
 
 let server;
