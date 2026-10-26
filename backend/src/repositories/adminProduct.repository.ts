@@ -1,4 +1,4 @@
-import { dataSource } from '../config/database.config';
+import { dataSource, inTransaction } from '../config/database.config';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 export interface ProductRecord {
     id_producto: number;
@@ -56,11 +56,11 @@ export const findByCodigo = async (codigo: string, excludeId?: number): Promise<
 export const categoryExists = (id_categoria: number): Promise<boolean> =>
   dataSource.getRepository(CategoriaSchema).existsBy({ id_categoria });
 export const create = async (data: CreateProductDTO): Promise<number> => {
-  const result = await dataSource.getRepository(ProductoSchema).insert({
+  const result = await inTransaction(manager => manager.getRepository(ProductoSchema).insert({
     id_categoria: data.id_categoria, codigo: data.codigo.trim(), nombre: data.nombre.trim(),
     descripcion: data.descripcion ?? null, precio: String(data.precio), stock: data.stock,
     imagen: data.imagen ?? null, activo: data.activo === undefined ? 1 : Number(data.activo),
-  });
+  }));
   return Number(result.identifiers[0].id_producto);
 };
 export const update = async (id: number, data: UpdateProductDTO): Promise<boolean> => {
@@ -73,7 +73,7 @@ export const update = async (id: number, data: UpdateProductDTO): Promise<boolea
       : field === 'activo' ? Number(value) : field === 'precio' ? String(value) : value as string | number | null;
   }
   if (!Object.keys(values).length) return false;
-  return ((await dataSource.getRepository(ProductoSchema).update({ id_producto: id }, values)).affected ?? 0) > 0;
+  return ((await inTransaction(manager => manager.getRepository(ProductoSchema).update({ id_producto: id }, values))).affected ?? 0) > 0;
 };
 export const deactivate = async (id: number): Promise<boolean> => update(id, { activo: false });
 export const updateStock = async (id: number, stock: number): Promise<boolean> => update(id, { stock });

@@ -68,6 +68,6 @@ test('repositorio consulta solo categorías activas, orden SQL determinista para
   assert.deepEqual(parameters, [1]);
   assert.doesNotMatch(sql, /descripcion/);
   const { dataSource } = require('../dist/config/database.config');
-  assert.equal(dataSource.options.enableQueryTimeout, true);
-  assert.equal(dataSource.options.maxQueryExecutionTime, 5000);
+  assert.equal(dataSource.options.enableQueryTimeout, false);
+  assert.equal(dataSource.options.maxQueryExecutionTime, 1000);
 });

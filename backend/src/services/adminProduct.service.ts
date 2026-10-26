@@ -159,7 +159,7 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
             const createdProduct = await findById(insertId);
             if (createdProduct) return createdProduct;
         } catch (readError) {
-            console.error('Error al leer el producto tras el INSERT, devolviendo datos persistidos:', readError);
+            console.error('Error al leer el producto tras el INSERT, devolviendo datos persistidos:');
         }
 
         return {

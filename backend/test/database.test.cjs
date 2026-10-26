@@ -16,7 +16,7 @@ for (const failure of ['none', 'start', 'work', 'commit', 'rollback']) {
   t.mock.method(dataSource, 'createQueryRunner', () => runner);
   const work = m => { assert.equal(m, manager); events.push('work'); if (['work', 'rollback'].includes(failure)) throw original; return Promise.resolve(42); };
   if (failure === 'none') assert.equal(await inTransaction(work), 42);
-  else await assert.rejects(inTransaction(work), e => e === original);
+  else await assert.rejects(inTransaction(work), e => ['commit','rollback'].includes(failure) ? e.code === 'DATABASE_OUTCOME_UNKNOWN' : e === original);
   const expected = {
    none: ['connect','start','work','commit','release'],
    start: ['connect','start','destroy','release'],
@@ -27,3 +27,25 @@ for (const failure of ['none', 'start', 'work', 'commit', 'rollback']) {
   assert.deepEqual(events, expected[failure]);
  });
 }
+
+test('uncertain result is explicit without leaking original query or credentials', () => {
+ const { DatabaseOutcomeUnknownError, mutationErrorMessage } = require('../dist/config/database-policy');
+ const error = new DatabaseOutcomeUnknownError();
+ assert.match(mutationErrorMessage(error), /No se pudo confirmar/);
+ assert.equal(mutationErrorMessage(Error('password=secret')), 'Error interno del servidor');
+});
+
+test('logger never serializes SQL parameters or arbitrary error messages', t => {
+ const { SafeDatabaseLogger } = require('../dist/config/database-policy');
+ const messages=[];
+ for(const method of ['log','warn','error'])t.mock.method(console,method,(...args)=>messages.push(JSON.stringify(args)));
+ const logger=new SafeDatabaseLogger();
+ const secret='email@example.test password=secret jwt_token=secret $2b$12$synthetic';
+ logger.logQuery('SELECT '+secret,[secret]);
+ logger.logQueryError(secret,'SELECT '+secret,[secret]);
+ logger.logQuerySlow(1200,'SELECT '+secret,[secret]);
+ logger.log('warn',secret);logger.logMigration(secret);logger.logSchemaBuild(secret);
+ assert.ok(messages.join(' ').includes('database.query.failed'));
+ assert.ok(messages.join(' ').includes('database.query.slow'));
+ assert.ok(!messages.join(' ').includes(secret));
+});
