@@ -1,4 +1,4 @@
-import { pool } from '../config/database.config';
+import { pool } from '../config/catalog-snapshot.config';
 import { CatalogPagination } from '../validators/catalog.validator';
 
 type CatalogRow = {

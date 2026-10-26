@@ -1,13 +1,9 @@
-import { pool } from '../config/database.config';
-
+import { dataSource } from '../config/database.config';
+import { CategoriaSchema } from '../entities/active.schemas';
 type CategoryRow = { id_categoria: number; nombre: string };
-
 export async function findActiveCategories(): Promise<CategoryRow[]> {
-  // Una sola lectura: pool.query devuelve automáticamente la conexión al pool.
-  return pool.query<CategoryRow[]>({ sql: `
-    SELECT id_categoria, nombre
-    FROM CATEGORIA
-    WHERE activo = 1
-    ORDER BY nombre ASC, id_categoria ASC
-  `, timeout: 5000 });
+  return dataSource.getRepository(CategoriaSchema).createQueryBuilder('c')
+    .select('c.id_categoria', 'id_categoria').addSelect('c.nombre', 'nombre')
+    .where('c.activo = :activo', { activo: 1 })
+    .orderBy('c.nombre', 'ASC').addOrderBy('c.id_categoria', 'ASC').getRawMany<CategoryRow>();
 }

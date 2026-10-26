@@ -1,3 +1,4 @@
+require('./helpers/integration-lifecycle.cjs');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { once } = require('node:events');
@@ -9,7 +10,7 @@ test('/auth/me en MariaDB: login, restauración, estado persistido y logout', {
 }, async t => {
   const { env } = require('../dist/config/env.config');
   assert.equal(env.db.database, process.env.AUTH_ME_TEST_DATABASE);
-  const { pool } = require('../dist/config/database.config');
+  const { pool } = require('../dist/config/catalog-snapshot.config');
   const { app } = require('../dist/app');
   const emails = [];
   const server = app.listen(0, '127.0.0.1');

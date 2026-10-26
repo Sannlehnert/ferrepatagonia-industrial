@@ -39,7 +39,8 @@ const request = (token, path = '/clientes') => fetch(`${url}${path}`, {
   headers: token === undefined ? {} : { Cookie: `jwt_token=${encodeURIComponent(token)}` },
 });
 const adminRequest = () => request(signToken({ id: 7, rol: 'ADMIN' }));
-const { pool } = require('../dist/config/database.config');
+const { pool } = require('../dist/config/catalog-snapshot.config');
+const probe = require('./helpers/query-probe.cjs');
 const repository = require('../dist/repositories/cliente.repository');
 let server;
 let url;
@@ -56,7 +57,7 @@ after(async () => {
 });
 
 test('#178: ADMIN autenticado recibe 200 con lista vacía', async (t) => {
-  t.mock.method(pool, 'query', async () => []);
+  t.mock.method(probe, 'query', async () => []);
   const response = await adminRequest();
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), {
@@ -74,7 +75,7 @@ for (const [label, token, status, message] of [
 ]) {
   test(`#178: ${label} devuelve ${status} sin ejecutar el controlador`, async (t) => {
     const beforeCalls = handler.mock.callCount();
-    const query = t.mock.method(pool, 'query', async () => []);
+    const query = t.mock.method(probe, 'query', async () => []);
     const response = await request(token);
     assert.equal(response.status, status);
     assert.deepEqual(await response.json(), { message });
@@ -102,7 +103,7 @@ for (const path of ['/clientes', '/test-only', '/inexistente']) {
       const counts = guardCounts();
       const handlerCalls = handler.mock.callCount();
       const auxiliaryCalls = auxiliaryHandler.mock.callCount();
-      const query = t.mock.method(pool, 'query', async () => []);
+      const query = t.mock.method(probe, 'query', async () => []);
       const response = await request(token, path);
       assert.equal(response.status, expectedStatus);
       assert.deepEqual(await response.json(), expectedBody);
@@ -115,7 +116,7 @@ for (const path of ['/clientes', '/test-only', '/inexistente']) {
 }
 
 test('#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB', async (t) => {
-  t.mock.method(pool, 'query', async () => [
+  t.mock.method(probe, 'query', async () => [
     { id_cliente: 8n, nombre_razon_social: 'Reciente', email: 'cuenta@example.test', fecha_creacion: new Date('2026-10-09T13:45:00.000Z'), telefono: 'no-exponer', fecha_alta: new Date('2000-01-01T00:00:00.000Z') },
     { id_cliente: 7, nombre_razon_social: 'Misma fecha, menor id', email: 'segundo@example.test', fecha_creacion: new Date('2026-10-09T13:45:00.000Z') },
     { id_cliente: 20, nombre_razon_social: 'Anterior', email: 'anterior@example.test', fecha_creacion: new Date('2026-10-08T10:00:00.000Z') },
@@ -132,15 +133,19 @@ test('#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden d
 });
 
 test('repositorio selecciona email y fecha de USUARIO, exige asociación y rol CLIENTE, y ordena por registro e id', async (t) => {
-  const query = t.mock.method(pool, 'query', async () => []);
+  const query = t.mock.method(probe, 'query', async () => []);
   assert.deepEqual(await repository.findAllClientes(), []);
   assert.equal(query.mock.callCount(), 1);
-  assert.equal(query.mock.calls[0].arguments[0].replace(/\s+/g, ' ').trim(),
-    "SELECT c.id_cliente, c.nombre_razon_social, u.email, u.fecha_creacion FROM CLIENTE c INNER JOIN USUARIO u ON u.id_cliente = c.id_cliente WHERE u.rol = 'CLIENTE' ORDER BY u.fecha_creacion DESC, c.id_cliente DESC");
+  const [sql, parameters] = query.mock.calls[0].arguments;
+  assert.match(sql, /INNER JOIN \x60USUARIO\x60/);
+  assert.match(sql, /\x60u\x60.\x60email\x60/);
+  assert.match(sql, /WHERE \x60u\x60.\x60rol\x60 = \?/);
+  assert.match(sql, /ORDER BY \x60u\x60.\x60fecha_creacion\x60 DESC, \x60c\x60.\x60id_cliente\x60 DESC/);
+  assert.deepEqual(parameters, ['CLIENTE']);
 });
 
 for (const [label, target, method] of [
-  ['BD', pool, 'query'], ['repositorio', repository, 'findAllClientes'],
+  ['BD', probe, 'query'], ['repositorio', repository, 'findAllClientes'],
 ]) {
   test(`error de ${label} devuelve 500 genérico sin detalles internos`, async (t) => {
     t.mock.method(target, method, async () => { throw new Error('SQL privado y credenciales'); });

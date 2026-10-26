@@ -1,36 +1,20 @@
-import { pool } from '../config/database.config';
+import { dataSource } from '../config/database.config';
+import { UsuarioSchema } from '../entities/active.schemas';
 import type { Role } from '../types/auth';
-
 interface UsuarioSessionRow {
-    id_usuario: number;
-    email: string;
-    rol: Role;
-    activo: number;
-    nombre_razon_social: string | null;
-    tipo_cliente: 'PARTICULAR' | 'EMPRESA' | null;
+  id_usuario: number; email: string; rol: Role; activo: number;
+  nombre_razon_social: string | null; tipo_cliente: 'PARTICULAR' | 'EMPRESA' | null;
 }
-
-export const findUsuarioById = async (id: number): Promise<UsuarioSessionRow | null> => {
-    const rows = await pool.query<UsuarioSessionRow[]>(`
-        SELECT u.id_usuario, u.email, u.rol, u.activo,
-            c.nombre_razon_social, c.tipo_cliente
-        FROM USUARIO u
-        LEFT JOIN CLIENTE c ON u.id_cliente = c.id_cliente
-        WHERE u.id_usuario = ?
-    `, [id]);
-    return rows[0] ?? null;
-};
-
-export const findUsuarioByEmail = async (email: string) => {
-    const sql = `
-        SELECT u.id_usuario, u.email, u.password_hash, u.rol, u.activo, 
-            c.nombre_razon_social, c.tipo_cliente
-        FROM USUARIO u
-        LEFT JOIN CLIENTE c ON u.id_cliente = c.id_cliente
-        WHERE u.email = ?
-    `;
-    
-    const rows: any = await pool.query(sql, [email]);
-    
-    return rows[0]; 
-};
+function sessionQuery() {
+  return dataSource.getRepository(UsuarioSchema).createQueryBuilder('u').leftJoin('u.cliente', 'c')
+    .select('u.id_usuario', 'id_usuario').addSelect('u.email', 'email')
+    .addSelect('u.rol', 'rol').addSelect('u.activo', 'activo')
+    .addSelect('c.nombre_razon_social', 'nombre_razon_social').addSelect('c.tipo_cliente', 'tipo_cliente');
+}
+export async function findUsuarioById(id: number): Promise<UsuarioSessionRow | null> {
+  return await sessionQuery().where('u.id_usuario = :id', { id }).getRawOne<UsuarioSessionRow>() ?? null;
+}
+export async function findUsuarioByEmail(email: string) {
+  return sessionQuery().addSelect('u.password_hash', 'password_hash')
+    .where('u.email = :email', { email }).getRawOne<UsuarioSessionRow & { password_hash: string }>();
+}

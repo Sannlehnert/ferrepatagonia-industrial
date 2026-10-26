@@ -1,6 +1,7 @@
 import type { RegisterInput } from '../validators/register.validator';
 import { hashPassword } from './password.service';
-import { pool } from '../config/database.config';
+import { inTransaction } from '../config/database.config';
+import { ClienteSchema, UsuarioSchema } from '../entities/active.schemas';
 
 // Datos de USUARIO para el registro público; tipoCliente pertenece a CLIENTE.
 export async function prepareRegisterUser(input: Pick<RegisterInput, 'email' | 'password'>) {
@@ -13,45 +14,20 @@ export async function prepareRegisterUser(input: Pick<RegisterInput, 'email' | '
 }
 
 export async function registerClient(input: RegisterInput) {
-  // Calcular bcrypt antes de ocupar una conexión y abrir la transacción.
   const user = await prepareRegisterUser(input);
-  const connection = await pool.getConnection();
-  let reusable = true;
-  try {
-    await connection.beginTransaction();
-    const cliente = await connection.query(
-      `INSERT INTO CLIENTE
-        (tipo_cliente, nombre_razon_social, doc_cliente, cuit, email, telefono,
-         direccion, estado_aprobacion_empresa, es_fiel, activo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1)`,
-      [input.tipoCliente, input.nombreRazonSocial, input.docCliente, input.cuit,
-        user.email, input.telefono, input.direccion,
-        input.tipoCliente === 'EMPRESA' ? 'PENDIENTE' : null],
-    );
-    const usuario = await connection.query(
-      `INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo)
-       VALUES (?, ?, ?, ?, 1)`,
-      [cliente.insertId, user.email, user.passwordHash, user.rol],
-    );
-    await connection.commit();
-    return {
-      // Los IDs son INT en el esquema; el driver devuelve insertId como bigint.
-      id: Number(usuario.insertId),
-      email: user.email,
-      rol: user.rol,
-      tipoCliente: input.tipoCliente,
-    };
-  } catch (error) {
-    try {
-      await connection.rollback();
-    } catch {
-      // No devolver al pool una conexión cuyo estado transaccional es incierto.
-      reusable = false;
-      connection.destroy();
-      throw error;
-    }
-    throw error;
-  } finally {
-    if (reusable) await connection.release();
-  }
+  return inTransaction(async manager => {
+    const cliente = await manager.getRepository(ClienteSchema).insert({
+      tipo_cliente: input.tipoCliente, nombre_razon_social: input.nombreRazonSocial,
+      doc_cliente: input.docCliente, cuit: input.cuit, email: user.email,
+      telefono: input.telefono, direccion: input.direccion,
+      estado_aprobacion_empresa: input.tipoCliente === 'EMPRESA' ? 'PENDIENTE' : null,
+      es_fiel: 0, activo: 1,
+    });
+    const usuario = await manager.getRepository(UsuarioSchema).insert({
+      id_cliente: Number(cliente.identifiers[0].id_cliente), email: user.email,
+      password_hash: user.passwordHash, rol: user.rol, activo: 1,
+    });
+    return { id: Number(usuario.identifiers[0].id_usuario), email: user.email,
+      rol: user.rol, tipoCliente: input.tipoCliente };
+  });
 }
