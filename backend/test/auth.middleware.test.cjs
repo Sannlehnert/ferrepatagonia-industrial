@@ -181,7 +181,7 @@ test('JWT_SECRET vacío impide cargar la configuración', () => {
 test('login emite JWT verificable sin cambiar sus datos públicos', async (t) => {
   const repository = require('../dist/repositories/usuario.repository');
   const bcrypt = require('bcrypt');
-  const { pool } = require('../dist/config/database.config');
+  const { pool } = require('../dist/config/catalog-snapshot.config');
   try {
     t.mock.method(repository, 'findUsuarioByEmail', async () => ({
       id_usuario: 7, rol: 'CLIENTE', activo: 1, email: 'login@example.test',

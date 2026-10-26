@@ -5,7 +5,8 @@ const { randomUUID } = require('node:crypto');
 // Ningún test unitario usa credenciales ni conexiones reales.
 Object.assign(process.env, { JWT_SECRET: randomUUID(), DB_HOST: '127.0.0.1',
   DB_PORT: '1', DB_NAME: randomUUID(), DB_USER: randomUUID(), DB_PASSWORD: randomUUID() });
-const { pool } = require('../dist/config/database.config');
+const { pool } = require('../dist/config/catalog-snapshot.config');
+const probe = require('./helpers/query-probe.cjs');
 const repository = require('../dist/repositories/category.repository');
 const catalog = require('../dist/repositories/catalog.repository');
 const { app } = require('../dist/app');
@@ -49,20 +50,24 @@ test('lista completa y orden preservado, sin depender de catálogo ni query', as
   assert.ok(stub.mock.calls.every(c => c.arguments.length === 0));
 });
 test('fallo del driver no filtra SQL, stack ni status', async t => {
-  t.mock.method(pool, 'query', async () => { throw Object.assign(Error('SELECT secreto'), { status: 401 }); });
+  t.mock.method(probe, 'query', async () => { throw Object.assign(Error('SELECT secreto'), { status: 401 }); });
   const log = t.mock.method(console, 'error', () => {});
   const response = await fetch(url);
   assert.equal(response.status, 500);
   assert.deepEqual(await response.json(), { message: 'Error interno del servidor.' });
   assert.deepEqual(log.mock.calls[0].arguments, ['Error al consultar las categorías.']);
 });
-test('repositorio consulta solo categorías activas, orden SQL determinista y timeout', async t => {
+test('repositorio consulta solo categorías activas, orden SQL determinista parametrizado', async t => {
   const rows = [{ id_categoria: 1, nombre: 'A' }];
-  const stub = t.mock.method(pool, 'query', async () => rows);
+  const stub = t.mock.method(probe, 'query', async () => rows);
   assert.deepEqual(await repository.findActiveCategories(), rows);
   assert.equal(stub.mock.callCount(), 1);
-  const [query] = stub.mock.calls[0].arguments;
-  assert.equal(query.sql.replace(/\s+/g, ' ').trim(),
-    'SELECT id_categoria, nombre FROM CATEGORIA WHERE activo = 1 ORDER BY nombre ASC, id_categoria ASC');
-  assert.equal(query.timeout, 5000);
+  const [sql, parameters] = stub.mock.calls[0].arguments;
+  assert.match(sql, /WHERE \x60c\x60.\x60activo\x60 = \?/);
+  assert.match(sql, /ORDER BY \x60c\x60.\x60nombre\x60 ASC, \x60c\x60.\x60id_categoria\x60 ASC/);
+  assert.deepEqual(parameters, [1]);
+  assert.doesNotMatch(sql, /descripcion/);
+  const { dataSource } = require('../dist/config/database.config');
+  assert.equal(dataSource.options.enableQueryTimeout, false);
+  assert.equal(dataSource.options.maxQueryExecutionTime, 1000);
 });

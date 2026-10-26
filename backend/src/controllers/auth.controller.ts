@@ -44,7 +44,7 @@ export const login = async (req: Request, res: Response) => {
         });
 
     } catch (error) {
-        console.error("Error en login:", error);
+        console.error("Error en login:");
         return res.status(500).json({ message: "Error interno del servidor" });
     }
 };
@@ -64,7 +64,7 @@ export const logout = (req: Request, res: Response) => {
         });
 
     } catch (error) {
-        console.error("Error en logout:", error);
+        console.error("Error en logout:");
         return res.status(500).json({ message: "Error interno del servidor" });
     }
 };

@@ -4,10 +4,7 @@ const { once } = require('node:events');
 const { randomBytes } = require('node:crypto');
 process.env.JWT_SECRET = randomBytes(32).toString('hex');
 Object.assign(process.env, { DB_HOST: '127.0.0.1', DB_NAME: 'auth_test', DB_USER: 'test', DB_PASSWORD: 'test' });
-const databasePath = require.resolve('../dist/config/database.config');
-// Evitar crear un pool real en las pruebas sin BD.
-const pool = { query: async () => { throw new Error('Consulta inesperada'); } };
-require.cache[databasePath] = { id: databasePath, filename: databasePath, loaded: true, exports: { pool } };
+const pool = require('./helpers/query-probe.cjs');
 const { app } = require('../dist/app');
 const { signToken } = require('../dist/services/token.service');
 const jwt = require('jsonwebtoken');
@@ -29,8 +26,8 @@ for (const [rol, tipo] of [['CLIENTE', 'PARTICULAR'], ['CLIENTE', 'EMPRESA'], ['
     let calls = 0;
     t.mock.method(pool, 'query', async (sql, values) => {
       calls++;
-      assert.match(sql, /LEFT JOIN CLIENTE/);
-      assert.match(sql, /WHERE u\.id_usuario = \?/);
+      assert.match(sql, /LEFT JOIN `CLIENTE`/);
+      assert.match(sql, /WHERE `u`\.`id_usuario` = \?/);
       assert.doesNotMatch(sql, /password_hash|SELECT\s+\*/i);
       assert.deepEqual(values, [12]);
       return [row({ rol, tipo_cliente: tipo, nombre_razon_social: rol === 'ADMIN' ? null : 'Cliente' })];

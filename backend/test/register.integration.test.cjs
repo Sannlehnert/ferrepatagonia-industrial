@@ -1,3 +1,4 @@
+require('./helpers/integration-lifecycle.cjs');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { once } = require('node:events');
@@ -8,7 +9,7 @@ const bcrypt = require('bcryptjs');
 test('registro transaccional en MariaDB', { skip: !process.env.REGISTER_TEST_DATABASE }, async (t) => {
   const { env } = require('../dist/config/env.config');
   assert.equal(env.db.database, process.env.REGISTER_TEST_DATABASE, 'Confirmar la base de pruebas');
-  const { pool } = require('../dist/config/database.config');
+  const { pool } = require('../dist/config/catalog-snapshot.config');
   const { app } = require('../dist/app');
   const server = app.listen(0, '127.0.0.1');
   const emails = [];
@@ -64,22 +65,23 @@ test('registro transaccional en MariaDB', { skip: !process.env.REGISTER_TEST_DAT
 
     await t.test('error en INSERT USUARIO revierte CLIENTE y devuelve 500 genérico', async (t) => {
       const body = makeBody('PARTICULAR');
-      const getConnection = pool.getConnection.bind(pool);
+      const database = require('../dist/config/database.config');
+      const { ClienteSchema, UsuarioSchema } = require('../dist/entities/active.schemas');
+      const transaction = database.inTransaction;
       let insertedCliente = false;
-      t.mock.method(pool, 'getConnection', async () => {
-        const connection = await getConnection();
-        return {
-          beginTransaction: () => connection.beginTransaction(),
-          query: async (sql, values) => {
-            if (sql.includes('INSERT INTO USUARIO')) throw new Error('fallo simulado con detalle interno');
-            const result = await connection.query(sql, values);
-            insertedCliente = true;
-            return result;
-          },
-          commit: () => connection.commit(), rollback: () => connection.rollback(),
-          release: () => connection.release(), destroy: () => connection.destroy(),
-        };
-      });
+      t.mock.method(database, 'inTransaction', callback => transaction(async manager => {
+        const getRepository = manager.getRepository.bind(manager);
+        t.mock.method(manager, 'getRepository', schema => {
+          const repository = getRepository(schema);
+          const insert = repository.insert.bind(repository);
+          if (schema === UsuarioSchema) t.mock.method(repository, 'insert', async () => { throw Error('fallo simulado con detalle interno'); });
+          if (schema === ClienteSchema) t.mock.method(repository, 'insert', async values => {
+            const result = await insert(values); insertedCliente = true; return result;
+          });
+          return repository;
+        });
+        return callback(manager);
+      }));
       const response = await post(body);
       assert.equal(insertedCliente, true);
       assert.equal(response.status, 500);

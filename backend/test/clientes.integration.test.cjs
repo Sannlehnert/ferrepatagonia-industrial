@@ -1,3 +1,4 @@
+require('./helpers/integration-lifecycle.cjs');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { once } = require('node:events');
@@ -7,7 +8,7 @@ const { randomUUID } = require('node:crypto');
 test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIENTES_TEST_DATABASE }, async (t) => {
   const { env } = require('../dist/config/env.config');
   assert.equal(env.db.database, process.env.CLIENTES_TEST_DATABASE, 'Confirmar la base de pruebas');
-  const { pool } = require('../dist/config/database.config');
+  const { pool } = require('../dist/config/catalog-snapshot.config');
   const { app } = require('../dist/app');
   const { signToken } = require('../dist/services/token.service');
   const adminCookie = `jwt_token=${encodeURIComponent(signToken({ id: 7, rol: 'ADMIN' }))}`;
@@ -34,11 +35,13 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
     });
 
     await t.test('usa datos de cuenta, excluye clientes sin usuario y ADMIN, y desempata por id', async (t) => {
-      const connection = await pool.getConnection();
+      const { dataSource } = require('../dist/config/database.config');
+      const connection = dataSource.createQueryRunner();
+      await connection.connect();
       const prefix = `test179-${randomUUID()}`;
       const fixtureIds = [];
       try {
-        await connection.beginTransaction();
+        await connection.startTransaction();
         const addCliente = async (label, fechaAlta) => {
           const result = await connection.query(`INSERT INTO CLIENTE
             (tipo_cliente, nombre_razon_social, email, es_fiel, activo, fecha_alta)
@@ -68,7 +71,8 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
         const fechaPorId = new Map(dates.map(u => [Number(u.id_cliente), u.fecha_creacion.toISOString()]));
 
         // Ejecutar el SQL real del repositorio en la conexión de los fixtures sin confirmar datos.
-        t.mock.method(pool, 'query', (...args) => connection.query(...args));
+        t.mock.method(connection, 'release', async () => {});
+        t.mock.method(dataSource, 'createQueryRunner', () => connection);
         const response = await fetch(url, { headers: { Cookie: adminCookie } });
         assert.equal(response.status, 200);
         const body = await response.json();
@@ -82,7 +86,7 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
         assert.ok(!listed.some(c => c.id === sinUsuario || c.email === adminEmail));
       } finally {
         t.mock.restoreAll();
-        try { await connection.rollback(); } finally { connection.release(); }
+        try { await connection.rollbackTransaction(); } finally { await connection.release(); }
       }
     });
   } finally {

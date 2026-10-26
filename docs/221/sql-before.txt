@@ -1,0 +1,28 @@
+backend/src\repositories\adminProduct.repository.ts:47:    const rows = await pool.query(query);
+backend/src\repositories\adminProduct.repository.ts:52:    const rows = await pool.query(
+backend/src\repositories\adminProduct.repository.ts:68:    const rows = await pool.query(query, params);
+backend/src\repositories\adminProduct.repository.ts:73:    const rows = await pool.query(
+backend/src\repositories\adminProduct.repository.ts:81:    const result = await pool.query(
+backend/src\repositories\adminProduct.repository.ts:114:        const result = await pool.query(
+backend/src\repositories\adminProduct.repository.ts:122:    const result = await pool.query(
+backend/src\repositories\adminProduct.repository.ts:130:    const result = await pool.query(
+backend/src\repositories\catalog.repository.ts:23:  const connection = await pool.getConnection();
+backend/src\repositories\catalog.repository.ts:27:    await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+backend/src\repositories\catalog.repository.ts:28:    await connection.query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
+backend/src\repositories\catalog.repository.ts:29:    const [count] = await connection.query<{ total: bigint }[]>({ sql: `
+backend/src\repositories\catalog.repository.ts:34:    const rows = await connection.query<CatalogRow[]>({ sql: `
+backend/src\repositories\catalog.repository.ts:42:    await connection.commit();
+backend/src\repositories\catalog.repository.ts:47:    try { await connection.rollback(); } catch { /* La conexión se destruye abajo. */ }
+backend/src\repositories\category.repository.ts:6:  // Una sola lectura: pool.query devuelve automáticamente la conexión al pool.
+backend/src\repositories\category.repository.ts:7:  return pool.query<CategoryRow[]>({ sql: `
+backend/src\repositories\cliente.repository.ts:11:  return pool.query<ClienteListRow[]>(`
+backend/src\repositories\usuario.repository.ts:14:    const rows = await pool.query<UsuarioSessionRow[]>(`
+backend/src\repositories\usuario.repository.ts:33:    const rows: any = await pool.query(sql, [email]);
+backend/src\config\database.config.ts:13:  // pool.query toma una conexión y la devuelve al pool automáticamente.
+backend/src\config\database.config.ts:14:  await pool.query({ sql: 'SELECT 1', timeout: 3000 });
+backend/src\services\register.service.ts:18:  const connection = await pool.getConnection();
+backend/src\services\register.service.ts:21:    await connection.beginTransaction();
+backend/src\services\register.service.ts:22:    const cliente = await connection.query(
+backend/src\services\register.service.ts:31:    const usuario = await connection.query(
+backend/src\services\register.service.ts:36:    await connection.commit();
+backend/src\services\register.service.ts:46:      await connection.rollback();

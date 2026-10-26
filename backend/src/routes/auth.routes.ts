@@ -1,3 +1,4 @@
+import { DatabaseOutcomeUnknownError } from '../config/database-policy';
 import { Router, json, ErrorRequestHandler, Request, Response } from 'express';
 import { validateRegister } from '../validators/register.validator';
 import { registerClient } from '../services/register.service';
@@ -16,6 +17,10 @@ authRouter.get('/me', authenticate, me);
 
 // Mantener el contrato { message } también para errores del lector JSON.
 const handleAuthError: ErrorRequestHandler = (error, _req, res, _next) => {
+  if (error instanceof DatabaseOutcomeUnknownError) {
+    res.status(500).json({ message: error.message });
+    return;
+  }
   if (error.code === 'ER_DUP_ENTRY') {
     res.status(409).json({ message: 'El email ya está registrado.' });
     return;
