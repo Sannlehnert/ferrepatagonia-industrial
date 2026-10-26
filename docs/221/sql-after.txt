@@ -1,0 +1,20 @@
+backend/src\repositories\adminProduct.repository.ts:42:  const query = dataSource.getRepository(ProductoSchema).createQueryBuilder('p');
+backend/src\repositories\adminProduct.repository.ts:57:  dataSource.getRepository(CategoriaSchema).existsBy({ id_categoria });
+backend/src\repositories\adminProduct.repository.ts:59:  const result = await dataSource.getRepository(ProductoSchema).insert({
+backend/src\repositories\adminProduct.repository.ts:76:  return ((await dataSource.getRepository(ProductoSchema).update({ id_producto: id }, values)).affected ?? 0) > 0;
+backend/src\repositories\catalog.repository.ts:23:  const connection = await pool.getConnection();
+backend/src\repositories\catalog.repository.ts:27:    await connection.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+backend/src\repositories\catalog.repository.ts:28:    await connection.query('START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY');
+backend/src\repositories\catalog.repository.ts:29:    const [count] = await connection.query<{ total: bigint }[]>({ sql: `
+backend/src\repositories\catalog.repository.ts:34:    const rows = await connection.query<CatalogRow[]>({ sql: `
+backend/src\repositories\catalog.repository.ts:42:    await connection.commit();
+backend/src\repositories\catalog.repository.ts:47:    try { await connection.rollback(); } catch { /* La conexión se destruye abajo. */ }
+backend/src\repositories\category.repository.ts:5:  return dataSource.getRepository(CategoriaSchema).createQueryBuilder('c')
+backend/src\config\database.config.ts:25:  await dataSource.query('SELECT 1');
+backend/src\config\database.config.ts:29:export async function inTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+backend/src\repositories\cliente.repository.ts:5:  return dataSource.getRepository(ClienteSchema).createQueryBuilder('c')
+backend/src\repositories\usuario.repository.ts:9:  return dataSource.getRepository(UsuarioSchema).createQueryBuilder('u').leftJoin('u.cliente', 'c')
+backend/src\services\register.service.ts:3:import { inTransaction } from '../config/database.config';
+backend/src\services\register.service.ts:18:  return inTransaction(async manager => {
+backend/src\services\register.service.ts:19:    const cliente = await manager.getRepository(ClienteSchema).insert({
+backend/src\services\register.service.ts:26:    const usuario = await manager.getRepository(UsuarioSchema).insert({
