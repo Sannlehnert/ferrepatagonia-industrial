@@ -17,7 +17,7 @@ for (const mode of ['development', 'test']) test('known local mode, no proxy or 
   assert.equal(c.publicOrigin, 'http://localhost:5173');
 });
 for (const mode of [undefined, '', 'prod', 'Production', 'staging', 'production ']) test('reject mode ' + String(mode), () => {
-  assert.throws(() => loadHttpSecurity({ NODE_ENV: mode }));
+  assert.throws(() => loadHttpSecurity({ ...production, NODE_ENV: mode }));
 });
 test('explicit production configuration, with precise proxy networks', () => {
   const c = loadHttpSecurity(production); assert.equal(c.requireHttps, true);
@@ -44,11 +44,12 @@ for (const kind of ['short', 'repeated', 'surrounding whitespace']) test('produc
 test('production accepts a generated key intact, without logging or fallback', () => {
   const value = randomBytes(32).toString('hex'); assert.equal(validateJwtSecret(value, 'production'), value);
 });
-for (const [label, overrides] of [['missing mode', { NODE_ENV: '' }], ['weak secret', { ...production, JWT_SECRET: 'x' }],
-  ['missing proxy', { ...production, TRUSTED_PROXY_CIDRS: '' }], ['missing production limits', { ...production, AUTH_LOGIN_LIMIT: '' }]])
+for (const [label, overrides, field] of [['missing mode', { NODE_ENV: '' }, 'NODE_ENV'], ['weak secret', { ...production, JWT_SECRET: 'x' }, 'JWT_SECRET'],
+  ['missing proxy', { ...production, TRUSTED_PROXY_CIDRS: '' }, 'TRUSTED_PROXY_CIDRS'], ['missing production limits', { ...production, AUTH_LOGIN_LIMIT: '' }, 'AUTH_LOGIN_LIMIT']])
   test('startup fails before listening: ' + label, () => {
     const result = spawnSync(process.execPath, ['dist/server.js'], { env: { ...process.env, ...overrides }, encoding: 'utf8', timeout: 5000 });
     assert.notEqual(result.status, 0); assert.doesNotMatch(result.stdout, /API disponible/);
+    assert.match(result.stderr, new RegExp('Configuración inválida: ' + field));
   });
 test('cookie flags come from validated startup mode, not a later process.env mutation', () => {
   const { clearAuthCookieOptions, issueAuthCookieOptions } = require('../dist/config/auth-cookie.config');

@@ -36,6 +36,10 @@ for (const route of mutations) for (const [label, headers] of [
   ['same-site sibling', { Origin: origin, 'Sec-Fetch-Site': 'same-site' }],
   ['external referer', { Referer: 'https://untrusted.example/path' }],
   ['contradictory referer', { Origin: origin, Referer: 'https://untrusted.example/path' }],
+  ['null cannot use valid referer', { Origin: 'null', Referer: origin + '/login' }],
+  ['external cannot use valid referer', { Origin: 'https://untrusted.example', Referer: origin + '/login' }],
+  ['empty origin', { Origin: '' }], ['non-http origin', { Origin: 'file://local' }],
+  ['multiple origins', { Origin: origin + ',https://untrusted.example' }],
 ]) test('CSRF rejects ' + label + ': ' + route.method + ' ' + route.path, async t => {
   const login = t.mock.method(auth, 'loginUsuario', async () => { throw Error('must not run'); });
   const register = t.mock.method(registration, 'registerClient', async () => { throw Error('must not run'); });
