@@ -148,3 +148,26 @@ Los campos del modal de productos, salvo el checkbox de activo,
 no tienen sus etiquetas asociadas mediante for/id.
 Las pruebas los localizan por la etiqueta y el campo siguiente.
 Coordinar esta observación con #215.
+
+## Revalidación con develop — 27/10/2026
+
+Se integró develop en 8080f210be80162048fb73420bc825369c9bc855,
+incluyendo #215 (Tailwind) y #222 (DTO y validaciones), sobre la suite
+c7fc041aabbbebac75a22d30ef7eb859e48a0acb.
+
+El conflicto de frontend/package.json se resolvió conservando
+la configuración compartida y la dependencia de Playwright.
+
+Validación sobre el contenido integrado, antes del commit de merge:
+- Build de backend y frontend, incluido TypeScript: aprobados.
+- Frontend: 55 pruebas aprobadas.
+- Unitarias backend: 502 aprobadas.
+- Integración backend: 55 aprobadas (47 + 8); esquema sin cambios.
+- E2E sin ventana: 22 aprobadas en 35,2 segundos.
+- Bloque de pruebas finalizado con código 0.
+- El ejecutor E2E confirmó la eliminación del contenedor y la base.
+
+Registros de pruebas en evidence/post-merge/.
+Los registros anteriores se conservan como evidencia de la versión inicial.
+Continúan pendientes la coordinación con #216, la revalidación tras
+#212/#217 y los límites de cobertura documentados.

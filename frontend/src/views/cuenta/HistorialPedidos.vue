@@ -61,17 +61,17 @@ const limpiarFiltros = () => {
 </script>
 
 <template>
-  <h3>Mis pedidos</h3>
+  <h3 class="m-0 mb-4 text-lg font-semibold text-[#0b2438]">Mis pedidos</h3>
 
-  <p v-if="cargando">Cargando...</p>
-  <p v-else-if="error">{{ error }}</p>
+  <p v-if="cargando" class="text-slate-600">Cargando...</p>
+  <p v-else-if="error" class="text-red-800">{{ error }}</p>
   <p v-else-if="!pedidos.length">Todavía no hiciste ningún pedido.</p>
 
   <template v-else>
-    <div class="filtros">
-      <label>
+    <div class="mb-4 flex flex-wrap items-end gap-4">
+      <label class="flex flex-col gap-1 text-sm">
         Estado
-        <select v-model="filtroEstado">
+        <select class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2" v-model="filtroEstado">
           <option value="">Todos</option>
           <option v-for="(label, valor) in etiquetas" :key="valor" :value="valor">
             {{ label }}
@@ -79,70 +79,59 @@ const limpiarFiltros = () => {
         </select>
       </label>
 
-      <label>
+      <label class="flex flex-col gap-1 text-sm">
         Desde
-        <input type="date" v-model="desde" :max="hasta || undefined" />
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2" type="date" v-model="desde" :max="hasta || undefined" />
       </label>
 
-      <label>
+      <label class="flex flex-col gap-1 text-sm">
         Hasta
-        <input type="date" v-model="hasta" :min="desde || undefined" />
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2" type="date" v-model="hasta" :min="desde || undefined" />
       </label>
 
-      <button type="button" :disabled="!hayFiltros" @click="limpiarFiltros">
+      <button class="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-[#103a5c] hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50" type="button" :disabled="!hayFiltros" @click="limpiarFiltros">
         Limpiar filtros
       </button>
     </div>
 
-    <p v-if="rangoInvalido" class="aviso">
+    <p v-if="rangoInvalido" class="text-red-800">
       La fecha "Desde" no puede ser posterior a "Hasta".
     </p>
     <p v-else-if="!pedidosFiltrados.length">
       No hay pedidos que coincidan con los filtros.
     </p>
 
-    <div v-else class="tabla-wrap">
-      <p class="resumen">
+    <div v-else class="overflow-x-auto">
+      <p class="mb-2 text-sm text-slate-600">
         Mostrando {{ pedidosFiltrados.length }} de {{ pedidos.length }} pedidos
       </p>
-      <table class="pedidos">
+      <table class="w-full min-w-[480px] border-collapse text-left">
         <thead>
           <tr>
-            <th>N°</th>
-            <th>Fecha</th>
-            <th>Estado</th>
-            <th class="num">Total</th>
+            <th class="border-b border-slate-300 p-2 text-left">N°</th>
+            <th class="border-b border-slate-300 p-2 text-left">Fecha</th>
+            <th class="border-b border-slate-300 p-2 text-left">Estado</th>
+            <th class="border-b border-slate-300 p-2 text-right">Total</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="p in pedidosFiltrados" :key="p.id">
-            <td>#{{ p.id }}</td>
-            <td>{{ fecha(p.fecha) }}</td>
-            <td>
-              <span class="estado" :class="`estado--${p.estado}`">
+            <td class="border-b border-slate-200 p-2">#{{ p.id }}</td>
+            <td class="border-b border-slate-200 p-2">{{ fecha(p.fecha) }}</td>
+            <td class="border-b border-slate-200 p-2">
+              <span class="rounded-full px-2 py-1 text-sm" :class="{
+                'bg-amber-100 text-amber-900': p.estado === 'pendiente',
+                'bg-blue-100 text-blue-800': p.estado === 'en_camino',
+                'bg-green-100 text-green-900': p.estado === 'entregado',
+                'bg-red-100 text-red-900': p.estado === 'cancelado',
+              }">
                 {{ etiquetas[p.estado] }}
               </span>
             </td>
-            <td class="num">{{ moneda(p.total) }}</td>
+            <td class="border-b border-slate-200 p-2 text-right">{{ moneda(p.total) }}</td>
           </tr>
         </tbody>
       </table>
     </div>
   </template>
 </template>
-
-<style scoped>
-.tabla-wrap { overflow-x: auto; }
-.pedidos { width: 100%; border-collapse: collapse; }
-.pedidos th, .pedidos td { padding: .6rem .8rem; text-align: left; border-bottom: 1px solid #ddd; }
-.num { text-align: right !important; }
-.estado { padding: .15rem .6rem; border-radius: 999px; font-size: .85rem; }
-.estado--pendiente { background: #fff3cd; color: #7a5b00; }
-.estado--en_camino { background: #cfe2ff; color: #084298; }
-.estado--entregado { background: #d1e7dd; color: #0f5132; }
-.estado--cancelado { background: #f8d7da; color: #842029; }
-.filtros { display: flex; flex-wrap: wrap; gap: 1rem; align-items: end; margin-bottom: 1rem; }
-.filtros label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; }
-.resumen { font-size: .85rem; color: #666; margin: 0 0 .5rem; }
-.aviso { color: #842029; }
-</style>

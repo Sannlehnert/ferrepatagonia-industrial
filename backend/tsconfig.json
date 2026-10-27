@@ -6,6 +6,8 @@
     "rootDir": "src",
     "outDir": "dist",
     "strict": true,
+    "experimentalDecorators": true,
+    "useDefineForClassFields": false,
     "esModuleInterop": true,
     "skipLibCheck": true
   },

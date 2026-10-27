@@ -1,6 +1,8 @@
 import { DatabaseOutcomeUnknownError } from '../config/database-policy';
 import { Router, json, ErrorRequestHandler, Request, Response } from 'express';
-import { validateRegister } from '../validators/register.validator';
+import { validateDto } from '../middlewares/validate-dto.middleware';
+import { loginPolicy, registerPolicy } from '../dtos/policies';
+import { registerInput } from '../dtos/auth/registro.dto';
 import { registerClient } from '../services/register.service';
 import { login, logout, me } from '../controllers/auth.controller';
 import { authenticate } from '../middlewares/auth.middleware';
@@ -11,7 +13,7 @@ export const authRouter = Router();
 authRouter.use(json());
 
 // Endpoints expuestos
-authRouter.post('/login', login);
+authRouter.post('/login', validateDto('body', loginPolicy), login);
 authRouter.post('/logout', logout);
 authRouter.get('/me', authenticate, me);
 
@@ -33,14 +35,8 @@ const handleAuthError: ErrorRequestHandler = (error, _req, res, _next) => {
   res.status(500).json({ message: 'Error interno del servidor.' });
 };
 
-authRouter.post('/register', async (req: Request, res: Response) => {
-  const result = validateRegister(req.body);
-  if (!result.valid) {
-    res.status(400).json({ message: result.message });
-    return;
-  }
-
-  const user = await registerClient(result.data);
+authRouter.post('/register', validateDto('body', registerPolicy), async (_req: Request, res: Response) => {
+  const user = await registerClient(registerInput(res.locals.dto.body));
 
   res.status(201).json({
     message: 'Registro exitoso',

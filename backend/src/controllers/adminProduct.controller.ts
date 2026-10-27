@@ -22,10 +22,7 @@ export const getProducts = async (_req: Request, res: Response) => {
 
 export const getProductById = async (req: Request, res: Response) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
-        }
+        const { id } = res.locals.dto.params;
         const product = await getAdminProductById(id);
         return res.status(200).json(product);
     } catch (error) {
@@ -36,11 +33,7 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
-            return res.status(400).json({ message: 'El cuerpo de la solicitud es requerido y debe ser un objeto válido.' });
-        }
-
-        const newProduct = await createAdminProduct(req.body);
+        const newProduct = await createAdminProduct(res.locals.dto.body);
         return res.status(201).json(newProduct);
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
@@ -55,16 +48,9 @@ export const createProduct = async (req: Request, res: Response) => {
 
 export const updateProduct = async (req: Request, res: Response) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
-        }
+        const { id } = res.locals.dto.params;
 
-        if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
-            return res.status(400).json({ message: 'El cuerpo de la solicitud es requerido y debe ser un objeto válido.' });
-        }
-
-        const updatedProduct = await updateAdminProduct(id, req.body);
+        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body);
         return res.status(200).json(updatedProduct);
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
@@ -78,10 +64,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 
 export const deactivateProduct = async (req: Request, res: Response) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
-        }
+        const { id } = res.locals.dto.params;
         const product = await deactivateAdminProduct(id);
         return res.status(200).json({ message: 'Producto desactivado exitosamente', product });
     } catch (error) {
@@ -93,16 +76,9 @@ export const deactivateProduct = async (req: Request, res: Response) => {
 
 export const updateProductStock = async (req: Request, res: Response) => {
     try {
-        const id = Number(req.params.id);
-        if (!Number.isInteger(id) || id <= 0) {
-            return res.status(400).json({ message: 'ID inválido' });
-        }
+        const { id } = res.locals.dto.params;
 
-        if (!req.body || typeof req.body !== 'object' || !('stock' in req.body)) {
-            return res.status(400).json({ message: 'El campo stock es requerido' });
-        }
-
-        const product = await updateAdminProductStock(id, req.body.stock);
+        const product = await updateAdminProductStock(id, res.locals.dto.body.stock);
         return res.status(200).json({ message: 'Stock actualizado exitosamente', product });
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });

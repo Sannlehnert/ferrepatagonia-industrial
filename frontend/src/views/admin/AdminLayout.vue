@@ -29,21 +29,21 @@ const permissions = computed(() => {
 </script>
 
 <template>
-    <div class="admin-layout">
-        <aside class="admin-layout__sidebar" aria-label="Panel administrativo">
-            <div class="admin-layout__brand">
-                <strong>FERREPATAGONIA</strong>
-                <span>INDUSTRIAL</span>
+    <div class="grid min-h-screen grid-cols-[220px_minmax(0,1fr)] bg-white text-[#0b2438] [@media(max-width:700px)]:grid-cols-1">
+        <aside class="flex flex-col bg-[#0b2438] text-white" aria-label="Panel administrativo">
+            <div class="flex flex-col gap-1 border-b border-[#33556f] px-5 py-8 [@media(max-width:700px)]:py-5">
+                <strong class="text-sm">FERREPATAGONIA</strong>
+                <span class="text-[10px] tracking-[3px] text-[#b7c6d4]">INDUSTRIAL</span>
             </div>
 
-            <div class="admin-layout__navigation">
+            <div class="flex-1 px-5 py-6 text-sm [@media(max-width:700px)]:py-5">
                 <AdminMenu :permissions="permissions" />
             </div>
 
-            <div class="admin-layout__session">
+            <div class="border-t border-[#33556f] p-5">
                 <button
                     type="button"
-                    class="admin-layout__logout"
+                    class="box-border min-h-11 w-full cursor-pointer rounded-md border-0 bg-transparent px-3 py-2 text-left text-sm text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60"
                     :disabled="saliendo"
                     @click="cerrarSesion"
                 >
@@ -52,131 +52,8 @@ const permissions = computed(() => {
             </div>
         </aside>
 
-        <main class="admin-layout__content">
+        <main class="min-w-0 p-8 [@media(max-width:700px)]:px-4 [@media(max-width:700px)]:py-6">
             <RouterView />
         </main>
     </div>
 </template>
-
-<style scoped>
-.admin-layout {
-    display: grid;
-    grid-template-columns: 220px minmax(0, 1fr);
-    min-height: 100vh;
-    color: #0b2438;
-    background: #fff;
-    font-family: Arial, sans-serif;
-}
-
-.admin-layout__sidebar {
-    display: flex;
-    flex-direction: column;
-    background: #0b2438;
-    color: #fff;
-}
-
-.admin-layout__brand {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 32px 20px;
-    border-bottom: 1px solid #33556f;
-}
-
-.admin-layout__brand strong {
-    font-size: 14px;
-}
-
-.admin-layout__brand span {
-    color: #b7c6d4;
-    font-size: 10px;
-    letter-spacing: 3px;
-}
-
-.admin-layout__navigation {
-    flex: 1;
-    padding: 24px 20px;
-    font-size: 14px;
-}
-
-.admin-layout__content {
-    min-width: 0;
-    padding: 32px;
-}
-
-.admin-layout__session {
-    padding: 20px;
-    border-top: 1px solid #33556f;
-}
-
-.admin-layout__logout {
-    width: 100%;
-    min-height: 44px;
-    padding: 10px 12px;
-    border: 0;
-    border-radius: 6px;
-    background: transparent;
-    color: #fff;
-    font: inherit;
-    font-size: 14px;
-    text-align: left;
-    cursor: pointer;
-}
-
-.admin-layout__logout:hover:not(:disabled) {
-    background: #103a5c;
-}
-
-.admin-layout__logout:focus-visible {
-    outline: 2px solid #fff;
-    outline-offset: 3px;
-}
-
-.admin-layout__logout:disabled {
-    opacity: 0.6;
-    cursor: wait;
-}
-
-.admin-layout__navigation :deep(.navigation-menu__link) {
-    display: flex;
-    align-items: center;
-    min-height: 44px;
-    box-sizing: border-box;
-    padding: 10px 12px;
-    border-radius: 6px;
-    color: #fff;
-    text-decoration: none;
-}
-
-.admin-layout__navigation :deep(.navigation-menu__link:hover) {
-    background: #103a5c;
-}
-
-.admin-layout__navigation :deep(.navigation-menu__link.router-link-active) {
-    background: #145a8d;
-    font-weight: 700;
-}
-
-.admin-layout__navigation :deep(.navigation-menu__link:focus-visible) {
-    outline: 2px solid #fff;
-    outline-offset: 3px;
-}
-
-@media (max-width: 700px) {
-    .admin-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-layout__brand {
-        padding: 20px;
-    }
-
-    .admin-layout__navigation {
-        padding: 20px;
-    }
-
-    .admin-layout__content {
-        padding: 24px 16px;
-    }
-}
-</style>

@@ -13,5 +13,6 @@ const props = defineProps<{
         :items="accountMenu"
         :permissions="props.permissions"
         label="Menú de mi cuenta"
+        variant="account"
     />
 </template>

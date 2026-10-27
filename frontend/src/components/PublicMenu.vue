@@ -14,5 +14,6 @@ const props = defineProps<{
         :permissions="props.permissions"
         label="Menú principal"
         orientation="horizontal"
+        variant="public"
     />
 </template>
