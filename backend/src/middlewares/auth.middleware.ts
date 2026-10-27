@@ -1,22 +1,23 @@
 import type { RequestHandler } from 'express';
-import { verifyToken } from '../services/token.service';
-import type { Role } from '../types/auth';
+import { authPassport } from '../config/passport.config';
+import type { Role, SessionUser } from '../types/auth';
 
 export const authenticate: RequestHandler = (req, res, next) => {
   delete req.auth;
-  const token: unknown = req.cookies?.jwt_token;
-  if (typeof token !== 'string' || !token) {
-    res.status(401).json({ message: 'No autenticado.' });
-    return;
-  }
-
-  try {
-    req.auth = verifyToken(token);
-  } catch {
-    res.status(401).json({ message: 'No autenticado.' });
-    return;
-  }
-  next();
+  delete req.authUser;
+  return authPassport.authenticate('jwt', { session: false }, (error: unknown, user: SessionUser | false) => {
+    if (error) {
+      res.status(500).json({ message: 'Error interno del servidor.' });
+      return;
+    }
+    if (!user) {
+      res.status(401).json({ message: 'No autenticado.' });
+      return;
+    }
+    req.auth = { id: user.id, rol: user.rol };
+    req.authUser = user;
+    next();
+  })(req, res, next);
 };
 
 // Uso esperado: authenticate, authorizeRoles('ADMIN'). No consulta JWT ni BD.

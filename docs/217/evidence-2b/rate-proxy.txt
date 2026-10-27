@@ -1,0 +1,23 @@
+✔ login and registration quotas are separate, and 429 precedes expensive services (880.688ms)
+✔ same account from different verified client IPs is not globally locked (610.1497ms)
+✔ IPv6 addresses in one /56 share quota, another /56 is isolated (603.5717ms)
+✔ untrusted X-Forwarded-* cannot choose a new rate-limit key (597.4188ms)
+✔ quota resets after the configured window and reports Retry-After (1750.956ms)
+✔ rate store keys contain only IPs, never account or credential values (86.1898ms)
+✔ store failure blocks the handler instead of failing open (4.6019ms)
+✔ direct development ignores spoofed forwarded IP, protocol and host (69.3017ms)
+✔ trust precise proxy networks and stop at the nearest untrusted hop (9.7294ms)
+✔ untrusted peer cannot satisfy production HTTPS with header: undefined (5.1116ms)
+✔ untrusted peer cannot satisfy production HTTPS with header: http (6.9715ms)
+✔ untrusted peer cannot satisfy production HTTPS with header: https (4.3787ms)
+✔ untrusted peer cannot satisfy production HTTPS with header: https,http (3.6106ms)
+✔ synthetic trusted TLS terminator permits HTTPS and correct client IP (3.9507ms)
+✔ invalid forwarded network identity gets controlled 400 without echoing its value (3.3784ms)
+ℹ tests 15
+ℹ suites 0
+ℹ pass 15
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4735.9096

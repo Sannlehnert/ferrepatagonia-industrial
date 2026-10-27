@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { getProducts, getProductById, createProduct, updateProduct, deactivateProduct, updateProductStock } from '../controllers/adminProduct.controller';
-import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 import { productIdPolicy, createProductPolicy, updateProductPolicy, stockPolicy } from '../dtos/policies';
 
 export const adminProductRouter = Router();
 
-adminProductRouter.use(authenticate, authorizeRoles('ADMIN'));
+// Mounted only beneath adminRouter's authentication and ADMIN guard.
 
 adminProductRouter.get('/', getProducts);
 adminProductRouter.get('/:id', validateDto('params', productIdPolicy), getProductById);
