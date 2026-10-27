@@ -155,3 +155,29 @@ test('real login/me/logout preserve cookie flags, TTL, public JSON and no refres
     } finally { await worker.close(); }
   });
 });
+
+test('real MariaDB login/register quotas return 429 without additional account writes', async () => {
+  const worker = await startHttpApp({ HTTP_TEST_DATABASE: '1', AUTH_LOGIN_LIMIT: '1', AUTH_REGISTER_LIMIT: '1', JWT_SECRET: randomBytes(32).toString('hex') });
+  const emails = [0, 1].map(() => `quota-${randomBytes(12).toString('hex')}@example.test`);
+  const call = async (endpoint, body) => {
+    const r = await fetch(worker.base + '/api/auth/' + endpoint, { method: 'POST', headers: { Origin: process.env.APP_PUBLIC_ORIGIN, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return { status: r.status, retry: r.headers.get('retry-after'), body: await r.json() };
+  };
+  try {
+    assert.equal((await call('login', { email: admin.email, password: admin.password })).status, 200);
+    const blockedLogin = await call('login', { email: admin.email, password: admin.password });
+    assert.equal(blockedLogin.status, 429); assert.ok(Number(blockedLogin.retry) > 0);
+    const registration = email => ({ tipoCliente: 'PARTICULAR', nombreRazonSocial: 'Quota fixture', email, password: randomBytes(24).toString('hex') });
+    assert.equal((await call('register', registration(emails[0]))).status, 201);
+    const blockedRegister = await call('register', registration(emails[1]));
+    assert.equal(blockedRegister.status, 429); assert.ok(Number(blockedRegister.retry) > 0);
+    const count = async email => {
+      const [row] = await pool.query('SELECT (SELECT COUNT(*) FROM CLIENTE WHERE email=?) AS c, (SELECT COUNT(*) FROM USUARIO WHERE email=?) AS u', [email, email]);
+      return [Number(row.c), Number(row.u)];
+    };
+    assert.deepEqual(await count(emails[0]), [1, 1]); assert.deepEqual(await count(emails[1]), [0, 0]);
+  } finally {
+    await worker.close();
+    for (const email of emails) { await pool.query('DELETE FROM USUARIO WHERE email=?', [email]); await pool.query('DELETE FROM CLIENTE WHERE email=?', [email]); }
+  }
+});
