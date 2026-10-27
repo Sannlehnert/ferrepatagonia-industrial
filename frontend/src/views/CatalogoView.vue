@@ -264,33 +264,33 @@ onBeforeUnmount(() => {
           </button>
         </div>
 
-        <ul v-else class="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-4 m-0 list-none p-0 max-[560px]:grid-cols-2 max-[560px]:gap-3">
-          <li v-for="p in productos" :key="p.id" class="box-border flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 max-[560px]:p-3">
+        <ul v-else class="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-4 m-0 list-none p-0 [@media(max-width:560px)]:grid-cols-2 [@media(max-width:560px)]:gap-3">
+          <li v-for="p in productos" :key="p.id" class="box-border flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 [@media(max-width:560px)]:p-3">
             <!-- CatalogProduct no tiene imagen todavía -->
-            <div class="mb-3 grid h-[140px] place-items-center rounded-md bg-slate-100 text-xs text-slate-500 max-[560px]:h-[110px]" aria-hidden="true"><span>Sin imagen</span></div>
+            <div class="mb-3 grid h-[140px] place-items-center rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]" aria-hidden="true"><span>Sin imagen</span></div>
 
             <p class="m-0 min-w-0 max-w-full break-all text-[.7rem] text-slate-500">COD. {{ p.codigo }}</p>
             <h3 class="my-1 break-all text-sm font-semibold text-slate-900">{{ p.nombre }}</h3>
             <p class="m-0 mb-2 text-[.95rem]">Precio a confirmar</p>
 
-            <div class="mt-auto flex items-center justify-between gap-2 max-[560px]:flex-col max-[560px]:items-stretch">
+            <div class="mt-auto flex items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
               <span class="text-sm text-green-600" :class="{ 'text-red-700': !p.disponible }">
                 {{ p.disponible ? 'Disponible' : 'No disponible' }}
               </span>
               <!-- Conectar al carrito cuando exista -->
-              <button type="button" class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] disabled:cursor-not-allowed disabled:bg-slate-400 max-[560px]:w-full" :disabled="!p.disponible">Agregar</button>
+              <button type="button" class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] disabled:cursor-not-allowed disabled:bg-slate-400 [@media(max-width:560px)]:w-full" :disabled="!p.disponible">Agregar</button>
             </div>
           </li>
         </ul>
 
         <nav
           v-if="!error && pagination && pagination.totalPages > 1"
-          class="mt-6 flex items-center justify-center gap-4 text-sm max-[560px]:gap-2"
+          class="mt-6 flex items-center justify-center gap-4 text-sm [@media(max-width:560px)]:gap-2"
           aria-label="Paginación del catálogo"
         >
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 max-[560px]:min-w-0 max-[560px]:flex-1"
+            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasPrevious"
             @click="cambiarPagina(pagina - 1)"
           >
@@ -299,7 +299,7 @@ onBeforeUnmount(() => {
           <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 max-[560px]:min-w-0 max-[560px]:flex-1"
+            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasNext"
             @click="cambiarPagina(pagina + 1)"
           >
