@@ -1,0 +1,4 @@
+﻿ferrepatagonia-backend@0.1.0 E:\uni\Profesionalizantes2\ferrepatagonia-industrial\backend
+ÔööÔöÇÔö¼ express@5.3.0
+  ÔööÔöÇÔöÇ body-parser@2.4.0
+
