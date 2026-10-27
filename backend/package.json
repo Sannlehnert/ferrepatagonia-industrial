@@ -7,9 +7,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:unit": "node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs",
+    "test:unit": "node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs",
     "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs",
-    "test": "npm run build && npm run test:unit && npm run test:integration"
+    "test": "npm run build && npm run test:unit && npm run test:dto-source && npm run test:integration",
+    "test:dto-source": "node --import tsx --test test/dto-source.test.cjs"
   },
   "engines": {
     "node": ">=22"
@@ -17,6 +18,8 @@
   "dependencies": {
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.14.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.2.0",
     "express": "^5.1.0",

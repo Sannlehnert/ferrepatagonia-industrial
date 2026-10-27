@@ -423,6 +423,38 @@ describe('Admin Products Endpoints (#197)', () => {
         }
     });
 
+    it('#222: invalid DTOs leave MariaDB unchanged; partial null updates preserve omitted values', async () => {
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
+        const snapshot = async () => JSON.stringify(await pool.query('SELECT * FROM PRODUCTO ORDER BY id_producto'));
+        const before = await snapshot();
+        const valid = { nombre: 'DTO', codigo: `${TEST_PREFIX}DTO`, id_categoria: 1, precio: 1.239, stock: 0 };
+        const send = (method, suffix, body) => fetch(`${BASE_URL}/admin/productos${suffix}`, {
+            method, headers: { Cookie: adminCookie, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        for (const [method, suffix, body] of [
+            ['POST', '', { ...valid, activo: 'false' }],
+            ['POST', '', { ...valid, extra: 'ignored before #222' }],
+            ['POST', '', { ...valid, id_categoria: 2147483647, stock: null }],
+            ['PUT', `/${fixtureProductId}`, { nombre: null }],
+            ['PUT', `/${fixtureProductId}`, { descripcion: {}, precio: 3 }],
+            ['PUT', '/2147483647', { precio: '3' }],
+            ['PATCH', `/${fixtureProductId}/stock`, { stock: '5' }],
+            ['PATCH', `/${fixtureProductId}/stock`, { stock: 5, permisos: 'ADMIN' }],
+        ]) assert.equal((await send(method, suffix, body)).status, 400);
+        assert.equal(await snapshot(), before, 'No invalid input can change persisted products');
+        assert.equal((await send('POST', '', { ...valid, id_categoria: 2147483647 })).status, 404);
+        assert.equal((await send('PUT', '/2147483647', { nombre: 'valid' })).status, 404);
+        const created = await send('POST', '', { ...valid, descripcion: 'before', imagen: 'before' });
+        assert.equal(created.status, 201);
+        const body = await created.json(); createdProductIds.push(body.id_producto);
+        assert.equal(body.precio, '1.24');
+        const cleared = await send('PUT', `/${body.id_producto}`, { descripcion: null, imagen: null });
+        assert.equal(cleared.status, 200);
+        const result = await cleared.json();
+        assert.equal(result.descripcion, null); assert.equal(result.imagen, null);
+        for (const key of ['nombre', 'codigo', 'precio', 'stock', 'id_categoria', 'activo']) assert.equal(result[key], body[key]);
+    });
+
     // Limpiar la BD exclusivamente por los IDs creados y cerrar conexión siempre
     after(async () => {
         const { pool } = require('../dist/config/catalog-snapshot.config.js');

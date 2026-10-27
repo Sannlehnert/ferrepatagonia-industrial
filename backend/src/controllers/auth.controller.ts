@@ -15,11 +15,7 @@ export const me = async (req: Request, res: Response) => {
 
 export const login = async (req: Request, res: Response) => {
     try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ message: "Email y contraseña son obligatorios" });
-        }
+        const { email, password } = res.locals.dto.body;
 
         // Llamamos al servicio
         const result = await loginUsuario(email, password);

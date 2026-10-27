@@ -112,6 +112,27 @@ test('registro transaccional en MariaDB', { skip: !process.env.REGISTER_TEST_DAT
       assert.equal(response.status, 200);
       assert.deepEqual(await response.json(), { api: 'ok', database: 'ok' });
     });
+
+    await t.test('#222: null/types/extras reject without rows; 72-byte password retains spaces at login', async () => {
+      const body = makeBody('PARTICULAR');
+      for (const invalid of [{...body,nombreRazonSocial:null},{...body,email:[]},
+        {...body,telefono:{}},{...body,estado_aprobacion_empresa:'APROBADA'},
+        {...body,password:'é'.repeat(37)},{...body,password:''}]) {
+        assert.equal((await post(invalid)).status,400);
+        assert.deepEqual(await counts(body.email),[0,0]);
+      }
+      const password = ' ' + 'é'.repeat(35) + ' ';
+      const created = await post({...body,password,docCliente:null});
+      assert.equal(created.status,201);
+      const login = pass => fetch(`${baseUrl}/api/auth/login`,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:body.email,password:pass})});
+      const success = await login(password);assert.equal(success.status,200);
+      assert.match(success.headers.get('set-cookie'),/HttpOnly/);
+      const json = await success.json();assert.equal(json.user.rol,'CLIENTE');
+      assert.equal('password' in json.user,false);assert.equal('password_hash' in json.user,false);
+      assert.equal((await login(password.trim())).status,401);
+      assert.equal((await login(password+'x')).status,400);
+    });
   } finally {
     await new Promise(resolve => server.close(resolve));
     try {
