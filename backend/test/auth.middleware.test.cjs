@@ -60,6 +60,7 @@ const invalidTokens = [
   ['sin cookie', undefined],
   ['token manipulado', parts.join('.')],
   ['token expirado', rawToken({ id: 7, rol: 'CLIENTE' }, { expiresIn: -1 })],
+  ['token sin exp', jwt.sign({ id: 7, rol: 'CLIENTE' }, process.env.JWT_SECRET, { algorithm: 'HS256' })],
   ['rol EMPRESA', rawToken({ id: 7, rol: 'EMPRESA' })],
   ['sin rol', rawToken({ id: 7 })],
   ['payload string', jwt.sign('texto', process.env.JWT_SECRET)],
