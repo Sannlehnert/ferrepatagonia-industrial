@@ -1,33 +1,39 @@
 # #214 — Pruebas E2E integradas
 
-## Estado
+## Estado actual
 
-En progreso. Suite inicial de 22 pruebas aprobada en una ejecución conjunta.
-Este resultado no implica el cierre de todos los criterios de la tarea.
+En progreso, pendiente de nueva revisión del PR #47.
 
-## Versión y entorno
+Se atendieron las observaciones sobre limpieza del contenedor,
+rechazos administrativos, reflejo público de altas/ediciones y evidencia.
 
-- Rama: feature/214-integrated-e2e.
-- HEAD base: f83f30710eb79eed920d53bc88b476da68bedf5b.
-- Las pruebas se ejecutaron con cambios locales de #214 sin commit.
-- Entorno: Windows, Git Bash, Node 22.22.2 y npm 10.9.7.
-- Playwright: 1.64.1, proyecto Chromium.
-- Base de datos: contenedor desechable mariadb:11.4.
-- Frontend y API locales, con puertos asignados dinámicamente.
+- Commit técnico validado: 32ea3714ea8cd2daa5fc4b642fc32174ae771a2b.
+- Develop integrado: 8080f210be80162048fb73420bc825369c9bc855.
+- PR: https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/47
+- Fecha de validación: 27/10/2026.
 
-El SHA base no identifica por sí solo el contenido de las pruebas.
-Se registrará el commit de la suite al publicarla.
+Las comprobaciones de las correcciones se ejecutaron antes del commit,
+sobre el contenido posteriormente registrado en ese SHA.
+La actualización documental se registra en un commit separado.
+
+## Entorno
+
+- Windows y Git Bash.
+- Node 22.22.2 y npm 10.9.7.
+- Playwright 1.64.1, proyecto Chromium.
+- MariaDB desechable mediante la imagen mariadb:11.4.
+- API y frontend locales con puertos asignados dinámicamente.
 
 ## Preparación
 
-Desde la raíz del repositorio:
+Con Docker iniciado, desde la raíz del repositorio:
 
 ```bash
 npm ci --prefix backend
 npm ci --prefix frontend
 ```
 
-Instalar Chromium desde frontend:
+Instalar Chromium:
 
 ```bash
 cd frontend
@@ -35,139 +41,173 @@ npx playwright install chromium
 cd ..
 ```
 
-Docker debe estar iniciado. El ejecutor crea su propio contenedor;
-no requiere levantar el compose del proyecto.
-
-Antes de ejecutar, compilar el backend y comprobar TypeScript:
+Compilar el backend y comprobar TypeScript:
 
 ```bash
 npm run build --prefix backend
 npm run type-check --prefix frontend
 ```
 
-El ejecutor utiliza backend/dist: hay que recompilar si cambia el backend.
+El ejecutor utiliza backend/dist. Recompilar cuando cambie el backend.
+No requiere levantar el compose del proyecto.
 
 ## Ejecución
 
-Suite completa con navegador visible:
+Suite completa sin ventana:
 
 ```bash
-node backend/test/helpers/run-e2e.cjs --headed
+node backend/test/helpers/run-e2e.cjs
 ```
+
+Agregar --headed para ver el navegador.
 
 Por área:
 
 ```bash
-node backend/test/helpers/run-e2e.cjs catalog/ --headed
-node backend/test/helpers/run-e2e.cjs auth/ --headed
-node backend/test/helpers/run-e2e.cjs admin/ --headed
+node backend/test/helpers/run-e2e.cjs catalog/
+node backend/test/helpers/run-e2e.cjs auth/
+node backend/test/helpers/run-e2e.cjs admin/
 ```
 
-Para ejecutarla sin ventana, omitir --headed.
-La ejecución sin ventana fue validada: 22 pruebas aprobadas en 36,3 segundos, con código de salida 0. Evidencia: evidence/e2e-headless.txt.
+Prueba independiente de limpieza ante confirmación perdida de Docker:
 
-No ejecutar las pruebas directamente con Playwright: requieren
-las variables y servicios que prepara el ejecutor aislado.
+```bash
+node --test backend/test/e2e-cleanup.test.cjs
+```
 
-## Resultado observado
+Esta prueba requiere Docker y backend compilado. Se ejecuta por separado;
+no está incluida en las 25 E2E ni en el comando test:unit del backend.
 
-Validación registrada el 27/10/2026 sobre el SHA base indicado y los
-cambios locales de #214 todavía sin commit.
+En Git Bash, si la redirección a tee muestra "stdout is not a tty",
+usar node.exe en lugar de node. Activar set -o pipefail para conservar
+los fallos de la ejecución al guardar registros con tee.
 
-| Verificación | Resultado | Evidencia |
+No iniciar las E2E directamente con Playwright: requieren el entorno
+aislado que prepara el ejecutor.
+
+## Cobertura actual
+
+| Área | Casos | Comportamientos |
+|---|---:|---|
+| Catálogo | 9 | Búsqueda por SKU/nombre, categoría combinada, limpieza de filtros, vacío, paginación, reinicio de página, disponibilidad, inactivos y recuperación ante errores |
+| Autenticación | 9 | Login, restauración, logout, rutas protegidas, restricciones entre roles y API administrativa con 401/403/200 |
+| Administración | 7 | Alta/edición persistentes y visibles para un visitante, cambios de estado, stock, guardado incierto y rechazos 400/404/409 |
+
+## Correcciones de la revisión
+
+### Limpieza del contenedor
+
+Se registra el intento antes de ejecutar docker run. La limpieza consulta
+el nombre exacto y exclusivo de la ejecución, elimina el contenedor si
+existe y verifica su ausencia.
+
+La prueba de regresión crea un contenedor real y provoca un error después
+de la creación, antes de devolver la confirmación al ejecutor. Comprueba
+que el ejecutor termine con código 1 y retire el contenedor.
+
+La propia prueba incluye limpieza de respaldo; si el ejecutor deja
+el contenedor, la comprobación falla antes de realizar ese respaldo.
+
+### Rechazos administrativos
+
+Se comprueban respuestas reales del backend:
+- 400: stock inválido enviado mediante interceptación de la solicitud.
+- 404: solicitud dirigida a un ID inexistente.
+- 409: SKU duplicado ingresado desde el formulario.
+
+Se verifica que el formulario conserve el borrador, permita corregirlo,
+no muestre éxito y que el producto original permanezca sin cambios.
+
+### Reflejo público
+
+Un contexto de navegador independiente, sin sesión administrativa,
+busca el producto creado por SKU y comprueba su nombre.
+Después de editarlo, verifica el nombre actualizado.
+Ambas comprobaciones se repiten al recargar el catálogo.
+
+## Evidencia de las correcciones
+
+Registros en evidence/review-fixes/:
+
+| Verificación | Resultado | Archivo |
 |---|---|---|
-| E2E sin ventana | 22 aprobadas; código 0 | evidence/e2e-headless.txt |
-| Build frontend y TypeScript | Aprobado; código 0 | evidence/frontend-build.txt |
-| Pruebas frontend | 55 aprobadas, sin fallos ni omisiones | evidence/frontend-tests.txt |
-| Build backend | Aprobado; código 0 | evidence/backend-build.txt |
-| Unitarias backend | 196 aprobadas, sin fallos ni omisiones | evidence/backend-unit.txt |
-| Integración backend | 53 aprobadas, sin fallos ni omisiones; código 0 | evidence/backend-integration.txt |
+| Confirmación perdida de Docker | 1 aprobada; código 0 | container-cleanup.txt |
+| Rechazos administrativos | 3 aprobadas; código 0 | admin-rejections.txt |
+| Alta/edición y reflejo público | 1 aprobada; código 0 | public-product.txt |
+| Suite E2E completa | 25 aprobadas en 40,2 s; código 0 | e2e-headless.txt |
 
-Las dos verificaciones de esquema de las pruebas de integración
-indicaron unchanged: true.
+TypeScript también fue aprobado al validar las pruebas modificadas.
+Las ejecuciones parciales están incluidas en la suite completa:
+no deben sumarse como casos adicionales.
+
+El mensaje database.query.failed observado durante el rechazo por SKU
+duplicado acompaña el 409 esperado; ese caso aprobó.
+
+## Validaciones anteriores
+
+Se conservan como evidencia histórica, no como nuevas ejecuciones
+del commit de correcciones.
+
+### Integración de develop con #215 y #222
+
+Commit de integración: cc4fa9e6ce34fb61916e954442edd236042e1fac.
+
+Registros en evidence/post-merge/:
+- Frontend: 55 pruebas aprobadas.
+- Unitarias backend: 502 aprobadas.
+- Integración backend: 55 aprobadas (47 + 8).
+- E2E: 22 aprobadas en 35,2 segundos.
+- Las verificaciones del esquema indicaron unchanged: true.
+
+Build de backend/frontend y TypeScript aprobados en esa integración;
+sus salidas se compartieron en terminal.
+
+### Versión inicial
+
+Suite incorporada en c7fc041aabbbebac75a22d30ef7eb859e48a0acb,
+partiendo de f83f30710eb79eed920d53bc88b476da68bedf5b.
+
+Registros directamente en evidence/:
+- 22 E2E aprobadas sin ventana.
+- 55 pruebas frontend, 196 unitarias y 53 de integración backend.
+- Builds de frontend/backend aprobados.
+- Limpieza tras un proyecto Playwright inexistente: código 1 esperado.
 
 También se verificó manualmente una interrupción con Ctrl+C durante
-la tercera prueba de una ejecución con --headed --repeat-each=5.
-El ejecutor devolvió código 1 e informó la eliminación del contenedor
-y la base. La consulta posterior de contenedores E2E no devolvió nombres.
-Esta comprobación se documentó mediante captura y salida de terminal;
-no está incluida en los archivos de evidencia anteriores.
+las pruebas: código 1, mensaje de limpieza y consulta posterior sin
+contenedores E2E. Se documentó mediante captura y salida de terminal.
 
-También se verificó la limpieza ante un error de configuración de
-Playwright usando --project=proyecto-inexistente. La ejecución terminó
-con código 1, informó la eliminación del contenedor y la consulta
-posterior no devolvió nombres.
-Evidencia: evidence/e2e-invalid-project.txt.
-
-Este caso no verifica fallos de arranque de la API o de MariaDB.
-
-## Cobertura
-
-| Área | Casos | Comportamientos verificados |
-|---|---:|---|
-| Catálogo | 9 | Búsqueda por SKU y nombre, combinación con categoría, limpieza de filtros, categoría vacía, paginación y reinicio de página, stock cero, exclusión de inactivos, errores de red y HTTP 500 con recuperación |
-| Autenticación | 9 | Login, restauración y logout de cliente y administrador; acceso directo sin sesión; restricciones entre roles; API administrativa con 401, 403 y 200 |
-| Administración | 4 | Alta y edición persistentes, cancelación/desactivación/reactivación con reflejo público, stock válido e inválido, guardado incierto y bloqueo hasta recarga exitosa |
-
-## Aislamiento y fallos controlados
+## Aislamiento
 
 Cada ejecución crea una base exclusiva con datos iniciales conocidos.
 Las pruebas de stock y estado restauran el producto utilizado.
-La prueba de alta desactiva su producto al finalizar para no alterar
-los resultados del catálogo público.
+La prueba de alta desactiva su producto al finalizar.
+El ejecutor elimina el contenedor de esa ejecución.
 
-La suite utiliza la API y MariaDB reales del entorno aislado.
-Los errores de red y HTTP se provocan mediante interceptación controlada.
+Las pruebas utilizan API y MariaDB reales. Los fallos de red y HTTP
+se provocan mediante interceptación controlada.
 
-En el caso de guardado incierto, la petición llega al backend y se guarda
-el cambio antes de perder la respuesta al navegador. Se comprueba que
-una recarga fallida mantiene el bloqueo y que una exitosa lo libera.
-
-La limpieza se confirmó en ejecuciones exitosas y en una interrupción
-manual con Ctrl+C durante las pruebas. Los fallos de arranque y las
-interrupciones en otras etapas todavía no se verificaron.
+En el guardado incierto, el backend guarda el stock antes de perderse
+la respuesta al navegador. Una recarga fallida conserva el bloqueo;
+una recarga exitosa lo libera y permite consultar el valor persistido.
 
 ## Límites y pendientes
 
-- Los casos API 401/403 cubren GET /api/admin/productos; no todas las rutas.
-- Los valores de stock inválidos se prueban en el formulario, no mediante
-  envíos inválidos directos a la API en esta suite.
-- El guardado incierto se cubre para stock, no para todas las mutaciones.
-- Revisar escenarios adicionales de validación y errores administrativos.
-- Verificar limpieza ante fallos de arranque.
-- Registrar el commit definitivo de las pruebas.
-- Repetir tras integrar #212 y #217, registrando el nuevo SHA.
+- Pendiente nueva revisión de Santi.
+- Repetir la validación tras integrar #212 y #217.
 - Coordinar la ejecución automatizada con #216.
-- Las expectativas pendientes de precios dependen de #208.
+- Los 401/403 directos cubren GET /api/admin/productos, no todas las rutas.
+- El guardado incierto se cubre para stock, no para todas las mutaciones.
+- La prueba de limpieza cubre la confirmación perdida tras crear el
+  contenedor; no demuestra todos los fallos posibles de Docker, API
+  o frontend ni todas las etapas de interrupción.
+- No se evaluaron otros navegadores ni vistas móviles.
+- Las expectativas de precios pendientes dependen de #208.
   No se define esa política ni se modifican #207/#208/#211.
-- No se evaluaron otros navegadores ni vistas móviles en esta ejecución.
 
 ## Observación de accesibilidad
 
 Los campos del modal de productos, salvo el checkbox de activo,
 no tienen sus etiquetas asociadas mediante for/id.
 Las pruebas los localizan por la etiqueta y el campo siguiente.
-Coordinar esta observación con #215.
-
-## Revalidación con develop — 27/10/2026
-
-Se integró develop en 8080f210be80162048fb73420bc825369c9bc855,
-incluyendo #215 (Tailwind) y #222 (DTO y validaciones), sobre la suite
-c7fc041aabbbebac75a22d30ef7eb859e48a0acb.
-
-El conflicto de frontend/package.json se resolvió conservando
-la configuración compartida y la dependencia de Playwright.
-
-Validación sobre el contenido integrado, antes del commit de merge:
-- Build de backend y frontend, incluido TypeScript: aprobados.
-- Frontend: 55 pruebas aprobadas.
-- Unitarias backend: 502 aprobadas.
-- Integración backend: 55 aprobadas (47 + 8); esquema sin cambios.
-- E2E sin ventana: 22 aprobadas en 35,2 segundos.
-- Bloque de pruebas finalizado con código 0.
-- El ejecutor E2E confirmó la eliminación del contenedor y la base.
-
-Registros de pruebas en evidence/post-merge/.
-Los registros anteriores se conservan como evidencia de la versión inicial.
-Continúan pendientes la coordinación con #216, la revalidación tras
-#212/#217 y los límites de cobertura documentados.
+Coordinar esta observación con el responsable de accesibilidad.
