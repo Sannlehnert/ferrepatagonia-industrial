@@ -1,9 +1,9 @@
 import { Request, Response } from 'express';
-import { loginUsuario, restoreUsuario } from '../services/auth.services';
+import { loginUsuario } from '../services/auth.services';
 
 export const me = async (req: Request, res: Response) => {
     try {
-        const user = req.auth ? await restoreUsuario(req.auth) : null;
+        const user = req.authUser;
         if (!user) {
             return res.status(401).json({ message: 'No autenticado.' });
         }

@@ -7,10 +7,11 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:unit": "node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs",
+    "test:unit": "node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs",
     "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs",
     "test": "npm run build && npm run test:unit && npm run test:dto-source && npm run test:integration",
-    "test:dto-source": "node --import tsx --test test/dto-source.test.cjs"
+    "test:dto-source": "node --import tsx --test test/dto-source.test.cjs",
+    "type-check": "tsc --noEmit"
   },
   "engines": {
     "node": ">=22"
@@ -26,6 +27,8 @@
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.4.0",
     "mysql2": "3.24.6",
+    "passport": "0.7.0",
+    "passport-jwt": "4.0.1",
     "reflect-metadata": "0.2.2",
     "typeorm": "0.3.31"
   },
@@ -35,6 +38,8 @@
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.0.0",
+    "@types/passport": "1.0.17",
+    "@types/passport-jwt": "4.0.1",
     "tsx": "^4.20.0",
     "typescript": "~5.9.2"
   }
