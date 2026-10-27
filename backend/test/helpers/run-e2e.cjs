@@ -17,7 +17,7 @@ const password = randomUUID();
 const services = [];
 let connection;
 let testProcess;
-let containerCreated = false;
+let containerCreationAttempted = false;
 let interrupted = false;
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -118,6 +118,8 @@ async function main() {
     'Primero compilá el backend.',
   );
 
+  containerCreationAttempted = true;
+
   docker(
     'run', '--rm', '-d',
     '--name', container,
@@ -126,7 +128,6 @@ async function main() {
     '-e', `MARIADB_DATABASE=${database}`,
     'mariadb:11.4',
   );
-  containerCreated = true;
 
   const info = JSON.parse(docker('inspect', container))[0];
   const dbPort = Number(
@@ -247,16 +248,25 @@ async function cleanup() {
     }
   }
 
-  if (containerCreated) {
+  if (containerCreationAttempted) {
     try {
-      docker('rm', '-f', container);
-      const remaining = docker(
+      const findContainer = () => docker(
         'ps', '-a',
         '--filter', `name=^/${container}$`,
         '--format', '{{.Names}}',
       );
-      assert.equal(remaining, '');
-      console.log('Contenedor y base E2E eliminados.');
+
+      const existing = findContainer();
+
+      if (existing !== '') {
+        assert.equal(existing, container);
+        docker('rm', '-f', container);
+      }
+
+      assert.equal(findContainer(), '');
+      console.log(
+        'Limpieza E2E confirmada: no queda el contenedor de esta ejecución.',
+      );
     } catch {
       console.error(`No se pudo confirmar la limpieza de ${container}`);
       failed = true;

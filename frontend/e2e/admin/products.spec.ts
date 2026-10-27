@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { test, expect } from '@playwright/test';
 
-test('crea y edita un producto, y conserva sus datos al recargar', async ({
+test('crea y edita un producto con persistencia y reflejo público', async ({
   page,
+  browser,
 }) => {
   const code = `E2E-ALTA-${randomUUID().slice(0, 8)}`;
   const initialName = `Producto de alta ${code}`;
@@ -30,7 +31,28 @@ test('crea y edita un producto, y conserva sus datos al recargar', async ({
     form.locator('label').filter({ hasText: label })
       .locator('xpath=following-sibling::input[1]');
 
+  // Visitante independiente, sin la sesión del administrador.
+  const visitorContext = await browser.newContext();
+  const visitor = await visitorContext.newPage();
+  const origin = new URL(page.url()).origin;
+  const publicNames = visitor.getByRole('heading', { level: 3 });
+
+  const checkPublicProduct = async (expectedName: string) => {
+    await visitor.goto(
+      `${origin}/catalogo?busqueda=${encodeURIComponent(code)}`,
+    );
+
+    await expect(publicNames).toHaveText([expectedName]);
+    await expect(visitor.getByText(`COD. ${code}`, {
+      exact: true,
+    })).toBeVisible();
+
+    await visitor.reload();
+    await expect(publicNames).toHaveText([expectedName]);
+  };
+
   try {
+    // Crear el producto desde administración.
     await page.getByRole('button', {
       name: '+ Nuevo Producto',
       exact: true,
@@ -71,6 +93,10 @@ test('crea y edita un producto, y conserva sus datos al recargar', async ({
     );
     await expect(form).toHaveCount(0);
 
+    // Comprobar que el visitante ve el producto recién creado.
+    await checkPublicProduct(initialName);
+
+    // Comprobar persistencia en administración.
     await page.reload();
 
     await page.getByRole('button', {
@@ -84,6 +110,7 @@ test('crea y edita un producto, y conserva sus datos al recargar', async ({
     await expect(field('Stock')).toHaveValue('8');
     await expect(form.getByRole('combobox')).toHaveValue('1');
 
+    // Editar el nombre desde administración.
     await field('Nombre del Producto').fill(editedName);
 
     const update = page.waitForResponse((response) =>
@@ -103,6 +130,10 @@ test('crea y edita un producto, y conserva sus datos al recargar', async ({
     );
     await expect(form).toHaveCount(0);
 
+    // Comprobar que el visitante ve el nombre actualizado.
+    await checkPublicProduct(editedName);
+
+    // Comprobar persistencia de la edición en administración.
     await page.reload();
 
     await page.getByRole('button', {
@@ -116,12 +147,16 @@ test('crea y edita un producto, y conserva sus datos al recargar', async ({
     await expect(field('Stock')).toHaveValue('8');
     await expect(form.getByRole('combobox')).toHaveValue('1');
   } finally {
-    // Evitar que el producto nuevo altere las pruebas del catálogo público.
-    if (createdId && Number.isInteger(createdId)) {
-      const cleanup = await page.request.patch(
-        `/api/admin/productos/${createdId}/desactivar`,
-      );
-      expect(cleanup.ok()).toBe(true);
+    try {
+      // Evitar que el producto altere las otras pruebas del catálogo.
+      if (createdId && Number.isInteger(createdId)) {
+        const cleanup = await page.request.patch(
+          `/api/admin/productos/${createdId}/desactivar`,
+        );
+        expect(cleanup.ok()).toBe(true);
+      }
+    } finally {
+      await visitorContext.close();
     }
   }
 });
