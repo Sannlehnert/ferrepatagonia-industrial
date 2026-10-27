@@ -226,7 +226,7 @@ const requestClose = () => {
                     @click="requestClose"
                     :disabled="isSubmitting || isReloading"
                     aria-label="Cerrar formulario"
-                    class="min-h-11 min-w-11 flex items-center justify-center text-[#64748B] hover:text-[#0B2438] text-2xl"
+                    class="box-border min-h-11 min-w-11 flex items-center justify-center border-0 bg-transparent text-[#64748B] hover:text-[#0B2438] text-2xl"
                 >
                     ×
                 </button>
@@ -237,7 +237,7 @@ const requestClose = () => {
                 <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
                     <div v-if="uncertain || mutationBlocked" role="alert" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         <p>{{ uncertainMutationMessage }}</p>
-                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="min-h-11 underline">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
+                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 border-0 bg-transparent underline">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
                     </div>
                     <div
                         v-if="backendError && !uncertain"
@@ -245,7 +245,7 @@ const requestClose = () => {
                         class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-center justify-between"
                     >
                         <span>{{ backendError }}</span>
-                        <button type="button" @click="backendError = ''" class="font-bold ml-4">✕</button>
+                        <button type="button" @click="backendError = ''" class="border-0 bg-transparent font-bold ml-4">✕</button>
                     </div>
 
                     <div>
@@ -254,7 +254,7 @@ const requestClose = () => {
                             v-model="form.nombre"
                             type="text"
                             :disabled="formDisabled"
-                            class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                            class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                             :class="fieldErrors.nombre ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                         >
                         <p v-if="fieldErrors.nombre" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.nombre }}</p>
@@ -267,7 +267,7 @@ const requestClose = () => {
                                 v-model="form.codigo"
                                 type="text"
                                 :disabled="formDisabled"
-                                class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
+                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
                                 :class="fieldErrors.codigo ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                             <p v-if="fieldErrors.codigo" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.codigo }}</p>
@@ -288,7 +288,7 @@ const requestClose = () => {
                                 v-if="!isLoadingCategories"
                                 v-model.number="form.id_categoria"
                                 :disabled="formDisabled || availableCategories.length === 0"
-                                class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.id_categoria ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                                 <option value="" disabled>Seleccioná una categoría</option>
@@ -309,7 +309,7 @@ const requestClose = () => {
                                 min="0"
                                 step="0.01"
                                 :disabled="formDisabled"
-                                class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.precio ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                             <p v-if="fieldErrors.precio" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.precio }}</p>
@@ -323,7 +323,7 @@ const requestClose = () => {
                                 min="0"
                                 step="1"
                                 :disabled="formDisabled"
-                                class="w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.stock ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                             <p v-if="fieldErrors.stock" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.stock }}</p>
@@ -337,7 +337,7 @@ const requestClose = () => {
                             type="text"
                             placeholder="https://..."
                             :disabled="formDisabled"
-                            class="w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                            class="box-border min-h-11 w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438]"
                         >
                     </div>
 
@@ -347,7 +347,7 @@ const requestClose = () => {
                             v-model="form.descripcion"
                             rows="3"
                             :disabled="formDisabled"
-                            class="w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438] resize-none"
+                            class="box-border min-h-11 w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438] resize-none"
                         ></textarea>
                     </div>
 
@@ -371,14 +371,14 @@ const requestClose = () => {
                         type="button"
                         @click="requestClose"
                         :disabled="isSubmitting || isReloading"
-                        class="min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto"
+                        class="box-border min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         :disabled="formDisabled"
-                        class="min-h-11 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
+                        class="box-border min-h-11 border-0 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
                     >
                         {{ isSubmitting ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Crear Producto') }}
                     </button>

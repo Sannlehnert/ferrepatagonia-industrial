@@ -69,24 +69,26 @@ function clearFilters() {
 
 <template>
     <form
-        class="catalog-filters"
+        class="flex flex-wrap items-end gap-4"
         aria-label="Buscar y filtrar productos"
         @submit.prevent="applyFilters"
     >
-        <label class="catalog-filters__field">
-            <span>Nombre o código</span>
+        <label class="flex min-w-0 flex-[1_1_220px] flex-col gap-1.5">
+            <span class="text-sm font-medium">Nombre o código</span>
             <input
                 v-model="search"
                 type="search"
                 placeholder="Buscá un producto"
+                class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#145a8d]"
                 :aria-invalid="validationError ? 'true' : undefined"
             />
         </label>
 
-        <label class="catalog-filters__field">
-            <span>Categoría</span>
+        <label class="flex min-w-0 flex-[1_1_220px] flex-col gap-1.5">
+            <span class="text-sm font-medium">Categoría</span>
             <select
                 v-model="categoryId"
+                class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:bg-slate-100"
                 :disabled="categoriesLoading || Boolean(categoriesError)"
             >
                 <option :value="null">Todas las categorías</option>
@@ -113,20 +115,20 @@ function clearFilters() {
             </select>
         </label>
 
-        <div class="catalog-filters__actions">
-            <button type="submit">Buscar</button>
-            <button type="button" @click="clearFilters">
+        <div class="flex flex-wrap gap-2">
+            <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="submit">Buscar</button>
+            <button class="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-[#103a5c] hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="button" @click="clearFilters">
                 Limpiar filtros
             </button>
         </div>
 
-        <p v-if="validationError" class="catalog-filters__message" role="alert">
+        <p v-if="validationError" class="m-0 basis-full text-sm text-red-800" role="alert">
             {{ validationError }}
         </p>
 
         <p
             v-if="categoriesLoading"
-            class="catalog-filters__message"
+            class="m-0 basis-full text-sm text-slate-600"
             role="status"
         >
             Cargando categorías…
@@ -134,66 +136,20 @@ function clearFilters() {
 
         <div
             v-else-if="categoriesError"
-            class="catalog-filters__message"
+            class="basis-full text-sm text-slate-700"
         >
-            <p role="alert">{{ categoriesError }}</p>
-            <button type="button" @click="emit('retryCategories')">
+            <p class="m-0 mb-2" role="alert">{{ categoriesError }}</p>
+            <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-3 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="button" @click="emit('retryCategories')">
                 Reintentar categorías
             </button>
         </div>
 
         <p
             v-else-if="categories.length === 0"
-            class="catalog-filters__message"
+            class="m-0 basis-full text-sm text-slate-600"
             role="status"
         >
             No hay categorías disponibles. Podés buscar por nombre o código.
         </p>
     </form>
 </template>
-
-<style scoped>
-.catalog-filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 1rem;
-}
-
-.catalog-filters__field {
-    display: flex;
-    flex: 1 1 220px;
-    flex-direction: column;
-    gap: 0.375rem;
-    min-width: 0;
-}
-
-.catalog-filters input,
-.catalog-filters select,
-.catalog-filters button {
-    box-sizing: border-box;
-    min-height: 44px;
-    padding: 0.5rem 0.75rem;
-    font: inherit;
-}
-
-.catalog-filters input,
-.catalog-filters select {
-    width: 100%;
-}
-
-.catalog-filters__actions {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.5rem;
-}
-
-.catalog-filters__message {
-    flex-basis: 100%;
-    margin: 0;
-}
-
-.catalog-filters__message p {
-    margin: 0 0 0.5rem;
-}
-</style>

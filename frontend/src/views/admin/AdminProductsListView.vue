@@ -161,7 +161,7 @@ onMounted(() => {
                 type="text"
                 placeholder="Buscar por Nombre o SKU..."
                 aria-label="Buscar productos por nombre o SKU"
-                class="w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
+                class="box-border min-h-11 w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
             >
         </div>
 
@@ -195,7 +195,7 @@ onMounted(() => {
                 <button
                     v-if="isSessionExpired"
                     type="button"
-                    class="min-h-11 bg-[#103A5C] text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D]"
+                    class="box-border min-h-11 border-0 bg-[#103A5C] text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D]"
                     @click="router.push('/login')"
                 >
                     Iniciar sesión
@@ -203,7 +203,7 @@ onMounted(() => {
                 <button
                     v-else
                     type="button"
-                    class="min-h-11 bg-white border border-red-300 text-red-700 text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100"
+                    class="box-border min-h-11 bg-white border border-red-300 text-red-700 text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100"
                     @click="fetchProductos"
                 >
                     Reintentar
@@ -294,7 +294,7 @@ onMounted(() => {
                 type="button"
                 @click="openCreateModal"
                 :disabled="actionsDisabled"
-                class="min-h-11 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md disabled:opacity-50 w-full sm:w-auto"
+                class="box-border min-h-11 border-0 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md disabled:opacity-50 w-full sm:w-auto"
             >
                 + Nuevo Producto
             </button>

@@ -13,5 +13,6 @@ const props = defineProps<{
         :items="adminMenu"
         :permissions="props.permissions"
         label="Menú de administración"
+        variant="admin"
     />
 </template>

@@ -20,87 +20,21 @@ const permissions = computed(() =>
 
 <template>
     <!-- Inicio temporal: reemplazar cuando se integre la Home definitiva. -->
-    <main class="home" aria-labelledby="home-title">
-        <section class="home__card">
-            <p class="home__brand">FERREPATAGONIA INDUSTRIAL</p>
-            <h1 id="home-title">Bienvenido a Ferrepatagonia</h1>
+    <main
+        class="grid min-h-[80vh] place-items-center bg-[#f4f7fa] p-6 font-[Arial,sans-serif] text-[#0b2438]"
+        aria-labelledby="home-title"
+    >
+        <section class="box-border w-full max-w-[640px] rounded-lg border border-slate-200 bg-white p-8">
+            <p class="m-0 mb-4 text-sm font-bold tracking-[0.08em] text-[#145a8d]">FERREPATAGONIA INDUSTRIAL</p>
+            <h1 id="home-title" class="mt-0 mb-4 text-[clamp(24px,4vw,32px)] leading-[1.2]">Bienvenido a Ferrepatagonia</h1>
 
-            <div class="home__actions">
+            <div class="mb-5">
                 <PublicMenu :permissions="permissions" />
             </div>
 
-            <p class="home__message">
+            <p class="m-0 leading-[1.6] text-slate-600">
                 Estamos preparando nuestro sitio. Ya podés explorar nuestro catálogo.
             </p>
         </section>
     </main>
 </template>
-
-<style scoped>
-.home {
-    min-height: 80vh;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-    background: #f4f7fa;
-    color: #0b2438;
-    font-family: Arial, sans-serif;
-}
-
-.home__card {
-    box-sizing: border-box;
-    width: 100%;
-    max-width: 640px;
-    padding: 32px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #fff;
-}
-
-.home__brand {
-    margin: 0 0 16px;
-    color: #145a8d;
-    font-size: 14px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-}
-
-h1 {
-    margin: 0 0 16px;
-    font-size: clamp(24px, 4vw, 32px);
-    line-height: 1.2;
-}
-
-.home__message {
-    margin: 0;
-    color: #475569;
-    line-height: 1.6;
-}
-
-.home__actions {
-    margin-bottom: 20px;
-}
-
-.home__actions :deep(.navigation-menu__link) {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    box-sizing: border-box;
-    min-height: 44px;
-    padding: 12px 24px;
-    border-radius: 6px;
-    background: #145a8d;
-    color: #fff;
-    font-weight: 600;
-    text-decoration: none;
-}
-
-.home__actions :deep(.navigation-menu__link:hover) {
-    background: #0b426b;
-}
-
-.home__actions :deep(.navigation-menu__link:focus-visible) {
-    outline: 3px solid #145a8d;
-    outline-offset: 3px;
-}
-</style>

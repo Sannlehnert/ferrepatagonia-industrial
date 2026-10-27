@@ -17,76 +17,20 @@ const metrics: readonly DashboardMetric[] = [
 
 <template>
     <section aria-labelledby="admin-dashboard-title">
-        <header class="dashboard__header">
-            <h1 id="admin-dashboard-title">Dashboard</h1>
-            <p>Vista de estructura con datos de ejemplo. No representa actividad real.</p>
+        <header class="mb-6">
+            <h1 id="admin-dashboard-title" class="m-0 mb-3 text-[28px] font-semibold">Dashboard</h1>
+            <p class="m-0 leading-6 text-slate-600">Vista de estructura con datos de ejemplo. No representa actividad real.</p>
         </header>
 
-        <dl class="dashboard__metrics">
+        <dl class="m-0 grid max-w-[900px] grid-cols-1 gap-6 min-[501px]:grid-cols-2 min-[1001px]:grid-cols-3">
             <div
                 v-for="metric in metrics"
                 :key="metric.id"
-                class="dashboard__metric"
+                class="rounded-lg border border-slate-200 bg-slate-50 p-6"
             >
-            <dt>{{ metric.label }}</dt>
-            <dd>{{ metric.value }}</dd>
+            <dt class="text-sm leading-6">{{ metric.label }}</dt>
+            <dd class="m-0 mt-3 text-[28px] font-bold text-[#145a8d]">{{ metric.value }}</dd>
             </div>
         </dl>
     </section>
 </template>
-
-<style scoped>
-.dashboard__header {
-    margin-bottom: 24px;
-}
-
-h1 {
-    margin: 0 0 12px;
-    font-size: 28px;
-}
-
-.dashboard__header p {
-    margin: 0;
-    color: #475569;
-    line-height: 1.5;
-}
-
-.dashboard__metrics {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 24px;
-    max-width: 900px;
-    margin: 0;
-}
-
-.dashboard__metric {
-    padding: 24px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #f8fafc;
-}
-
-dt {
-    font-size: 14px;
-    line-height: 1.5;
-}
-
-dd {
-    margin: 12px 0 0;
-    color: #145a8d;
-    font-size: 28px;
-    font-weight: 700;
-}
-
-@media (max-width: 1000px) {
-    .dashboard__metrics {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-}
-
-@media (max-width: 500px) {
-    .dashboard__metrics {
-        grid-template-columns: 1fr;
-    }
-}
-</style>

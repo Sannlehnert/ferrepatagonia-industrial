@@ -55,80 +55,70 @@ async function enviar() {
 </script>
 
 <template>
-  <section class="registro">
-    <h2>Crear cuenta</h2>
+  <section class="mx-auto my-8 max-w-[420px] px-4">
+    <h2 class="m-0 mb-5 text-2xl font-semibold text-[#0b2438]">Crear cuenta</h2>
 
-    <form novalidate @submit.prevent="enviar">
-      <fieldset class="tipo">
-        <label><input type="radio" value="PARTICULAR" v-model="form.tipoCliente" /> Particular</label>
-        <label><input type="radio" value="EMPRESA" v-model="form.tipoCliente" /> Empresa</label>
+    <form class="flex flex-col gap-4" novalidate @submit.prevent="enviar">
+      <fieldset class="flex gap-6 border-0 p-0">
+        <label class="flex items-center gap-2 text-sm"><input type="radio" value="PARTICULAR" v-model="form.tipoCliente" /> Particular</label>
+        <label class="flex items-center gap-2 text-sm"><input type="radio" value="EMPRESA" v-model="form.tipoCliente" /> Empresa</label>
       </fieldset>
 
       <template v-if="form.tipoCliente === 'PARTICULAR'">
-        <label>Nombre
-          <input v-model="form.nombre" @blur="tocados.nombre = true" autocomplete="given-name" />
-          <small v-if="verError('nombre')" class="error">{{ verError('nombre') }}</small>
+        <label class="flex flex-col gap-1 text-sm">Nombre
+          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.nombre" @blur="tocados.nombre = true" autocomplete="given-name" />
+          <small v-if="verError('nombre')" class="text-sm text-[#842029]">{{ verError('nombre') }}</small>
         </label>
-        <label>Apellido
-          <input v-model="form.apellido" @blur="tocados.apellido = true" autocomplete="family-name" />
-          <small v-if="verError('apellido')" class="error">{{ verError('apellido') }}</small>
+        <label class="flex flex-col gap-1 text-sm">Apellido
+          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.apellido" @blur="tocados.apellido = true" autocomplete="family-name" />
+          <small v-if="verError('apellido')" class="text-sm text-[#842029]">{{ verError('apellido') }}</small>
         </label>
       </template>
 
       <template v-else>
-        <label>Razón social
-          <input v-model="form.razonSocial" @blur="tocados.razonSocial = true" autocomplete="organization" />
-          <small v-if="verError('razonSocial')" class="error">{{ verError('razonSocial') }}</small>
+        <label class="flex flex-col gap-1 text-sm">Razón social
+          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.razonSocial" @blur="tocados.razonSocial = true" autocomplete="organization" />
+          <small v-if="verError('razonSocial')" class="text-sm text-[#842029]">{{ verError('razonSocial') }}</small>
         </label>
-        <label>CUIT
-          <input v-model="form.cuit" @blur="tocados.cuit = true" inputmode="numeric" placeholder="30-12345678-9" />
-          <small v-if="verError('cuit')" class="error">{{ verError('cuit') }}</small>
+        <label class="flex flex-col gap-1 text-sm">CUIT
+          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.cuit" @blur="tocados.cuit = true" inputmode="numeric" placeholder="30-12345678-9" />
+          <small v-if="verError('cuit')" class="text-sm text-[#842029]">{{ verError('cuit') }}</small>
         </label>
-        <p class="aviso">
+        <p class="m-0 text-sm text-slate-600">
           Registrarte como empresa no habilita cuenta corriente ni descuentos:
           tu cuenta queda pendiente de aprobación.
         </p>
       </template>
 
-      <label>Email
-        <input v-model="form.email" type="email" @blur="tocados.email = true" @input="errorEmail = null" autocomplete="email" />
-        <small v-if="verError('email') || errorEmail" class="error">{{ verError('email') ?? errorEmail }}</small>
+      <label class="flex flex-col gap-1 text-sm">Email
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.email" type="email" @blur="tocados.email = true" @input="errorEmail = null" autocomplete="email" />
+        <small v-if="verError('email') || errorEmail" class="text-sm text-[#842029]">{{ verError('email') ?? errorEmail }}</small>
       </label>
 
-      <label>Teléfono
-        <input v-model="form.telefono" type="tel" @blur="tocados.telefono = true" autocomplete="tel" />
-        <small v-if="verError('telefono')" class="error">{{ verError('telefono') }}</small>
+      <label class="flex flex-col gap-1 text-sm">Teléfono
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.telefono" type="tel" @blur="tocados.telefono = true" autocomplete="tel" />
+        <small v-if="verError('telefono')" class="text-sm text-[#842029]">{{ verError('telefono') }}</small>
       </label>
 
-      <label>Dirección (opcional)
-        <input v-model="form.direccion" @blur="tocados.direccion = true" autocomplete="street-address" />
-        <small v-if="verError('direccion')" class="error">{{ verError('direccion') }}</small>
+      <label class="flex flex-col gap-1 text-sm">Dirección (opcional)
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.direccion" @blur="tocados.direccion = true" autocomplete="street-address" />
+        <small v-if="verError('direccion')" class="text-sm text-[#842029]">{{ verError('direccion') }}</small>
       </label>
 
-      <label>Contraseña
-        <input v-model="form.password" type="password" @blur="tocados.password = true" autocomplete="new-password" />
-        <small v-if="verError('password')" class="error">{{ verError('password') }}</small>
+      <label class="flex flex-col gap-1 text-sm">Contraseña
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.password" type="password" @blur="tocados.password = true" autocomplete="new-password" />
+        <small v-if="verError('password')" class="text-sm text-[#842029]">{{ verError('password') }}</small>
       </label>
 
-      <label>Repetir contraseña
-        <input v-model="form.confirmar" type="password" @blur="tocados.confirmar = true" autocomplete="new-password" />
-        <small v-if="verError('confirmar')" class="error">{{ verError('confirmar') }}</small>
+      <label class="flex flex-col gap-1 text-sm">Repetir contraseña
+        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.confirmar" type="password" @blur="tocados.confirmar = true" autocomplete="new-password" />
+        <small v-if="verError('confirmar')" class="text-sm text-[#842029]">{{ verError('confirmar') }}</small>
       </label>
 
-      <p v-if="errorGeneral" class="error" role="alert">{{ errorGeneral }}</p>
+      <p v-if="errorGeneral" class="m-0 text-sm text-[#842029]" role="alert">{{ errorGeneral }}</p>
 
-      <button :disabled="enviando">{{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}</button>
-      <p>¿Ya tenés cuenta? <RouterLink :to="{ name: 'login' }">Iniciá sesión</RouterLink></p>
+      <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 font-semibold text-white hover:bg-[#103a5c] disabled:cursor-wait disabled:opacity-60" :disabled="enviando">{{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}</button>
+      <p class="m-0 text-sm">¿Ya tenés cuenta? <RouterLink class="text-[#145a8d] underline" :to="{ name: 'login' }">Iniciá sesión</RouterLink></p>
     </form>
   </section>
 </template>
-
-<style scoped>
-.registro { max-width: 420px; margin: 2rem auto; padding: 0 1rem; }
-form { display: flex; flex-direction: column; gap: 1rem; }
-label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; }
-.tipo { display: flex; gap: 1.5rem; border: 0; padding: 0; }
-.tipo label { flex-direction: row; align-items: center; gap: .4rem; }
-.error { color: #842029; }
-.aviso { font-size: .85rem; color: #666; margin: 0; }
-</style>
