@@ -44,7 +44,7 @@ async function main() {
       return require('node:crypto').createHash('sha256').update(definitions.sort().join('\n')).digest('hex');
     };
     const schemaBefore = await fingerprint();
-    const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'test/adminProduct.test.cjs', 'test/catalog.integration.test.cjs', 'test/register.integration.test.cjs', 'test/auth.me.integration.test.cjs', 'test/clientes.integration.test.cjs', 'test/orm.integration.test.cjs', 'test/database-policy.integration.test.cjs'], {
+    const result = spawnSync(process.execPath, ['--test', '--test-concurrency=1', 'test/adminProduct.test.cjs', 'test/catalog.integration.test.cjs', 'test/register.integration.test.cjs', 'test/auth.me.integration.test.cjs', 'test/clientes.integration.test.cjs', 'test/orm.integration.test.cjs', 'test/database-policy.integration.test.cjs', 'test/auth.security.integration.test.cjs'], {
       cwd: backend, stdio: 'inherit', env: { ...process.env,
         DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
         JWT_SECRET: randomUUID(), DB_HOST: '127.0.0.1', DB_PORT: String(port),

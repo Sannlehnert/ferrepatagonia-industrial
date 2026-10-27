@@ -10,8 +10,9 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
   assert.equal(env.db.database, process.env.CLIENTES_TEST_DATABASE, 'Confirmar la base de pruebas');
   const { pool } = require('../dist/config/catalog-snapshot.config');
   const { app } = require('../dist/app');
-  const { signToken } = require('../dist/services/token.service');
-  const adminCookie = `jwt_token=${encodeURIComponent(signToken({ id: 7, rol: 'ADMIN' }))}`;
+  const { createAuthUser } = require('./helpers/auth-user.cjs');
+  const admin = await createAuthUser(pool);
+  const adminCookie = admin.cookie;
   const server = app.listen(0, '127.0.0.1');
   try {
     await once(server, 'listening');
@@ -91,6 +92,6 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
     });
   } finally {
     await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
-    await pool.end();
+    try { await admin.destroy(); } finally { await pool.end(); }
   }
 });
