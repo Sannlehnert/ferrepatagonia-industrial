@@ -6,8 +6,12 @@ import { adminRouter } from './routes/admin.routes';
 import { authPassport } from './config/passport.config';
 import { catalogRouter } from './routes/catalog.routes';
 import { categoryRouter } from './routes/category.routes';
+import { env } from './config/env.config';
+import { httpSecurity } from './middlewares/http-security.middleware';
 
 export const app = express();
+app.set('trust proxy', env.httpSecurity.trustedProxies);
+app.use('/api', httpSecurity(env.httpSecurity));
 
 app.use(cookieParser());
 app.use(authPassport.initialize());

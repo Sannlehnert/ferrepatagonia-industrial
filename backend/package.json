@@ -7,7 +7,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs",
+    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs",
     "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs",
     "test": "npm run build && npm run test:unit && npm run test:dto-source && npm run test:integration",
     "test:dto-source": "node --require ./test/helpers/test-env.cjs --import tsx --test test/dto-source.test.cjs test/auth.passport-source.test.cjs",
