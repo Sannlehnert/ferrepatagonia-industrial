@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const assert = require('node:assert/strict');
 const { before, beforeEach, after, test, mock } = require('node:test');
 const { once } = require('node:events');

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { loginUsuario } from '../services/auth.services';
+import { authCookieName, issueAuthCookieOptions, clearAuthCookieOptions } from '../config/auth-cookie.config';
 
 export const me = async (req: Request, res: Response) => {
     try {
@@ -26,12 +27,7 @@ export const login = async (req: Request, res: Response) => {
         }
 
         // Inyectamos la cookie HttpOnly
-        res.cookie('jwt_token', result.token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict',
-            maxAge: 2 * 60 * 60 * 1000 // 2 horas
-        });
+        res.cookie(authCookieName, result.token, issueAuthCookieOptions);
 
         // Devolvemos la respuesta exitosa para Pinia
         return res.status(200).json({
@@ -48,11 +44,7 @@ export const login = async (req: Request, res: Response) => {
 export const logout = (req: Request, res: Response) => {
     try {
         // Destruimos la cookie del JWT
-        res.clearCookie('jwt_token', {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'strict'
-        });
+        res.clearCookie(authCookieName, clearAuthCookieOptions);
 
         // Devolvemos la estructura de respuesta estandarizada
         return res.status(200).json({ 

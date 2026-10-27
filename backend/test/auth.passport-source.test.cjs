@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 // Exercise the real source app with tsx; replace only the TypeORM driver boundary.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

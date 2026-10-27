@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const req = p => require('../' + p);
 
 req('test/helpers/integration-lifecycle.cjs');

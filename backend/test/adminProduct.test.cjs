@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 require('./helpers/integration-lifecycle.cjs');
 require('dotenv/config'); // Carga el .env automáticamente
 const { describe, it, before, after } = require('node:test');

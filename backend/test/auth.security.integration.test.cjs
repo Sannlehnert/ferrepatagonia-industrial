@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 require('./helpers/integration-lifecycle.cjs');
 const assert = require('node:assert/strict');
 const { test, before, after } = require('node:test');
@@ -11,6 +12,8 @@ const users = require('../dist/repositories/usuario.repository');
 const { signToken } = require('../dist/services/token.service');
 const { sessionJwtStrategy } = require('../dist/config/passport.config');
 const { createAuthUser } = require('./helpers/auth-user.cjs');
+const { startHttpApp } = require('./helpers/start-http-app.cjs');
+const { productionHttpEnv } = require('./helpers/production-http-env.cjs');
 let server, base, admin, client, categoryId, productId, routes;
 before(async () => {
   admin = await createAuthUser(pool);
@@ -117,11 +120,21 @@ test('real identity pool saturation produces controlled 500 and recovers', async
   assert.equal((await send(routes[0], admin.cookie)).status, 200);
 });
 test('real login/me/logout preserve cookie flags, TTL, public JSON and no refresh', async t => {
-  const savedMode = process.env.NODE_ENV;
-  try {
-    for (const mode of ['development', 'production']) await t.test(mode, async () => {
-      process.env.NODE_ENV = mode;
-      const login = await send({ method: 'POST', path: '/api/auth/login', body: { email: admin.email, password: admin.password } });
+  for (const mode of ['development', 'production']) await t.test(mode, async () => {
+    // Fresh process: cookie mode is validated once at startup, never changed via
+    // process.env after the server is initialized. Real accounts/DB in both modes.
+    const options = mode === 'production' ? productionHttpEnv() : { NODE_ENV: mode };
+    const worker = await startHttpApp({ ...options, HTTP_TEST_DATABASE: '1', JWT_SECRET: randomBytes(32).toString('hex') });
+    const call = async (route, cookie) => {
+      const r = await fetch(worker.base + route.path, { method: route.method, headers: {
+        Origin: options.APP_PUBLIC_ORIGIN ?? process.env.APP_PUBLIC_ORIGIN,
+        ...(mode === 'production' ? { 'X-Forwarded-Proto': 'https' } : {}),
+        ...(cookie ? { Cookie: cookie } : {}), ...(route.body ? { 'Content-Type': 'application/json' } : {}),
+      }, ...(route.body ? { body: JSON.stringify(route.body) } : {}) });
+      return { status: r.status, body: await r.json(), headers: r.headers };
+    };
+    try {
+      const login = await call({ method: 'POST', path: '/api/auth/login', body: { email: admin.email, password: admin.password } });
       assert.equal(login.status, 200);
       assert.deepEqual(login.body, { message: 'Login exitoso', user: { id: admin.id, email: admin.email, rol: 'ADMIN', tipo_cliente: null, nombre: 'Administrador' } });
       const set = login.headers.get('set-cookie');
@@ -130,15 +143,15 @@ test('real login/me/logout preserve cookie flags, TTL, public JSON and no refres
       const cookie = set.split(';')[0];
       const decoded = jwt.decode(cookie.slice(cookie.indexOf('=') + 1));
       assert.equal(decoded.exp - decoded.iat, 7200);
-      const me = await send(routes[0], cookie);
+      const me = await call(routes[0], cookie);
       assert.deepEqual(me.body, { user: login.body.user }); assert.equal(me.headers.get('set-cookie'), null);
-      const logout = await send({ method: 'POST', path: '/api/auth/logout' }, cookie);
+      const logout = await call({ method: 'POST', path: '/api/auth/logout' }, cookie);
       assert.equal(logout.status, 200); assert.deepEqual(logout.body, { message: 'Sesión cerrada correctamente' });
       const clear = logout.headers.get('set-cookie');
       for (const pattern of [/jwt_token=;/, /Expires=Thu, 01 Jan 1970/, /Path=\//, /HttpOnly/, /SameSite=Strict/]) assert.ok(pattern.test(clear), 'Required clear-cookie flag missing');
       assert.equal(/; Secure/i.test(clear), mode === 'production');
-      assert.equal((await send(routes[0])).status, 401); // browser applies cookie deletion
-      assert.equal((await send(routes[0], cookie)).status, 200); // persistent revocation is out of scope
-    });
-  } finally { if (savedMode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = savedMode; }
+      assert.equal((await call(routes[0])).status, 401); // browser applies cookie deletion
+      assert.equal((await call(routes[0], cookie)).status, 200); // persistent revocation is out of scope
+    } finally { await worker.close(); }
+  });
 });
