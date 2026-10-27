@@ -4,3 +4,7 @@ dist/
 .env.*
 !.env.example
 *.log
+
+# Resultados generados por Playwright
+/frontend/playwright-report/
+/frontend/test-results/
