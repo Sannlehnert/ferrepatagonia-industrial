@@ -1,0 +1,39 @@
+✔ authenticate: CLIENTE conserva solamente id y rol (37.5671ms)
+✔ authenticate: ADMIN conserva solamente id y rol (3.4456ms)
+✔ authenticate: sin cookie devuelve 401 con message (1.5184ms)
+✔ authenticate: token manipulado devuelve 401 con message (1.6275ms)
+✔ authenticate: token expirado devuelve 401 con message (1.5752ms)
+✔ authenticate: token sin exp devuelve 401 con message (1.5107ms)
+✔ authenticate: rol EMPRESA devuelve 401 con message (1.5608ms)
+✔ authenticate: sin rol devuelve 401 con message (1.9688ms)
+✔ authenticate: payload string devuelve 401 con message (1.4957ms)
+✔ authenticate: algoritmo distinto devuelve 401 con message (1.4828ms)
+✔ authenticate: firma con otro secreto devuelve 401 con message (1.0936ms)
+✔ authenticate: cookie JSON devuelve 401 con message (0.8033ms)
+✔ authenticate: token malformado devuelve 401 con message (1.1518ms)
+✔ authenticate: id inválido undefined devuelve 401 con message (0.8881ms)
+✔ authenticate: id inválido null devuelve 401 con message (0.8489ms)
+✔ authenticate: id inválido 0 devuelve 401 con message (1.5684ms)
+✔ authenticate: id inválido -1 devuelve 401 con message (0.8531ms)
+✔ authenticate: id inválido 1.5 devuelve 401 con message (0.9288ms)
+✔ authenticate: id inválido 7 devuelve 401 con message (0.8827ms)
+✔ authenticate: id inválido 9007199254740992 devuelve 401 con message (0.806ms)
+✔ authenticate elimina un contexto previo si falla la autenticación (0.1713ms)
+✔ authorizeRoles ADMIN devuelve 200 y ejecuta el handler (1.2953ms)
+✔ authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler (0.9531ms)
+✔ ruta ADMIN: sin sesión devuelve 401 sin ejecutar handler (1.848ms)
+✔ ruta ADMIN: token inválido devuelve 401 sin ejecutar handler (0.8284ms)
+✔ ruta ADMIN: token expirado devuelve 401 sin ejecutar handler (0.8493ms)
+✔ authorizeRoles no lee cookies ni vuelve a verificar JWT (0.4082ms)
+✔ authorizeRoles permite múltiples roles y sin argumentos devuelve 403 (0.14ms)
+✔ authorizeRoles sin req.auth devuelve 401 aunque haya cookie (0.2212ms)
+✔ JWT_SECRET vacío impide cargar la configuración (46.0382ms)
+✔ login emite JWT verificable sin cambiar sus datos públicos (266.1679ms)
+ℹ tests 31
+ℹ suites 0
+ℹ pass 31
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 587.4615
