@@ -1,40 +1,41 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import PublicMenu from '@/components/PublicMenu.vue'
-import { getPermissionsForUser } from '@/config/permissions'
-import { useAuthStore } from '@/stores/auth'
-
-const auth = useAuthStore()
-
-const permissions = computed(() =>
-    getPermissionsForUser(
-        auth.user
-        ? {
-            rol: auth.user.rol,
-            tipoCliente: auth.user.tipo_cliente,
-            }
-        : null,
-    ),
-)
+import { RouterLink } from 'vue-router'
+import HomeHero from '@/components/HomeHero.vue'
+import HomeCategories from '@/components/HomeCategories.vue'
+import HomeRecommended from '@/components/HomeRecommended.vue'
 </script>
 
 <template>
-    <!-- Inicio temporal: reemplazar cuando se integre la Home definitiva. -->
-    <main
-        class="grid min-h-[80vh] place-items-center bg-[#f4f7fa] p-6 font-[Arial,sans-serif] text-[#0b2438]"
-        aria-labelledby="home-title"
+  <main aria-labelledby="home-title">
+    <h1 id="home-title" class="sr-only">
+      Ferrepatagonia Industrial
+    </h1>
+
+    <HomeHero />
+    <HomeCategories />
+    <HomeRecommended />
+
+    <section
+      class="box-border mx-auto w-full max-w-[1440px] px-4 pb-10 text-[#0b2438] sm:px-6 lg:px-10"
+      aria-labelledby="home-catalog-title"
     >
-        <section class="box-border w-full max-w-[640px] rounded-lg border border-slate-200 bg-white p-8">
-            <p class="m-0 mb-4 text-sm font-bold tracking-[0.08em] text-[#145a8d]">FERREPATAGONIA INDUSTRIAL</p>
-            <h1 id="home-title" class="mt-0 mb-4 text-[clamp(24px,4vw,32px)] leading-[1.2]">Bienvenido a Ferrepatagonia</h1>
+      <h2
+        id="home-catalog-title"
+        class="m-0 text-2xl leading-tight font-bold"
+      >
+        Explorá nuestro catálogo
+      </h2>
 
-            <div class="mb-5">
-                <PublicMenu :permissions="permissions" />
-            </div>
+      <p class="mt-4 mb-6 text-base text-slate-600">
+        Encontrá productos y consultá su disponibilidad.
+      </p>
 
-            <p class="m-0 leading-[1.6] text-slate-600">
-                Estamos preparando nuestro sitio. Ya podés explorar nuestro catálogo.
-            </p>
-        </section>
-    </main>
+      <RouterLink
+        :to="{ name: 'catalogo' }"
+        class="box-border inline-flex min-h-11 items-center justify-center rounded-lg bg-[#103a5c] px-6 py-3 font-bold text-white no-underline hover:bg-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2b7bbb]"
+      >
+        Ver catálogo
+      </RouterLink>
+    </section>
+  </main>
 </template>
