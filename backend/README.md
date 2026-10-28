@@ -1,13 +1,57 @@
-# Backend — primera etapa
+# Backend
 
-Backend con Node.js, Express y TypeScript. Comprueba la conexión con MariaDB y
-registra CLIENTE + USUARIO en una transacción (#164), con validación (#163),
-hashing de contraseñas (#165) y rol CLIENTE asignado por el servidor (#166).
+Backend con Node.js, Express, TypeScript y MariaDB. La persistencia activa usa
+TypeORM/mysql2; el snapshot de lectura del catálogo conserva un adaptador MariaDB
+aislado por sus requisitos de consistencia. El esquema SQL sigue siendo la
+autoridad y TypeORM no ejecuta migraciones ni sincroniza el esquema.
 
 ## Requisitos
 
 - Node.js 22 o superior y npm (se probó con Node.js 24).
 - Docker iniciado, con contenedores Linux y Docker Compose.
+
+## Configuración
+
+Crear `backend/.env` a partir de `.env.example` y sustituir cualquier valor de
+ejemplo por la configuración local apropiada. La tabla documenta nombres y
+requisitos; los valores entre `<...>` son placeholders, no credenciales:
+
+| Variable | Requisito |
+| --- | --- |
+| `PORT` | Puerto HTTP; predeterminado local `3000`. |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | Conexión MariaDB. `DB_PORT` usa `3307` local si se omite. La contraseña es privada del entorno. |
+| `JWT_SECRET` | Obligatoria en todos los entornos. En producción, secreto aleatorio privado de al menos 32 bytes; no usar un fallback ni registrarlo. |
+| `NODE_ENV` | `development`, `test` o `production`; obligatorio. |
+| `APP_PUBLIC_ORIGIN` | Origen exacto del navegador, sin ruta ni slash final. En producción debe ser HTTPS. |
+| `TRUSTED_PROXY_CIDRS` | CIDR(s) reales separados por coma; `none` para no confiar proxies. Obligatoria en producción. |
+| `HTTPS_TERMINATION` | En producción debe ser `trusted-proxy`; identifica la terminación HTTPS confiable, no un proveedor específico. |
+| `AUTH_RATE_STORE`, `API_PROCESS_COUNT` | El único store disponible es `memory`; requiere exactamente un proceso. En producción ambos deben configurarse explícitamente. |
+| `AUTH_LOGIN_LIMIT`, `AUTH_LOGIN_WINDOW_MS`, `AUTH_REGISTER_LIMIT`, `AUTH_REGISTER_WINDOW_MS` | Umbrales de rate limit positivos. Los valores locales son operativos, no límites comerciales ni productivos acordados. |
+
+Ejemplo de formato, sin valores de secretos:
+
+```dotenv
+PORT=<puerto>
+DB_HOST=<host-mariadb>
+DB_PORT=<puerto-mariadb>
+DB_NAME=<base-de-datos>
+DB_USER=<usuario>
+DB_PASSWORD=<secreto-privado>
+JWT_SECRET=<secreto-aleatorio-privado>
+NODE_ENV=<development-o-production>
+APP_PUBLIC_ORIGIN=<origen-http-local-o-https-publico>
+TRUSTED_PROXY_CIDRS=<cidr-real-o-none>
+HTTPS_TERMINATION=<trusted-proxy-solo-en-produccion>
+AUTH_RATE_STORE=<memory>
+API_PROCESS_COUNT=<1>
+AUTH_LOGIN_LIMIT=<entero-positivo>
+AUTH_LOGIN_WINDOW_MS=<milisegundos-positivos>
+AUTH_REGISTER_LIMIT=<entero-positivo>
+AUTH_REGISTER_WINDOW_MS=<milisegundos-positivos>
+```
+
+No copiar valores locales a producción ni guardar `.env` en Git. En producción
+no inventar la IP/CIDR del proxy: obtenerla del operador de infraestructura.
 
 ## Levantar la base y el servidor
 
@@ -75,32 +119,47 @@ Ejecutarlos desde `backend/` para que se lea su `.env`:
 | `npm run dev` | Ejecuta TypeScript y reinicia al guardar cambios. |
 | `npm run build` | Comprueba tipos y compila en `dist/`. |
 | `npm start` | Ejecuta el código compilado; requiere build previo. |
+| `npm run test:unit` | Ejecuta las pruebas unitarias/HTTP seleccionadas. |
+| `npm run test:integration` | Ejecuta integraciones MariaDB en contenedores desechables. |
+| `npm test` | Build, pruebas unitarias, validación de fuentes DTO y suites MariaDB aisladas. |
+| `npm run type-check` | Comprueba TypeScript sin emitir archivos. |
 
-Detener el servidor con Ctrl+C. Para detener la base sin eliminar datos,
-ejecutar `docker compose stop mariadb` desde la raíz.
+Ejecutar los comandos desde `backend/`. Las integraciones de `npm test` requieren
+Docker y usan helpers que crean sus propias bases desechables: no se debe
+reemplazar ese flujo por credenciales de una base compartida. No ejecutar
+`node --test` sin una lista de pruebas porque podría descubrir helpers que
+requieren aislamiento. Detener el servidor con Ctrl+C. Para detener la base sin
+eliminar datos, ejecutar `docker compose stop mariadb` desde la raíz.
 
 ## Organización
 
 ```text
 src/
 ├── config/
-│   ├── env.ts          # Lectura y comprobaciones básicas de configuración
-│   └── database.ts     # Pool de conexiones y SELECT 1
+│   ├── env.config.ts
+│   ├── database.config.ts
+│   ├── database-policy.ts
+│   └── catalog-snapshot.config.ts
 ├── routes/
-│   ├── health.ts       # GET /api/health
-│   └── auth.ts         # POST /api/auth/register
+│   ├── auth.routes.ts
+│   ├── admin.routes.ts
+│   ├── adminProduct.routes.ts
+│   ├── catalog.routes.ts
+│   └── category.routes.ts
 ├── validators/
-│   └── register.validator.ts # Datos de entrada del registro
+│   └── (DTOs y políticas de validación en src/dtos/)
+├── repositories/
 ├── services/
-│   ├── password.service.ts   # Hash asíncrono de contraseñas (#165)
-│   └── register.service.ts   # Preparación del usuario y transacción (#166/#164)
-├── app.ts             # Express, rutas y manejo de errores
-└── server.ts          # Inicio y cierre del servidor
+├── controllers/
+├── app.ts
+└── server.ts
 ```
 
-`mariadb` es el driver provisional para la conexión y el registro. No define la
-estrategia definitiva de acceso a datos: podrá cambiar cuando el equipo elija
-Knex u otro ORM. El servicio de registro usa consultas parametrizadas.
+TypeORM 0.3 con mysql2 atiende los módulos migrados. El catálogo conserva una
+excepción aislada para iniciar un snapshot de solo lectura y conservar su
+contrato de paginación. `schema.sql` es la fuente del esquema: `synchronize`,
+`dropSchema` y `migrationsRun` permanecen desactivados. No generar ni aplicar
+DDL desde TypeORM; seguir el procedimiento de [migración SKU](../database/README.md#migrar-sku-en-una-base-existente-197).
 
 ## Registro de cliente — #163, #164, #165 y #166
 
@@ -135,10 +194,10 @@ Ejemplo PARTICULAR:
 ```json
 {
   "tipoCliente": "PARTICULAR",
-  "nombreRazonSocial": "Santiago Lehnert",
-  "docCliente": "12345678",
-  "email": "santi@example.com",
-  "password": "Password123!"
+  "nombreRazonSocial": "Cliente de prueba",
+  "docCliente": "DOC-DE-PRUEBA",
+  "email": "cliente@example.test",
+  "password": "<secreto-local-de-prueba>"
 }
 ```
 
@@ -147,12 +206,16 @@ Ejemplo EMPRESA:
 ```json
 {
   "tipoCliente": "EMPRESA",
-  "nombreRazonSocial": "Constructora Sur SRL",
-  "cuit": "30-12345678-9",
-  "email": "compras@constructorasur.com",
-  "password": "Password123!"
+  "nombreRazonSocial": "Empresa de prueba S.R.L.",
+  "cuit": "CUIT-DE-PRUEBA",
+  "email": "compras@example.test",
+  "password": "<secreto-local-de-prueba>"
 }
 ```
+
+Los valores son ilustrativos y no son datos de clientes ni contraseñas para
+reutilizar. Sustituirlos por datos ficticios y un secreto temporal local al
+ejecutar pruebas manuales.
 
 Respuesta exitosa: HTTP **201 Created**. Ejemplo para PARTICULAR:
 
@@ -162,7 +225,7 @@ Respuesta exitosa: HTTP **201 Created**. Ejemplo para PARTICULAR:
   "data": {
     "user": {
       "id": 104,
-      "email": "santi@example.com",
+      "email": "cliente@example.test",
       "rol": "CLIENTE",
       "tipoCliente": "PARTICULAR"
     }
@@ -205,6 +268,94 @@ de registro concentra la preparación y la persistencia transaccional.
 El router de `/api/auth` aplica `json()` una sola vez antes de sus rutas y el
 manejador de errores `{ message }` al final. Las futuras rutas de auth deben
 agregarse entre ambos, sin repetir el parser en cada endpoint.
+
+## Autenticación — contratos Taiga #155–#160
+
+Los contratos canónicos están adjuntos a [Taiga #155 (login)](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/155),
+[Taiga #156 (logout)](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/156),
+[Taiga #157 (/me)](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/157),
+[Taiga #158 (JWT HttpOnly)](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/158),
+[Taiga #159 (respuestas y errores)](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/159)
+y [Taiga #160 (mock)](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/160).
+Esta sección registra el comportamiento comprobable del código integrado en
+`develop`; los PDFs y el mock son referencias de contrato, no evidencia de que
+cada detalle ya esté implementado. Las diferencias se conservan explícitamente
+como pendientes de alineación; esta actualización documental no modifica el API.
+
+### Login
+
+`POST /api/auth/login` recibe `email` y `password`; no admite campos adicionales.
+La contraseña no se recorta ni normaliza. Con credenciales válidas devuelve
+HTTP **200** y establece `jwt_token` como cookie HttpOnly, SameSite Strict,
+path `/`, con duración de dos horas; `Secure` se activa en producción. La
+respuesta JSON no contiene el token:
+
+```json
+{
+  "message": "Login exitoso",
+  "user": {
+    "id": 12,
+    "email": "cliente@example.test",
+    "rol": "CLIENTE",
+    "tipo_cliente": "PARTICULAR",
+    "nombre": "Cliente de prueba"
+  }
+}
+```
+
+Credenciales inválidas o usuario inactivo responden **401**
+`{ "message": "Credenciales inválidas" }`. Errores de validación responden **400**;
+fallos internos, **500** con mensaje genérico. El cliente debe enviar cookies al
+API para que `/me` y las rutas protegidas reciban la sesión.
+
+**Diferencia pendiente con #155:** el PDF acuerda éxito
+`{ "message": "...", "data": { "user": { "id", "email", "rol", "tipoCliente" } } }`.
+El código actual devuelve `{ "message": "...", "user": { "id", "email", "rol",
+"tipo_cliente", "nombre" } }`. El ejemplo del PDF se sanitiza aquí; no representa
+una respuesta verificada de `develop`.
+
+### Logout
+
+`POST /api/auth/logout` elimina la cookie y responde **200**
+`{ "message": "Sesión cerrada correctamente" }`. No revoca el JWT en servidor:
+el cierre de sesión depende de que el cliente aplique la eliminación de cookie.
+
+**Diferencia pendiente con #156:** el texto canónico esperado es
+`{ "message": "Sesión cerrada" }`; `develop` responde
+`{ "message": "Sesión cerrada correctamente" }`.
+
+### Cookie JWT
+
+Conforme a #158, el token viaja en la cookie HttpOnly `jwt_token`; frontend no
+lo lee ni lo copia a localStorage o a Pinia. El navegador la adjunta cuando la
+petición incluye credenciales. Configuración actual: HttpOnly, SameSite Strict,
+path `/`, duración de dos horas y Secure en producción. La cookie evita que
+JavaScript lea directamente su contenido, pero **no vuelve inocuo un XSS**:
+un script inyectado todavía puede realizar acciones como el usuario desde el
+navegador. No registrar ni compartir el valor de la cookie.
+
+### Respuestas comunes y mock
+
+#159 acuerda éxito JSON con `message` y `data` cuando hay carga útil; los errores
+usan `{ "message": "..." }` y códigos 400, 401, 403 o 500 según el caso. En
+`develop` no hay una envoltura uniforme para todos los éxitos: login retorna
+`message` y `user`, `/me` retorna `user`, catálogo/categorías retornan `data`,
+y algunas rutas de clientes/productos usan sus propios mensajes. La mayoría de
+errores de dominio usan `{ "message": "..." }`, pero el 404 global y ciertos
+errores del parser JSON usan `{ "error": "..." }`. Mantener como fuentes de
+comportamiento los contratos específicos existentes, por ejemplo
+[catálogo](../docs/api/catalogo.md), [categorías](../docs/api/categorias.md) y
+[productos administrativos](../docs/api/admin-productos.md).
+
+El [mock de #160](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/160)
+es material de integración frontend, no fuente de verdad del runtime. Sus
+ejemplos no coinciden en todos los campos, envolturas y mensajes con el código
+vigente; deben actualizarse cuando se resuelva la alineación.
+
+### Restauración de sesión — FER-3
+
+`GET /api/auth/me` requiere la cookie y devuelve el usuario autenticado; el
+detalle del comportamiento vigente está en [Restauración de sesión](#restauración-de-sesión--fer-3).
 
 ### Hash de contraseña — #165
 
@@ -282,8 +433,8 @@ function Test-Register($body) {
     $json = $body | ConvertTo-Json -Compress
     $json | curl.exe -sS -w '\nHTTP %{http_code}\n' -X POST "$base/auth/register" -H 'Content-Type: application/json' --data-binary '@-'
 }
-$particular = @{ tipoCliente = 'PARTICULAR'; nombreRazonSocial = 'Santiago Lehnert'; docCliente = '12345678'; email = 'santi@example.com'; password = 'Password123!' }
-$empresa = @{ tipoCliente = 'EMPRESA'; nombreRazonSocial = 'Constructora Sur SRL'; cuit = '30-12345678-9'; email = 'compras@constructorasur.com'; password = 'Password123!' }
+$particular = @{ tipoCliente = 'PARTICULAR'; nombreRazonSocial = 'Cliente de prueba'; docCliente = 'DOC-DE-PRUEBA'; email = 'cliente@example.test'; password = '<secreto-local-de-prueba>' }
+$empresa = @{ tipoCliente = 'EMPRESA'; nombreRazonSocial = 'Empresa de prueba S.R.L.'; cuit = 'CUIT-DE-PRUEBA'; email = 'compras@example.test'; password = '<secreto-local-de-prueba>' }
 Test-Register $particular # 201; 409 si el email ya existe
 Test-Register $empresa # 201; 409 si el email ya existe
 $invalidEmail = $particular.Clone(); $invalidEmail.email = 'invalido'
@@ -317,7 +468,9 @@ ausente o solo espacios, opcionales nulos o vacíos, límites de los cuatro camp
 opcionales, email demasiado largo, rol/estado enviados y tamaño JSON excedido.
 Se comprobó `{ message }`, ausencia de cookies y de password en esas respuestas.
 Una comprobación directa del validador confirmó la normalización de textos y
-nulos sin modificar la contraseña. No hay scripts de test o lint en package.json.
+nulos sin modificar la contraseña. Es evidencia histórica de #163; para las
+pruebas vigentes consultar los scripts descritos arriba y
+[la evidencia reproducible de #221](../docs/221/README.md#reproducción-segura).
 # Listado de clientes — #177, #178 y #179
 
 `GET /api/admin/clientes` consulta MariaDB mediante el pool existente y devuelve
@@ -374,8 +527,8 @@ La integración de registro mantiene su activación con `REGISTER_TEST_DATABASE`
 
 ## Restauración de sesión — FER-3
 
-`GET /api/auth/me` usa `authenticate` y la cookie HttpOnly `jwt_token` existente.
-Responde **200** exclusivamente con:
+El endpoint es `GET /api/auth/me` (prefijo de aplicación `/api`), usa
+`authenticate` y la cookie HttpOnly `jwt_token`. Responde **200** con:
 
 ```json
 { "user": { "id": 12, "nombre": "Cliente", "email": "cliente@example.test", "rol": "CLIENTE", "tipo_cliente": "PARTICULAR" } }
@@ -391,10 +544,18 @@ rol desactualizado: **401** `{ "message": "No autenticado." }`.
 Error de BD: **500** `{ "message": "Error interno del servidor." }`.
 No se emiten ni renuevan tokens o cookies; no se devuelven secretos.
 
-El login conserva su implementación y contrato `{ message, user }`. Como su
-mapeo público era inline, `/me` reproduce ese criterio; las pruebas de regresión
-comparan ambos contratos. Logout conserva la eliminación de cookie sin revocar
-el JWT: el cliente debe aplicar esa eliminación.
+**Diferencia pendiente con [Taiga #157](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/157):**
+el PDF acuerda éxito `{ "data": { "user": { "id", "email", "rol", "tipoCliente" } } }`
+y error 401 `{ "message": "Sesión expirada o no válida" }`. `develop` devuelve
+`{ "user": { "id", "nombre", "email", "rol", "tipo_cliente" } }` y
+`{ "message": "No autenticado." }`. La prueba de regresión compara `/me` con el
+usuario devuelto por login; no confirma conformidad con el formato del PDF.
+
+Estas divergencias de auth y de errores comunes se registran como pendientes de
+alineación con #155–#159; no se altera el contrato en este cambio documental.
+Logout elimina la cookie sin revocar el JWT; el cliente debe aplicar esa
+eliminación, según el comportamiento vigente y la diferencia de mensaje
+documentada arriba.
 
 Desde `backend`, después de un build limpio:
 

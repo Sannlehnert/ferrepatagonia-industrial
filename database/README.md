@@ -250,18 +250,44 @@ Después ejecutar nuevamente los tres comandos del paso 3: `schema.sql`, `seed.s
 11.4 y el esquema del proyecto (`codigo VARCHAR(100) NOT NULL`,
 `utf8mb4_unicode_ci`); comprobar `SHOW CREATE TABLE PRODUCTO` y disponer de permisos
 SELECT, UPDATE y ALTER. No volver a ejecutar `schema.sql` ni `seed.sql`.
+Una base nueva creada con `schema.sql` ya tiene `uq_producto_codigo`; no necesita
+esta migración. El único ensayo de esta tarea usa el helper y una base
+MariaDB desechable. Para cualquier ensayo manual, usar también una base aislada,
+nunca el volumen de desarrollo compartido ni datos productivos.
 
 1. Confirmar host, puerto y `SELECT DATABASE(), VERSION()` en el destino elegido.
    Reservar una ventana de mantenimiento: detener todos los escritores, incluidos
    backend, importadores y otras sesiones. Mantenerlos detenidos hasta verificar.
-2. Hacer un backup completo con `mariadb-dump` y comprobar su restauración en una
-   base aparte antes de modificar datos. La migración contiene DDL con commits
-   implícitos: **no es una transacción reversible con ROLLBACK**. Si falla después
-   de normalizar o eliminar un índice, inspeccionar el estado antes de continuar;
-   restaurar el backup si es necesario.
-3. Buscar datos que impedirían migrar (las dos consultas deben devolver cero filas):
+2. Guardar evidencia del estado previo: `SHOW CREATE TABLE PRODUCTO`, cantidad
+   de filas y resultados de las consultas de precondición del paso 3. Hacer un
+   backup completo y comprobar su restauración en una base aparte antes de
+   modificar datos. Ejemplo de backup; reemplazar los placeholders y escribir
+   la contraseña solo en el prompt:
+
+```text
+mariadb-dump --host <HOST> --port <PORT> --user <USER> --password --single-transaction --routines --triggers --events <DB_NAME> --result-file="<BACKUP_FILE>"
+```
+
+`--single-transaction` protege tablas transaccionales; mantener igualmente
+detenidos todos los escritores durante respaldo y migración. Para ensayar la
+restauración, reemplazar los placeholders, crear una base vacía aislada con el
+mismo charset/collation, conectar `mariadb` a esa base y ejecutar
+`SOURCE <RUTA_BACKUP>;` usando una ruta local legible por el cliente. Comparar
+`SHOW CREATE TABLE PRODUCTO`, cantidades y las verificaciones de integridad; no
+restaurar sobre el destino original como prueba.
+
+La migración contiene DDL con commits implícitos: **no es una transacción
+reversible con ROLLBACK**. Si falla después de normalizar o eliminar un índice,
+inspeccionar el estado antes de continuar; restaurar el backup verificado si es
+necesario y solo después de confirmar host y base. Mantener escritores
+detenidos: si ya se reanudaron, conciliar cambios posteriores antes de restaurar
+para no descartarlos. No ejecutar `--force`.
+3. Buscar datos que impedirían migrar. Las consultas de códigos nulos/vacíos y
+   de SKUs duplicados deben devolver cero filas:
 
 ```sql
+SELECT COUNT(*) AS productos_antes FROM PRODUCTO;
+
 SELECT id_producto, codigo FROM PRODUCTO
 WHERE codigo IS NULL OR CHAR_LENGTH(TRIM(codigo)) = 0;
 
@@ -290,6 +316,8 @@ En el cliente dentro de Compose, la ruta de solo lectura es
 5. Verificar ausencia de espacios y definición completa del índice:
 
 ```sql
+SELECT COUNT(*) AS productos_despues FROM PRODUCTO;
+
 SELECT COUNT(*) AS sku_con_espacios FROM PRODUCTO
 WHERE BINARY codigo <> BINARY TRIM(codigo)
    OR CHAR_LENGTH(codigo) <> CHAR_LENGTH(TRIM(codigo));
@@ -304,11 +332,17 @@ El conteo debe ser 0. Debe existir un índice con **exactamente una fila**:
 `NON_UNIQUE=0`, `SEQ_IN_INDEX=1`, `COLUMN_NAME=codigo`, `SUB_PART=NULL`.
 Normalmente se llama `uq_producto_codigo`; un UNIQUE equivalente con otro nombre
 también es aceptado por el script. Un índice compuesto o de prefijo no alcanza.
+`productos_despues` debe coincidir con `productos_antes`; revisar también que no
+haya SKUs perdidos y conservar los resultados antes/después junto con el SHA del
+script y la ventana de mantenimiento.
 Reejecutar la migración y estas verificaciones en la misma ventana: debe finalizar
 sin error, conservar los SKU normalizados y la definición del índice. Reanudar
 escritores solo después de validar ambos resultados.
 
 ### Pruebas destructivas en MariaDB desechable
+
+Estas pruebas son el ensayo de la migración SKU para esta tarea. No apuntan a
+la base Compose ni a una base real:
 
 Desde `backend/`, con Node >=22 y Docker iniciado:
 

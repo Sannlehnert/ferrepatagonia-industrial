@@ -52,9 +52,17 @@ Las reglas específicas de descuentos, crédito, vencimientos y otras condicione
 
 ## Estado del proyecto
 
-El proyecto cuenta con el diseño inicial del MVP, scripts SQL, MariaDB con Docker Compose y una primera base de backend con Node.js, Express y TypeScript.
+El repositorio contiene el backend Node.js/Express/TypeScript con MariaDB,
+autenticación de clientes y administradores, catálogo y categorías públicas,
+y operaciones administrativas de clientes y productos. El alcance completo
+del MVP sigue en desarrollo; las funcionalidades descritas en este README no
+deben interpretarse como todas implementadas.
 
-Para levantar la base y ejecutar el servidor, consultar la [guía del backend](backend/README.md). Esta etapa implementa únicamente `GET /api/health`; las funcionalidades de negocio descriptas a continuación siguen pendientes.
+Para instalar y ejecutar el backend, consultar la
+[guía del backend](backend/README.md). El índice de documentación técnica,
+runbooks y checklist de release está en [docs/README.md](docs/README.md).
+La política pública de precios continúa pendiente de validación comercial;
+el [contrato del catálogo](docs/api/catalogo.md) es la fuente canónica.
 
 Durante el Sprint 1 se trabajó en:
 
@@ -67,7 +75,9 @@ Durante el Sprint 1 se trabajó en:
 - identificación de perfiles de usuario, roles técnicos y permisos;
 - definición conceptual de autenticación, autorización y protección de rutas.
 
-La documentación describe las decisiones y propuestas de diseño. No implica que las funcionalidades del sistema ya se encuentren implementadas.
+Los documentos de relevamiento y diseño del Sprint 1 registran decisiones y
+propuestas; no implican que todas las funcionalidades previstas estén
+implementadas.
 
 ---
 
