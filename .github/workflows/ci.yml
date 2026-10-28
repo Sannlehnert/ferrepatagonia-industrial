@@ -1,4 +1,4 @@
-﻿name: CI Build, Types and Tests
+name: CI Build, Types and Tests
 
 on:
     push:
@@ -27,7 +27,9 @@ jobs:
                   cache-dependency-path: backend/package-lock.json
 
             - name: Capture initial Docker resources baseline
+              shell: bash
               run: |
+                  set -euo pipefail
                   mkdir -p ci-diagnostics
                   docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-before.txt
                   docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-before.txt
@@ -65,11 +67,16 @@ jobs:
 
             - name: Verify MariaDB container and volume cleanup
               if: always()
+              shell: bash
               run: |
+                  set -euo pipefail
+                  mkdir -p ci-diagnostics
+                  printf '%s\n' '{"verification":"error","clean":false}' > ci-diagnostics/backend-docker-cleanup.json
+                  trap 'rc=$?; if [ "$rc" -ne 0 ]; then cat ci-diagnostics/backend-docker-cleanup.json >> "$GITHUB_STEP_SUMMARY"; fi' EXIT
                   docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-after.txt
                   docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-after.txt
-                  LEAKED_CONTAINERS=$(comm -13 /tmp/docker-containers-before.txt /tmp/docker-containers-after.txt || true)
-                  LEAKED_VOLUMES=$(comm -13 /tmp/docker-volumes-before.txt /tmp/docker-volumes-after.txt || true)
+                  LEAKED_CONTAINERS=$(comm -13 /tmp/docker-containers-before.txt /tmp/docker-containers-after.txt)
+                  LEAKED_VOLUMES=$(comm -13 /tmp/docker-volumes-before.txt /tmp/docker-volumes-after.txt)
                   node -e '
                     const fs = require("node:fs");
                     const containers = process.argv[1].split(/\r?\n/).filter(Boolean);
@@ -117,7 +124,9 @@ jobs:
                       backend/package-lock.json
 
             - name: Capture initial Docker resources baseline
+              shell: bash
               run: |
+                  set -euo pipefail
                   mkdir -p ci-diagnostics
                   docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-before.txt
                   docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-before.txt
@@ -157,11 +166,16 @@ jobs:
 
             - name: Verify MariaDB E2E container and volume cleanup
               if: always()
+              shell: bash
               run: |
+                  set -euo pipefail
+                  mkdir -p ci-diagnostics
+                  printf '%s\n' '{"verification":"error","clean":false}' > ci-diagnostics/frontend-e2e-docker-cleanup.json
+                  trap 'rc=$?; if [ "$rc" -ne 0 ]; then cat ci-diagnostics/frontend-e2e-docker-cleanup.json >> "$GITHUB_STEP_SUMMARY"; fi' EXIT
                   docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-after.txt
                   docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-after.txt
-                  LEAKED_CONTAINERS=$(comm -13 /tmp/docker-containers-before.txt /tmp/docker-containers-after.txt || true)
-                  LEAKED_VOLUMES=$(comm -13 /tmp/docker-volumes-before.txt /tmp/docker-volumes-after.txt || true)
+                  LEAKED_CONTAINERS=$(comm -13 /tmp/docker-containers-before.txt /tmp/docker-containers-after.txt)
+                  LEAKED_VOLUMES=$(comm -13 /tmp/docker-volumes-before.txt /tmp/docker-volumes-after.txt)
                   node -e '
                     const fs = require("node:fs");
                     const containers = process.argv[1].split(/\r?\n/).filter(Boolean);
@@ -191,6 +205,5 @@ jobs:
                   path: |
                       ci-diagnostics/
                       frontend/playwright-report/
-                      frontend/test-results/
                   if-no-files-found: ignore
                   retention-days: 7
