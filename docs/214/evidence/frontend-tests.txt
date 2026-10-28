@@ -1,0 +1,344 @@
+
+> ferrepatagonia@0.0.0 test
+> node --test
+
+TAP version 13
+# Subtest: status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation
+ok 1 - status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation
+  ---
+  duration_ms: 242.5814
+  type: 'test'
+  ...
+# Subtest: status: pending mutation prevents duplicate and opening any modal
+ok 2 - status: pending mutation prevents duplicate and opening any modal
+  ---
+  duration_ms: 46.8441
+  type: 'test'
+  ...
+# Subtest: uncertain status undefined: failed reload retains lock; successful reload unlocks
+ok 3 - uncertain status undefined: failed reload retains lock; successful reload unlocks
+  ---
+  duration_ms: 37.7074
+  type: 'test'
+  ...
+# Subtest: uncertain status 500: failed reload retains lock; successful reload unlocks
+ok 4 - uncertain status 500: failed reload retains lock; successful reload unlocks
+  ---
+  duration_ms: 31.3933
+  type: 'test'
+  ...
+# Subtest: uncertain status 502: failed reload retains lock; successful reload unlocks
+ok 5 - uncertain status 502: failed reload retains lock; successful reload unlocks
+  ---
+  duration_ms: 25.7627
+  type: 'test'
+  ...
+# Subtest: successful mutation or modal save followed by failed read stays locked
+ok 6 - successful mutation or modal save followed by failed read stays locked
+  ---
+  duration_ms: 25.0388
+  type: 'test'
+  ...
+# Subtest: known rejection 400 does not count as uncertain
+ok 7 - known rejection 400 does not count as uncertain
+  ---
+  duration_ms: 31.1418
+  type: 'test'
+  ...
+# Subtest: known rejection 401 does not count as uncertain
+ok 8 - known rejection 401 does not count as uncertain
+  ---
+  duration_ms: 18.5602
+  type: 'test'
+  ...
+# Subtest: known rejection 403 does not count as uncertain
+ok 9 - known rejection 403 does not count as uncertain
+  ---
+  duration_ms: 24.8493
+  type: 'test'
+  ...
+# Subtest: known rejection 404 does not count as uncertain
+ok 10 - known rejection 404 does not count as uncertain
+  ---
+  duration_ms: 18.4878
+  type: 'test'
+  ...
+# Subtest: known rejection 409 does not count as uncertain
+ok 11 - known rejection 409 does not count as uncertain
+  ---
+  duration_ms: 26.1655
+  type: 'test'
+  ...
+# Subtest: known rejection 422 does not count as uncertain
+ok 12 - known rejection 422 does not count as uncertain
+  ---
+  duration_ms: 16.4404
+  type: 'test'
+  ...
+# Subtest: stock zero uses stock-only operation and preserves all original fields
+ok 13 - stock zero uses stock-only operation and preserves all original fields
+  ---
+  duration_ms: 55.9686
+  type: 'test'
+  ...
+# Subtest: general edit preserves description, image and category
+ok 14 - general edit preserves description, image and category
+  ---
+  duration_ms: 42.3911
+  type: 'test'
+  ...
+# Subtest: modal deactivation cancel preserves draft without request
+ok 15 - modal deactivation cancel preserves draft without request
+  ---
+  duration_ms: 25.0912
+  type: 'test'
+  ...
+# Subtest: invalid stock "" sends nothing
+ok 16 - invalid stock "" sends nothing
+  ---
+  duration_ms: 23.1708
+  type: 'test'
+  ...
+# Subtest: invalid stock -1 sends nothing
+ok 17 - invalid stock -1 sends nothing
+  ---
+  duration_ms: 26.215
+  type: 'test'
+  ...
+# Subtest: invalid stock 1.5 sends nothing
+ok 18 - invalid stock 1.5 sends nothing
+  ---
+  duration_ms: 22.2662
+  type: 'test'
+  ...
+# Subtest: invalid stock 2147483648 sends nothing
+ok 19 - invalid stock 2147483648 sends nothing
+  ---
+  duration_ms: 16.5085
+  type: 'test'
+  ...
+# Subtest: modal pending request prevents double submit and closing
+ok 20 - modal pending request prevents double submit and closing
+  ---
+  duration_ms: 23.3448
+  type: 'test'
+  ...
+# Subtest: modal uncertain result retains draft, emits parent lock and blocks resubmission
+ok 21 - modal uncertain result retains draft, emits parent lock and blocks resubmission
+  ---
+  duration_ms: 21.0454
+  type: 'test'
+  ...
+# Subtest: SKU conflict retains data and permits correction
+ok 22 - SKU conflict retains data and permits correction
+  ---
+  duration_ms: 66.7208
+  type: 'test'
+  ...
+# Subtest: parent lock survives closing uncertain modal and successful reload closes stale form
+ok 23 - parent lock survives closing uncertain modal and successful reload closes stale form
+  ---
+  duration_ms: 23.8484
+  type: 'test'
+  ...
+# Subtest: service calls shared Axios with real route methods and minimal payloads
+ok 24 - service calls shared Axios with real route methods and minimal payloads
+  ---
+  duration_ms: 29.1722
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "0" recovers before request
+ok 25 - invalid/noncanonical page "0" recovers before request
+  ---
+  duration_ms: 1386.5321
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "-1" recovers before request
+ok 26 - invalid/noncanonical page "-1" recovers before request
+  ---
+  duration_ms: 13.1714
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "1.5" recovers before request
+ok 27 - invalid/noncanonical page "1.5" recovers before request
+  ---
+  duration_ms: 3.4971
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "abc" recovers before request
+ok 28 - invalid/noncanonical page "abc" recovers before request
+  ---
+  duration_ms: 3.241
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "1000001" recovers before request
+ok 29 - invalid/noncanonical page "1000001" recovers before request
+  ---
+  duration_ms: 5.6778
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "1e3" recovers before request
+ok 30 - invalid/noncanonical page "1e3" recovers before request
+  ---
+  duration_ms: 4.2089
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "1e6" recovers before request
+ok 31 - invalid/noncanonical page "1e6" recovers before request
+  ---
+  duration_ms: 4.0567
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "9007199254740993" recovers before request
+ok 32 - invalid/noncanonical page "9007199254740993" recovers before request
+  ---
+  duration_ms: 4.5297
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "99999999999999999999999999999999" recovers before request
+ok 33 - invalid/noncanonical page "99999999999999999999999999999999" recovers before request
+  ---
+  duration_ms: 5.9851
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page ["2","3"] recovers before request
+ok 34 - invalid/noncanonical page ["2","3"] recovers before request
+  ---
+  duration_ms: 3.1017
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page ["2","2"] recovers before request
+ok 35 - invalid/noncanonical page ["2","2"] recovers before request
+  ---
+  duration_ms: 2.4709
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "" recovers before request
+ok 36 - invalid/noncanonical page "" recovers before request
+  ---
+  duration_ms: 2.5945
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page null recovers before request
+ok 37 - invalid/noncanonical page null recovers before request
+  ---
+  duration_ms: 2.2256
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page " 2 " recovers before request
+ok 38 - invalid/noncanonical page " 2 " recovers before request
+  ---
+  duration_ms: 3.1249
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "+2" recovers before request
+ok 39 - invalid/noncanonical page "+2" recovers before request
+  ---
+  duration_ms: 4.0282
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "02" recovers before request
+ok 40 - invalid/noncanonical page "02" recovers before request
+  ---
+  duration_ms: 2.9498
+  type: 'test'
+  ...
+# Subtest: invalid/noncanonical page "1" recovers before request
+ok 41 - invalid/noncanonical page "1" recovers before request
+  ---
+  duration_ms: 2.5927
+  type: 'test'
+  ...
+# Subtest: valid page 999 recovers to last result page preserving filters
+ok 42 - valid page 999 recovers to last result page preserving filters
+  ---
+  duration_ms: 3.179
+  type: 'test'
+  ...
+# Subtest: valid page 1000000 recovers to last result page preserving filters
+ok 43 - valid page 1000000 recovers to last result page preserving filters
+  ---
+  duration_ms: 2.3023
+  type: 'test'
+  ...
+# Subtest: maximum page is accepted when available
+ok 44 - maximum page is accepted when available
+  ---
+  duration_ms: 2.1215
+  type: 'test'
+  ...
+# Subtest: zero totalPages recovers to page 1 without a loop
+ok 45 - zero totalPages recovers to page 1 without a loop
+  ---
+  duration_ms: 3.0539
+  type: 'test'
+  ...
+# Subtest: normalization replaces history; page buttons push; back/forward and filters survive
+ok 46 - normalization replaces history; page buttons push; back/forward and filters survive
+  ---
+  duration_ms: 9.6823
+  type: 'test'
+  ...
+# Subtest: loading, error and retry after invalid page recovery
+ok 47 - loading, error and retry after invalid page recovery
+  ---
+  duration_ms: 2.5075
+  type: 'test'
+  ...
+# Subtest: stale request cannot overwrite recovered page or error state
+ok 48 - stale request cannot overwrite recovered page or error state
+  ---
+  duration_ms: 2.8606
+  type: 'test'
+  ...
+# Subtest: el catálogo está disponible en el menú público sin permisos
+ok 49 - el catálogo está disponible en el menú público sin permisos
+  ---
+  duration_ms: 40.8822
+  type: 'test'
+  ...
+# Subtest: Inicio conserva el menú público que da acceso al catálogo
+ok 50 - Inicio conserva el menú público que da acceso al catálogo
+  ---
+  duration_ms: 5.1852
+  type: 'test'
+  ...
+# Subtest: normaliza páginas inválidas antes de solicitar el catálogo
+ok 51 - normaliza páginas inválidas antes de solicitar el catálogo
+  ---
+  duration_ms: 3.7723
+  type: 'test'
+  ...
+# Subtest: normaliza páginas por encima del máximo y conserva filtros y categoría
+ok 52 - normaliza páginas por encima del máximo y conserva filtros y categoría
+  ---
+  duration_ms: 2.4572
+  type: 'test'
+  ...
+# Subtest: mantiene como canónica una página válida dentro del rango
+ok 53 - mantiene como canónica una página válida dentro del rango
+  ---
+  duration_ms: 0.8722
+  type: 'test'
+  ...
+# Subtest: error y reintento de categorías siguen visibles junto a la categoría actual
+ok 54 - error y reintento de categorías siguen visibles junto a la categoría actual
+  ---
+  duration_ms: 13.9065
+  type: 'test'
+  ...
+# Subtest: crear sin categorías muestra error y reintento sin habilitar el selector
+ok 55 - crear sin categorías muestra error y reintento sin habilitar el selector
+  ---
+  duration_ms: 1.5226
+  type: 'test'
+  ...
+1..55
+# tests 55
+# suites 0
+# pass 55
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3490.983

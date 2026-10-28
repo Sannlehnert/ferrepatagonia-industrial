@@ -59,7 +59,7 @@ async function main() {
     process.exitCode = result.status === 0 ? 0 : 1;
   } finally {
     if (connection) await connection.end();
-    if (started) docker('rm', '-f', container);
+    if (started) docker('rm', '-f', '-v', container);
   }
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });

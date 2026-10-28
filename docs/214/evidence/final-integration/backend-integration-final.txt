@@ -1,0 +1,302 @@
+
+> ferrepatagonia-backend@0.1.0 test:integration
+> node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs
+
+{"database":"admin_products_test_d7373d8b71294ff1b30d9fc3f4ae4f03","port":52655,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ Admin Products Endpoints (#197)
+  ✔ should return 401 when unauthenticated (27.3362ms)
+  ✔ should return 403 when authenticated as CLIENTE (8.7705ms)
+  ✔ should list all products for ADMIN (6.7966ms)
+  ✔ should return 400 on invalid product creation data, missing body, or fields exceeding max length (18.45ms)
+  ✔ should create and update a product as ADMIN (29.377ms)
+  ✔ should soft-delete (deactivate) a product idempotently (17.5635ms)
+  ✔ should update product stock successfully (15.659ms)
+  ✔ should return 400 when updating with negative stock (2.2176ms)
+  ✔ should return 400 when updating stock with invalid data types or out of range (13.8331ms)
+  ✔ should return 400 when updating stock without a body (1.8936ms)
+Error al leer el producto tras el INSERT, devolviendo datos persistidos:
+  ✔ should return persisted price precision (1.24 for 1.239) in fallback when post-INSERT SELECT fails (31.7673ms)
+  ✔ migration should trim leading and trailing spaces in SKU, validate UNIQUE index definition, and be idempotent (130.8872ms)
+  ✔ migration rejects blank and duplicate normalized SKUs before changing data or indexes (276.5484ms)
+  ✔ #222: invalid DTOs leave MariaDB unchanged; partial null updates preserve omitted values (38.0734ms)
+✔ Admin Products Endpoints (#197) (922.3234ms)
+▶ /auth/me en MariaDB: login, restauración, estado persistido y logout
+  ✔ PARTICULAR (101.9703ms)
+  ✔ EMPRESA (26.7489ms)
+  ✔ ADMIN sin cliente (16.7969ms)
+✔ /auth/me en MariaDB: login, restauración, estado persistido y logout (430.3447ms)
+▶ real ADMIN crosses Passport exactly once on every protected method/path
+  ✔ GET /api/auth/me (33.2147ms)
+  ✔ GET /api/admin/clientes (6.7907ms)
+  ✔ GET /api/admin/productos (4.8065ms)
+  ✔ GET /api/admin/productos/23 (7.6776ms)
+  ✔ POST /api/admin/productos (24.2572ms)
+  ✔ PUT /api/admin/productos/23 (10.299ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (8.0489ms)
+  ✔ PATCH /api/admin/productos/23/stock (8.3257ms)
+  ✔ GET /api/admin/unknown (2.4738ms)
+  ✔ POST /api/admin/productos/unknown/path (2.8626ms)
+  ✔ DELETE /api/admin/productos/23 (1.9467ms)
+✔ real ADMIN crosses Passport exactly once on every protected method/path (162.1807ms)
+▶ real CLIENTE receives 403 in ADMIN and 200 in me, without product writes
+  ✔ GET /api/auth/me (1.88ms)
+  ✔ GET /api/admin/clientes (1.9586ms)
+  ✔ GET /api/admin/productos (1.7675ms)
+  ✔ GET /api/admin/productos/23 (1.6832ms)
+  ✔ POST /api/admin/productos (2.24ms)
+  ✔ PUT /api/admin/productos/23 (1.9812ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (4.6798ms)
+  ✔ PATCH /api/admin/productos/23/stock (2.3541ms)
+  ✔ GET /api/admin/unknown (1.8667ms)
+  ✔ POST /api/admin/productos/unknown/path (2.0292ms)
+  ✔ DELETE /api/admin/productos/23 (1.8212ms)
+✔ real CLIENTE receives 403 in ADMIN and 200 in me, without product writes (27.0394ms)
+▶ real session revalidated after user is inactive
+  ✔ GET /api/auth/me (1.7521ms)
+  ✔ GET /api/admin/clientes (1.7412ms)
+  ✔ GET /api/admin/productos (1.6031ms)
+  ✔ GET /api/admin/productos/23 (1.682ms)
+  ✔ POST /api/admin/productos (2.1053ms)
+  ✔ PUT /api/admin/productos/23 (2.016ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (1.8598ms)
+  ✔ PATCH /api/admin/productos/23/stock (2.0099ms)
+  ✔ GET /api/admin/unknown (1.6179ms)
+  ✔ POST /api/admin/productos/unknown/path (1.8765ms)
+  ✔ DELETE /api/admin/productos/23 (1.7193ms)
+✔ real session revalidated after user is inactive (34.295ms)
+▶ real session revalidated after user is deleted
+  ✔ GET /api/auth/me (1.5927ms)
+  ✔ GET /api/admin/clientes (1.6647ms)
+  ✔ GET /api/admin/productos (1.7714ms)
+  ✔ GET /api/admin/productos/23 (1.6361ms)
+  ✔ POST /api/admin/productos (1.88ms)
+  ✔ PUT /api/admin/productos/23 (1.8924ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (1.6276ms)
+  ✔ PATCH /api/admin/productos/23/stock (1.8684ms)
+  ✔ GET /api/admin/unknown (1.6614ms)
+  ✔ POST /api/admin/productos/unknown/path (1.7369ms)
+  ✔ DELETE /api/admin/productos/23 (1.7628ms)
+✔ real session revalidated after user is deleted (31.6029ms)
+▶ real session revalidated after user is downgraded
+  ✔ GET /api/auth/me (1.4926ms)
+  ✔ GET /api/admin/clientes (1.661ms)
+  ✔ GET /api/admin/productos (1.5744ms)
+  ✔ GET /api/admin/productos/23 (1.6234ms)
+  ✔ POST /api/admin/productos (1.8904ms)
+  ✔ PUT /api/admin/productos/23 (1.8204ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (1.637ms)
+  ✔ PATCH /api/admin/productos/23/stock (1.8847ms)
+  ✔ GET /api/admin/unknown (1.6458ms)
+  ✔ POST /api/admin/productos/unknown/path (2.0209ms)
+  ✔ DELETE /api/admin/productos/23 (1.5906ms)
+✔ real session revalidated after user is downgraded (42.1631ms)
+▶ real session revalidated after user is upgraded
+  ✔ GET /api/auth/me (1.758ms)
+  ✔ GET /api/admin/clientes (1.5676ms)
+  ✔ GET /api/admin/productos (1.52ms)
+  ✔ GET /api/admin/productos/23 (1.5915ms)
+  ✔ POST /api/admin/productos (1.8523ms)
+  ✔ PUT /api/admin/productos/23 (1.9499ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (2.1168ms)
+  ✔ PATCH /api/admin/productos/23/stock (1.8275ms)
+  ✔ GET /api/admin/unknown (1.6347ms)
+  ✔ POST /api/admin/productos/unknown/path (1.8785ms)
+  ✔ DELETE /api/admin/productos/23 (1.6262ms)
+✔ real session revalidated after user is upgraded (35.4282ms)
+▶ real HTTP rejects absent before lookup
+  ✔ GET /api/auth/me (0.7505ms)
+  ✔ GET /api/admin/clientes (0.8228ms)
+  ✔ GET /api/admin/productos (0.746ms)
+  ✔ GET /api/admin/productos/23 (0.7147ms)
+  ✔ POST /api/admin/productos (0.9903ms)
+  ✔ PUT /api/admin/productos/23 (0.8395ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.7631ms)
+  ✔ PATCH /api/admin/productos/23/stock (0.8963ms)
+  ✔ GET /api/admin/unknown (0.6592ms)
+  ✔ POST /api/admin/productos/unknown/path (0.9097ms)
+  ✔ DELETE /api/admin/productos/23 (0.7394ms)
+✔ real HTTP rejects absent before lookup (11.2877ms)
+▶ real HTTP rejects invalid before lookup
+  ✔ GET /api/auth/me (0.6561ms)
+  ✔ GET /api/admin/clientes (0.8203ms)
+  ✔ GET /api/admin/productos (0.7135ms)
+  ✔ GET /api/admin/productos/23 (0.693ms)
+  ✔ POST /api/admin/productos (0.9518ms)
+  ✔ PUT /api/admin/productos/23 (0.9282ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.7167ms)
+  ✔ PATCH /api/admin/productos/23/stock (0.929ms)
+  ✔ GET /api/admin/unknown (0.6838ms)
+  ✔ POST /api/admin/productos/unknown/path (0.9177ms)
+  ✔ DELETE /api/admin/productos/23 (0.881ms)
+✔ real HTTP rejects invalid before lookup (11.07ms)
+▶ real HTTP rejects expired before lookup
+  ✔ GET /api/auth/me (0.8011ms)
+  ✔ GET /api/admin/clientes (0.879ms)
+  ✔ GET /api/admin/productos (0.7799ms)
+  ✔ GET /api/admin/productos/23 (0.9025ms)
+  ✔ POST /api/admin/productos (1.0505ms)
+  ✔ PUT /api/admin/productos/23 (0.9834ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.7614ms)
+  ✔ PATCH /api/admin/productos/23/stock (0.9856ms)
+  ✔ GET /api/admin/unknown (0.7936ms)
+  ✔ POST /api/admin/productos/unknown/path (1.0927ms)
+  ✔ DELETE /api/admin/productos/23 (0.8888ms)
+✔ real HTTP rejects expired before lookup (12.4308ms)
+▶ real HTTP rejects without exp before lookup
+  ✔ GET /api/auth/me (0.7007ms)
+  ✔ GET /api/admin/clientes (0.7691ms)
+  ✔ GET /api/admin/productos (1.0847ms)
+  ✔ GET /api/admin/productos/23 (0.752ms)
+  ✔ POST /api/admin/productos (0.9822ms)
+  ✔ PUT /api/admin/productos/23 (0.9272ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.7469ms)
+  ✔ PATCH /api/admin/productos/23/stock (0.9209ms)
+  ✔ GET /api/admin/unknown (0.781ms)
+  ✔ POST /api/admin/productos/unknown/path (0.9842ms)
+  ✔ DELETE /api/admin/productos/23 (0.7655ms)
+✔ real HTTP rejects without exp before lookup (11.7287ms)
+▶ real HTTP rejects HS384 before lookup
+  ✔ GET /api/auth/me (0.8173ms)
+  ✔ GET /api/admin/clientes (0.8257ms)
+  ✔ GET /api/admin/productos (0.7526ms)
+  ✔ GET /api/admin/productos/23 (0.7261ms)
+  ✔ POST /api/admin/productos (1.0737ms)
+  ✔ PUT /api/admin/productos/23 (0.9552ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.7929ms)
+  ✔ PATCH /api/admin/productos/23/stock (1.9202ms)
+  ✔ GET /api/admin/unknown (0.73ms)
+  ✔ POST /api/admin/productos/unknown/path (0.9448ms)
+  ✔ DELETE /api/admin/productos/23 (0.7559ms)
+✔ real HTTP rejects HS384 before lookup (12.7918ms)
+▶ real HTTP rejects wrong key before lookup
+  ✔ GET /api/auth/me (0.7049ms)
+  ✔ GET /api/admin/clientes (0.8138ms)
+  ✔ GET /api/admin/productos (0.9102ms)
+  ✔ GET /api/admin/productos/23 (0.7678ms)
+  ✔ POST /api/admin/productos (0.9454ms)
+  ✔ PUT /api/admin/productos/23 (0.9378ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.8068ms)
+  ✔ PATCH /api/admin/productos/23/stock (8.5913ms)
+  ✔ GET /api/admin/unknown (1.0158ms)
+  ✔ POST /api/admin/productos/unknown/path (1.007ms)
+  ✔ DELETE /api/admin/productos/23 (0.6949ms)
+✔ real HTTP rejects wrong key before lookup (20.1017ms)
+▶ real HTTP rejects tampered before lookup
+  ✔ GET /api/auth/me (0.6838ms)
+  ✔ GET /api/admin/clientes (0.7532ms)
+  ✔ GET /api/admin/productos (0.7118ms)
+  ✔ GET /api/admin/productos/23 (0.77ms)
+  ✔ POST /api/admin/productos (0.9032ms)
+  ✔ PUT /api/admin/productos/23 (0.8499ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.9419ms)
+  ✔ PATCH /api/admin/productos/23/stock (0.9063ms)
+  ✔ GET /api/admin/unknown (0.7522ms)
+  ✔ POST /api/admin/productos/unknown/path (0.9208ms)
+  ✔ DELETE /api/admin/productos/23 (0.8106ms)
+✔ real HTTP rejects tampered before lookup (11.3601ms)
+▶ real identity pool saturation produces controlled 500 and recovers
+  ✔ GET /api/auth/me (1.0663ms)
+  ✔ GET /api/admin/clientes (0.878ms)
+  ✔ GET /api/admin/productos (0.8912ms)
+  ✔ GET /api/admin/productos/23 (0.8074ms)
+  ✔ POST /api/admin/productos (0.9982ms)
+  ✔ PUT /api/admin/productos/23 (1.0221ms)
+  ✔ PATCH /api/admin/productos/23/desactivar (0.8619ms)
+  ✔ PATCH /api/admin/productos/23/stock (1.0518ms)
+  ✔ GET /api/admin/unknown (0.7759ms)
+  ✔ POST /api/admin/productos/unknown/path (0.9394ms)
+  ✔ DELETE /api/admin/productos/23 (0.7828ms)
+✔ real identity pool saturation produces controlled 500 and recovers (17.5956ms)
+▶ real login/me/logout preserve cookie flags, TTL, public JSON and no refresh
+  ✔ development (639.9522ms)
+  ✔ production (615.1139ms)
+✔ real login/me/logout preserve cookie flags, TTL, public JSON and no refresh (1255.5041ms)
+✔ real MariaDB login/register quotas return 429 without additional account writes (865.6159ms)
+▶ catálogo público real en MariaDB
+  ✔ filtra activos, conserva sin stock y pagina sin duplicar ni omitir productos (55.5566ms)
+  ✔ categoría activa: contrato HTTP y paginación sobre el subconjunto (27.4935ms)
+  ✔ categorías inactiva, vacía, solo productos inactivos e inexistente devuelven vacío (47.0485ms)
+  ✔ categoría inválida rechazada por HTTP real (4.3241ms)
+  ✔ catálogo vacío: ninguna página tiene anterior ni siguiente (16.3563ms)
+  ✔ busqueda real: nombre/codigo, collation, literales y paginacion (960.0701ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda undefined (8.4347ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda catalog-289c7d7e-f302-4989-84dd-63d1134042dc (5.6599ms)
+  ✔ inserción concurrente conserva snapshot, categoría 3, búsqueda undefined (5.5576ms)
+  ✔ inserción concurrente conserva snapshot, categoría 3, búsqueda catalog-289c7d7e-f302-4989-84dd-63d1134042dc (5.5428ms)
+✔ catálogo público real en MariaDB (1508.2257ms)
+▶ listado HTTP de cuentas registradas en MariaDB
+  ✔ coincide con las cuentas CLIENTE asociadas y su orden, con sesión ADMIN (36.1418ms)
+  ✔ usa datos de cuenta, excluye clientes sin usuario y ADMIN, y desempata por id (19.1627ms)
+✔ listado HTTP de cuentas registradas en MariaDB (355.4883ms)
+database.query.slow { milliseconds: 5001 }
+database.query.failed
+Error al actualizar stock:
+✔ server timeout rolls back stock before HTTP error, with no late write (5421.7998ms)
+ℹ {"case":"timeout-write","status":500,"result":{"message":"Error interno del servidor"},"elapsed":5045,"stockBeforeUnlock":1,"stockAfterUnlock":1,"pendingWritesBeforeUnlock":0}
+Health: no se pudo consultar MariaDB. Revisá Docker y backend/.env.
+Error al consultar las categorías.
+✔ saturation rejects HTTP requests, does not queue, permits shutdown and recovery (12.5635ms)
+ℹ {"saturatedHealth":503,"saturatedCategory":500,"elapsed":5,"shutdown":"completed with pool occupied"}
+ℹ Recovered health and all five connections; no queued late acquisitions
+✔ slow registration logs diagnostics without secrets, then rolls back (5251.6871ms)
+ℹ {"case":"sensitive-slow-log","logging":false,"hashLeaked":false,"emailLeaked":false}
+database.query.failed
+database.query.failed
+✔ lost transaction connection yields an explicitly uncertain outcome and is not reused (64.1458ms)
+✔ schema metadata mirrors every active column, CHECK, index and FK (39.8414ms)
+✔ all DDL automation stays disabled and password is hidden by default (1.8164ms)
+✔ real repository decimal, nullable fields and relations retain their shape (37.3445ms)
+database.query.failed
+▶ registro transaccional en MariaDB
+  ✔ PARTICULAR: persiste ambas filas y revierte un duplicado (763.9854ms)
+database.query.failed
+  ✔ EMPRESA: persiste ambas filas y revierte un duplicado (689.7454ms)
+  ✔ error en INSERT USUARIO revierte CLIENTE y devuelve 500 genérico (232.7241ms)
+database.query.failed
+  ✔ dos registros simultáneos del mismo email crean solo un par (478.9555ms)
+  ✔ rol ADMIN y contraseña excesiva no crean filas (5.9868ms)
+  ✔ health sigue 200 después de las transacciones (2.4486ms)
+  ✔ #222: null/types/extras reject without rows; 72-byte password retains spaces at login (648.7313ms)
+✔ registro transaccional en MariaDB (3130.711ms)
+ℹ tests 219
+ℹ suites 1
+ℹ pass 219
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 22958.5202
+{"schemaBefore":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","schemaAfter":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","unchanged":true}
+{"database":"categories_test_c923bb3e40bd4710bd0d5c689108ffb4","port":50062,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ categorías HTTP y SQL real en MariaDB aislada
+  ✔ cero categorías (38.8557ms)
+  ✔ solo inactivas también devuelve vacío (3.2225ms)
+  ✔ activas sin productos, orden por collation y desempate por ID (7.6536ms)
+  ✔ paginación, búsqueda y venta no limitan categorías; catálogo sigue vacío (13.0463ms)
+  ✔ productos inactivos y sin stock no cambian el listado (31.8045ms)
+  ✔ más de 100 categorías no se truncan (199.673ms)
+database.query.failed
+Error al consultar las categorías.
+  ✔ fallo SQL real responde 500 genérico (23.7717ms)
+✔ categorías HTTP y SQL real en MariaDB aislada (625.854ms)
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias?page=2&limit=1&categoria=999&busqueda=nada&venta=0","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias?limit=1&page=999","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":7,"nombre":"Tornillos 000"},{"id":8,"nombre":"Tornillos 001"},{"id":9,"nombre":"Tornillos 002"},{"id":10,"nombre":"Tornillos 003"},{"id":11,"nombre":"Tornillos 004"},{"id":12,"nombre":"Tornillos 005"},{"id":13,"nombre":"Tornillos 006"},{"id":14,"nombre":"Tornillos 007"},{"id":15,"nombre":"Tornillos 008"},{"id":16,"nombre":"Tornillos 009"},{"id":17,"nombre":"Tornillos 010"},{"id":18,"nombre":"Tornillos 011"},{"id":19,"nombre":"Tornillos 012"},{"id":20,"nombre":"Tornillos 013"},{"id":21,"nombre":"Tornillos 014"},{"id":22,"nombre":"Tornillos 015"},{"id":23,"nombre":"Tornillos 016"},{"id":24,"nombre":"Tornillos 017"},{"id":25,"nombre":"Tornillos 018"},{"id":26,"nombre":"Tornillos 019"},{"id":27,"nombre":"Tornillos 020"},{"id":28,"nombre":"Tornillos 021"},{"id":29,"nombre":"Tornillos 022"},{"id":30,"nombre":"Tornillos 023"},{"id":31,"nombre":"Tornillos 024"},{"id":32,"nombre":"Tornillos 025"},{"id":33,"nombre":"Tornillos 026"},{"id":34,"nombre":"Tornillos 027"},{"id":35,"nombre":"Tornillos 028"},{"id":36,"nombre":"Tornillos 029"},{"id":37,"nombre":"Tornillos 030"},{"id":38,"nombre":"Tornillos 031"},{"id":39,"nombre":"Tornillos 032"},{"id":40,"nombre":"Tornillos 033"},{"id":41,"nombre":"Tornillos 034"},{"id":42,"nombre":"Tornillos 035"},{"id":43,"nombre":"Tornillos 036"},{"id":44,"nombre":"Tornillos 037"},{"id":45,"nombre":"Tornillos 038"},{"id":46,"nombre":"Tornillos 039"},{"id":47,"nombre":"Tornillos 040"},{"id":48,"nombre":"Tornillos 041"},{"id":49,"nombre":"Tornillos 042"},{"id":50,"nombre":"Tornillos 043"},{"id":51,"nombre":"Tornillos 044"},{"id":52,"nombre":"Tornillos 045"},{"id":53,"nombre":"Tornillos 046"},{"id":54,"nombre":"Tornillos 047"},{"id":55,"nombre":"Tornillos 048"},{"id":56,"nombre":"Tornillos 049"},{"id":57,"nombre":"Tornillos 050"},{"id":58,"nombre":"Tornillos 051"},{"id":59,"nombre":"Tornillos 052"},{"id":60,"nombre":"Tornillos 053"},{"id":61,"nombre":"Tornillos 054"},{"id":62,"nombre":"Tornillos 055"},{"id":63,"nombre":"Tornillos 056"},{"id":64,"nombre":"Tornillos 057"},{"id":65,"nombre":"Tornillos 058"},{"id":66,"nombre":"Tornillos 059"},{"id":67,"nombre":"Tornillos 060"},{"id":68,"nombre":"Tornillos 061"},{"id":69,"nombre":"Tornillos 062"},{"id":70,"nombre":"Tornillos 063"},{"id":71,"nombre":"Tornillos 064"},{"id":72,"nombre":"Tornillos 065"},{"id":73,"nombre":"Tornillos 066"},{"id":74,"nombre":"Tornillos 067"},{"id":75,"nombre":"Tornillos 068"},{"id":76,"nombre":"Tornillos 069"},{"id":77,"nombre":"Tornillos 070"},{"id":78,"nombre":"Tornillos 071"},{"id":79,"nombre":"Tornillos 072"},{"id":80,"nombre":"Tornillos 073"},{"id":81,"nombre":"Tornillos 074"},{"id":82,"nombre":"Tornillos 075"},{"id":83,"nombre":"Tornillos 076"},{"id":84,"nombre":"Tornillos 077"},{"id":85,"nombre":"Tornillos 078"},{"id":86,"nombre":"Tornillos 079"},{"id":87,"nombre":"Tornillos 080"},{"id":88,"nombre":"Tornillos 081"},{"id":89,"nombre":"Tornillos 082"},{"id":90,"nombre":"Tornillos 083"},{"id":91,"nombre":"Tornillos 084"},{"id":92,"nombre":"Tornillos 085"},{"id":93,"nombre":"Tornillos 086"},{"id":94,"nombre":"Tornillos 087"},{"id":95,"nombre":"Tornillos 088"},{"id":96,"nombre":"Tornillos 089"},{"id":97,"nombre":"Tornillos 090"},{"id":98,"nombre":"Tornillos 091"},{"id":99,"nombre":"Tornillos 092"},{"id":100,"nombre":"Tornillos 093"},{"id":101,"nombre":"Tornillos 094"},{"id":102,"nombre":"Tornillos 095"},{"id":103,"nombre":"Tornillos 096"},{"id":104,"nombre":"Tornillos 097"},{"id":105,"nombre":"Tornillos 098"},{"id":106,"nombre":"Tornillos 099"},{"id":107,"nombre":"Tornillos 100"},{"id":108,"nombre":"Tornillos 101"},{"id":109,"nombre":"Tornillos 102"},{"id":110,"nombre":"Tornillos 103"},{"id":111,"nombre":"Tornillos 104"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias (tabla no disponible)","status":500,"body":{"message":"Error interno del servidor."}}
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 972.6296
+{"schemaBefore":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","schemaAfter":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","unchanged":true}
+{"name":"admin-products-test-d7373d8b71294ff1b30d9fc3f4ae4f03","containerAbsent":true,"orphanVolumes":[]}
+{"name":"categories-test-c923bb3e40bd4710bd0d5c689108ffb4","containerAbsent":true,"orphanVolumes":[]}
+AUDIT_RECORDED_CLEANUP {"originalClean":true,"ownResourcesRemoved":true}

@@ -1,0 +1,10 @@
+✔ elimina contenedor y volúmenes ante fallo de run-confirmation (2839.9778ms)
+✔ elimina contenedor y volúmenes ante fallo de inspect (3027.4984ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5929.3926

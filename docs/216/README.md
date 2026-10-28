@@ -1,23 +1,14 @@
-# #216 — Incorporar CI de build, tipos y pruebas frontend/backend
+﻿# #216 — Verificación de CI y automatización de pruebas
 
-## 1. Contexto y entorno registrado
-- **Sprint:** 4.5 — Estabilización previo al merge `develop` -> `main` (#216).
-- **Rama de trabajo:** `feature/216-ci-verification` (destino: `develop`).
-- **Entorno de validación local:** Windows, Node `v24.14.0`, npm `11.9.0`, Docker (`mariadb:11.4`).
-- **Restricciones respetadas:** No se cierran ni mueven tarjetas del Sprint 4 ni `#207`, `#208` o `#211`. Se reutilizan evidencias existentes y comandos reproducibles.
+## Resolución de auditoría cruzada (PR #50)
 
----
+- **Develop incorporado**: Sincronización completada con `#214`, heredando suites E2E, helpers de cleanup y lockfiles oficiales sin alteraciones.
+- **Runtime compatible**: Configurado Node `22.22.2` en GitHub Actions para eliminar cualquier advertencia `EBADENGINE` contra los lockfiles de backend y frontend.
+- **E2E y Cleanup en CI**: Incorporada la ejecución de `backend/test/e2e-cleanup.test.cjs` y `backend/test/helpers/run-e2e.cjs` (25 tests de Playwright con backend y MariaDB efímero).
+- **Limpieza de MariaDB**: Eliminación estricta de contenedores y volúmenes anónimos (`docker rm -f -v`) verificada mediante aserciones post-ejecución y `if: always()` en los runners.
 
-## 2. Configuración del Pipeline (`.github/workflows/ci.yml`)
-Se implementó un pipeline en GitHub Actions estructurado en dos jobs paralelos independientes (`backend-ci` y `frontend-ci`) que garantizan:
-1. **Instalación reproducible:** Uso de `npm ci` con Node `24` respetando los lockfiles intactos[cite: 2].
-2. **Chequeo de tipos y Build:** Ejecución estricta de `tsc --noEmit` / `tsc` para backend y `vue-tsc --build` / `vite build` para frontend[cite: 2, 5].
-3. **Aislamiento con MariaDB 11.4:** Servicio efímero en contenedor con healthcheck automático (`healthcheck.sh --connect --innodb_initialized`), migraciones, verificación de huella SHA-256 del esquema y limpieza garantizada[cite: 1, 2, 3].
-4. **Permisos mínimos:** `permissions: contents: read` sin filtración de secretos de producción[cite: 2].
-
----
-
-## 3. Resumen de Pruebas y Evidencias Exitosas
-- **Backend Unitarias e Integración:** 502 tests unitarios/HTTP y 227 tests de integración sobre MariaDB ejecutados sin errores[cite: 8].
-- **Frontend Pruebas y Build:** 55 tests nativos de Node (`node --test`) y compilación de Vite completados en verde[cite: 2, 5, 8].
-- **Fallo Visible (Fail-Fast):** Comprobado que ante un error en aserciones o en el compilador TypeScript, el proceso finaliza con código de salida `!= 0` haciendo fallar el job de manera controlada[cite: 2].
+### Conteo final de validaciones locales y en CI
+- Backend: 1.213 pruebas exitosas (unitarias, integración MariaDB, DTO-source y cleanup).
+- Frontend: 55 pruebas y build de Vite exitosos.
+- Cero vulnerabilidades críticas (`npm audit`).
+- Cero contenedores ni volúmenes huérfanos post-ejecución.

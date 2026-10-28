@@ -1,4 +1,4 @@
-name: CI Build, Types and Tests
+﻿name: CI Build, Types and Tests
 
 on:
   push:
@@ -12,27 +12,17 @@ permissions:
 
 jobs:
   backend-ci:
-    name: Backend CI (Node 24 + MariaDB)
+    name: Backend CI (Node 22 + MariaDB + E2E & Cleanup)
     runs-on: ubuntu-latest
-
-    services:
-      mariadb:
-        image: mariadb:11.4
-        env:
-          MARIADB_ROOT_PASSWORD: root_dev_only
-          MARIADB_DATABASE: ferrepatagonia_dev
-        ports:
-          - 3306:3306
-        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=10
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 24
+      - name: Setup Node.js 22.22.2
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22.22.2'
           cache: 'npm'
           cache-dependency-path: backend/package-lock.json
 
@@ -62,27 +52,23 @@ jobs:
 
       - name: Run backend MariaDB integration tests
         working-directory: backend
-        env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_NAME: ferrepatagonia_dev
-          DB_USER: root
-          DB_PASSWORD: root_dev_only
-          JWT_SECRET: 3f646223a285abff63ac1dbcb731cb3dc85444204113d59d07204e14658afa9f
         run: npm run test:integration
 
+      - name: Run E2E cleanup validation tests
+        run: node --test backend/test/e2e-cleanup.test.cjs
+
   frontend-ci:
-    name: Frontend CI (Node 24 + Vite)
+    name: Frontend CI (Node 22 + Vite + Playwright E2E)
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 24
+      - name: Setup Node.js 22.22.2
         uses: actions/setup-node@v4
         with:
-          node-version: '24'
+          node-version: '22.22.2'
           cache: 'npm'
           cache-dependency-path: frontend/package-lock.json
 
@@ -90,14 +76,29 @@ jobs:
         working-directory: frontend
         run: npm ci
 
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
       - name: Type check frontend
         working-directory: frontend
         run: npm run type-check
 
-      - name: Run frontend tests
+      - name: Run frontend unit/component tests
         working-directory: frontend
         run: npm test
 
       - name: Build frontend
         working-directory: frontend
         run: npm run build
+
+      - name: Run integrated E2E suite
+        run: node backend/test/helpers/run-e2e.cjs
+
+      - name: Verify clean Docker state
+        if: always()
+        run: |
+          echo "Contenedores activos restantes:"
+          docker ps -a
+          echo "Volúmenes Docker restantes:"
+          docker volume ls
