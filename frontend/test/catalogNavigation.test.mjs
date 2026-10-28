@@ -3,11 +3,15 @@ import test from 'node:test'
 import { readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
 
-test('el catálogo está disponible en el menú público sin permisos', async () => {
-  const menu = await readFile(
-    fileURLToPath(new URL('../src/config/menu.ts', import.meta.url)),
+function readSource(path) {
+  return readFile(
+    fileURLToPath(new URL(path, import.meta.url)),
     'utf8',
   )
+}
+
+test('el catálogo está disponible en el menú público sin permisos', async () => {
+  const menu = await readSource('../src/config/menu.ts')
 
   assert.match(
     menu,
@@ -15,11 +19,19 @@ test('el catálogo está disponible en el menú público sin permisos', async ()
   )
 })
 
-test('Inicio conserva el menú público que da acceso al catálogo', async () => {
-  const home = await readFile(
-    fileURLToPath(new URL('../src/views/HomeView.vue', import.meta.url)),
-    'utf8',
-  )
+test('el layout público incluye el encabezado y el contenido de la ruta', async () => {
+  const layout = await readSource('../src/layouts/PublicLayout.vue')
 
-  assert.match(home, /<PublicMenu :permissions="permissions" \/>/)
+  assert.match(layout, /<PublicHeader\s*\/>/)
+  assert.match(layout, /<RouterView\s*\/>/)
+})
+
+test('el encabezado utiliza el menú público con permisos', async () => {
+  const header = await readSource('../src/components/PublicHeader.vue')
+
+  assert.match(header, /import \{ publicMenu \} from/)
+  assert.match(
+    header,
+    /<NavigationMenu\b[^>]*:items="publicMenu"[^>]*:permissions="permissions"/,
+  )
 })
