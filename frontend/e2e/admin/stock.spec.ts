@@ -121,7 +121,7 @@ test('valida stock y refleja los cambios en el catálogo público', async ({
     try {
       const restored = await page.request.patch(
         '/api/admin/productos/2/stock',
-        { data: { stock: 30 } },
+        { data: { stock: 30 }, headers: { Origin: new URL(page.url()).origin } },
       );
       expect(restored.ok()).toBe(true);
 

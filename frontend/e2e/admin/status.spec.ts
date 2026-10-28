@@ -103,6 +103,7 @@ test('cancela, desactiva y reactiva un producto con reflejo público', async ({
       // Restaurar el estado incluso si falla una comprobación.
       const restored = await page.request.put('/api/admin/productos/2', {
         data: { activo: true },
+        headers: { Origin: new URL(page.url()).origin },
       });
       expect(restored.ok()).toBe(true);
 

@@ -152,6 +152,7 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
       if (createdId && Number.isInteger(createdId)) {
         const cleanup = await page.request.patch(
           `/api/admin/productos/${createdId}/desactivar`,
+          { headers: { Origin: new URL(page.url()).origin } },
         );
         expect(cleanup.ok()).toBe(true);
       }

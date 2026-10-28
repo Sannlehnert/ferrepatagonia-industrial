@@ -179,9 +179,26 @@ async function main() {
   console.log(`Base E2E preparada: ${database}`);
   checkInterrupted();
 
+  // Elegir el origen antes de iniciar la API; strictPort falla si se ocupa.
+  const candidate = require('node:net').createServer();
+  await new Promise((resolve, reject) => {
+    candidate.once('error', reject);
+    candidate.listen(0, '127.0.0.1', resolve);
+  });
+  const plannedWebPort = candidate.address().port;
+  await new Promise(resolve => candidate.close(resolve));
   const apiEnv = {
     ...process.env,
     NODE_ENV: 'test',
+    APP_PUBLIC_ORIGIN: 'http://127.0.0.1:' + plannedWebPort,
+    TRUSTED_PROXY_CIDRS: 'none',
+    HTTPS_TERMINATION: 'trusted-proxy',
+    AUTH_RATE_STORE: 'memory',
+    API_PROCESS_COUNT: '1',
+    AUTH_LOGIN_LIMIT: '100',
+    AUTH_REGISTER_LIMIT: '100',
+    AUTH_LOGIN_WINDOW_MS: '60000',
+    AUTH_REGISTER_WINDOW_MS: '60000',
     DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
     E2E_ISOLATED: '1',
     JWT_SECRET: randomUUID(),
@@ -205,6 +222,7 @@ async function main() {
     ...process.env,
     NODE_ENV: 'test',
     E2E_ISOLATED: '1',
+    E2E_WEB_PORT: String(plannedWebPort),
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
   };
 

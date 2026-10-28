@@ -14,6 +14,9 @@ assert.equal(apiURL.username, "");
 assert.equal(apiURL.password, "");
 
 const frontend = fileURLToPath(new URL("../../", import.meta.url));
+const webPort = Number(process.env.E2E_WEB_PORT);
+assert.ok(Number.isInteger(webPort) && webPort > 0 && webPort <= 65535,
+  "El ejecutor debe fijar el puerto público E2E.");
 
 let server;
 let stopping = false;
@@ -49,7 +52,8 @@ async function main() {
     clearScreen: false,
     server: {
       host: "127.0.0.1",
-      port: 0,
+      port: webPort,
+      strictPort: true,
       open: false,
       proxy: {
         "/api": {
