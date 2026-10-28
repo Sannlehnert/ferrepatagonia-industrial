@@ -48,7 +48,7 @@ onBeforeUnmount(() => {
         id="home-recommended-title"
         class="m-0 mb-7 text-center text-2xl font-bold"
       >
-        Recomendados
+        Productos
       </h2>
 
       <p v-if="loading" class="m-0 text-center" role="status">

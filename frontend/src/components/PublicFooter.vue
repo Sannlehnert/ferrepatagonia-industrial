@@ -32,7 +32,7 @@ const linkClass =
 
 <template>
   <footer class="bg-[#0b2438] text-white">
-    <div class="box-border mx-auto w-full max-w-[1440px] px-4 sm:px-6 lg:px-10">
+    <div class="box-border w-full px-4 sm:px-6 lg:px-10">
       <div
         class="grid grid-cols-1 gap-8 py-8 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr] lg:gap-16"
       >

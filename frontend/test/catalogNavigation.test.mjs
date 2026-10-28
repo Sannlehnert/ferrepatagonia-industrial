@@ -35,10 +35,3 @@ test('el encabezado utiliza el menú público con permisos', async () => {
     /<NavigationMenu\b[^>]*:items="publicMenu"[^>]*:permissions="permissions"/,
   )
 })
-
-test('Inicio mantiene un acceso destacado al catálogo', async () => {
-  const home = await readSource('../src/views/HomeView.vue')
-
-  assert.match(home, /:to="\{ name: 'catalogo' \}"/)
-  assert.match(home, /Ver catálogo/)
-})

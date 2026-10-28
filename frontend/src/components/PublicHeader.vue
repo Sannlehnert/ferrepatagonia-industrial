@@ -58,7 +58,7 @@ async function submitSearch() {
   <header class="bg-white text-[#103a5c]">
     <div class="bg-[#0b2438] text-white">
       <div
-        class="box-border mx-auto flex min-h-9 max-w-[1440px] items-center px-4 py-2 text-xs sm:px-6 lg:px-10"
+        class="box-border flex min-h-9 items-center px-4 py-2 text-xs sm:px-6 lg:px-10"
       >
         Envíos y retiros coordinados · Neuquén Capital
       </div>
@@ -66,7 +66,7 @@ async function submitSearch() {
 
     <div class="border-0 border-b border-solid border-[#e2e8f0]">
       <div
-        class="box-border mx-auto grid max-w-[1440px] grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 px-4 py-4 sm:px-6 lg:min-h-20 lg:grid-cols-[223px_minmax(0,1fr)_auto] lg:px-10"
+        class="box-border grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 px-4 py-4 sm:px-6 lg:min-h-20 lg:grid-cols-[223px_minmax(0,1fr)_auto] lg:px-10"
       >
         <RouterLink
           :to="{ name: 'home' }"
@@ -132,7 +132,7 @@ async function submitSearch() {
 
     <div class="border-0 border-b border-solid border-[#e2e8f0]">
       <div
-        class="box-border mx-auto flex max-w-[1440px] flex-wrap items-center gap-1 px-1 text-sm font-bold sm:px-3 lg:px-7"
+        class="box-border flex flex-wrap items-center gap-1 px-1 text-sm font-bold sm:px-3 lg:px-7"
       >
         <NavigationMenu
           :items="publicMenu"
