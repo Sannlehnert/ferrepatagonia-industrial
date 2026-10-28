@@ -1,0 +1,52 @@
+✖ elimina contenedor y volúmenes ante fallo de run-confirmation (2634.5054ms)
+✖ elimina contenedor y volúmenes ante fallo de inspect (2780.3499ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 0
+ℹ fail 2
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5480.5842
+
+✖ failing tests:
+
+test at backend\test\e2e-cleanup.test.cjs:6:3
+✖ elimina contenedor y volúmenes ante fallo de run-confirmation (2634.5054ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Limpieza E2E confirmada/. Input:
+
+  'TEST_RESOURCE={"name":"ferrepatagonia-e2e-b9502314d6a747ea8447de4d3c8d24d3","volumes":["7ce4f1515e9e8abfabc185d8738774b668b02468749f23d299df7b79cfd28980"]}\n'
+
+      at TestContext.<anonymous> (C:\Users\santi\.codex\.chatgpt-projects\g-p-6ad2bb061ed081919f828743ce783346\fix-214-final\backend\test\e2e-cleanup.test.cjs:47:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.start (node:internal/test_runner/test:1015:17)
+      at startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'TEST_RESOURCE={"name":"ferrepatagonia-e2e-b9502314d6a747ea8447de4d3c8d24d3","volumes":["7ce4f1515e9e8abfabc185d8738774b668b02468749f23d299df7b79cfd28980"]}\n',
+    expected: /Limpieza E2E confirmada/,
+    operator: 'match',
+    diff: 'simple'
+  }
+
+test at backend\test\e2e-cleanup.test.cjs:6:3
+✖ elimina contenedor y volúmenes ante fallo de inspect (2780.3499ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /Limpieza E2E confirmada/. Input:
+
+  'TEST_RESOURCE={"name":"ferrepatagonia-e2e-689c75033e794273a479921252c7f4b7","volumes":["1a0cddf0e80dc44912861b2715cfa91cb3c3a59e0b5884fdea71fa251e064246"]}\n'
+
+      at TestContext.<anonymous> (C:\Users\santi\.codex\.chatgpt-projects\g-p-6ad2bb061ed081919f828743ce783346\fix-214-final\backend\test\e2e-cleanup.test.cjs:47:14)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:787:18)
+      at Test.postRun (node:internal/test_runner/test:1247:19)
+      at Test.run (node:internal/test_runner/test:1175:12)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 'TEST_RESOURCE={"name":"ferrepatagonia-e2e-689c75033e794273a479921252c7f4b7","volumes":["1a0cddf0e80dc44912861b2715cfa91cb3c3a59e0b5884fdea71fa251e064246"]}\n',
+    expected: /Limpieza E2E confirmada/,
+    operator: 'match',
+    diff: 'simple'
+  }

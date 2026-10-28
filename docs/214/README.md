@@ -1,6 +1,82 @@
 # #214 — Pruebas E2E integradas
 
-## Estado actual
+## Validación final con #212 y #217 — 27/10/2026
+
+LISTO PARA AUDITORÍA FINAL. PR #47 abierto; aprobación y merge reservados al coordinador.
+
+- Develop incorporado por merge normal: b49568f1345ef406df7a365d762211c7f139e75a.
+- Merge en esta rama: 8cef69a181df4aa1ca97658d1131de32cd2b4ea2.
+- Cleanup: ceb0d3ae7571c2fd803d8671805a7af95db836b5.
+- Origen HTTP: cd36f6bf792336727f586fc69833cdcf5f71a0cb.
+- Estado técnico final validado: fee8707eb76de45bd1370cfd46be2f0c3611013c.
+- La documentación y evidencia se registran después, sin cambiar ese contenido técnico.
+
+El runner inventaría los volúmenes del contenedor exclusivo, incluso durante cleanup
+si se perdió la confirmación de run o falló inspect. Retira con rm -f -v y verifica
+que no quedan ni el contenedor ni sus volúmenes. Si no logra inventariar o verificar,
+informa el fallo y conserva exit 1; no oculta el error inicial. Sin prune.
+La consulta exacta de recursos permite repetir cleanup sin intentar borrar contenedores ajenos.
+Los dos helpers backend heredados también reciben -v para que toda la regresión
+final termine sin respaldo externo.
+
+El puerto público se elige antes de iniciar la API. APP_PUBLIC_ORIGIN coincide con
+Vite, que valida el puerto y usa strictPort. Las cuatro limpiezas administrativas
+envían Origin real. El perfil E2E fija login y registro en 100 solicitudes por 60 s,
+MemoryStore de un proceso, sobreescribiendo las variables específicas heredadas.
+Passport, cookies, autorización, origen/CSRF y DTOs permanecen reales e intactos.
+El puerto reservado se libera antes de Vite: una colisión falla por strictPort.
+
+### Resultados finales independientes
+
+| Comprobación | PASS | FAIL | SKIP |
+|---|---:|---:|---:|
+| E2E completos sobre el runner versionado | 25 | 0 | 0 |
+| Segunda ejecución con entorno heredado adverso y observador de recursos | 25 | 0 | 0 |
+| Cleanup: confirmación perdida e inspect fallido | 2 | 0 | 0 |
+| Backend unitarias/HTTP | 984 | 0 | 0 |
+| Backend desde fuente | 2 | 0 | 0 |
+| Integraciones backend finales | 219 + 8 | 0 | 0 |
+| Total backend | 1213 | 0 | 0 |
+
+npm ci, builds y TypeScript de ambos proyectos: PASS.
+body-parser instalado: 2.4.0; npm audit backend: 0 vulnerabilidades.
+Sonda negativa externa que quita -v sólo en memoria: ambos tests de cleanup
+fallan como se esperaba, y su finally retira únicamente los IDs propios.
+No se suma como una falla funcional del estado publicado.
+
+Evidencias saneadas: evidence/final-integration/. e2e-independent.txt registra
+contenedor ausente y cero volúmenes huérfanos. backend-integration-final.txt
+confirma lo mismo en ambos helpers y esquema unchanged.
+backend-tests.txt conserva la primera corrida funcional de 1213 casos: sus helpers
+heredados todavía dejaron volúmenes, retirados por respaldo externo.
+Después del ajuste de dos líneas se repitieron las 227 integraciones: limpieza
+original confirmada, sin respaldo. Las otras 986 pruebas no cambiaron.
+
+Comandos adicionales a los descriptos más abajo:
+
+~~~text
+npm run type-check --prefix backend
+npm test --prefix backend
+node --test backend/test/e2e-cleanup.test.cjs
+node backend/test/helpers/run-e2e.cjs
+npm audit --prefix backend
+~~~
+
+Entorno: Windows, Node 24.14.0, npm 11.18.0, Docker 29.9.2,
+Playwright 1.64.1 / Chromium revisión 1248, MariaDB 11.4.
+Imagen observada: mariadb@sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b.
+Hay advertencias EBADENGINE de herramientas frontend para Node 24.14:
+los checks ejecutados pasan; CI debe utilizar un runtime admitido por el lock,
+por ejemplo Node 22.22.2. No se modificaron dependencias para ocultar el aviso.
+Los observadores y la sonda negativa sólo registran/instrumentan recursos de prueba;
+los 25 E2E iniciales pasaron directamente sin ellos.
+
+Pendiente auditoría final del coordinador y coordinación #216/#218.
+Las expectativas de precio #208 siguen pendientes; no se alteran #207/#208/#211.
+No se afirma validación de TLS/proxy productivo ni de otros navegadores.
+
+
+## Estado anterior (histórico)
 
 En progreso, pendiente de nueva revisión del PR #47.
 
