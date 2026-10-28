@@ -1,0 +1,209 @@
+name: CI Build, Types and Tests
+
+on:
+    push:
+        branches: [ develop, main ]
+    pull_request:
+        branches: [ develop, main ]
+    workflow_dispatch:
+
+permissions:
+    contents: read
+
+jobs:
+    backend-ci:
+        name: Backend CI (Node 22 + MariaDB + E2E & Cleanup)
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js 22.22.2
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22.22.2'
+                  cache: 'npm'
+                  cache-dependency-path: backend/package-lock.json
+
+            - name: Capture initial Docker resources baseline
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p ci-diagnostics
+                  docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-before.txt
+                  docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-before.txt
+
+            - name: Install backend dependencies
+              working-directory: backend
+              run: npm ci
+
+            - name: Run backend security audit
+              working-directory: backend
+              run: npm audit --audit-level=high
+
+            - name: Type check backend
+              working-directory: backend
+              run: npm run type-check
+
+            - name: Build backend
+              working-directory: backend
+              run: npm run build
+
+            - name: Run backend unit tests
+              working-directory: backend
+              run: npm run test:unit
+
+            - name: Run backend DTO source tests
+              working-directory: backend
+              run: npm run test:dto-source
+
+            - name: Run backend MariaDB integration tests
+              working-directory: backend
+              run: npm run test:integration
+
+            - name: Run E2E cleanup resilience tests
+              run: node --test backend/test/e2e-cleanup.test.cjs
+
+            - name: Verify MariaDB container and volume cleanup
+              if: always()
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p ci-diagnostics
+                  printf '%s\n' '{"verification":"error","clean":false}' > ci-diagnostics/backend-docker-cleanup.json
+                  trap 'rc=$?; if [ "$rc" -ne 0 ]; then cat ci-diagnostics/backend-docker-cleanup.json >> "$GITHUB_STEP_SUMMARY"; fi' EXIT
+                  docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-after.txt
+                  docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-after.txt
+                  LEAKED_CONTAINERS=$(comm -13 /tmp/docker-containers-before.txt /tmp/docker-containers-after.txt)
+                  LEAKED_VOLUMES=$(comm -13 /tmp/docker-volumes-before.txt /tmp/docker-volumes-after.txt)
+                  node -e '
+                    const fs = require("node:fs");
+                    const containers = process.argv[1].split(/\r?\n/).filter(Boolean);
+                    const volumes = process.argv[2].split(/\r?\n/).filter(Boolean);
+                    const report = {
+                      job: "backend-ci",
+                      remainingContainers: containers,
+                      remainingVolumes: volumes,
+                      clean: containers.length === 0 && volumes.length === 0
+                    };
+                    fs.writeFileSync("ci-diagnostics/backend-docker-cleanup.json", JSON.stringify(report, null, 2) + "\n");
+                    console.log(JSON.stringify(report, null, 2));
+                    if (!report.clean) process.exit(1);
+                  ' "$LEAKED_CONTAINERS" "$LEAKED_VOLUMES"
+                  {
+                    echo "### Backend CI — MariaDB Cleanup Verification"
+                    echo '```json'
+                    cat ci-diagnostics/backend-docker-cleanup.json
+                    echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Upload backend CI diagnostics
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: backend-ci-diagnostics
+                  path: ci-diagnostics/
+                  retention-days: 7
+
+    frontend-ci:
+        name: Frontend CI (Node 22 + Vite + Playwright E2E)
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js 22.22.2
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22.22.2'
+                  cache: 'npm'
+                  cache-dependency-path: |
+                      frontend/package-lock.json
+                      backend/package-lock.json
+
+            - name: Capture initial Docker resources baseline
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p ci-diagnostics
+                  docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-before.txt
+                  docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-before.txt
+
+            - name: Install frontend dependencies
+              working-directory: frontend
+              run: npm ci
+
+            - name: Run frontend security audit
+              working-directory: frontend
+              run: npm audit --audit-level=high
+
+            - name: Type check frontend
+              working-directory: frontend
+              run: npm run type-check
+
+            - name: Run frontend unit tests
+              working-directory: frontend
+              run: npm test
+
+            - name: Build frontend
+              working-directory: frontend
+              run: npm run build
+
+            - name: Prepare backend dependencies and build for integrated E2E
+              working-directory: backend
+              run: |
+                  npm ci
+                  npm run build
+
+            - name: Install Playwright Chromium browser
+              working-directory: frontend
+              run: npx playwright install --with-deps chromium
+
+            - name: Run integrated E2E suite
+              run: node backend/test/helpers/run-e2e.cjs
+
+            - name: Verify MariaDB E2E container and volume cleanup
+              if: always()
+              shell: bash
+              run: |
+                  set -euo pipefail
+                  mkdir -p ci-diagnostics
+                  printf '%s\n' '{"verification":"error","clean":false}' > ci-diagnostics/frontend-e2e-docker-cleanup.json
+                  trap 'rc=$?; if [ "$rc" -ne 0 ]; then cat ci-diagnostics/frontend-e2e-docker-cleanup.json >> "$GITHUB_STEP_SUMMARY"; fi' EXIT
+                  docker ps -a --format '{{.Names}}' | sort > /tmp/docker-containers-after.txt
+                  docker volume ls --format '{{.Name}}' | sort > /tmp/docker-volumes-after.txt
+                  LEAKED_CONTAINERS=$(comm -13 /tmp/docker-containers-before.txt /tmp/docker-containers-after.txt)
+                  LEAKED_VOLUMES=$(comm -13 /tmp/docker-volumes-before.txt /tmp/docker-volumes-after.txt)
+                  node -e '
+                    const fs = require("node:fs");
+                    const containers = process.argv[1].split(/\r?\n/).filter(Boolean);
+                    const volumes = process.argv[2].split(/\r?\n/).filter(Boolean);
+                    const report = {
+                      job: "frontend-ci",
+                      remainingContainers: containers,
+                      remainingVolumes: volumes,
+                      clean: containers.length === 0 && volumes.length === 0
+                    };
+                    fs.writeFileSync("ci-diagnostics/frontend-e2e-docker-cleanup.json", JSON.stringify(report, null, 2) + "\n");
+                    console.log(JSON.stringify(report, null, 2));
+                    if (!report.clean) process.exit(1);
+                  ' "$LEAKED_CONTAINERS" "$LEAKED_VOLUMES"
+                  {
+                    echo "### Frontend & E2E CI — MariaDB Cleanup Verification"
+                    echo '```json'
+                    cat ci-diagnostics/frontend-e2e-docker-cleanup.json
+                    echo '```'
+                  } >> "$GITHUB_STEP_SUMMARY"
+
+            - name: Upload frontend and E2E CI diagnostics
+              if: always()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: frontend-e2e-ci-diagnostics
+                  path: |
+                      ci-diagnostics/
+                      frontend/playwright-report/index.html
+                  if-no-files-found: ignore
+                  retention-days: 7
