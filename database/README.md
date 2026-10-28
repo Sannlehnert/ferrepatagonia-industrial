@@ -251,7 +251,7 @@ Después ejecutar nuevamente los tres comandos del paso 3: `schema.sql`, `seed.s
 `utf8mb4_unicode_ci`); comprobar `SHOW CREATE TABLE PRODUCTO` y disponer de permisos
 SELECT, UPDATE y ALTER. No volver a ejecutar `schema.sql` ni `seed.sql`.
 Una base nueva creada con `schema.sql` ya tiene `uq_producto_codigo`; no necesita
-esta migración. El único ensayo de esta tarea usa el helper y una base
+esta migración. El ensayo automatizado usa el helper y una base
 MariaDB desechable. Para cualquier ensayo manual, usar también una base aislada,
 nunca el volumen de desarrollo compartido ni datos productivos.
 
@@ -261,20 +261,92 @@ nunca el volumen de desarrollo compartido ni datos productivos.
 2. Guardar evidencia del estado previo: `SHOW CREATE TABLE PRODUCTO`, cantidad
    de filas y resultados de las consultas de precondición del paso 3. Hacer un
    backup completo y comprobar su restauración en una base aparte antes de
-   modificar datos. Ejemplo de backup; reemplazar los placeholders y escribir
-   la contraseña solo en el prompt:
+   modificar datos. Usar una de las variantes de cliente de la siguiente sección;
+   reemplazar los placeholders y escribir la contraseña solo en el prompt.
+
+### Cliente y respaldo previo (paso 2)
+
+El servidor corre en Docker, pero eso **no instala `mariadb-dump`/`mariadb` en
+el host**. Referencia ensayada: servidor y clientes MariaDB **11.4.13**, imagen
+`mariadb:11.4`; el tag puede avanzar. Registrar `mariadb-dump --version`,
+`mariadb --version` y `SELECT VERSION()` del ensayo. Usar clientes MariaDB 11.4
+compatibles, preferentemente los de la misma imagen/versión del servidor;
+no asumir compatibilidad de un cliente MySQL distinto con el dump generado.
+
+**Cliente instalado en el host:** instalar previamente las herramientas cliente
+MariaDB para esa plataforma. Desde cualquier carpeta, ejecutar el siguiente
+template con host/puerto explícitos; `BACKUP_FILE` es una ruta absoluta en una
+carpeta privada fuera del repositorio. No usar `--databases`/`--all-databases`:
+el dump de esta receta se restaurará dentro de otra base elegida explícitamente.
 
 ```text
 mariadb-dump --host <HOST> --port <PORT> --user <USER> --password --single-transaction --routines --triggers --events <DB_NAME> --result-file="<BACKUP_FILE>"
 ```
 
+**Solo Docker (PowerShell o Bash, desde la raíz):** no hace falta instalar un
+cliente en el host. El contenedor origen debe ser el identificado para el ensayo;
+su cliente conecta al servidor dentro de ese mismo contenedor, puerto 3306.
+El primer comando pide la contraseña sin incluirla en la línea de comando.
+`BACKUP_BASENAME` debe ser un nombre nuevo y exclusivo de esta operación.
+
+```text
+docker exec -it <SOURCE_CONTAINER> mariadb-dump --default-character-set=utf8mb4 --user <BACKUP_USER> --password --single-transaction --routines --triggers --events --result-file=/tmp/<BACKUP_BASENAME>.sql <DB_NAME>
+docker exec <SOURCE_CONTAINER> sha256sum /tmp/<BACKUP_BASENAME>.sql
+docker cp <SOURCE_CONTAINER>:/tmp/<BACKUP_BASENAME>.sql "<PROTECTED_BACKUP_PATH>"
+```
+
+Ejecutar cada comando por separado y detenerse ante error. Verificar archivo no
+vacío y comparar el SHA-256 del origen con `Get-FileHash -Algorithm SHA256
+-LiteralPath '<PROTECTED_BACKUP_PATH>'` (PowerShell) o
+`sha256sum '<PROTECTED_BACKUP_PATH>'` (Bash). Guardar hash, identidad de host/base,
+versiones, conteos y DDL junto al registro del respaldo. El hash comprueba la
+copia; **no sustituye la restauración**. El backup contiene datos y hashes de
+contraseña: protegerlo, no adjuntarlo a tickets ni versionarlo.
+
+Los permisos SELECT/UPDATE/ALTER indicados arriba son para la migración. El
+operador debe habilitar los permisos mínimos necesarios para respaldar los
+objetos existentes, incluidas rutinas/triggers/eventos si los hay; un error de
+permisos invalida el backup. No ampliar a root por defecto ni omitir objetos
+silenciosamente para conseguir un exit exitoso.
+
+### Restauración aislada y continuación (pasos 2–3)
+
+Usar **otra instancia/contenedor descartable**, confirmar su identidad y copiar
+allí el archivo ya verificado. `RESTORE_DB` debe ser un nombre nuevo; no usar
+`IF NOT EXISTS` para encubrir una base preexistente. Sustituir los placeholders
+antes de ejecutar (también dentro del SQL); no usar nombres productivos.
+
+```text
+docker cp "<PROTECTED_BACKUP_PATH>" <RESTORE_CONTAINER>:/tmp/<BACKUP_BASENAME>.sql
+docker exec <RESTORE_CONTAINER> sha256sum /tmp/<BACKUP_BASENAME>.sql
+docker exec -it <RESTORE_CONTAINER> mariadb --default-character-set=utf8mb4 --user <RESTORE_USER> --password
+```
+
+Dentro de ese cliente, después de comparar el hash:
+
+```sql
+SELECT @@hostname, VERSION();
+CREATE DATABASE `<RESTORE_DB>` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `<RESTORE_DB>`;
+SELECT DATABASE();
+SOURCE /tmp/<BACKUP_BASENAME>.sql;
+SHOW CREATE TABLE PRODUCTO;
+SELECT COUNT(*) AS productos_restaurados FROM PRODUCTO;
+```
+
+Comparar todas las tablas/DDL y conteos con el origen, relaciones y verificaciones
+de integridad pertinentes, y los SKU antes/después. Un dump puede contener
+`DROP TABLE`: por eso solo se carga en esa base nueva, vacía y aislada. No
+restaurarlo sobre la base original para ensayar. Con cliente de host se utiliza
+`SOURCE <RUTA_LOCAL_BACKUP>;` en la base aislada; la ruta es del cliente, no del
+servidor. Para automatización, usar un archivo de opciones privado/gestor de
+secretos (`--defaults-extra-file` como primera opción), nunca `-p<contraseña>`,
+echo de secretos ni un archivo del repositorio. No imprimir ni conservar ese
+archivo de opciones como evidencia.
+
 `--single-transaction` protege tablas transaccionales; mantener igualmente
-detenidos todos los escritores durante respaldo y migración. Para ensayar la
-restauración, reemplazar los placeholders, crear una base vacía aislada con el
-mismo charset/collation, conectar `mariadb` a esa base y ejecutar
-`SOURCE <RUTA_BACKUP>;` usando una ruta local legible por el cliente. Comparar
-`SHOW CREATE TABLE PRODUCTO`, cantidades y las verificaciones de integridad; no
-restaurar sobre el destino original como prueba.
+detenidos todos los escritores durante respaldo y migración. Reanudar la
+migración solo después de verificar el respaldo restaurado y su integridad.
 
 La migración contiene DDL con commits implícitos: **no es una transacción
 reversible con ROLLBACK**. Si falla después de normalizar o eliminar un índice,
@@ -282,6 +354,7 @@ inspeccionar el estado antes de continuar; restaurar el backup verificado si es
 necesario y solo después de confirmar host y base. Mantener escritores
 detenidos: si ya se reanudaron, conciliar cambios posteriores antes de restaurar
 para no descartarlos. No ejecutar `--force`.
+
 3. Buscar datos que impedirían migrar. Las consultas de códigos nulos/vacíos y
    de SKUs duplicados deben devolver cero filas:
 
@@ -344,7 +417,7 @@ escritores solo después de validar ambos resultados.
 Estas pruebas son el ensayo de la migración SKU para esta tarea. No apuntan a
 la base Compose ni a una base real:
 
-Desde `backend/`, con Node >=22 y Docker iniciado:
+Desde `backend/`, con Node 22.22.2/npm 10.9.7 de referencia y Docker iniciado:
 
 ```bash
 npm ci
@@ -353,9 +426,10 @@ node test/helpers/run-admin-products-mariadb.cjs
 ```
 
 El helper sigue el flujo Docker desechable de categorías: crea un contenedor
-MariaDB 11.4 sin volúmenes, credenciales aleatorias, puerto aleatorio en loopback y
+MariaDB 11.4 con credenciales aleatorias, puerto aleatorio en loopback y
 un esquema nuevo sin seed. Ejecuta admin y catálogo en serie y elimina el
-contenedor al terminar. No utiliza Compose ni su volumen de desarrollo.
+contenedor y los volúmenes anónimos de la imagen al terminar. No utiliza Compose
+ni su volumen de desarrollo.
 Si Docker no está disponible, detenerse; no sustituirlo por `ferrepatagonia_dev`.
 
 `adminProduct.test.cjs` exige `ADMIN_PRODUCTS_TEST_DATABASE` con formato

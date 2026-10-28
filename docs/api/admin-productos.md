@@ -4,6 +4,10 @@ Las rutas de productos administrativos se montan bajo `/api/admin/productos`.
 Requieren la cookie `jwt_token` emitida por `POST /api/auth/login` y rol
 `ADMIN`. El frontend debe enviar la cookie; no se acepta autenticación por un
 parámetro de URL. Las validaciones se ejecutan en el backend.
+Antes de autenticar, `/api` aplica los controles de red, HTTPS y origen de
+[seguridad HTTP común](../../backend/README.md#seguridad-http-común).
+POST/PUT/PATCH requieren el contexto de origen permitido además de la cookie;
+un 403 de origen no significa que el usuario tenga el rol incorrecto.
 
 ## Rutas
 
@@ -83,6 +87,10 @@ borra sus referencias ni elimina el SKU.
 
 ## Autenticación y errores
 
+- Origen rechazado antes de autenticar: **403**
+  `{ "message": "Origen de solicitud no permitido." }`.
+- Producción sin transporte reconocido como HTTPS: **426**
+  `{ "message": "Se requiere HTTPS." }`, también antes de autenticar.
 - Sin sesión válida: **401** `{ "message": "No autenticado." }`.
 - Sesión CLIENTE: **403** `{ "message": "El rol autenticado no tiene permiso." }`.
 - ID o entrada inválidos: **400** con `{ "message": "..." }`; producto/categoría
@@ -97,6 +105,47 @@ por ID/SKU antes de reintentar. No se garantiza ejecución exactamente una vez.
 Las rutas no existentes bajo `/api/admin` conservan la protección previa a la
 respuesta global 404; esa respuesta global usa `{ "error": "Ruta no encontrada" }`.
 
+El **429** `{ "message": "Demasiadas solicitudes. Intente nuevamente más tarde." }`
+y `Retry-After` corresponden al login/registro utilizado para obtener la sesión;
+no se atribuye ese limitador a las escrituras de productos. Esperar el plazo,
+sin desactivar cuotas ni reenviar automáticamente una escritura incierta.
+
+## Receta CLI en PowerShell — solo base aislada
+
+Requiere una cuenta **ADMIN ficticia ya preparada** en esa base y una categoría
+existente; el seed no proporciona hashes utilizables para iniciar sesión y no
+existe aquí un endpoint para crear administradores. Sustituir email/categoría y
+usar un SKU ficticio libre. Los 401/403 se conservan si la cuenta no está
+autorizada. Conservar la clave y la cookie solo en memoria; no activar transcript
+ni registrar cuerpos/cabeceras de autenticación.
+
+```powershell
+$base = 'http://localhost:3000/api'
+$origin = 'http://localhost:5173' # APP_PUBLIC_ORIGIN del backend local.
+$session = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+$claveTemporal = Read-Host 'Clave del ADMIN ficticio de la base aislada' -AsSecureString
+$login = @{ email = 'admin@example.test'; password = [System.Net.NetworkCredential]::new('', $claveTemporal).Password }
+try {
+    $loginJson = $login | ConvertTo-Json -Compress
+    Invoke-RestMethod -Uri "$base/auth/login" -Method Post -WebSession $session -Headers @{ Origin = $origin } -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($loginJson)) # 200
+    $payload = @{ id_categoria = 2; codigo = 'SKU-CLI-DE-PRUEBA'; nombre = 'Producto de prueba'; precio = 1250.5; stock = 4; activo = $true } | ConvertTo-Json -Compress
+    $producto = Invoke-RestMethod -Uri "$base/admin/productos" -Method Post -WebSession $session -Headers @{ Origin = $origin } -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($payload)) # 201
+    $idProducto = $producto.id_producto
+    Invoke-RestMethod -Uri "$base/admin/productos/$idProducto" -Method Put -WebSession $session -Headers @{ Origin = $origin } -ContentType 'application/json' -Body '{"nombre":"Producto actualizado"}' # 200
+    Invoke-RestMethod -Uri "$base/admin/productos/$idProducto/stock" -Method Patch -WebSession $session -Headers @{ Origin = $origin } -ContentType 'application/json' -Body '{"stock":0}' # 200
+    Invoke-RestMethod -Uri "$base/admin/productos/$idProducto/desactivar" -Method Patch -WebSession $session -Headers @{ Origin = $origin } # 200
+    Invoke-RestMethod -Uri "$base/auth/logout" -Method Post -WebSession $session -Headers @{ Origin = $origin } # 200
+} finally {
+    Remove-Variable login,loginJson,claveTemporal,session,payload,producto,idProducto -ErrorAction SilentlyContinue
+}
+```
+
+La cookie no aparece en las respuestas JSON. La desactivación conserva el SKU;
+repetir la creación con ese SKU produce 409, no una segunda creación. La limpieza
+de fixtures corresponde al contenedor/base descartable, no a borrar datos de
+una base compartida. Las recetas de registro/login/logout están en la
+[guía de backend](../../backend/README.md#prueba-manual-en-powershell).
+
 ## Comprobaciones
 
 Desde `backend/`:
@@ -109,6 +158,6 @@ npm run test:integration
 
 Las pruebas de integración que verifican SKU usan el helper
 `test/helpers/run-admin-products-mariadb.cjs`, que crea y elimina su propio
-contenedor MariaDB sin volúmenes. No ejecutar la suite destructiva sobre la
+contenedor MariaDB exclusivo y sus volúmenes anónimos. No ejecutar la suite destructiva sobre la
 base Compose ni sobre datos compartidos. Ver también el procedimiento único en
 [database/README.md](../../database/README.md#migrar-sku-en-una-base-existente-197).

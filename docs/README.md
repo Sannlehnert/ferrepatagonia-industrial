@@ -5,7 +5,8 @@
 - [Operación, diagnóstico y liberación](operaciones-release.md): instalación
   limpia, configuración, runbooks y checklist pendiente de completar.
 - [Backend](../backend/README.md): contratos de autenticación y clientes,
-  comandos vigentes, validaciones y recuperación de sesión.
+  comandos vigentes, validaciones, [seguridad HTTP común](../backend/README.md#seguridad-http-común)
+  y [detalle de recuperación de sesión](../backend/README.md#restauración-de-sesión--fer-3).
 - [Base de datos](../database/README.md): preparación de MariaDB y migración SKU.
 - [Catálogo público](api/catalogo.md) y [categorías públicas](api/categorias.md):
   contratos y validaciones del catálogo.
@@ -38,3 +39,8 @@ No mantener copias paralelas de esos PDFs en el repositorio.
 La suite de integración prepara MariaDB en contenedores desechables. Estos
 registros son evidencia de pruebas locales; no equivalen a una ejecución de CI
 ni a una aprobación de release.
+
+Para el estado de integración y CI, usar el
+[corte fechado de operación](operaciones-release.md#corte-de-integración--28102026-1747-art),
+que distingue el run de PR, push/develop y la candidata pendiente de revisión.
+Los ensayos locales no certifican TLS/proxy o respaldos del entorno de destino.

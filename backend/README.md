@@ -7,7 +7,12 @@ autoridad y TypeORM no ejecuta migraciones ni sincroniza el esquema.
 
 ## Requisitos
 
-- Node.js 22 o superior y npm (se probó con Node.js 24).
+- Referencia reproducible del equipo y CI: **Node.js 22.22.2 + npm 10.9.7**.
+  Comprobar `node --version` y `npm --version` antes de `npm ci`.
+  Backend declara `>=22`, pero eso no garantiza compatibilidad del flujo completo:
+  frontend declara `^22.18.0 || >=24.12.0` y sus dependencias fijadas exigen, entre
+  otros rangos, `^22.22.2 || ^24.15.0 || >=26.0.0`. Usar la referencia probada;
+  no interpretar “cualquier Node 22 o superior” como validación de todas las versiones.
 - Docker iniciado, con contenedores Linux y Docker Compose.
 
 ## Configuración
@@ -282,6 +287,48 @@ Esta sección registra el comportamiento comprobable del código integrado en
 cada detalle ya esté implementado. Las diferencias se conservan explícitamente
 como pendientes de alineación; esta actualización documental no modifica el API.
 
+### Seguridad HTTP común
+
+El middleware de `/api` comprueba red, HTTPS y origen **antes** de los routers
+de autenticación y autorización. Su contrato vigente se describe aquí sin
+redefinir los contratos históricos de Taiga:
+
+- `APP_PUBLIC_ORIGIN` es el origen exacto del navegador: esquema, host y puerto,
+  sin ruta ni slash final. No es necesariamente la URL interna del backend.
+- POST, PUT, PATCH, DELETE y cualquier método distinto de GET/HEAD/OPTIONS
+  necesitan `Origin` igual al configurado. Si falta Origin, se admite un
+  `Referer` cuyo origen coincida. Un Origin presente pero inválido no se rescata
+  con Referer. Un Referer presente y de otro origen también provoca rechazo.
+- Si faltan **ambos**, el único fallback exige `Sec-Fetch-Site: same-origin`,
+  `Host` igual al host/puerto de `APP_PUBLIC_ORIGIN` y protocolo coincidente.
+  Si Sec-Fetch-Site está presente, cualquier valor distinto de `same-origin`
+  se rechaza incluso con Origin válido. Las recetas CLI deben enviar Origin;
+  no necesitan simular Fetch Metadata ni inventar cabeceras de proxy.
+- OPTIONS no exige por sí solo un origen si faltan las cabeceras, pero rechaza
+  origen/Referer/Fetch Metadata incompatibles. No habilita CORS externo ni
+  convierte un preflight en permiso para escribir.
+
+| HTTP | Situación y respuesta vigente |
+| --- | --- |
+| 400 | Red/IP inválida: `{"message":"Información de red inválida."}`. La validación de body/query ocurre después de estos controles. |
+| 426 | En producción, petición que Express no considera segura: `{"message":"Se requiere HTTPS."}`; puede ocurrir incluso en GET y antes de autenticar. |
+| 403 | Origen rechazado: `{"message":"Origen de solicitud no permitido."}`; puede ocurrir sin sesión, en login/registro/logout o escrituras admin. |
+| 401 | Sesión ausente o inválida: `{"message":"No autenticado."}` en rutas protegidas; login usa `{"message":"Credenciales inválidas"}` para credenciales incorrectas. |
+| 403 | Sesión válida sin rol permitido: `{"message":"El rol autenticado no tiene permiso."}`. Corregir origen no concede permisos. |
+| 429 | Cuota de login o registro agotada: `{"message":"Demasiadas solicitudes. Intente nuevamente más tarde."}` y `Retry-After` en segundos. Esperar ese plazo antes de reintentar; cuentan éxitos y fallos. Logout y escrituras admin no tienen este limitador de auth. |
+
+No desactivar controles de origen/CSRF, Passport, cookies, HTTPS ni rate limiting
+para resolver un rechazo. Las cuotas en memoria requieren un solo proceso.
+
+En desarrollo, abrir el frontend en `http://localhost:5173`, configurar ese valor
+en `backend/.env` y arrancar `npm ci` / `npm run dev` desde `frontend/` (en otra
+terminal). Axios usa `/api` y credenciales; Vite reenvía `/api` a
+`http://localhost:3000`. Así el navegador consume el mismo origen. Si cambia el
+puerto de Vite, corregir el origen configurado antes de probar. No mezclar
+`localhost` con `127.0.0.1` ni consumir el backend como un origen externo.
+En producción, frontend y `/api` deben publicarse bajo el mismo origen HTTPS;
+el CIDR y la terminación TLS reales se verifican en destino, no se presumen.
+
 ### Login
 
 `POST /api/auth/login` recibe `email` y `password`; no admite campos adicionales.
@@ -352,7 +399,7 @@ es material de integración frontend, no fuente de verdad del runtime. Sus
 ejemplos no coinciden en todos los campos, envolturas y mensajes con el código
 vigente; deben actualizarse cuando se resuelva la alineación.
 
-### Restauración de sesión — FER-3
+### Resumen de restauración de sesión
 
 `GET /api/auth/me` requiere la cookie y devuelve el usuario autenticado; el
 detalle del comportamiento vigente está en [Restauración de sesión](#restauración-de-sesión--fer-3).
@@ -431,10 +478,12 @@ Con el servidor iniciado (`npm run build` y `npm start` desde backend):
 $base = 'http://localhost:3000/api'
 function Test-Register($body) {
     $json = $body | ConvertTo-Json -Compress
-    $json | curl.exe -sS -w '\nHTTP %{http_code}\n' -X POST "$base/auth/register" -H 'Content-Type: application/json' --data-binary '@-'
+    $json | curl.exe -sS -w '\nHTTP %{http_code}\n' -X POST "$base/auth/register" -H 'Content-Type: application/json' -H "Origin: $origin" --data-binary '@-'
 }
-$particular = @{ tipoCliente = 'PARTICULAR'; nombreRazonSocial = 'Cliente de prueba'; docCliente = 'DOC-DE-PRUEBA'; email = 'cliente@example.test'; password = '<secreto-local-de-prueba>' }
-$empresa = @{ tipoCliente = 'EMPRESA'; nombreRazonSocial = 'Empresa de prueba S.R.L.'; cuit = 'CUIT-DE-PRUEBA'; email = 'compras@example.test'; password = '<secreto-local-de-prueba>' }
+$origin = 'http://localhost:5173' # Debe coincidir con APP_PUBLIC_ORIGIN.
+$claveTemporal = Read-Host 'Clave ficticia temporal (solo base aislada)' -AsSecureString
+$particular = @{ tipoCliente = 'PARTICULAR'; nombreRazonSocial = 'Cliente de prueba'; docCliente = 'DOC-DE-PRUEBA'; email = 'cliente@example.test'; password = [System.Net.NetworkCredential]::new('', $claveTemporal).Password }
+$empresa = @{ tipoCliente = 'EMPRESA'; nombreRazonSocial = 'Empresa de prueba S.R.L.'; cuit = 'CUIT-DE-PRUEBA'; email = 'compras@example.test'; password = [System.Net.NetworkCredential]::new('', $claveTemporal).Password }
 Test-Register $particular # 201; 409 si el email ya existe
 Test-Register $empresa # 201; 409 si el email ya existe
 $invalidEmail = $particular.Clone(); $invalidEmail.email = 'invalido'
@@ -443,7 +492,33 @@ Test-Register @{ tipoCliente = 'PARTICULAR' } # 400: nombreRazonSocial es obliga
 $invalidTipo = $particular.Clone(); $invalidTipo.tipoCliente = 'OTRO'
 Test-Register $invalidTipo # 400: tipoCliente debe ser PARTICULAR o EMPRESA.
 curl.exe -sS -w '\nHTTP %{http_code}\n' "$base/health" # 200 con MariaDB disponible; 503 si no lo está.
+Remove-Variable particular,empresa,invalidEmail,invalidTipo,claveTemporal -ErrorAction SilentlyContinue
 ```
+
+La receta presupone una base aislada con esquema, emails ficticios libres y
+cuota de registro disponible. Sin Origin devuelve 403 antes de validar el body;
+con cuota agotada devuelve 429/Retry-After. No registrar cuerpos, contraseñas ni
+sesiones. Los ejemplos de login/logout siguientes conservan la cookie en memoria
+sin imprimir `Set-Cookie` ni crear un archivo JWT:
+
+```powershell
+$base = 'http://localhost:3000/api'
+$origin = 'http://localhost:5173'
+$session = [Microsoft.PowerShell.Commands.WebRequestSession]::new()
+$claveTemporal = Read-Host 'Clave de cliente@example.test en la base aislada' -AsSecureString
+$login = @{ email = 'cliente@example.test'; password = [System.Net.NetworkCredential]::new('', $claveTemporal).Password }
+try {
+    $loginJson = $login | ConvertTo-Json -Compress
+    Invoke-RestMethod -Uri "$base/auth/login" -Method Post -WebSession $session -Headers @{ Origin = $origin } -ContentType 'application/json' -Body ([Text.Encoding]::UTF8.GetBytes($loginJson)) # 200
+    Invoke-RestMethod -Uri "$base/auth/me" -Method Get -WebSession $session # 200
+    Invoke-RestMethod -Uri "$base/auth/logout" -Method Post -WebSession $session -Headers @{ Origin = $origin } # 200
+} finally {
+    Remove-Variable login,loginJson,claveTemporal,session -ErrorAction SilentlyContinue
+}
+```
+
+Usar la cuenta ficticia creada antes, sin modificar la contraseña entre recetas.
+Un logout correcto elimina la cookie del cliente, no revoca el JWT en servidor.
 
 ### Resultados históricos de #163 — 2026-10-04 (antes de la persistencia)
 
