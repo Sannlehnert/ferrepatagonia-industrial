@@ -12,6 +12,15 @@ declare module 'vue-router' {
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(to, _from, savedPosition) {
+    if (savedPosition) return savedPosition
+
+    if (to.hash) {
+      return { el: to.hash, behavior: 'smooth' }
+    }
+
+    return { top: 0 }
+  },
   routes: [
     {
       path: '/admin',
@@ -64,19 +73,25 @@ const router = createRouter({
       ],
     },
     {
-      path: '/catalogo',
-      name: 'catalogo',
-      component: () => import('@/views/CatalogoView.vue'),
+      path: '/',
+      component: () => import('@/layouts/PublicLayout.vue'),
+      children: [
+        {
+          path: '',
+          name: 'home',
+          component: () => import('@/views/HomeView.vue'),
+        },
+        {
+          path: 'catalogo',
+          name: 'catalogo',
+          component: () => import('@/views/CatalogoView.vue'),
+        },
+      ],
     },
     {
       path: '/registro',
       name: 'registro',
       component: () => import('@/views/cuenta/RegistroView.vue'),
-    },
-    {
-      path: '/',
-      name: 'home',
-      component: () => import('@/views/HomeView.vue'),
     },
     {
       path: '/acceso-denegado',
