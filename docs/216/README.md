@@ -18,9 +18,9 @@ Ambos jobs capturan inventario previo y posterior. Bash estricto propaga errores
 
 Comandos de CI: npm ci; npm audit --audit-level=high; npm run type-check; npm run build; npm run test:unit; npm run test:dto-source; npm run test:integration; node --test backend/test/e2e-cleanup.test.cjs; npm test (frontend); npx playwright install --with-deps chromium; node backend/test/helpers/run-e2e.cjs.
 
-## Cierre pendiente
+## Alcance de la evidencia
 
-La nueva corrida verde y la prueba negativa real se documentarán tras verificarse. La negativa se realiza exclusivamente en un PR temporal, con CI_NEGATIVE_PROBE_216 en una aserción real, sin introducirla en #50/develop/main. No se declara terminada #216 hasta verificar ambas evidencias.
+La prueba negativa real se documenta abajo. La ejecución verde final debe corresponder al HEAD publicado en los checks de #50. El fallo histórico de preparación no sustituye la aserción real.
 
 Artifacts: únicamente diagnósticos Docker y reporte HTML de Playwright. Se excluye test-results de la publicación para no subir traces, cookies o JWT de pruebas fallidas.
 
