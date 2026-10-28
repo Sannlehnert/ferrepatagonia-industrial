@@ -2,75 +2,59 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync, execFileSync } = require('node:child_process');
 
-test('limpia el contenedor si se pierde la confirmación de docker run', () => {
-  const runner = require.resolve('./helpers/run-e2e.cjs');
-
-  // En un proceso separado, ejecutar Docker realmente y luego simular
-  // que el comando falla antes de devolver su confirmación al ejecutor.
-  const script = `
-    const childProcess = require('node:child_process');
-    const original = childProcess.execFileSync;
-
-    childProcess.execFileSync = function (command, args, options) {
-      if (command === 'docker' && args[0] === 'run') {
-        const name = args[args.indexOf('--name') + 1];
-        console.log('TEST_CONTAINER=' + name);
-
-        original(command, args, options);
-
-        console.log('TEST_CONTAINER_CREATED');
-        throw new Error('E2E_TEST_LOST_DOCKER_CONFIRMATION');
+for (const failure of ['run-confirmation', 'inspect']) {
+  test(`elimina contenedor y volúmenes ante fallo de ${failure}`, () => {
+    const runner = require.resolve('./helpers/run-e2e.cjs');
+    const script = `
+      const cp = require('node:child_process');
+      const original = cp.execFileSync;
+      let injected = false;
+      cp.execFileSync = function(command, args, options) {
+        const result = original(command, args, options);
+        if (command === 'docker' && args[0] === 'run') {
+          const name = args[args.indexOf('--name') + 1];
+          const info = JSON.parse(original('docker', ['inspect', name], {encoding:'utf8'}))[0];
+          console.log('TEST_RESOURCE=' + JSON.stringify({name,
+            volumes: info.Mounts.filter(m => m.Type === 'volume').map(m => m.Name)}));
+          if (${JSON.stringify(failure)} === 'run-confirmation') throw Error('TEST_LOST_CONFIRMATION');
+        }
+        if (command === 'docker' && args[0] === 'inspect' &&
+            ${JSON.stringify(failure)} === 'inspect' && !injected) {
+          injected = true;
+          throw Error('TEST_INSPECT_FAILURE');
+        }
+        return result;
+      };
+      require(${JSON.stringify(runner)});
+    `;
+    const result = spawnSync(process.execPath, ['-e', script], {
+      encoding: 'utf8', timeout: 240_000, windowsHide: true, maxBuffer: 1024 * 1024,
+    });
+    const match = (result.stdout || '').match(/^TEST_RESOURCE=(.+)\r?$/m);
+    assert.ok(match, 'Debe identificar los recursos reales creados');
+    const resource = JSON.parse(match[1]);
+    assert.match(resource.name, /^ferrepatagonia-e2e-[a-f0-9]{32}$/);
+    const docker = (...args) => execFileSync('docker', args, {
+      encoding: 'utf8', timeout: 30_000, windowsHide: true,
+    }).trim();
+    const find = () => docker('ps', '-a', '--filter',
+      `name=^/${resource.name}$`, '--format', '{{.Names}}');
+    const volumes = () => docker('volume', 'ls', '--format', '{{.Name}}').split(/\r?\n/);
+    try {
+      assert.ifError(result.error);
+      assert.equal(result.status, 1, 'Conservar el fallo original');
+      assert.match(result.stderr, failure === 'inspect' ? /TEST_INSPECT_FAILURE/ : /TEST_LOST_CONFIRMATION/);
+      assert.match(result.stdout, /Limpieza E2E confirmada/);
+      assert.ok(resource.volumes.length > 0, 'La imagen debe crear su volumen anónimo');
+      assert.equal(find(), '');
+      for (const volume of resource.volumes) {
+        assert.ok(!volumes().includes(volume), 'El runner dejó un volumen anónimo');
       }
-
-      return original(command, args, options);
-    };
-
-    require(${JSON.stringify(runner)});
-  `;
-
-  const result = spawnSync(process.execPath, ['-e', script], {
-    encoding: 'utf8',
-    timeout: 240_000,
-    windowsHide: true,
-    maxBuffer: 1024 * 1024,
-  });
-
-  const stdout = result.stdout || '';
-  const stderr = result.stderr || '';
-  const match = stdout.match(
-    /^TEST_CONTAINER=(ferrepatagonia-e2e-[a-f0-9]{32})\r?$/m,
-  );
-
-  assert.ok(match, 'El proceso debe identificar su contenedor exclusivo');
-  const container = match[1];
-
-  const docker = (...args) => execFileSync('docker', args, {
-    encoding: 'utf8',
-    timeout: 30_000,
-    windowsHide: true,
-  }).trim();
-
-  const findContainer = () => docker(
-    'ps', '-a',
-    '--filter', `name=^/${container}$`,
-    '--format', '{{.Names}}',
-  );
-
-  try {
-    assert.ifError(result.error);
-    assert.equal(result.status, 1, 'El fallo debe devolver código 1');
-    assert.match(stdout, /TEST_CONTAINER_CREATED/);
-    assert.match(stderr, /E2E_TEST_LOST_DOCKER_CONFIRMATION/);
-    assert.match(
-      stdout,
-      /Limpieza E2E confirmada: no queda el contenedor de esta ejecución\./,
-    );
-    assert.equal(findContainer(), '', 'El ejecutor dejó un contenedor');
-  } finally {
-    // Respaldo de la prueba: si hay una regresión, falla la comprobación
-    // anterior, pero igualmente retiramos su contenedor exclusivo.
-    if (findContainer() === container) {
-      docker('rm', '-f', container);
+    } finally {
+      if (find() === resource.name) docker('rm', '-f', '-v', resource.name);
+      for (const volume of resource.volumes) {
+        if (volumes().includes(volume)) docker('volume', 'rm', volume);
+      }
     }
-  }
-});
+  });
+}

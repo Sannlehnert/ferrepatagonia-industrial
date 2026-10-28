@@ -19,6 +19,15 @@ let connection;
 let testProcess;
 let containerCreationAttempted = false;
 let interrupted = false;
+const anonymousVolumes = new Set();
+
+function inspectContainer() {
+  const info = JSON.parse(docker('inspect', container))[0];
+  for (const mount of info.Mounts || []) {
+    if (mount.Type === 'volume') anonymousVolumes.add(mount.Name);
+  }
+  return info;
+}
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -129,7 +138,7 @@ async function main() {
     'mariadb:11.4',
   );
 
-  const info = JSON.parse(docker('inspect', container))[0];
+  const info = inspectContainer();
   const dbPort = Number(
     info.NetworkSettings.Ports['3306/tcp'][0].HostPort,
   );
@@ -260,12 +269,25 @@ async function cleanup() {
 
       if (existing !== '') {
         assert.equal(existing, container);
-        docker('rm', '-f', container);
+        // Volver a inventariar también si run o el primer inspect fallaron.
+        // Un fallo de inventario no debe impedir intentar el borrado seguro.
+        try {
+          inspectContainer();
+        } catch {
+          failed = true;
+          console.error('No se pudieron identificar los volúmenes E2E.');
+        }
+        docker('rm', '-f', '-v', container);
       }
 
       assert.equal(findContainer(), '');
+      const remainingVolumes = docker('volume', 'ls', '--format', '{{.Name}}')
+        .split(/\r?\n/);
+      for (const volume of anonymousVolumes) {
+        assert.ok(!remainingVolumes.includes(volume), 'Quedó un volumen E2E');
+      }
       console.log(
-        'Limpieza E2E confirmada: no queda el contenedor de esta ejecución.',
+        'Limpieza E2E confirmada: no quedan el contenedor ni sus volúmenes.',
       );
     } catch {
       console.error(`No se pudo confirmar la limpieza de ${container}`);
