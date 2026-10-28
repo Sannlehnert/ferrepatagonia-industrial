@@ -1,0 +1,1190 @@
+
+> ferrepatagonia-backend@0.1.0 test:unit
+> node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs
+
+TAP version 13
+# Subtest: CLIENTE PARTICULAR: contrato exacto, SQL por id y sin renovar cookie
+ok 1 - CLIENTE PARTICULAR: contrato exacto, SQL por id y sin renovar cookie
+  ---
+  duration_ms: 113.9418
+  type: 'test'
+  ...
+# Subtest: CLIENTE EMPRESA: contrato exacto, SQL por id y sin renovar cookie
+ok 2 - CLIENTE EMPRESA: contrato exacto, SQL por id y sin renovar cookie
+  ---
+  duration_ms: 17.2097
+  type: 'test'
+  ...
+# Subtest: ADMIN null: contrato exacto, SQL por id y sin renovar cookie
+ok 3 - ADMIN null: contrato exacto, SQL por id y sin renovar cookie
+  ---
+  duration_ms: 14.6961
+  type: 'test'
+  ...
+# Subtest: sin cookie: 401 sin consultar BD
+ok 4 - sin cookie: 401 sin consultar BD
+  ---
+  duration_ms: 11.4436
+  type: 'test'
+  ...
+# Subtest: JWT inválido: 401 sin consultar BD
+ok 5 - JWT inválido: 401 sin consultar BD
+  ---
+  duration_ms: 8.1164
+  type: 'test'
+  ...
+# Subtest: JWT expirado: 401 sin consultar BD
+ok 6 - JWT expirado: 401 sin consultar BD
+  ---
+  duration_ms: 7.974
+  type: 'test'
+  ...
+# Subtest: inexistente: 401
+ok 7 - inexistente: 401
+  ---
+  duration_ms: 15.226
+  type: 'test'
+  ...
+# Subtest: inactivo: 401
+ok 8 - inactivo: 401
+  ---
+  duration_ms: 9.1152
+  type: 'test'
+  ...
+# Subtest: rol desactualizado: 401
+ok 9 - rol desactualizado: 401
+  ---
+  duration_ms: 37.219
+  type: 'test'
+  ...
+# Subtest: error de BD: 500 sin detalles internos incluso si contiene status/code
+ok 10 - error de BD: 500 sin detalles internos incluso si contiene status/code
+  ---
+  duration_ms: 35.1303
+  type: 'test'
+  ...
+# Subtest: regresión login y coherencia con /me: PARTICULAR
+ok 11 - regresión login y coherencia con /me: PARTICULAR
+  ---
+  duration_ms: 77.9266
+  type: 'test'
+  ...
+# Subtest: regresión login y coherencia con /me: EMPRESA
+ok 12 - regresión login y coherencia con /me: EMPRESA
+  ---
+  duration_ms: 36.6683
+  type: 'test'
+  ...
+# Subtest: regresión login y coherencia con /me: null
+ok 13 - regresión login y coherencia con /me: null
+  ---
+  duration_ms: 17.9586
+  type: 'test'
+  ...
+# Subtest: authenticate: CLIENTE conserva solamente id y rol
+ok 14 - authenticate: CLIENTE conserva solamente id y rol
+  ---
+  duration_ms: 146.2551
+  type: 'test'
+  ...
+# Subtest: authenticate: ADMIN conserva solamente id y rol
+ok 15 - authenticate: ADMIN conserva solamente id y rol
+  ---
+  duration_ms: 27.3984
+  type: 'test'
+  ...
+# Subtest: authenticate: sin cookie devuelve 401 con message
+ok 16 - authenticate: sin cookie devuelve 401 con message
+  ---
+  duration_ms: 8.4639
+  type: 'test'
+  ...
+# Subtest: authenticate: token manipulado devuelve 401 con message
+ok 17 - authenticate: token manipulado devuelve 401 con message
+  ---
+  duration_ms: 47.877
+  type: 'test'
+  ...
+# Subtest: authenticate: token expirado devuelve 401 con message
+ok 18 - authenticate: token expirado devuelve 401 con message
+  ---
+  duration_ms: 9.9825
+  type: 'test'
+  ...
+# Subtest: authenticate: rol EMPRESA devuelve 401 con message
+ok 19 - authenticate: rol EMPRESA devuelve 401 con message
+  ---
+  duration_ms: 10.6767
+  type: 'test'
+  ...
+# Subtest: authenticate: sin rol devuelve 401 con message
+ok 20 - authenticate: sin rol devuelve 401 con message
+  ---
+  duration_ms: 7.9991
+  type: 'test'
+  ...
+# Subtest: authenticate: payload string devuelve 401 con message
+ok 21 - authenticate: payload string devuelve 401 con message
+  ---
+  duration_ms: 8.7311
+  type: 'test'
+  ...
+# Subtest: authenticate: algoritmo distinto devuelve 401 con message
+ok 22 - authenticate: algoritmo distinto devuelve 401 con message
+  ---
+  duration_ms: 23.24
+  type: 'test'
+  ...
+# Subtest: authenticate: firma con otro secreto devuelve 401 con message
+ok 23 - authenticate: firma con otro secreto devuelve 401 con message
+  ---
+  duration_ms: 10.5996
+  type: 'test'
+  ...
+# Subtest: authenticate: cookie JSON devuelve 401 con message
+ok 24 - authenticate: cookie JSON devuelve 401 con message
+  ---
+  duration_ms: 6.6934
+  type: 'test'
+  ...
+# Subtest: authenticate: token malformado devuelve 401 con message
+ok 25 - authenticate: token malformado devuelve 401 con message
+  ---
+  duration_ms: 5.1741
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido undefined devuelve 401 con message
+ok 26 - authenticate: id inválido undefined devuelve 401 con message
+  ---
+  duration_ms: 6.9747
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido null devuelve 401 con message
+ok 27 - authenticate: id inválido null devuelve 401 con message
+  ---
+  duration_ms: 10.3353
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 0 devuelve 401 con message
+ok 28 - authenticate: id inválido 0 devuelve 401 con message
+  ---
+  duration_ms: 5.716
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido -1 devuelve 401 con message
+ok 29 - authenticate: id inválido -1 devuelve 401 con message
+  ---
+  duration_ms: 7.6574
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 1.5 devuelve 401 con message
+ok 30 - authenticate: id inválido 1.5 devuelve 401 con message
+  ---
+  duration_ms: 6.7907
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 7 devuelve 401 con message
+ok 31 - authenticate: id inválido 7 devuelve 401 con message
+  ---
+  duration_ms: 5.8758
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 9007199254740992 devuelve 401 con message
+ok 32 - authenticate: id inválido 9007199254740992 devuelve 401 con message
+  ---
+  duration_ms: 6.4947
+  type: 'test'
+  ...
+# Subtest: authenticate elimina un contexto previo si falla la autenticación
+ok 33 - authenticate elimina un contexto previo si falla la autenticación
+  ---
+  duration_ms: 0.7097
+  type: 'test'
+  ...
+# Subtest: authorizeRoles ADMIN devuelve 200 y ejecuta el handler
+ok 34 - authorizeRoles ADMIN devuelve 200 y ejecuta el handler
+  ---
+  duration_ms: 7.5608
+  type: 'test'
+  ...
+# Subtest: authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler
+ok 35 - authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler
+  ---
+  duration_ms: 14.5993
+  type: 'test'
+  ...
+# Subtest: ruta ADMIN: sin sesión devuelve 401 sin ejecutar handler
+ok 36 - ruta ADMIN: sin sesión devuelve 401 sin ejecutar handler
+  ---
+  duration_ms: 6.5892
+  type: 'test'
+  ...
+# Subtest: ruta ADMIN: token inválido devuelve 401 sin ejecutar handler
+ok 37 - ruta ADMIN: token inválido devuelve 401 sin ejecutar handler
+  ---
+  duration_ms: 5.7424
+  type: 'test'
+  ...
+# Subtest: ruta ADMIN: token expirado devuelve 401 sin ejecutar handler
+ok 38 - ruta ADMIN: token expirado devuelve 401 sin ejecutar handler
+  ---
+  duration_ms: 5.5981
+  type: 'test'
+  ...
+# Subtest: authorizeRoles no lee cookies ni vuelve a verificar JWT
+ok 39 - authorizeRoles no lee cookies ni vuelve a verificar JWT
+  ---
+  duration_ms: 2.2677
+  type: 'test'
+  ...
+# Subtest: authorizeRoles permite múltiples roles y sin argumentos devuelve 403
+ok 40 - authorizeRoles permite múltiples roles y sin argumentos devuelve 403
+  ---
+  duration_ms: 0.8926
+  type: 'test'
+  ...
+# Subtest: authorizeRoles sin req.auth devuelve 401 aunque haya cookie
+ok 41 - authorizeRoles sin req.auth devuelve 401 aunque haya cookie
+  ---
+  duration_ms: 2.4506
+  type: 'test'
+  ...
+# Subtest: JWT_SECRET vacío impide cargar la configuración
+ok 42 - JWT_SECRET vacío impide cargar la configuración
+  ---
+  duration_ms: 150.6573
+  type: 'test'
+  ...
+# Subtest: login emite JWT verificable sin cambiar sus datos públicos
+ok 43 - login emite JWT verificable sin cambiar sus datos públicos
+  ---
+  duration_ms: 1642.6038
+  type: 'test'
+  ...
+# Subtest: público con cookie undefined: contrato exacto y precio no publicado
+ok 44 - público con cookie undefined: contrato exacto y precio no publicado
+  ---
+  duration_ms: 147.3688
+  type: 'test'
+  ...
+# Subtest: público con cookie jwt_token=invalido: contrato exacto y precio no publicado
+ok 45 - público con cookie jwt_token=invalido: contrato exacto y precio no publicado
+  ---
+  duration_ms: 13.8481
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=0
+ok 46 - 400 sin consultar BD: page=0
+  ---
+  duration_ms: 8.1254
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=-1
+ok 47 - 400 sin consultar BD: page=-1
+  ---
+  duration_ms: 11.0065
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1.5
+ok 48 - 400 sin consultar BD: page=1.5
+  ---
+  duration_ms: 7.8181
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1e2
+ok 49 - 400 sin consultar BD: page=1e2
+  ---
+  duration_ms: 12.322
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=01
+ok 50 - 400 sin consultar BD: page=01
+  ---
+  duration_ms: 6.7133
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=
+ok 51 - 400 sin consultar BD: page=
+  ---
+  duration_ms: 6.6688
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=%20
+ok 52 - 400 sin consultar BD: page=%20
+  ---
+  duration_ms: 9.659
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=%2B1
+ok 53 - 400 sin consultar BD: page=%2B1
+  ---
+  duration_ms: 7.4454
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1000001
+ok 54 - 400 sin consultar BD: page=1000001
+  ---
+  duration_ms: 9.8423
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=9007199254740992
+ok 55 - 400 sin consultar BD: page=9007199254740992
+  ---
+  duration_ms: 26.648
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1&page=2
+ok 56 - 400 sin consultar BD: page=1&page=2
+  ---
+  duration_ms: 6.6807
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page[]=1
+ok 57 - 400 sin consultar BD: page[]=1
+  ---
+  duration_ms: 8.3002
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page[x]=1
+ok 58 - 400 sin consultar BD: page[x]=1
+  ---
+  duration_ms: 5.6855
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=0
+ok 59 - 400 sin consultar BD: limit=0
+  ---
+  duration_ms: 5.127
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=-1
+ok 60 - 400 sin consultar BD: limit=-1
+  ---
+  duration_ms: 10.4978
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=101
+ok 61 - 400 sin consultar BD: limit=101
+  ---
+  duration_ms: 18.5674
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=1.5
+ok 62 - 400 sin consultar BD: limit=1.5
+  ---
+  duration_ms: 7.5657
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=1&limit=2
+ok 63 - 400 sin consultar BD: limit=1&limit=2
+  ---
+  duration_ms: 7.1153
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=
+ok 64 - 400 sin consultar BD: limit=
+  ---
+  duration_ms: 9.2785
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=abc
+ok 65 - 400 sin consultar BD: limit=abc
+  ---
+  duration_ms: 6.1784
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=01
+ok 66 - 400 sin consultar BD: limit=01
+  ---
+  duration_ms: 4.2619
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=1e2
+ok 67 - 400 sin consultar BD: limit=1e2
+  ---
+  duration_ms: 4.1692
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: q=taladro
+ok 68 - 400 sin consultar BD: q=taladro
+  ---
+  duration_ms: 6.134
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=0
+ok 69 - 400 sin consultar BD: categoria=0
+  ---
+  duration_ms: 5.6418
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=-1
+ok 70 - 400 sin consultar BD: categoria=-1
+  ---
+  duration_ms: 4.8441
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=
+ok 71 - 400 sin consultar BD: categoria=
+  ---
+  duration_ms: 19.9997
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=01
+ok 72 - 400 sin consultar BD: categoria=01
+  ---
+  duration_ms: 6.6017
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1.5
+ok 73 - 400 sin consultar BD: categoria=1.5
+  ---
+  duration_ms: 4.5044
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1e2
+ok 74 - 400 sin consultar BD: categoria=1e2
+  ---
+  duration_ms: 6.301
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=%20
+ok 75 - 400 sin consultar BD: categoria=%20
+  ---
+  duration_ms: 5.2096
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=%2B1
+ok 76 - 400 sin consultar BD: categoria=%2B1
+  ---
+  duration_ms: 7.6448
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=abc
+ok 77 - 400 sin consultar BD: categoria=abc
+  ---
+  duration_ms: 10.048
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=2147483648
+ok 78 - 400 sin consultar BD: categoria=2147483648
+  ---
+  duration_ms: 5.4133
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=9007199254740992
+ok 79 - 400 sin consultar BD: categoria=9007199254740992
+  ---
+  duration_ms: 6.1681
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1&categoria=2
+ok 80 - 400 sin consultar BD: categoria=1&categoria=2
+  ---
+  duration_ms: 6.1243
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria[]=1
+ok 81 - 400 sin consultar BD: categoria[]=1
+  ---
+  duration_ms: 5.0863
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria[id]=1
+ok 82 - 400 sin consultar BD: categoria[id]=1
+  ---
+  duration_ms: 5.1183
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1%20OR%201=1
+ok 83 - 400 sin consultar BD: categoria=1%20OR%201=1
+  ---
+  duration_ms: 5.3149
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1%20OR%201=1
+ok 84 - 400 sin consultar BD: page=1%20OR%201=1
+  ---
+  duration_ms: 5.5073
+  type: 'test'
+  ...
+# Subtest: página 1, límite 20, total 0
+ok 85 - página 1, límite 20, total 0
+  ---
+  duration_ms: 6.0495
+  type: 'test'
+  ...
+# Subtest: página 1, límite 2, total 3
+ok 86 - página 1, límite 2, total 3
+  ---
+  duration_ms: 5.9373
+  type: 'test'
+  ...
+# Subtest: página 2, límite 2, total 3
+ok 87 - página 2, límite 2, total 3
+  ---
+  duration_ms: 4.856
+  type: 'test'
+  ...
+# Subtest: página 3, límite 2, total 3
+ok 88 - página 3, límite 2, total 3
+  ---
+  duration_ms: 4.6024
+  type: 'test'
+  ...
+# Subtest: página 4, límite 2, total 3
+ok 89 - página 4, límite 2, total 3
+  ---
+  duration_ms: 4.8397
+  type: 'test'
+  ...
+# Subtest: página 1000000, límite 2, total 3
+ok 90 - página 1000000, límite 2, total 3
+  ---
+  duration_ms: 4.9397
+  type: 'test'
+  ...
+# Subtest: página 2, límite 20, total 0
+ok 91 - página 2, límite 20, total 0
+  ---
+  duration_ms: 4.9636
+  type: 'test'
+  ...
+# Subtest: página 3, límite 20, total 0
+ok 92 - página 3, límite 20, total 0
+  ---
+  duration_ms: 5.6714
+  type: 'test'
+  ...
+# Subtest: página 1000000, límite 100, total 0
+ok 93 - página 1000000, límite 100, total 0
+  ---
+  duration_ms: 6.2058
+  type: 'test'
+  ...
+# Subtest: validador rechaza objetos y arrays, y admite límites mínimos
+ok 94 - validador rechaza objetos y arrays, y admite límites mínimos
+  ---
+  duration_ms: 0.719
+  type: 'test'
+  ...
+# Subtest: HTTP propaga categoría y paginación con total 0
+ok 95 - HTTP propaga categoría y paginación con total 0
+  ---
+  duration_ms: 6.3489
+  type: 'test'
+  ...
+# Subtest: HTTP propaga categoría y paginación con total 3
+ok 96 - HTTP propaga categoría y paginación con total 3
+  ---
+  duration_ms: 7.638
+  type: 'test'
+  ...
+# Subtest: COUNT y SELECT comparten predicado y parámetros: categoría undefined
+ok 97 - COUNT y SELECT comparten predicado y parámetros: categoría undefined
+  ---
+  duration_ms: 2.9204
+  type: 'test'
+  ...
+# Subtest: COUNT y SELECT comparten predicado y parámetros: categoría 2
+ok 98 - COUNT y SELECT comparten predicado y parámetros: categoría 2
+  ---
+  duration_ms: 0.5618
+  type: 'test'
+  ...
+# Subtest: COUNT y SELECT comparten predicado y parámetros: categoría 2147483647
+ok 99 - COUNT y SELECT comparten predicado y parámetros: categoría 2147483647
+  ---
+  duration_ms: 0.6546
+  type: 'test'
+  ...
+# Subtest: error interno no filtra detalles ni adopta status del driver
+ok 100 - error interno no filtra detalles ni adopta status del driver
+  ---
+  duration_ms: 7.9722
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (null)
+ok 101 - repositorio: snapshot, parámetros y limpieza (null)
+  ---
+  duration_ms: 1.198
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (acquire)
+ok 102 - repositorio: snapshot, parámetros y limpieza (acquire)
+  ---
+  duration_ms: 0.9426
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (isolation)
+ok 103 - repositorio: snapshot, parámetros y limpieza (isolation)
+  ---
+  duration_ms: 0.5341
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (start)
+ok 104 - repositorio: snapshot, parámetros y limpieza (start)
+  ---
+  duration_ms: 0.5632
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (count)
+ok 105 - repositorio: snapshot, parámetros y limpieza (count)
+  ---
+  duration_ms: 0.6596
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (rows)
+ok 106 - repositorio: snapshot, parámetros y limpieza (rows)
+  ---
+  duration_ms: 0.9999
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (commit)
+ok 107 - repositorio: snapshot, parámetros y limpieza (commit)
+  ---
+  duration_ms: 0.5488
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (rollback)
+ok 108 - repositorio: snapshot, parámetros y limpieza (rollback)
+  ---
+  duration_ms: 0.5247
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=
+ok 109 - busqueda invalida sin consultar BD: busqueda=
+  ---
+  duration_ms: 9.0653
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%20%20
+ok 110 - busqueda invalida sin consultar BD: busqueda=%20%20
+  ---
+  duration_ms: 4.5112
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&busqueda=b
+ok 111 - busqueda invalida sin consultar BD: busqueda=a&busqueda=b
+  ---
+  duration_ms: 4.5568
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda[]=a
+ok 112 - busqueda invalida sin consultar BD: busqueda[]=a
+  ---
+  duration_ms: 5.4554
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda[x]=a
+ok 113 - busqueda invalida sin consultar BD: busqueda[x]=a
+  ---
+  duration_ms: 7.7314
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%00
+ok 114 - busqueda invalida sin consultar BD: busqueda=%00
+  ---
+  duration_ms: 5.7133
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%09a
+ok 115 - busqueda invalida sin consultar BD: busqueda=%09a
+  ---
+  duration_ms: 3.8813
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ok 116 - busqueda invalida sin consultar BD: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  ---
+  duration_ms: 4.6456
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&categoria=0
+ok 117 - busqueda invalida sin consultar BD: busqueda=a&categoria=0
+  ---
+  duration_ms: 4.7936
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&categoria=2&categoria=3
+ok 118 - busqueda invalida sin consultar BD: busqueda=a&categoria=2&categoria=3
+  ---
+  duration_ms: 6.5384
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&categoria=2&limit=101
+ok 119 - busqueda invalida sin consultar BD: busqueda=a&categoria=2&limit=101
+  ---
+  duration_ms: 3.8741
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%00&categoria=2
+ok 120 - busqueda invalida sin consultar BD: busqueda=%00&categoria=2
+  ---
+  duration_ms: 3.7775
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&busqueda=b&categoria=2
+ok 121 - busqueda invalida sin consultar BD: busqueda=a&busqueda=b&categoria=2
+  ---
+  duration_ms: 3.9578
+  type: 'test'
+  ...
+# Subtest: valida tipo, longitud Unicode, espacios y controles de busqueda
+ok 122 - valida tipo, longitud Unicode, espacios y controles de busqueda
+  ---
+  duration_ms: 1.0229
+  type: 'test'
+  ...
+# Subtest: HTTP busqueda normalizada y metadatos: 0
+ok 123 - HTTP busqueda normalizada y metadatos: 0
+  ---
+  duration_ms: 3.8804
+  type: 'test'
+  ...
+# Subtest: HTTP busqueda normalizada y metadatos: 3
+ok 124 - HTTP busqueda normalizada y metadatos: 3
+  ---
+  duration_ms: 3.3844
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: undefined / Taladro
+ok 125 - SQL parametrizado y escape literal: undefined / Taladro
+  ---
+  duration_ms: 1.1232
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: undefined / %_!\\
+ok 126 - SQL parametrizado y escape literal: undefined / %_!\\
+  ---
+  duration_ms: 0.3154
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: undefined / ' OR 1=1 --
+ok 127 - SQL parametrizado y escape literal: undefined / ' OR 1=1 --
+  ---
+  duration_ms: 0.3558
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2 / Taladro
+ok 128 - SQL parametrizado y escape literal: 2 / Taladro
+  ---
+  duration_ms: 0.5357
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2 / %_!\\
+ok 129 - SQL parametrizado y escape literal: 2 / %_!\\
+  ---
+  duration_ms: 0.5784
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2 / ' OR 1=1 --
+ok 130 - SQL parametrizado y escape literal: 2 / ' OR 1=1 --
+  ---
+  duration_ms: 0.358
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2147483647 / Taladro
+ok 131 - SQL parametrizado y escape literal: 2147483647 / Taladro
+  ---
+  duration_ms: 0.5207
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2147483647 / %_!\\
+ok 132 - SQL parametrizado y escape literal: 2147483647 / %_!\\
+  ---
+  duration_ms: 0.4719
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2147483647 / ' OR 1=1 --
+ok 133 - SQL parametrizado y escape literal: 2147483647 / ' OR 1=1 --
+  ---
+  duration_ms: 0.3654
+  type: 'test'
+  ...
+# Subtest: validador combina filtros sin omitir validaciones individuales
+ok 134 - validador combina filtros sin omitir validaciones individuales
+  ---
+  duration_ms: 0.5109
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 1/3
+ok 135 - HTTP combina filtros y pagina: 1/3
+  ---
+  duration_ms: 8.1447
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 2/3
+ok 136 - HTTP combina filtros y pagina: 2/3
+  ---
+  duration_ms: 4.0291
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 3/3
+ok 137 - HTTP combina filtros y pagina: 3/3
+  ---
+  duration_ms: 5.1442
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 4/3
+ok 138 - HTTP combina filtros y pagina: 4/3
+  ---
+  duration_ms: 4.4166
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 1000000/3
+ok 139 - HTTP combina filtros y pagina: 1000000/3
+  ---
+  duration_ms: 5.2405
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 1/0
+ok 140 - HTTP combina filtros y pagina: 1/0
+  ---
+  duration_ms: 5.073
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 2/0
+ok 141 - HTTP combina filtros y pagina: 2/0
+  ---
+  duration_ms: 4.3449
+  type: 'test'
+  ...
+# Subtest: público, contrato exacto, sin autenticación: undefined
+ok 142 - público, contrato exacto, sin autenticación: undefined
+  ---
+  duration_ms: 94.13
+  type: 'test'
+  ...
+# Subtest: público, contrato exacto, sin autenticación: jwt_token=invalido
+ok 143 - público, contrato exacto, sin autenticación: jwt_token=invalido
+  ---
+  duration_ms: 17.259
+  type: 'test'
+  ...
+# Subtest: vacío HTTP 200
+ok 144 - vacío HTTP 200
+  ---
+  duration_ms: 9.742
+  type: 'test'
+  ...
+# Subtest: lista completa y orden preservado, sin depender de catálogo ni query
+ok 145 - lista completa y orden preservado, sin depender de catálogo ni query
+  ---
+  duration_ms: 28.362
+  type: 'test'
+  ...
+# Subtest: fallo del driver no filtra SQL, stack ni status
+ok 146 - fallo del driver no filtra SQL, stack ni status
+  ---
+  duration_ms: 26.0619
+  type: 'test'
+  ...
+# Subtest: repositorio consulta solo categorías activas, orden SQL determinista parametrizado
+ok 147 - repositorio consulta solo categorías activas, orden SQL determinista parametrizado
+  ---
+  duration_ms: 3.4032
+  type: 'test'
+  ...
+# Subtest: \#178: ADMIN autenticado recibe 200 con lista vacía
+ok 148 - \#178: ADMIN autenticado recibe 200 con lista vacía
+  ---
+  duration_ms: 134.961
+  type: 'test'
+  ...
+# Subtest: \#178: CLIENTE autenticado devuelve 403 sin ejecutar el controlador
+ok 149 - \#178: CLIENTE autenticado devuelve 403 sin ejecutar el controlador
+  ---
+  duration_ms: 15.5196
+  type: 'test'
+  ...
+# Subtest: \#178: sin cookie devuelve 401 sin ejecutar el controlador
+ok 150 - \#178: sin cookie devuelve 401 sin ejecutar el controlador
+  ---
+  duration_ms: 8.4396
+  type: 'test'
+  ...
+# Subtest: \#178: token inválido devuelve 401 sin ejecutar el controlador
+ok 151 - \#178: token inválido devuelve 401 sin ejecutar el controlador
+  ---
+  duration_ms: 10.5465
+  type: 'test'
+  ...
+# Subtest: \#178: token expirado devuelve 401 sin ejecutar el controlador
+ok 152 - \#178: token expirado devuelve 401 sin ejecutar el controlador
+  ---
+  duration_ms: 9.8038
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, ADMIN: protección global sin duplicar guardas ni JWT
+ok 153 - \#175: /clientes, ADMIN: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 16.9788
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, CLIENTE: protección global sin duplicar guardas ni JWT
+ok 154 - \#175: /clientes, CLIENTE: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 8.1195
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, sin sesión: protección global sin duplicar guardas ni JWT
+ok 155 - \#175: /clientes, sin sesión: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 11.3218
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, token inválido: protección global sin duplicar guardas ni JWT
+ok 156 - \#175: /clientes, token inválido: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 23.8022
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, token expirado: protección global sin duplicar guardas ni JWT
+ok 157 - \#175: /clientes, token expirado: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 21.3202
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, ADMIN: protección global sin duplicar guardas ni JWT
+ok 158 - \#175: /test-only, ADMIN: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 25.4247
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, CLIENTE: protección global sin duplicar guardas ni JWT
+ok 159 - \#175: /test-only, CLIENTE: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 7.5861
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, sin sesión: protección global sin duplicar guardas ni JWT
+ok 160 - \#175: /test-only, sin sesión: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 11.7437
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, token inválido: protección global sin duplicar guardas ni JWT
+ok 161 - \#175: /test-only, token inválido: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 9.4901
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, token expirado: protección global sin duplicar guardas ni JWT
+ok 162 - \#175: /test-only, token expirado: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 7.6982
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, ADMIN: protección global sin duplicar guardas ni JWT
+ok 163 - \#175: /inexistente, ADMIN: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 27.0048
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, CLIENTE: protección global sin duplicar guardas ni JWT
+ok 164 - \#175: /inexistente, CLIENTE: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 5.5334
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, sin sesión: protección global sin duplicar guardas ni JWT
+ok 165 - \#175: /inexistente, sin sesión: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 21.5928
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, token inválido: protección global sin duplicar guardas ni JWT
+ok 166 - \#175: /inexistente, token inválido: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 10.641
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, token expirado: protección global sin duplicar guardas ni JWT
+ok 167 - \#175: /inexistente, token expirado: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 5.6196
+  type: 'test'
+  ...
+# Subtest: \#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB
+ok 168 - \#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB
+  ---
+  duration_ms: 18.0603
+  type: 'test'
+  ...
+# Subtest: repositorio selecciona email y fecha de USUARIO, exige asociación y rol CLIENTE, y ordena por registro e id
+ok 169 - repositorio selecciona email y fecha de USUARIO, exige asociación y rol CLIENTE, y ordena por registro e id
+  ---
+  duration_ms: 2.4961
+  type: 'test'
+  ...
+# Subtest: error de BD devuelve 500 genérico sin detalles internos
+ok 170 - error de BD devuelve 500 genérico sin detalles internos
+  ---
+  duration_ms: 18.0174
+  type: 'test'
+  ...
+# Subtest: error de repositorio devuelve 500 genérico sin detalles internos
+ok 171 - error de repositorio devuelve 500 genérico sin detalles internos
+  ---
+  duration_ms: 6.9634
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos
+ok 172 - uncertain HTTP result: /api/admin/productos
+  ---
+  duration_ms: 166.3271
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos/1
+ok 173 - uncertain HTTP result: /api/admin/productos/1
+  ---
+  duration_ms: 27.6674
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos/1/stock
+ok 174 - uncertain HTTP result: /api/admin/productos/1/stock
+  ---
+  duration_ms: 35.501
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos/1/desactivar
+ok 175 - uncertain HTTP result: /api/admin/productos/1/desactivar
+  ---
+  duration_ms: 23.5345
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/auth/register
+ok 176 - uncertain HTTP result: /api/auth/register
+  ---
+  duration_ms: 17.0237
+  type: 'test'
+  ...
+# Subtest: login errors never log driver details
+ok 177 - login errors never log driver details
+  ---
+  duration_ms: 20.4224
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: none
+ok 178 - transaction lifecycle: none
+  ---
+  duration_ms: 4.9217
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: start
+ok 179 - transaction lifecycle: start
+  ---
+  duration_ms: 2.0275
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: work
+ok 180 - transaction lifecycle: work
+  ---
+  duration_ms: 0.6864
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: commit
+ok 181 - transaction lifecycle: commit
+  ---
+  duration_ms: 1.0312
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: rollback
+ok 182 - transaction lifecycle: rollback
+  ---
+  duration_ms: 0.8383
+  type: 'test'
+  ...
+# Subtest: uncertain result is explicit without leaking original query or credentials
+ok 183 - uncertain result is explicit without leaking original query or credentials
+  ---
+  duration_ms: 1.3956
+  type: 'test'
+  ...
+# Subtest: logger never serializes SQL parameters or arbitrary error messages
+ok 184 - logger never serializes SQL parameters or arbitrary error messages
+  ---
+  duration_ms: 3.1647
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+ok 185 - PARTICULAR: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+  ---
+  duration_ms: 516.945
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: el helper no toma un rol inyectado
+ok 186 - PARTICULAR: el helper no toma un rol inyectado
+  ---
+  duration_ms: 245.5483
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: POST rechaza el campo rol=ADMIN
+ok 187 - PARTICULAR: POST rechaza el campo rol=ADMIN
+  ---
+  duration_ms: 56.3273
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: POST rechaza el campo rol=CLIENTE
+ok 188 - PARTICULAR: POST rechaza el campo rol=CLIENTE
+  ---
+  duration_ms: 7.2904
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: POST rechaza el campo rol=null
+ok 189 - PARTICULAR: POST rechaza el campo rol=null
+  ---
+  duration_ms: 5.0278
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: responde 201 con data.user sin credenciales ni cookie
+ok 190 - PARTICULAR: responde 201 con data.user sin credenciales ni cookie
+  ---
+  duration_ms: 7.3348
+  type: 'test'
+  ...
+# Subtest: EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+ok 191 - EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+  ---
+  duration_ms: 548.1608
+  type: 'test'
+  ...
+# Subtest: EMPRESA: el helper no toma un rol inyectado
+ok 192 - EMPRESA: el helper no toma un rol inyectado
+  ---
+  duration_ms: 258.3838
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=ADMIN
+ok 193 - EMPRESA: POST rechaza el campo rol=ADMIN
+  ---
+  duration_ms: 15.9212
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=CLIENTE
+ok 194 - EMPRESA: POST rechaza el campo rol=CLIENTE
+  ---
+  duration_ms: 7.7303
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=null
+ok 195 - EMPRESA: POST rechaza el campo rol=null
+  ---
+  duration_ms: 8.8403
+  type: 'test'
+  ...
+# Subtest: EMPRESA: responde 201 con data.user sin credenciales ni cookie
+ok 196 - EMPRESA: responde 201 con data.user sin credenciales ni cookie
+  ---
+  duration_ms: 5.2421
+  type: 'test'
+  ...
+1..196
+# tests 196
+# suites 0
+# pass 196
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7481.375
