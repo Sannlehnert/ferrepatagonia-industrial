@@ -1,0 +1,7 @@
+﻿HEALTHCHECK: PASS (healthcheck.sh --connect --innodb_initialized)
+SCHEMA_LOAD: PASS (database/schema.sql)
+SEED_LOAD: PASS (database/seed.sql)
+VERIFY_SEED: tabla filas CATEGORIA 2 PRODUCTO 3 CLIENTE 3 USUARIO 4 CUENTA_CORRIENTE 1 PEDIDO 2 DETALLE_PEDIDO 4 PAGO 2 resultado PASS: conteos, relaciones, importes y destinos de pago
+MIGRATE_RUN_1: PASS 
+MIGRATE_RUN_2_IDEMPOTENT: PASS 
+CLEANUP: PASS (ephemeral container removed)

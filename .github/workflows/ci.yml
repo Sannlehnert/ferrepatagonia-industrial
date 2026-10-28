@@ -1,0 +1,103 @@
+name: CI Build, Types and Tests
+
+on:
+  push:
+    branches: [ develop, main ]
+  pull_request:
+    branches: [ develop, main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend-ci:
+    name: Backend CI (Node 24 + MariaDB)
+    runs-on: ubuntu-latest
+
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: root_dev_only
+          MARIADB_DATABASE: ferrepatagonia_dev
+        ports:
+          - 3306:3306
+        options: --health-cmd="healthcheck.sh --connect --innodb_initialized" --health-interval=10s --health-timeout=5s --health-retries=10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run security audit
+        working-directory: backend
+        run: npm audit --audit-level=high
+
+      - name: Type check backend
+        working-directory: backend
+        run: npm run type-check
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Run backend unit tests
+        working-directory: backend
+        run: npm run test:unit
+
+      - name: Run backend DTO source tests
+        working-directory: backend
+        run: npm run test:dto-source
+
+      - name: Run backend MariaDB integration tests
+        working-directory: backend
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_NAME: ferrepatagonia_dev
+          DB_USER: root
+          DB_PASSWORD: root_dev_only
+          JWT_SECRET: 3f646223a285abff63ac1dbcb731cb3dc85444204113d59d07204e14658afa9f
+        run: npm run test:integration
+
+  frontend-ci:
+    name: Frontend CI (Node 24 + Vite)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type check frontend
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
