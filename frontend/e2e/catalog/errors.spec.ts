@@ -63,6 +63,7 @@ for (const failure of ['red', 'http500'] as const) {
     await expect(names).toHaveText(['Producto E2E 02']);
     await expect(page.getByRole('searchbox', {
       name: 'Nombre o código',
+      exact: true,
     })).toHaveValue('E2E-02');
     await expect.poll(
       () => new URL(page.url()).searchParams.get('busqueda'),
