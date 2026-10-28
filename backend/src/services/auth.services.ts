@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt';
-import type { AuthContext } from '../types/auth';
+import type { AuthContext, SessionUser } from '../types/auth';
 import { findUsuarioById } from '../repositories/usuario.repository';
 import { signToken } from './token.service';
 import { findUsuarioByEmail } from '../repositories/usuario.repository'; // Ajustá la ruta a donde guardaste el repo
@@ -33,7 +33,7 @@ export const loginUsuario = async (email: string, password: string) => {
     return { token, user: userPublic };
 };
 
-export const restoreUsuario = async (auth: AuthContext) => {
+export const restoreUsuario = async (auth: AuthContext): Promise<SessionUser | null> => {
     const user = await findUsuarioById(auth.id);
     if (!user || !user.activo || user.rol !== auth.rol) {
         return null;

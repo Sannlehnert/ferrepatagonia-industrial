@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 require('./helpers/integration-lifecycle.cjs');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');

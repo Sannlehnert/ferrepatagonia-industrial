@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const req = p => require('../' + p);
 
 req('test/helpers/integration-lifecycle.cjs');
@@ -8,10 +9,11 @@ const { setTimeout: delay } = require('node:timers/promises');
 const { dataSource, checkDatabase } = req('dist/config/database.config');
 const { pool } = req('dist/config/catalog-snapshot.config');
 const { app } = req('dist/app');
-const { signToken } = req('dist/services/token.service');
+const { createAuthUser } = require('./helpers/auth-user.cjs');
 after(() => pool.end());
 
 test('server timeout rolls back stock before HTTP error, with no late write', async t => {
+ const admin = await createAuthUser(pool);
  const category = await pool.query("INSERT INTO CATEGORIA(nombre,activo) VALUES ('audit',1)");
  const product = await pool.query("INSERT INTO PRODUCTO(id_categoria,codigo,nombre,precio,stock,activo) VALUES (?,'AUDIT-TIMEOUT','audit',1,1,1)",[category.insertId]);
  const id=Number(product.insertId), lock=await pool.getConnection();
@@ -22,7 +24,7 @@ test('server timeout rolls back stock before HTTP error, with no late write', as
   await lock.query('SELECT id_producto FROM PRODUCTO WHERE id_producto = ? FOR UPDATE',[id]);
   watchdog=setTimeout(()=>lock.rollback(),10000);
   const started=Date.now();
-  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/productos/'+id+'/stock',{method:'PATCH',signal:AbortSignal.timeout(12000),headers:{'Content-Type':'application/json',Cookie:'jwt_token='+signToken({id:4,rol:'ADMIN'})},body:JSON.stringify({stock:9})});
+  const response=await fetch('http://127.0.0.1:'+server.address().port+'/api/admin/productos/'+id+'/stock',{method:'PATCH',signal:AbortSignal.timeout(12000),headers:{'Content-Type':'application/json',Cookie:admin.cookie},body:JSON.stringify({stock:9})});
   const result=await response.json();
   const elapsed=Date.now()-started;
   const [before]=await pool.query('SELECT stock FROM PRODUCTO WHERE id_producto=?',[id]);
@@ -46,6 +48,7 @@ test('server timeout rolls back stock before HTTP error, with no late write', as
   await new Promise(r=>server.close(r));
   await pool.query('DELETE FROM PRODUCTO WHERE id_producto=?',[id]);
   await pool.query('DELETE FROM CATEGORIA WHERE id_categoria=?',[category.insertId]);
+  await admin.destroy();
  }
 });
 

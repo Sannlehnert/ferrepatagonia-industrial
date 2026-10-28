@@ -1,5 +1,6 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const assert = require('node:assert/strict');
-const { test, before, after } = require('node:test');
+const { test, before, beforeEach, after } = require('node:test');
 const { once } = require('node:events');
 Object.assign(process.env, { JWT_SECRET: 'dto-test-only', DB_HOST: '127.0.0.1', DB_PORT: '1', DB_NAME: 'unit', DB_USER: 'unit', DB_PASSWORD: 'unit' });
 const load = p => require(`../dist/${p}.js`);
@@ -12,6 +13,9 @@ const catalog = load('services/catalog.service');
 const policies = load('dtos/policies');
 const { validateDtoInput } = load('dtos/validation');
 const { destroyDatabase } = load('config/database.config');
+const users = load('repositories/usuario.repository');
+const { sessionRow } = require('./helpers/session-fixture.cjs');
+beforeEach(t => { t.mock.method(users, 'findUsuarioById', async id => sessionRow(id, 'ADMIN')); });
 let server, base;
 before(async () => { server = app.listen(0, '127.0.0.1'); await once(server, 'listening'); base = `http://127.0.0.1:${server.address().port}`; });
 after(async () => { await new Promise(r => server.close(r)); await destroyDatabase(); });

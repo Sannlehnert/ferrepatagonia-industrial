@@ -1,5 +1,6 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const assert = require('node:assert/strict');
-const { before, after, test } = require('node:test');
+const { before, beforeEach, after, test } = require('node:test');
 const { once } = require('node:events');
 const { randomBytes } = require('node:crypto');
 const { spawnSync } = require('node:child_process');
@@ -15,6 +16,9 @@ process.env.DB_USER = 'test';
 process.env.DB_PASSWORD = 'test';
 const { signToken, verifyToken } = require('../dist/services/token.service');
 const { authenticate, authorizeRoles } = require('../dist/middlewares/auth.middleware');
+const users = require('../dist/repositories/usuario.repository');
+const { sessionRow } = require('./helpers/session-fixture.cjs');
+beforeEach(t => { t.mock.method(users, 'findUsuarioById', async id => sessionRow(id, 'CLIENTE')); });
 let server;
 let baseUrl;
 let handlerCalls = 0;
@@ -43,7 +47,8 @@ const rawToken = (payload, options = {}) => jwt.sign(payload, process.env.JWT_SE
 });
 
 for (const rol of ['CLIENTE', 'ADMIN']) {
-  test(`authenticate: ${rol} conserva solamente id y rol`, async () => {
+  test(`authenticate: ${rol} conserva solamente id y rol`, async t => {
+    t.mock.method(users, 'findUsuarioById', async id => sessionRow(id, rol));
     const token = signToken({ id: 7, rol });
     const decoded = jwt.decode(token);
     assert.equal(decoded.exp - decoded.iat, 7200);
@@ -60,6 +65,7 @@ const invalidTokens = [
   ['sin cookie', undefined],
   ['token manipulado', parts.join('.')],
   ['token expirado', rawToken({ id: 7, rol: 'CLIENTE' }, { expiresIn: -1 })],
+  ['token sin exp', jwt.sign({ id: 7, rol: 'CLIENTE' }, process.env.JWT_SECRET, { algorithm: 'HS256' })],
   ['rol EMPRESA', rawToken({ id: 7, rol: 'EMPRESA' })],
   ['sin rol', rawToken({ id: 7 })],
   ['payload string', jwt.sign('texto', process.env.JWT_SECRET)],
@@ -86,7 +92,8 @@ test('authenticate elimina un contexto previo si falla la autenticación', () =>
   assert.equal(req.auth, undefined);
 });
 
-test('authorizeRoles ADMIN devuelve 200 y ejecuta el handler', async () => {
+test('authorizeRoles ADMIN devuelve 200 y ejecuta el handler', async t => {
+  t.mock.method(users, 'findUsuarioById', async id => sessionRow(id, 'ADMIN'));
   const beforeCalls = handlerCalls;
   const allowed = await request(signToken({ id: 7, rol: 'ADMIN' }), '/admin');
   assert.equal(allowed.status, 200);

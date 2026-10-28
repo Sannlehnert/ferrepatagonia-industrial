@@ -1,10 +1,11 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 require('./helpers/integration-lifecycle.cjs');
 require('dotenv/config'); // Carga el .env automáticamente
 const { describe, it, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const jwt = require('jsonwebtoken');
+const { createAuthUser } = require('./helpers/auth-user.cjs');
 const { once } = require('node:events');
 
 // Esta suite altera índices y ejecuta UPDATE sobre toda PRODUCTO. Fallar antes
@@ -19,6 +20,7 @@ const TEST_PREFIX = `TEST-RUN-${RUN_ID}-SKU-`;
 let BASE_URL;
 
 const createdProductIds = [];
+const authUsers = [];
 
 // Helper para ejecutar el archivo SQL de migración eliminando directivas DELIMITER de cliente CLI
 const runMigrationSql = async (pool) => {
@@ -37,18 +39,12 @@ describe('Admin Products Endpoints (#197)', () => {
     let fixtureProductId;
 
     before(async () => {
-        const secret = process.env.JWT_SECRET;
-        if (!secret) throw new Error('No se encontró JWT_SECRET en el entorno.');
-
-        const adminToken = jwt.sign({ id: 4, rol: 'ADMIN' }, secret, { expiresIn: '2h' });
-        adminCookie = `jwt_token=${adminToken}`;
-
-        const clientToken = jwt.sign({ id: 1, rol: 'CLIENTE' }, secret, { expiresIn: '2h' });
-        clientCookie = `jwt_token=${clientToken}`;
         const { pool } = require('../dist/config/catalog-snapshot.config.js');
         const { app } = require('../dist/app.js');
         const [identity] = await pool.query('SELECT DATABASE() AS name');
         assert.equal(identity.name, process.env.ADMIN_PRODUCTS_TEST_DATABASE);
+        const admin = await createAuthUser(pool); authUsers.push(admin); adminCookie = admin.cookie;
+        const client = await createAuthUser(pool, 'CLIENTE'); authUsers.push(client); clientCookie = client.cookie;
         const [count] = await pool.query('SELECT COUNT(*) AS total FROM CATEGORIA');
         assert.equal(Number(count.total), 0, 'Se requiere esquema nuevo, sin seed ni datos compartidos');
         await pool.query("INSERT INTO CATEGORIA (id_categoria, nombre, activo) VALUES (1, 'Test #197', 1)");
@@ -472,7 +468,8 @@ describe('Admin Products Endpoints (#197)', () => {
                 try {
                     if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
                 } finally {
-                    await pool.end();
+                    try { for (const user of authUsers) await user.destroy(); }
+                    finally { await pool.end(); }
                 }
             }
         }

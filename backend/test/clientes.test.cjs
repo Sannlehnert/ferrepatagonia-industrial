@@ -1,5 +1,6 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const assert = require('node:assert/strict');
-const { before, after, test, mock } = require('node:test');
+const { before, beforeEach, after, test, mock } = require('node:test');
 const { once } = require('node:events');
 const { randomBytes } = require('node:crypto');
 
@@ -42,6 +43,9 @@ const adminRequest = () => request(signToken({ id: 7, rol: 'ADMIN' }));
 const { pool } = require('../dist/config/catalog-snapshot.config');
 const probe = require('./helpers/query-probe.cjs');
 const repository = require('../dist/repositories/cliente.repository');
+const users = require('../dist/repositories/usuario.repository');
+const { sessionRow } = require('./helpers/session-fixture.cjs');
+beforeEach(t => { t.mock.method(users, 'findUsuarioById', async id => sessionRow(id, id === 8 ? 'CLIENTE' : 'ADMIN')); });
 let server;
 let url;
 
@@ -66,7 +70,7 @@ test('#178: ADMIN autenticado recibe 200 con lista vacía', async (t) => {
 });
 
 for (const [label, token, status, message] of [
-  ['CLIENTE autenticado', signToken({ id: 7, rol: 'CLIENTE' }), 403, 'El rol autenticado no tiene permiso.'],
+  ['CLIENTE autenticado', signToken({ id: 8, rol: 'CLIENTE' }), 403, 'El rol autenticado no tiene permiso.'],
   ['sin cookie', undefined, 401, 'No autenticado.'],
   ['token inválido', 'invalid', 401, 'No autenticado.'],
   ['token expirado', jwt.sign({ id: 7, rol: 'ADMIN' }, process.env.JWT_SECRET, {
@@ -91,7 +95,7 @@ for (const path of ['/clientes', '/test-only', '/inexistente']) {
       path === '/inexistente' ? { error: 'Ruta no encontrada' } :
         path === '/test-only' ? { ok: true } :
           { message: 'Clientes obtenidos correctamente', data: { clientes: [] } }, 1, 1],
-    ['CLIENTE', signToken({ id: 7, rol: 'CLIENTE' }), 403,
+    ['CLIENTE', signToken({ id: 8, rol: 'CLIENTE' }), 403,
       { message: 'El rol autenticado no tiene permiso.' }, 1, 1],
     ['sin sesión', undefined, 401, { message: 'No autenticado.' }, 0, 0],
     ['token inválido', 'invalid', 401, { message: 'No autenticado.' }, 0, 1],

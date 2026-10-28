@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { loadHttpSecurity, validateJwtSecret } from './http-security.config';
 
 function required(name: string): string {
   const value = process.env[name];
@@ -16,8 +17,10 @@ function port(name: string, fallback: number): number {
   return value;
 }
 
+const httpSecurity = loadHttpSecurity(process.env);
 export const env = {
-  jwtSecret: required('JWT_SECRET'),
+  httpSecurity,
+  jwtSecret: validateJwtSecret(required('JWT_SECRET'), httpSecurity.mode),
   port: port('PORT', 3000),
   db: {
     host: required('DB_HOST'),
