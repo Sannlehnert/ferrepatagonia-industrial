@@ -204,6 +204,6 @@ jobs:
                   name: frontend-e2e-ci-diagnostics
                   path: |
                       ci-diagnostics/
-                      frontend/playwright-report/
+                      frontend/playwright-report/index.html
                   if-no-files-found: ignore
                   retention-days: 7

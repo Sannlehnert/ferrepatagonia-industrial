@@ -23,3 +23,10 @@ Comandos de CI: npm ci; npm audit --audit-level=high; npm run type-check; npm ru
 La nueva corrida verde y la prueba negativa real se documentarán tras verificarse. La negativa se realiza exclusivamente en un PR temporal, con CI_NEGATIVE_PROBE_216 en una aserción real, sin introducirla en #50/develop/main. No se declara terminada #216 hasta verificar ambas evidencias.
 
 Artifacts: únicamente diagnósticos Docker y reporte HTML de Playwright. Se excluye test-results de la publicación para no subir traces, cookies o JWT de pruebas fallidas.
+
+## Evidencia nueva de correcciones finales
+
+- Pruebas locales focalizadas sobre los bloques reales del workflow: 12/12 PASS (6 escenarios por job: limpio, fuga, baseline ausente, fallo Docker, sort y comm). Comandos Docker simulados; no se crearon recursos reales. Ver evidence/verifier-focused-results.json.
+- Prueba negativa real: PR temporal #53, commit 02f46dbfbd7557caa682e5fd6311377e1657c933. Run https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/40760563063 ; job frontend 123071025234, paso Run frontend unit tests: CI_NEGATIVE_PROBE_216 compara actual 1 con expected 2. Resultado 56 PASS, 1 FAIL, 0 SKIP; exit 1 y job FAILURE. Ver negative-assertion-actions.json. El marcador no forma parte del PR #50.
+- Corrección técnica publicada en 918f2d67b81636488f1e0ec78507fdeea256aaff. La ejecución final asociada al HEAD documental se verifica desde los checks del PR #50; no se sustituye por resultados locales.
+- Los artifacts frontend publican únicamente index.html del reporte y el diagnóstico Docker. Se excluyen test-results y el directorio de attachments/data para evitar publicar traces y datos HTTP.
