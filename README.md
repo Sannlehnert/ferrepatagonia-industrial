@@ -52,9 +52,20 @@ Las reglas específicas de descuentos, crédito, vencimientos y otras condicione
 
 ## Estado del proyecto
 
-El proyecto cuenta con el diseño inicial del MVP, scripts SQL, MariaDB con Docker Compose y una primera base de backend con Node.js, Express y TypeScript.
+El repositorio contiene el backend Node.js/Express/TypeScript con MariaDB,
+autenticación de clientes y administradores, catálogo y categorías públicas,
+y operaciones administrativas de clientes y productos. El alcance completo
+del MVP sigue en desarrollo; las funcionalidades descritas en este README no
+deben interpretarse como todas implementadas.
 
-Para levantar la base y ejecutar el servidor, consultar la [guía del backend](backend/README.md). Esta etapa implementa únicamente `GET /api/health`; las funcionalidades de negocio descriptas a continuación siguen pendientes.
+Para instalar y ejecutar el backend, consultar la
+[guía del backend](backend/README.md). El índice de documentación técnica,
+runbooks y checklist de release está en [docs/README.md](docs/README.md).
+La referencia reproducible es Node.js 22.22.2/npm 10.9.7; los pasos de mismo
+origen, seguridad HTTP y el corte de integración/CI están en la
+[guía de operación](docs/operaciones-release.md).
+La política pública de precios continúa pendiente de validación comercial;
+el [contrato del catálogo](docs/api/catalogo.md) es la fuente canónica.
 
 Durante el Sprint 1 se trabajó en:
 
@@ -67,7 +78,9 @@ Durante el Sprint 1 se trabajó en:
 - identificación de perfiles de usuario, roles técnicos y permisos;
 - definición conceptual de autenticación, autorización y protección de rutas.
 
-La documentación describe las decisiones y propuestas de diseño. No implica que las funcionalidades del sistema ya se encuentren implementadas.
+Los documentos de relevamiento y diseño del Sprint 1 registran decisiones y
+propuestas; no implican que todas las funcionalidades previstas estén
+implementadas.
 
 ---
 
@@ -122,7 +135,11 @@ Estos cuatro perfiles no equivalen a cuatro roles almacenados en la base de dato
 
 Se utilizará un único login (`/login`) con JWT para clientes y administradores. Todo inicio de sesión exitoso llevará al Home (`/`); solo `ADMIN` verá allí el botón de acceso al panel administrativo. Las opciones de cliente dependerán de sus condiciones comerciales vigentes.
 
-Pinia gestionará el estado de sesión de la interfaz. El almacenamiento/transporte de JWT, su expiración y renovación permanecen pendientes: la propuesta previa de `localStorage` no se considera una decisión definitiva.
+La implementación vigente transporta JWT en la cookie HttpOnly `jwt_token`
+(SameSite Strict, Secure en producción, dos horas). Pinia conserva los datos
+públicos del usuario, no el JWT; no se usa `localStorage` para el token ni se
+implementa renovación automática. Los contratos reales y sus divergencias
+históricas con #155–#160 están en la [guía del backend](backend/README.md#autenticación--contratos-taiga-155160).
 
 CAPTCHA se aplicará al login y ante actividad sospechosa, junto con rate limiting en backend. El proveedor y los umbrales se definirán durante la implementación.
 
