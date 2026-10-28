@@ -1,0 +1,40 @@
+Base E2E preparada: e2e_test_bdd8bcd98a6d45ed973410c5032a4680
+Frontend E2E: http://127.0.0.1:52708
+
+Running 25 tests using 1 worker
+
+  ✓   1 [chromium] › e2e\admin\products.spec.ts:4:1 › crea y edita un producto con persistencia y reflejo público (5.5s)
+  ✓   2 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 400: conserva datos sin éxito falso (1.5s)
+  ✓   3 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 404: conserva datos sin éxito falso (1.5s)
+database.query.failed
+  ✓   4 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 409: conserva datos sin éxito falso (1.5s)
+  ✓   5 [chromium] › e2e\admin\status.spec.ts:3:1 › cancela, desactiva y reactiva un producto con reflejo público (4.6s)
+  ✓   6 [chromium] › e2e\admin\stock.spec.ts:3:1 › valida stock y refleja los cambios en el catálogo público (3.8s)
+  ✓   7 [chromium] › e2e\admin\uncertain-save.spec.ts:3:1 › bloquea cambios tras una respuesta perdida hasta recargar correctamente (2.1s)
+  ✓   8 [chromium] › e2e\auth\access.spec.ts:4:3 › visitante: exige iniciar sesión para acceder a /admin/productos (525ms)
+  ✓   9 [chromium] › e2e\auth\access.spec.ts:4:3 › visitante: exige iniciar sesión para acceder a /mi-cuenta/datos (515ms)
+  ✓  10 [chromium] › e2e\auth\access.spec.ts:40:3 › cliente: rechaza otra área y conserva la sesión (1.3s)
+  ✓  11 [chromium] › e2e\auth\access.spec.ts:40:3 › administrador: rechaza otra área y conserva la sesión (1.3s)
+  ✓  12 [chromium] › e2e\auth\api-permissions.spec.ts:3:1 › API: rechaza al visitante con 401 (551ms)
+  ✓  13 [chromium] › e2e\auth\api-permissions.spec.ts:28:3 › API: responde 403 al cliente (775ms)
+  ✓  14 [chromium] › e2e\auth\api-permissions.spec.ts:28:3 › API: responde 200 al administrador (869ms)
+  ✓  15 [chromium] › e2e\auth\session.spec.ts:15:3 › administrador: inicia, restaura y cierra sesión (1.5s)
+  ✓  16 [chromium] › e2e\auth\session.spec.ts:15:3 › cliente: inicia, restaura y cierra sesión (1.4s)
+  ✓  17 [chromium] › e2e\catalog\availability.spec.ts:3:1 › mantiene visible el producto sin stock y deshabilita Agregar (1.2s)
+  ✓  18 [chromium] › e2e\catalog\availability.spec.ts:61:3 › oculta los productos inactivos al buscarlos por código (1.1s)
+  ✓  19 [chromium] › e2e\catalog\availability.spec.ts:61:3 › oculta los productos de una categoría inactiva (1.0s)
+  ✓  20 [chromium] › e2e\catalog\errors.spec.ts:4:3 › recupera el catálogo después de un error de red (737ms)
+  ✓  21 [chromium] › e2e\catalog\errors.spec.ts:4:3 › recupera el catálogo después de un error de http500 (769ms)
+  ✓  22 [chromium] › e2e\catalog\filters.spec.ts:3:1 › visitante busca por SKU y conserva el resultado al recargar (1.2s)
+  ✓  23 [chromium] › e2e\catalog\filters.spec.ts:50:1 › combina búsqueda por nombre y categoría, y permite limpiar filtros (998ms)
+  ✓  24 [chromium] › e2e\catalog\filters.spec.ts:105:1 › muestra una categoría vacía y permite volver al catálogo (803ms)
+  ✓  25 [chromium] › e2e\catalog\pagination.spec.ts:3:1 › pagina sin repetir productos y vuelve a la primera página al filtrar (994ms)
+
+  25 passed (40.2s)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
+[2m7:31:51 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/index.html[22m
+Limpieza E2E confirmada: no queda el contenedor de esta ejecución.

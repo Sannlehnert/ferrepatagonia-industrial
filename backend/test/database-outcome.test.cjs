@@ -1,5 +1,6 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const assert=require('node:assert/strict');
-const {test,before,after}=require('node:test');
+const {test,before,beforeEach,after}=require('node:test');
 const {once}=require('node:events');
 Object.assign(process.env,{JWT_SECRET:'unit',DB_HOST:'127.0.0.1',DB_PORT:'1',DB_NAME:'unit',DB_USER:'unit',DB_PASSWORD:'unit'});
 const { app }=require('../dist/app');
@@ -9,6 +10,9 @@ const auth=require('../dist/services/auth.services');
 const {DatabaseOutcomeUnknownError}=require('../dist/config/database-policy');
 const {signToken}=require('../dist/services/token.service');
 const {destroyDatabase}=require('../dist/config/database.config');
+const users=require('../dist/repositories/usuario.repository');
+const {sessionRow}=require('./helpers/session-fixture.cjs');
+beforeEach(t=>{t.mock.method(users,'findUsuarioById',async id=>sessionRow(id,'ADMIN'));});
 let server,url;
 before(async()=>{server=app.listen(0,'127.0.0.1');await once(server,'listening');url='http://127.0.0.1:'+server.address().port;});
 after(async()=>{await new Promise(r=>server.close(r));await destroyDatabase();});

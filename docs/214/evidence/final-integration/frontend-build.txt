@@ -1,0 +1,41 @@
+
+> ferrepatagonia@0.0.0 build
+> run-p type-check "build-only {@}" --
+
+
+> ferrepatagonia@0.0.0 type-check
+> vue-tsc --build
+
+
+> ferrepatagonia@0.0.0 build-only
+> vite build
+
+vite v8.3.4 building client environment for production...
+transforming...
+✓ 144 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       0.68 kB │ gzip:  0.36 kB
+dist/assets/index-B9i5G4s-.css                       26.12 kB │ gzip:  5.75 kB
+dist/assets/cuentaService-PJBUYHrH.js                 0.18 kB │ gzip:  0.14 kB
+dist/assets/AdminSectionPlaceholderView-DUv0wCE7.js   0.69 kB │ gzip:  0.46 kB
+dist/assets/DatosClientes-D9WExq9S.js                 1.20 kB │ gzip:  0.62 kB
+dist/assets/AdminDashboardView-B-x5L7_q.js            1.21 kB │ gzip:  0.65 kB
+dist/assets/AccessDeniedView-CWeZUrGT.js              1.28 kB │ gzip:  0.77 kB
+dist/assets/HomeView-DVIpYpN7.js                      1.31 kB │ gzip:  0.81 kB
+dist/assets/MiCuentaLayout-CWrAW8Q3.js                1.35 kB │ gzip:  0.81 kB
+dist/assets/AdminLayout-DDXWeQkN.js                   1.91 kB │ gzip:  1.02 kB
+dist/assets/registro-Chub-07l.js                      2.08 kB │ gzip:  0.90 kB
+dist/assets/AdminClientsView-CQR-GQJ_.js              2.89 kB │ gzip:  1.33 kB
+dist/assets/LoginView-BSmkUWoU.js                     3.12 kB │ gzip:  1.50 kB
+dist/assets/HistorialPedidos-DsDf0Wyx.js              3.94 kB │ gzip:  1.69 kB
+dist/assets/NavigationMenu-BhRS4Tj7.js                4.05 kB │ gzip:  1.57 kB
+dist/assets/auth-C5hZb-7c.js                          6.57 kB │ gzip:  3.08 kB
+dist/assets/RegistroView-CZlluYK8.js                  7.11 kB │ gzip:  2.24 kB
+dist/assets/CatalogoView-DNTj21y1.js                 11.49 kB │ gzip:  4.09 kB
+dist/assets/AdminProductsListView--wyfQppG.js        20.73 kB │ gzip:  6.49 kB
+dist/assets/index-BRTJN0cW.js                        39.99 kB │ gzip: 15.48 kB
+dist/assets/api-DWRGVcKy.js                          52.66 kB │ gzip: 19.79 kB
+dist/assets/runtime-core.esm-bundler-CYdTbhkB.js     58.54 kB │ gzip: 22.90 kB
+
+✓ built in 563ms

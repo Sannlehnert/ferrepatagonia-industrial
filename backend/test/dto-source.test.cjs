@@ -1,3 +1,4 @@
+const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 // Executed with node --import tsx: no mocking of esbuild's read-only export getters.
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
