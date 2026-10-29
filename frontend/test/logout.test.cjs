@@ -1,6 +1,41 @@
 const { test } = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), ts = require('typescript'), { createPinia, setActivePinia } = require('pinia');
 function setup(api) { setActivePinia(createPinia()); const m = { exports: {} }; const s = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/stores/auth.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText; new Function('require', 'module', 'exports', s)(n => n === '@/services/api' ? api : require(n), m, m.exports); const auth = m.exports.useAuthStore(); auth.user = { id: 1, email: 'fixture@test', rol: 'ADMIN' }; auth.sessionChecked = true; return auth; }
 const err = status => Object.assign(Error('failure'), { isAxiosError: true, response: status ? { status } : undefined });
+
+for (const response of [200, 401, 500, 'network']) {
+    for (const restore of [false, true]) {
+        test(`obsolete logout verification ${response}, newer session ${restore}`, async () => {
+            let finish;
+            let started;
+            const ready = new Promise(resolve => { started = resolve; });
+            let reads = 0;
+            const newerUser = { id: 2, rol: 'CLIENTE' };
+            const auth = setup({
+                post: async () => { throw err(401); },
+                get: () => {
+                    if (++reads > 1) return Promise.resolve({ data: { user: newerUser } });
+                    started();
+                    return new Promise((resolve, reject) => {
+                        finish = () => response === 200
+                            ? resolve({ data: { user: { id: 1, rol: 'ADMIN' } } })
+                            : reject(err(response === 'network' ? undefined : response));
+                    });
+                },
+            });
+            const pending = auth.logout();
+            await ready;
+            auth.clear();
+            if (restore) await auth.fetchSession();
+            const version = auth.sessionVersion;
+            finish();
+            assert.equal(await pending, false, 'obsolete operation cannot confirm logout');
+            assert.deepEqual(auth.user, restore ? newerUser : null);
+            assert.equal(auth.sessionVersion, version);
+            assert.equal(auth.loggingOut, false);
+            assert.equal(auth.loggingIn, false);
+        });
+    }
+}
 test('pending login cannot overlap logout', async () => { let resolve; const a = setup({ post: () => new Promise(r => resolve = r) }); const pending = a.login('a@test', 'fixture'); await assert.rejects(a.logout()); resolve({ data: { user: { id: 2, rol: 'ADMIN' } } }); await pending; assert.equal(a.user.id, 2); });
 for (const status of [500, 403, undefined])
     test('logout failure preserves session ' + status, async () => { const a = setup({ post: async () => { throw err(status); } }); await assert.rejects(a.logout()); assert.equal(a.isAuthenticated, true); assert.equal(a.loggingOut, false); });

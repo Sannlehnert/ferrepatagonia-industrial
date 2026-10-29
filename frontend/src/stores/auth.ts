@@ -50,18 +50,22 @@ export const useAuthStore = defineStore('auth', {
       if (this.loggingIn) throw new Error('Esperá a que termine el inicio de sesión.')
       if (this.loggingOut) return false
       this.loggingOut = true
-      this.sessionVersion++ // Ignore session reads started before this attempt.
+      const version = ++this.sessionVersion // Ignore session reads started before this attempt.
       try {
         await api.post('/auth/logout')
+        if (version !== this.sessionVersion) return false
         this.clear()
         return true
       } catch (error) {
+        if (version !== this.sessionVersion) return false
         // A logout rejection alone never proves that the session has expired.
         if (axios.isAxiosError(error) && error.response?.status === 401) {
           try {
             const { data } = await api.get<{ user: UsuarioSesion }>('/auth/me')
+            if (version !== this.sessionVersion) return false
             this.user = data.user
           } catch (verification) {
+            if (version !== this.sessionVersion) return false
             if (axios.isAxiosError(verification) && verification.response?.status === 401) {
               this.clear()
               return true
