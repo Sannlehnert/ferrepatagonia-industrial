@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const isLoggingOut = ref(false)
+const logoutError = ref('')
 
 const permissions = computed(() =>
   getPermissionsForUser(
@@ -21,11 +22,14 @@ const permissions = computed(() =>
 )
 
 async function logout() {
+  if (isLoggingOut.value) return
+  logoutError.value = ''
   isLoggingOut.value = true
 
   try {
-    await auth.logout()
-    await router.replace({ name: 'login' })
+    if (await auth.logout()) await router.replace({ name: 'login' })
+  } catch {
+    logoutError.value = 'No se pudo cerrar la sesión. No se confirmó el cierre. Reintentá con Cerrar sesión.'
   } finally {
     isLoggingOut.value = false
   }
@@ -38,6 +42,7 @@ async function logout() {
       <h2 class="mb-4 text-xl font-semibold text-[#0b2438]">Mi Cuenta</h2>
       <AccountMenu :permissions="permissions" />
 
+      <p v-if="logoutError" role="alert" class="text-red-800">{{ logoutError }}</p>
       <button class="mt-4 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#103a5c] hover:bg-slate-100 disabled:opacity-60" type="button" :disabled="isLoggingOut" @click="logout">
         {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
       </button>
