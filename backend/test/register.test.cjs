@@ -13,6 +13,9 @@ const { validateRegister } = require('../dist/validators/register.validator');
 
 let server;
 const passwordCases = [
+  ...['\ud800'.repeat(8), '\udc00'.repeat(8), 'abcdefg\ud800', '\udc00abcdefg',
+    'abc\ud800X\udc00def', '😀abcdef\ud800', '\udc00\ud800abcdef'].map(p => [p, false]),
+  ['\ufffd'.repeat(8), true],
   ['', false], ['x', false], ['a'.repeat(7), false], ['😀'.repeat(7), false],
   ['a'.repeat(8), true], ['😀'.repeat(8), true], [' '.repeat(8), true],
   ['  abcdef  ', true], ['a'.repeat(72), true], ['a'.repeat(73), false],

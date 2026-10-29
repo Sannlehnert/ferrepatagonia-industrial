@@ -51,7 +51,11 @@ export function validarRegistro(f: RegistroForm): ErroresRegistro {
   if (f.direccion.trim() && largo(f.direccion) > MAX.direccion)
     e.direccion = `Admite hasta ${MAX.direccion} caracteres.`
 
-  if (Array.from(f.password).length < MIN_PASSWORD)
+  // Unicode regex supports existing ES2015+ browsers without isWellFormed().
+  // Valid pairs (emoji) do not match; unpaired UTF-16 surrogates do.
+  if (/[\uD800-\uDFFF]/u.test(f.password))
+    e.password = 'La contraseña contiene Unicode inválido.'
+  else if (Array.from(f.password).length < MIN_PASSWORD)
     e.password = `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.`
   else if (new TextEncoder().encode(f.password).length > MAX_PASSWORD_BYTES)
     e.password = 'La contraseña es demasiado larga (máximo 72 bytes).'

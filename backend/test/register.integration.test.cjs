@@ -115,13 +115,19 @@ test('registro transaccional en MariaDB', { skip: !process.env.REGISTER_TEST_DAT
     });
 
     for (const tipoCliente of ['PARTICULAR','EMPRESA']) {
-      await t.test(`F02 ${tipoCliente}: rejects invalid passwords without rows and preserves valid values`, async () => {
-        for (const password of ['x','a'.repeat(7),'😀'.repeat(7),'a'.repeat(73),'é'.repeat(36)+'a','😀'.repeat(18)+'a']) {
+      await t.test(`F02 ${tipoCliente}: rejects invalid passwords without rows and preserves valid values`, async (t) => {
+        const db = require('../dist/config/database.config');
+        const original = db.inTransaction;
+        const transaction = t.mock.method(db, 'inTransaction', (...args) => original(...args));
+        for (const password of ['x','a'.repeat(7),'😀'.repeat(7),'a'.repeat(73),'é'.repeat(36)+'a','😀'.repeat(18)+'a',
+          '\ud800'.repeat(8),'\udc00'.repeat(8),'abcdefg\ud800','\udc00abcdefg',
+          'abc\ud800X\udc00def','😀abcdef\ud800','\udc00\ud800abcdef']) {
           const body = {...makeBody(tipoCliente),password};
           assert.equal((await post(body)).status,400);
           assert.deepEqual(await counts(body.email),[0,0]);
+          assert.equal(transaction.mock.callCount(),0, 'invalid password must not start a transaction');
         }
-        for (const password of ['a'.repeat(8),'😀'.repeat(8),' '.repeat(8),' abcdef ','a'.repeat(72),'é'.repeat(36),'😀'.repeat(18),'e\u0301'.repeat(4)]) {
+        for (const password of ['a'.repeat(8),'😀'.repeat(8),' '.repeat(8),' abcdef ','a'.repeat(72),'é'.repeat(36),'😀'.repeat(18),'e\u0301'.repeat(4),'\ufffd'.repeat(8)]) {
           const body = {...makeBody(tipoCliente),password};
           assert.equal((await post(body)).status,201);
           const [row] = await pool.query('SELECT password_hash FROM USUARIO WHERE email = ?',[body.email]);
