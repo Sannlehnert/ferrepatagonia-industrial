@@ -1,5 +1,6 @@
+const generation = { currentSessionGeneration: () => counter, advanceSessionGeneration: () => ++counter }; let counter = 0;
 const { test } = require('node:test'), assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), ts = require('typescript'), { createPinia, setActivePinia } = require('pinia');
-function setup(api) { setActivePinia(createPinia()); const m = { exports: {} }; const s = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/stores/auth.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText; new Function('require', 'module', 'exports', s)(n => n === '@/services/api' ? api : require(n), m, m.exports); const auth = m.exports.useAuthStore(); auth.user = { id: 1, email: 'fixture@test', rol: 'ADMIN' }; auth.sessionChecked = true; return auth; }
+function setup(api) { setActivePinia(createPinia()); const m = { exports: {} }; const s = ts.transpileModule(fs.readFileSync(path.join(__dirname, '../src/stores/auth.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText; new Function('require', 'module', 'exports', s)(n => n === '@/services/api' ? api : n === '@/services/sessionGeneration' ? generation : require(n), m, m.exports); const auth = m.exports.useAuthStore(); auth.user = { id: 1, email: 'fixture@test', rol: 'ADMIN' }; auth.sessionChecked = true; return auth; }
 const err = status => Object.assign(Error('failure'), { isAxiosError: true, response: status ? { status } : undefined });
 
 for (const response of [200, 401, 500, 'network']) {
@@ -54,3 +55,12 @@ for (const status of [401, 500, 200])
     } });
 test('late me cannot resurrect successful logout', async () => { let resolve; const a = setup({ get: () => new Promise(r => resolve = r), post: async () => { } }); const pending = a.fetchSession(); await a.logout(); resolve({ data: { user: { id: 1, rol: 'ADMIN' } } }); await pending; assert.equal(a.isAuthenticated, false); });
 test('me failure preserves session; confirmed expiry clears', async () => { let status = 500; const a = setup({ get: async () => { throw err(status); } }); await assert.rejects(a.fetchSession()); assert.equal(a.isAuthenticated, true); status = 401; await a.fetchSession(); assert.equal(a.isAuthenticated, false); });
+test('login completion advances generation and an intervening clear cannot restore user', async () => {
+ let finish; const auth=setup({post:()=>new Promise(resolve=>{finish=resolve})});
+ const pending=auth.login('fixture@test','fixture');const during=auth.sessionVersion;
+ finish({data:{user:{id:2,rol:'ADMIN'}}});await pending;
+ assert.ok(auth.sessionVersion>during);assert.equal(auth.user.id,2);assert.equal(auth.loggingIn,false);
+ const second=auth.login('fixture@test','fixture');auth.clear();const newer=auth.sessionVersion;
+ finish({data:{user:{id:3,rol:'ADMIN'}}});await assert.rejects(second);
+ assert.equal(auth.user,null);assert.equal(auth.sessionVersion,newer);assert.equal(auth.loggingIn,false);
+});

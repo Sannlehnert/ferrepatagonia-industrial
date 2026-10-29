@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import axios from 'axios'
 import api from '@/services/api'
+import { currentSessionGeneration, advanceSessionGeneration } from '@/services/sessionGeneration'
 import type { UsuarioSesion } from '@/types/auth'
 
 export const useAuthStore = defineStore('auth', {
@@ -10,7 +11,7 @@ export const useAuthStore = defineStore('auth', {
     sessionError: '',
     loggingOut: false,
     loggingIn: false,
-    sessionVersion: 0,
+    sessionVersion: currentSessionGeneration(),
   }),
   getters: {
     isAuthenticated: (s) => !!s.user,
@@ -22,6 +23,7 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data } = await api.get<{ user: UsuarioSesion }>('/auth/me')
         if (version !== this.sessionVersion) return
+        if (this.user?.id !== data.user.id) this.sessionVersion = advanceSessionGeneration()
         this.user = data.user
         this.sessionError = ''
         this.sessionChecked = true
@@ -37,12 +39,14 @@ export const useAuthStore = defineStore('auth', {
     async login(email: string, password: string) {
       if (this.loggingOut || this.loggingIn) throw new Error('Esperá a que termine la operación de sesión.')
       this.loggingIn = true
-      this.sessionVersion++
+      const version = this.sessionVersion = advanceSessionGeneration()
       try {
         const { data } = await api.post<{ user: UsuarioSesion }>('/auth/login', { email, password })
+        if (version !== this.sessionVersion) throw new Error('El inicio de sesión fue reemplazado por otra operación.')
         this.user = data.user
         this.sessionChecked = true
       } finally {
+        if (version === this.sessionVersion) this.sessionVersion = advanceSessionGeneration()
         this.loggingIn = false
       }
     },
@@ -50,7 +54,7 @@ export const useAuthStore = defineStore('auth', {
       if (this.loggingIn) throw new Error('Esperá a que termine el inicio de sesión.')
       if (this.loggingOut) return false
       this.loggingOut = true
-      const version = ++this.sessionVersion // Ignore session reads started before this attempt.
+      const version = this.sessionVersion = advanceSessionGeneration() // Ignore session reads started before this attempt.
       try {
         await api.post('/auth/logout')
         if (version !== this.sessionVersion) return false
@@ -74,11 +78,12 @@ export const useAuthStore = defineStore('auth', {
         }
         throw error
       } finally {
+        if (version === this.sessionVersion) this.sessionVersion = advanceSessionGeneration()
         this.loggingOut = false
       }
     },
     clear() {
-      this.sessionVersion++
+      this.sessionVersion = advanceSessionGeneration()
       this.user = null
       this.sessionError = ''
       this.sessionChecked = true
