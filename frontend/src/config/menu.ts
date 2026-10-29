@@ -39,7 +39,7 @@ export const accountMenu: readonly MenuItem[] = [
     },
     {
         id: 'account-details',
-        label: 'Configuración de datos',
+        label: 'Mis datos',
         routeName: 'cuenta-datos',
         permission: PERMISSIONS.VIEW_OWN_ACCOUNT,
     },
