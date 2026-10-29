@@ -1,0 +1,76 @@
+{"database":"admin_products_test_b2b78d05c1fc45f49f08b3784a336a59","port":53979,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ Admin Products Endpoints (#197)
+  ✔ should return 401 when unauthenticated (52.0639ms)
+  ✔ should return 403 when authenticated as CLIENTE (3.504ms)
+  ✔ should list all products for ADMIN (9.1197ms)
+  ✔ should return 400 on invalid product creation data, missing body, or fields exceeding max length (13.1187ms)
+  ✔ should create and update a product as ADMIN (27.265ms)
+  ✔ should soft-delete (deactivate) a product idempotently (19.6822ms)
+  ✔ should update product stock successfully (14.1019ms)
+  ✔ should return 400 when updating with negative stock (2.424ms)
+  ✔ should return 400 when updating stock with invalid data types or out of range (10.5921ms)
+  ✔ should return 400 when updating stock without a body (1.1081ms)
+Error al leer el producto tras el INSERT, devolviendo datos persistidos:
+  ✔ should return persisted price precision (1.24 for 1.239) in fallback when post-INSERT SELECT fails (6.439ms)
+  ✔ migration should trim leading and trailing spaces in SKU, validate UNIQUE index definition, and be idempotent (133.969ms)
+  ✔ migration rejects blank and duplicate normalized SKUs before changing data or indexes (287.4173ms)
+✔ Admin Products Endpoints (#197) (2436.319ms)
+▶ /auth/me en MariaDB: login, restauración, estado persistido y logout
+  ✔ PARTICULAR (75.0991ms)
+  ✔ EMPRESA (32.266ms)
+  ✔ ADMIN sin cliente (16.7265ms)
+✔ /auth/me en MariaDB: login, restauración, estado persistido y logout (274.0182ms)
+▶ catálogo público real en MariaDB
+  ✔ filtra activos, conserva sin stock y pagina sin duplicar ni omitir productos (55.8163ms)
+  ✔ categoría activa: contrato HTTP y paginación sobre el subconjunto (30.9145ms)
+  ✔ categorías inactiva, vacía, solo productos inactivos e inexistente devuelven vacío (48.2113ms)
+  ✔ categoría inválida rechazada por HTTP real (9.4585ms)
+  ✔ catálogo vacío: ninguna página tiene anterior ni siguiente (16.5112ms)
+  ✔ busqueda real: nombre/codigo, collation, literales y paginacion (947.0948ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda undefined (7.6326ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda catalog-d313a5b6-2f19-421d-9522-b96e2b3ff320 (5.6101ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda undefined (5.873ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda catalog-d313a5b6-2f19-421d-9522-b96e2b3ff320 (5.5468ms)
+✔ catálogo público real en MariaDB (1353.7653ms)
+▶ listado HTTP de cuentas registradas en MariaDB
+  ✔ coincide con las cuentas CLIENTE asociadas y su orden, con sesión ADMIN (38.4878ms)
+  ✔ usa datos de cuenta, excluye clientes sin usuario y ADMIN, y desempata por id (15.1302ms)
+✔ listado HTTP de cuentas registradas en MariaDB (195.7072ms)
+database.query.slow { milliseconds: 5001 }
+database.query.failed
+Error al actualizar stock:
+✔ server timeout rolls back stock before HTTP error, with no late write (5407.5662ms)
+ℹ {"case":"timeout-write","status":500,"result":{"message":"Error interno del servidor"},"elapsed":5042,"stockBeforeUnlock":1,"stockAfterUnlock":1,"pendingWritesBeforeUnlock":0}
+Health: no se pudo consultar MariaDB. Revisá Docker y backend/.env.
+Error al consultar las categorías.
+✔ saturation rejects HTTP requests, does not queue, permits shutdown and recovery (13.9754ms)
+ℹ {"saturatedHealth":503,"saturatedCategory":500,"elapsed":7,"shutdown":"completed with pool occupied"}
+ℹ Recovered health and all five connections; no queued late acquisitions
+✔ slow registration logs diagnostics without secrets, then rolls back (5248.6567ms)
+ℹ {"case":"sensitive-slow-log","logging":false,"hashLeaked":false,"emailLeaked":false}
+database.query.failed
+database.query.failed
+✔ lost transaction connection yields an explicitly uncertain outcome and is not reused (64.8318ms)
+✔ schema metadata mirrors every active column, CHECK, index and FK (39.2119ms)
+✔ all DDL automation stays disabled and password is hidden by default (1.7856ms)
+✔ real repository decimal, nullable fields and relations retain their shape (40.2908ms)
+database.query.failed
+▶ registro transaccional en MariaDB
+  ✔ PARTICULAR: persiste ambas filas y revierte un duplicado (739.1749ms)
+database.query.failed
+  ✔ EMPRESA: persiste ambas filas y revierte un duplicado (703.2564ms)
+  ✔ error en INSERT USUARIO revierte CLIENTE y devuelve 500 genérico (231.3334ms)
+database.query.failed
+  ✔ dos registros simultáneos del mismo email crean solo un par (462.5604ms)
+  ✔ rol ADMIN y contraseña excesiva no crean filas (5.5782ms)
+  ✔ health sigue 200 después de las transacciones (2.5221ms)
+✔ registro transaccional en MariaDB (2303.7268ms)
+ℹ tests 45
+ℹ suites 1
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 27430.2876
+{"schemaBefore":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","schemaAfter":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","unchanged":true}

@@ -1,0 +1,18 @@
+Base E2E preparada: e2e_test_487a68aee86545aa910173d6c16430cd
+Frontend E2E: http://127.0.0.1:53207
+
+Running 3 tests using 1 worker
+
+  ✓  1 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 400: conserva datos sin éxito falso (3.4s)
+  ✓  2 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 404: conserva datos sin éxito falso (1.6s)
+database.query.failed
+  ✓  3 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 409: conserva datos sin éxito falso (1.6s)
+
+  3 passed (8.3s)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
+[2m7:24:09 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/index.html[22m
+Limpieza E2E confirmada: no queda el contenedor de esta ejecución.

@@ -1,0 +1,7 @@
+Base E2E preparada: e2e_test_fba812ac866248288fcea7d51f714ab2
+Frontend E2E: http://127.0.0.1:53664
+Error: Project(s) "proyecto-inexistente" not found. Available projects: "chromium"
+    at Object.filterProjects (C:\Bruno\ITS\PP II\TP ferrepatagonia\ferrepatagonia_project\ferrepatagonia-industrial\frontend\node_modules\playwright\lib\runner\index.js:2164:11)
+    at runTests (C:\Bruno\ITS\PP II\TP ferrepatagonia\ferrepatagonia_project\ferrepatagonia-industrial\frontend\node_modules\playwright\lib\cli\testActions.js:59:30)
+    at _Command.<anonymous> (C:\Bruno\ITS\PP II\TP ferrepatagonia\ferrepatagonia_project\ferrepatagonia-industrial\frontend\node_modules\playwright\lib\program.js:55:7)
+Contenedor y base E2E eliminados.
