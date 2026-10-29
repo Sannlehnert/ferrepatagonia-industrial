@@ -5,7 +5,7 @@ export type ErroresRegistro = Partial<Record<CampoRegistro, string>>
 
 // Límites de database/schema.sql y password.service.ts
 const MAX = { nombreRazonSocial: 200, email: 254, cuit: 20, telefono: 50, direccion: 500 }
-const MIN_PASSWORD = 8 // criterio del front; el backend no exige mínimo
+const MIN_PASSWORD = 8 // puntos de código Unicode, igual que el DTO de registro backend
 const MAX_PASSWORD_BYTES = 72
 
 export const esEmailValido = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
@@ -51,7 +51,7 @@ export function validarRegistro(f: RegistroForm): ErroresRegistro {
   if (f.direccion.trim() && largo(f.direccion) > MAX.direccion)
     e.direccion = `Admite hasta ${MAX.direccion} caracteres.`
 
-  if (f.password.length < MIN_PASSWORD)
+  if (Array.from(f.password).length < MIN_PASSWORD)
     e.password = `La contraseña debe tener al menos ${MIN_PASSWORD} caracteres.`
   else if (new TextEncoder().encode(f.password).length > MAX_PASSWORD_BYTES)
     e.password = 'La contraseña es demasiado larga (máximo 72 bytes).'

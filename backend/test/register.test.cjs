@@ -12,6 +12,37 @@ const { pool } = require('../dist/config/catalog-snapshot.config');
 const { validateRegister } = require('../dist/validators/register.validator');
 
 let server;
+const passwordCases = [
+  ['', false], ['x', false], ['a'.repeat(7), false], ['😀'.repeat(7), false],
+  ['a'.repeat(8), true], ['😀'.repeat(8), true], [' '.repeat(8), true],
+  ['  abcdef  ', true], ['a'.repeat(72), true], ['a'.repeat(73), false],
+  ['é'.repeat(36), true], ['é'.repeat(36)+'a', false],
+  ['😀'.repeat(18), true], ['😀'.repeat(18)+'a', false],
+  ['e\u0301'.repeat(4), true],
+];
+for (const tipoCliente of ['PARTICULAR', 'EMPRESA']) {
+  for (const [index, [password, valid]] of passwordCases.entries()) {
+    test(`F02 ${tipoCliente}: boundary ${index}`, async t => {
+      const body = {tipoCliente,nombreRazonSocial:'Fixture',email:'policy@example.test',password};
+      const validated = validateRegister(body);
+      assert.equal(validated.valid,valid);
+      if (valid) assert.equal(validated.data.password,password);
+      const service = t.mock.method(registerService,'registerClient',async () => ({id:1}));
+      const response = await fetch(`${baseUrl}/api/auth/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+      assert.equal(response.status,valid?201:400);
+      assert.equal(service.mock.callCount(),valid?1:0);
+      if (!valid) {
+        assert.deepEqual(Object.keys(await response.json()),['message']);
+        const db = require('../dist/config/database.config');
+        const transaction = t.mock.method(db,'inTransaction',async()=>{throw Error('must not write');});
+        // Also check the service boundary independently of the HTTP DTO.
+        await assert.rejects(registerServiceOriginal(body), {status:400});
+        assert.equal(transaction.mock.callCount(),0);
+      }
+    });
+  }
+}
+const registerServiceOriginal = registerService.registerClient;
 let baseUrl;
 before(async () => {
   const app = express();

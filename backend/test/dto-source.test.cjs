@@ -11,7 +11,7 @@ test('tsx: all seven decorated DTOs validate, transform and reject without emitt
   const app = express(); app.use(express.json());
   const cases = [
     ['loginPolicy', {email:'a',password:' pass '}, {email:[],password:'x'}],
-    ['registerPolicy',{tipoCliente:'PARTICULAR',nombreRazonSocial:'x',email:'a@b.test',password:'x'},{rol:'ADMIN'}],
+    ['registerPolicy',{tipoCliente:'PARTICULAR',nombreRazonSocial:'x',email:'a@b.test',password:'password'},{rol:'ADMIN'}],
     ['catalogPolicy',{page:'2',limit:'1'}, {page:'01'}],
     ['productIdPolicy',{id:'1'},{id:'1e0'}],
     ['createProductPolicy',{nombre:'x',codigo:'x',id_categoria:1,precio:1.239,stock:0},{nombre:null}],

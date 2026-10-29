@@ -20,7 +20,7 @@ let server, base;
 before(async () => { server = app.listen(0, '127.0.0.1'); await once(server, 'listening'); base = `http://127.0.0.1:${server.address().port}`; });
 after(async () => { await new Promise(r => server.close(r)); await destroyDatabase(); });
 const product = { nombre: ' Producto ', codigo: ' SKU ', id_categoria: 1, precio: 1.239, stock: 0 };
-const registration = { tipoCliente: 'PARTICULAR', nombreRazonSocial: ' Cliente ', email: ' a@b.test ', password: ' pass ' };
+const registration = { tipoCliente: 'PARTICULAR', nombreRazonSocial: ' Cliente ', email: ' a@b.test ', password: ' password ' };
 const scenarios = [
   ['Login', 'loginPolicy', '/api/auth/login', 'POST', auth, 'loginUsuario', { email: 'a@b.test', password: ' pass ' }],
   ['Registro', 'registerPolicy', '/api/auth/register', 'POST', register, 'registerClient', registration],
@@ -68,7 +68,7 @@ for (const [name, policy, path, method, target, key, valid] of scenarios) {
     assert.equal(stub.mock.callCount(),1);
     const args=stub.mock.calls[0].arguments;
     if(name==='Login') assert.deepEqual(args,['a@b.test',' pass ']);
-    if(name==='Registro') {assert.equal(args[0].password,' pass ');assert.equal(args[0].email,'a@b.test');assert.equal(args[0].docCliente,null);}
+    if(name==='Registro') {assert.equal(args[0].password,' password ');assert.equal(args[0].email,'a@b.test');assert.equal(args[0].docCliente,null);}
     if(name==='CreateProduct') {assert.ok(args[0] instanceof policies[policy].type);assert.equal(args[0].precio,1.239);}
     if(name==='UpdateProduct') {assert.ok(args[1] instanceof policies[policy].type);assert.deepEqual(Object.keys(args[1]),['nombre']);}
     if(name==='Stock') assert.deepEqual(args,[1,0]);
