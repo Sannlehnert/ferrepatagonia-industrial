@@ -26,7 +26,7 @@ api.interceptors.response.use(
       }
     }
 
-    if (status === 403) {
+    if (status === 403 && url !== '/auth/logout') {
       const { default: router } = await import('@/router')
 
       if (router.currentRoute.value.name !== 'access-denied') {
