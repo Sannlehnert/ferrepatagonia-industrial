@@ -1,3 +1,4 @@
+import { registrationPasswordError } from '../../services/password-policy';
 import { Rule } from '../rules';
 import type { RegisterInput } from '../../validators/register.validator';
 
@@ -18,8 +19,7 @@ export class Registro {
   @text('cuit', 20) cuit?: string | null;
   @text('telefono', 50) telefono?: string | null;
   @text('direccion', 500) direccion?: string | null;
-  @Rule(v => typeof v !== 'string' || !v.trim() ? 'password debe ser un texto no vacío.'
-    : Buffer.byteLength(v, 'utf8') > 72 ? 'Solicitud inválida.' : null)
+  @Rule(registrationPasswordError)
   password!: string;
 }
 

@@ -8,14 +8,17 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 const router = useRouter()
 const saliendo = ref(false)
+const logoutError = ref('')
 
 async function cerrarSesion() {
     if (saliendo.value) return
 
+    logoutError.value = ''
     saliendo.value = true
     try {
-        await auth.logout()
-        await router.replace({ name: 'login' })
+        if (await auth.logout()) await router.replace({ name: 'login' })
+    } catch {
+        logoutError.value = 'No se pudo cerrar la sesión. No se confirmó el cierre. Reintentá con Cerrar sesión.'
     } finally {
         saliendo.value = false
     }
@@ -41,6 +44,7 @@ const permissions = computed(() => {
             </div>
 
             <div class="border-t border-[#33556f] p-5">
+                <p v-if="logoutError" role="alert" class="text-sm">{{ logoutError }}</p>
                 <button
                     type="button"
                     class="box-border min-h-11 w-full cursor-pointer rounded-md border-0 bg-transparent px-3 py-2 text-left text-sm text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60"
