@@ -1,0 +1,15 @@
+Base E2E preparada: e2e_test_1bce590bb0094011ba850e03d3e6be01
+Frontend E2E: http://127.0.0.1:60117
+
+Running 1 test using 1 worker
+
+  ✓  1 [chromium] › e2e\admin\products.spec.ts:4:1 › crea y edita un producto con persistencia y reflejo público (5.6s)
+
+  1 passed (7.0s)
+
+To open last HTML report run:
+[36m[39m
+[36m  npx playwright show-report[39m
+[36m[39m
+[2m7:29:59 PM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/index.html[22m
+Limpieza E2E confirmada: no queda el contenedor de esta ejecución.

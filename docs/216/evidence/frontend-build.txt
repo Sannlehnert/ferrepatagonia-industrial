@@ -1,0 +1,41 @@
+﻿
+> ferrepatagonia@0.0.0 build
+> run-p type-check "build-only {@}" --
+
+
+> ferrepatagonia@0.0.0 type-check
+> vue-tsc --build
+
+
+> ferrepatagonia@0.0.0 build-only
+> vite build
+
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 147 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                       0.68 kB │ gzip:  0.36 kB
+dist/assets/index-B9i5G4s-.css                       26.12 kB │ gzip:  5.75 kB
+dist/assets/cuentaService-BGvUXg2k.js                 0.18 kB │ gzip:  0.14 kB
+dist/assets/AdminSectionPlaceholderView-Cm0gHfBG.js   0.69 kB │ gzip:  0.46 kB
+dist/assets/DatosClientes-DZwdGCVx.js                 1.20 kB │ gzip:  0.62 kB
+dist/assets/AdminDashboardView-BARgT6V8.js            1.21 kB │ gzip:  0.65 kB
+dist/assets/AccessDeniedView-DnhvlrUu.js              1.28 kB │ gzip:  0.77 kB
+dist/assets/HomeView-CULcArSa.js                      1.31 kB │ gzip:  0.81 kB
+dist/assets/MiCuentaLayout-CVoCKY4H.js                1.35 kB │ gzip:  0.81 kB
+dist/assets/AdminLayout-DrfXdTPZ.js                   1.91 kB │ gzip:  1.02 kB
+dist/assets/registro-Chub-07l.js                      2.08 kB │ gzip:  0.90 kB
+dist/assets/AdminClientsView-DtUYYGyV.js              2.89 kB │ gzip:  1.33 kB
+dist/assets/LoginView-CoRdtxFL.js                     3.12 kB │ gzip:  1.50 kB
+dist/assets/HistorialPedidos-DwX0sfzr.js              3.94 kB │ gzip:  1.69 kB
+dist/assets/NavigationMenu-BW-aTFJY.js                4.05 kB │ gzip:  1.58 kB
+dist/assets/auth-CgfYhhY6.js                          6.57 kB │ gzip:  3.09 kB
+dist/assets/RegistroView-Clkx6Rsm.js                  7.11 kB │ gzip:  2.24 kB
+dist/assets/CatalogoView-A5dNMoCb.js                 11.49 kB │ gzip:  4.09 kB
+dist/assets/AdminProductsListView-Dzzjca5D.js        20.73 kB │ gzip:  6.49 kB
+dist/assets/index-C6AJiiCY.js                        39.96 kB │ gzip: 15.44 kB
+dist/assets/runtime-core.esm-bundler-BGJ6elZU.js     58.50 kB │ gzip: 22.90 kB
+dist/assets/api-BmNzDLil.js                          60.08 kB │ gzip: 22.35 kB
+
+[32m✓ built in 981ms[39m

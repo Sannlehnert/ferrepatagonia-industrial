@@ -1,0 +1,30 @@
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
+/* No global Preflight or Vue starter reset: public pages own their styles. */
+@layer base {
+  body {
+    margin: 0;
+    color: #13293a;
+    font-family: Arial, sans-serif;
+    line-height: 1.5;
+  }
+
+  .admin-products,
+  .admin-products *,
+  .admin-products *::before,
+  .admin-products *::after {
+    box-sizing: border-box;
+    margin: 0;
+    font-weight: normal;
+  }
+
+  .admin-products {
+    line-height: 1.6;
+  }
+
+  .admin-products :is(button, input, select, textarea) {
+    font-family: inherit;
+  }
+}

@@ -1,0 +1,11 @@
+﻿=== 1. CONTROLLED TEST FAILURE CHECK ===
+EXIT_CODE: 9
+NON_ZERO_FAIL_VISIBLE: true
+
+
+=== 2. CONTROLLED TYPECHECK FAILURE CHECK ===
+EXIT_CODE: 2
+NON_ZERO_FAIL_VISIBLE: true
+error TS6053: File 'backend/src/nonexistent-ci-verify-file.ts' not found.
+  The file is in the program because:
+    Root file specified for compilation

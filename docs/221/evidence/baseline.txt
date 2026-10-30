@@ -1,0 +1,44 @@
+{"database":"admin_products_test_5b862a2abf064d7b9a3c923ed6df7c2a","port":59539,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ Admin Products Endpoints (#197)
+  ✔ should return 401 when unauthenticated (28.1804ms)
+  ✔ should return 403 when authenticated as CLIENTE (4.0599ms)
+  ✔ should list all products for ADMIN (5.563ms)
+  ✔ should return 400 on invalid product creation data, missing body, or fields exceeding max length (17.7519ms)
+  ✔ should create and update a product as ADMIN (28.029ms)
+  ✔ should soft-delete (deactivate) a product idempotently (11.4189ms)
+  ✔ should update product stock successfully (11.0473ms)
+  ✔ should return 400 when updating with negative stock (2.4351ms)
+  ✔ should return 400 when updating stock with invalid data types or out of range (10.3422ms)
+  ✔ should return 400 when updating stock without a body (0.9944ms)
+Error al leer el producto tras el INSERT, devolviendo datos persistidos: Error: Fallo simulado de lectura post-INSERT
+    at <checkout>\backend\test\adminProduct.test.cjs:298:19
+    at Object.apply (node:internal/test_runner/mock/mock:757:20)
+    at createAdminProduct (<checkout>\backend\dist\services\adminProduct.service.js:139:81)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async TestContext.<anonymous> (<checkout>\backend\test\adminProduct.test.cjs:301:32)
+    at async Test.run (node:internal/test_runner/test:1125:7)
+    at async Suite.processPendingSubtests (node:internal/test_runner/test:787:7)
+  ✔ should return persisted price precision (1.24 for 1.239) in fallback when post-INSERT SELECT fails (4.4528ms)
+  ✔ migration should trim leading and trailing spaces in SKU, validate UNIQUE index definition, and be idempotent (137.2569ms)
+  ✔ migration rejects blank and duplicate normalized SKUs before changing data or indexes (289.0442ms)
+✔ Admin Products Endpoints (#197) (705.135ms)
+▶ catálogo público real en MariaDB
+  ✔ filtra activos, conserva sin stock y pagina sin duplicar ni omitir productos (56.8811ms)
+  ✔ categoría activa: contrato HTTP y paginación sobre el subconjunto (28.4346ms)
+  ✔ categorías inactiva, vacía, solo productos inactivos e inexistente devuelven vacío (51.317ms)
+  ✔ categoría inválida rechazada por HTTP real (3.7873ms)
+  ✔ catálogo vacío: ninguna página tiene anterior ni siguiente (17.1449ms)
+  ✔ busqueda real: nombre/codigo, collation, literales y paginacion (1023.3673ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda undefined (8.3143ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda catalog-3664dcf5-cbf8-4009-aca7-31cbb56f4edf (5.7774ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda undefined (5.5779ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda catalog-3664dcf5-cbf8-4009-aca7-31cbb56f4edf (5.7577ms)
+✔ catálogo público real en MariaDB (1468.1366ms)
+ℹ tests 24
+ℹ suites 1
+ℹ pass 24
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2335.6879

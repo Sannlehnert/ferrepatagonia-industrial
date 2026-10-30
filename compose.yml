@@ -1,0 +1,27 @@
+# Solo desarrollo local. Estas credenciales son publicas y no son secretos reales.
+name: ferrepatagonia-dev
+
+services:
+  mariadb:
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      MARIADB_DATABASE: ferrepatagonia_dev
+      MARIADB_USER: ferrepatagonia
+      MARIADB_PASSWORD: ferrepatagonia_dev_only
+      MARIADB_ROOT_PASSWORD: root_dev_only
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      # Disponibles para ejecucion manual; no se cargan al iniciar.
+      - ./database:/scripts:ro
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 30s
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  mariadb_data:

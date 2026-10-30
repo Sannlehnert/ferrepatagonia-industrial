@@ -1,0 +1,39 @@
+Base E2E preparada: e2e_test_c4d1652d76df4ad881e0185dc0d66315
+Frontend E2E: http://127.0.0.1:49672
+
+Running 25 tests using 1 worker
+
+(node:26352) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › e2e\admin\products.spec.ts:4:1 › crea y edita un producto con persistencia y reflejo público (2.7s)
+  ok  2 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 400: conserva datos sin éxito falso (878ms)
+  ok  3 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 404: conserva datos sin éxito falso (838ms)
+database.query.failed
+  ok  4 [chromium] › e2e\admin\rejections.spec.ts:4:3 › rechazo administrativo 409: conserva datos sin éxito falso (843ms)
+  ok  5 [chromium] › e2e\admin\status.spec.ts:3:1 › cancela, desactiva y reactiva un producto con reflejo público (2.2s)
+  ok  6 [chromium] › e2e\admin\stock.spec.ts:3:1 › valida stock y refleja los cambios en el catálogo público (1.9s)
+  ok  7 [chromium] › e2e\admin\uncertain-save.spec.ts:3:1 › bloquea cambios tras una respuesta perdida hasta recargar correctamente (1.0s)
+  ok  8 [chromium] › e2e\auth\access.spec.ts:4:3 › visitante: exige iniciar sesión para acceder a /admin/productos (279ms)
+  ok  9 [chromium] › e2e\auth\access.spec.ts:4:3 › visitante: exige iniciar sesión para acceder a /mi-cuenta/datos (275ms)
+  ok 10 [chromium] › e2e\auth\access.spec.ts:40:3 › cliente: rechaza otra área y conserva la sesión (627ms)
+  ok 11 [chromium] › e2e\auth\access.spec.ts:40:3 › administrador: rechaza otra área y conserva la sesión (627ms)
+  ok 12 [chromium] › e2e\auth\api-permissions.spec.ts:3:1 › API: rechaza al visitante con 401 (282ms)
+  ok 13 [chromium] › e2e\auth\api-permissions.spec.ts:28:3 › API: responde 403 al cliente (436ms)
+  ok 14 [chromium] › e2e\auth\api-permissions.spec.ts:28:3 › API: responde 200 al administrador (444ms)
+  ok 15 [chromium] › e2e\auth\session.spec.ts:15:3 › administrador: inicia, restaura y cierra sesión (683ms)
+  ok 16 [chromium] › e2e\auth\session.spec.ts:15:3 › cliente: inicia, restaura y cierra sesión (708ms)
+  ok 17 [chromium] › e2e\catalog\availability.spec.ts:3:1 › mantiene visible el producto sin stock y deshabilita Agregar (441ms)
+  ok 18 [chromium] › e2e\catalog\availability.spec.ts:61:3 › oculta los productos inactivos al buscarlos por código (505ms)
+  ok 19 [chromium] › e2e\catalog\availability.spec.ts:61:3 › oculta los productos de una categoría inactiva (493ms)
+  ok 20 [chromium] › e2e\catalog\errors.spec.ts:4:3 › recupera el catálogo después de un error de red (398ms)
+  ok 21 [chromium] › e2e\catalog\errors.spec.ts:4:3 › recupera el catálogo después de un error de http500 (389ms)
+  ok 22 [chromium] › e2e\catalog\filters.spec.ts:3:1 › visitante busca por SKU y conserva el resultado al recargar (502ms)
+  ok 23 [chromium] › e2e\catalog\filters.spec.ts:50:1 › combina búsqueda por nombre y categoría, y permite limpiar filtros (476ms)
+  ok 24 [chromium] › e2e\catalog\filters.spec.ts:105:1 › muestra una categoría vacía y permite volver al catálogo (458ms)
+  ok 25 [chromium] › e2e\catalog\pagination.spec.ts:3:1 › pagina sin repetir productos y vuelve a la primera página al filtrar (567ms)
+
+  25 passed (20.1s)
+10:04:59 [vite] (client) page reload playwright-report/index.html
+Limpieza E2E confirmada: no quedan el contenedor ni sus volúmenes.
+{"name":"ferrepatagonia-e2e-c4d1652d76df4ad881e0185dc0d66315","containerAbsent":true,"orphanVolumes":[]}
+AUDIT_RECORDED_CLEANUP {"originalClean":true,"ownResourcesRemoved":true}

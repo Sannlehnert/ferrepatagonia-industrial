@@ -1,0 +1,138 @@
+[
+  {
+    "job": "backend",
+    "scenario": "clean",
+    "exit": 0,
+    "report": {
+      "job": "backend-ci",
+      "remainingContainers": [],
+      "remainingVolumes": [],
+      "clean": true
+    },
+    "ok": true
+  },
+  {
+    "job": "backend",
+    "scenario": "leak",
+    "exit": 1,
+    "report": {
+      "job": "backend-ci",
+      "remainingContainers": [
+        "owned-test-resource"
+      ],
+      "remainingVolumes": [
+        "owned-test-resource"
+      ],
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "backend",
+    "scenario": "missing-baseline",
+    "exit": 1,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "backend",
+    "scenario": "docker-error",
+    "exit": 7,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "backend",
+    "scenario": "sort-error",
+    "exit": 8,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "backend",
+    "scenario": "comm-error",
+    "exit": 9,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "frontend-e2e",
+    "scenario": "clean",
+    "exit": 0,
+    "report": {
+      "job": "frontend-ci",
+      "remainingContainers": [],
+      "remainingVolumes": [],
+      "clean": true
+    },
+    "ok": true
+  },
+  {
+    "job": "frontend-e2e",
+    "scenario": "leak",
+    "exit": 1,
+    "report": {
+      "job": "frontend-ci",
+      "remainingContainers": [
+        "owned-test-resource"
+      ],
+      "remainingVolumes": [
+        "owned-test-resource"
+      ],
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "frontend-e2e",
+    "scenario": "missing-baseline",
+    "exit": 1,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "frontend-e2e",
+    "scenario": "docker-error",
+    "exit": 7,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "frontend-e2e",
+    "scenario": "sort-error",
+    "exit": 8,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  },
+  {
+    "job": "frontend-e2e",
+    "scenario": "comm-error",
+    "exit": 9,
+    "report": {
+      "verification": "error",
+      "clean": false
+    },
+    "ok": true
+  }
+]

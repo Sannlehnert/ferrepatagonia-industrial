@@ -1,0 +1,19 @@
+{
+  "pr": 53,
+  "sha": "02f46dbfbd7557caa682e5fd6311377e1657c933",
+  "run": 40760563063,
+  "job": 123071025234,
+  "url": "https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/40760563063/job/123071025234",
+  "excerpt": [
+    "2026-10-28T20:08:44.6461809Z # Subtest: CI_NEGATIVE_PROBE_216",
+    "2026-10-28T20:08:44.6462378Z not ok 55 - CI_NEGATIVE_PROBE_216",
+    "2026-10-28T20:08:44.6466050Z     CI_NEGATIVE_PROBE_216 intentional assertion",
+    "2026-10-28T20:08:44.6468066Z   expected: 2",
+    "2026-10-28T20:08:44.6468387Z   actual: 1",
+    "2026-10-28T20:08:44.6479063Z # tests 57",
+    "2026-10-28T20:08:44.6479688Z # pass 56",
+    "2026-10-28T20:08:44.6479977Z # fail 1",
+    "2026-10-28T20:08:44.6480566Z # skipped 0",
+    "2026-10-28T20:08:44.6525902Z ##[error]Process completed with exit code 1."
+  ]
+}

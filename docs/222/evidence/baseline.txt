@@ -1,0 +1,326 @@
+
+> ferrepatagonia-backend@0.1.0 test
+> npm run build && npm run test:unit && npm run test:integration
+
+
+> ferrepatagonia-backend@0.1.0 build
+> tsc
+
+
+> ferrepatagonia-backend@0.1.0 test:unit
+> node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs
+
+✔ CLIENTE PARTICULAR: contrato exacto, SQL por id y sin renovar cookie (57.1019ms)
+✔ CLIENTE EMPRESA: contrato exacto, SQL por id y sin renovar cookie (7.0783ms)
+✔ ADMIN null: contrato exacto, SQL por id y sin renovar cookie (4.7005ms)
+✔ sin cookie: 401 sin consultar BD (3.4186ms)
+✔ JWT inválido: 401 sin consultar BD (2.726ms)
+✔ JWT expirado: 401 sin consultar BD (2.6264ms)
+✔ inexistente: 401 (3.3673ms)
+✔ inactivo: 401 (4.0061ms)
+✔ rol desactualizado: 401 (3.9847ms)
+✔ error de BD: 500 sin detalles internos incluso si contiene status/code (4.5332ms)
+✔ regresión login y coherencia con /me: PARTICULAR (20.9114ms)
+✔ regresión login y coherencia con /me: EMPRESA (5.0424ms)
+✔ regresión login y coherencia con /me: null (3.3345ms)
+✔ authenticate: CLIENTE conserva solamente id y rol (44.0187ms)
+✔ authenticate: ADMIN conserva solamente id y rol (8.5851ms)
+✔ authenticate: sin cookie devuelve 401 con message (2.7874ms)
+✔ authenticate: token manipulado devuelve 401 con message (3.1648ms)
+✔ authenticate: token expirado devuelve 401 con message (3.0082ms)
+✔ authenticate: rol EMPRESA devuelve 401 con message (2.8607ms)
+✔ authenticate: sin rol devuelve 401 con message (2.8252ms)
+✔ authenticate: payload string devuelve 401 con message (2.8567ms)
+✔ authenticate: algoritmo distinto devuelve 401 con message (2.8218ms)
+✔ authenticate: firma con otro secreto devuelve 401 con message (2.6004ms)
+✔ authenticate: cookie JSON devuelve 401 con message (1.9991ms)
+✔ authenticate: token malformado devuelve 401 con message (1.5158ms)
+✔ authenticate: id inválido undefined devuelve 401 con message (2.0264ms)
+✔ authenticate: id inválido null devuelve 401 con message (1.5926ms)
+✔ authenticate: id inválido 0 devuelve 401 con message (1.9232ms)
+✔ authenticate: id inválido -1 devuelve 401 con message (1.5684ms)
+✔ authenticate: id inválido 1.5 devuelve 401 con message (1.1312ms)
+✔ authenticate: id inválido 7 devuelve 401 con message (1.1968ms)
+✔ authenticate: id inválido 9007199254740992 devuelve 401 con message (1.1893ms)
+✔ authenticate elimina un contexto previo si falla la autenticación (0.2136ms)
+✔ authorizeRoles ADMIN devuelve 200 y ejecuta el handler (1.7198ms)
+✔ authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler (1.5954ms)
+✔ ruta ADMIN: sin sesión devuelve 401 sin ejecutar handler (1.3018ms)
+✔ ruta ADMIN: token inválido devuelve 401 sin ejecutar handler (1.3169ms)
+✔ ruta ADMIN: token expirado devuelve 401 sin ejecutar handler (4.0857ms)
+✔ authorizeRoles no lee cookies ni vuelve a verificar JWT (0.7419ms)
+✔ authorizeRoles permite múltiples roles y sin argumentos devuelve 403 (0.276ms)
+✔ authorizeRoles sin req.auth devuelve 401 aunque haya cookie (0.3967ms)
+✔ JWT_SECRET vacío impide cargar la configuración (70.4696ms)
+✔ login emite JWT verificable sin cambiar sus datos públicos (379.5905ms)
+✔ público con cookie undefined: contrato exacto y precio no publicado (61.5967ms)
+✔ público con cookie jwt_token=invalido: contrato exacto y precio no publicado (3.8448ms)
+✔ 400 sin consultar BD: page=0 (2.5251ms)
+✔ 400 sin consultar BD: page=-1 (1.661ms)
+✔ 400 sin consultar BD: page=1.5 (1.5463ms)
+✔ 400 sin consultar BD: page=1e2 (1.7967ms)
+✔ 400 sin consultar BD: page=01 (1.2395ms)
+✔ 400 sin consultar BD: page= (1.9014ms)
+✔ 400 sin consultar BD: page=%20 (2.0267ms)
+✔ 400 sin consultar BD: page=%2B1 (2.1092ms)
+✔ 400 sin consultar BD: page=1000001 (1.1114ms)
+✔ 400 sin consultar BD: page=9007199254740992 (1.3388ms)
+✔ 400 sin consultar BD: page=1&page=2 (1.6187ms)
+✔ 400 sin consultar BD: page[]=1 (1.75ms)
+✔ 400 sin consultar BD: page[x]=1 (1.5205ms)
+✔ 400 sin consultar BD: limit=0 (1.4632ms)
+✔ 400 sin consultar BD: limit=-1 (1.3052ms)
+✔ 400 sin consultar BD: limit=101 (1.4445ms)
+✔ 400 sin consultar BD: limit=1.5 (1.5717ms)
+✔ 400 sin consultar BD: limit=1&limit=2 (1.3519ms)
+✔ 400 sin consultar BD: limit= (1.5031ms)
+✔ 400 sin consultar BD: limit=abc (1.332ms)
+✔ 400 sin consultar BD: limit=01 (1.5837ms)
+✔ 400 sin consultar BD: limit=1e2 (1.7417ms)
+✔ 400 sin consultar BD: q=taladro (1.2984ms)
+✔ 400 sin consultar BD: categoria=0 (1.2924ms)
+✔ 400 sin consultar BD: categoria=-1 (1.7059ms)
+✔ 400 sin consultar BD: categoria= (1.4368ms)
+✔ 400 sin consultar BD: categoria=01 (1.5891ms)
+✔ 400 sin consultar BD: categoria=1.5 (1.3566ms)
+✔ 400 sin consultar BD: categoria=1e2 (1.3774ms)
+✔ 400 sin consultar BD: categoria=%20 (1.6917ms)
+✔ 400 sin consultar BD: categoria=%2B1 (1.5046ms)
+✔ 400 sin consultar BD: categoria=abc (1.5094ms)
+✔ 400 sin consultar BD: categoria=2147483648 (1.3821ms)
+✔ 400 sin consultar BD: categoria=9007199254740992 (1.6861ms)
+✔ 400 sin consultar BD: categoria=1&categoria=2 (1.5901ms)
+✔ 400 sin consultar BD: categoria[]=1 (1.9918ms)
+✔ 400 sin consultar BD: categoria[id]=1 (1.8759ms)
+✔ 400 sin consultar BD: categoria=1%20OR%201=1 (1.8336ms)
+✔ 400 sin consultar BD: page=1%20OR%201=1 (1.7949ms)
+✔ página 1, límite 20, total 0 (1.7597ms)
+✔ página 1, límite 2, total 3 (1.8924ms)
+✔ página 2, límite 2, total 3 (2.1104ms)
+✔ página 3, límite 2, total 3 (2.1494ms)
+✔ página 4, límite 2, total 3 (1.8417ms)
+✔ página 1000000, límite 2, total 3 (1.7017ms)
+✔ página 2, límite 20, total 0 (2.2282ms)
+✔ página 3, límite 20, total 0 (1.8435ms)
+✔ página 1000000, límite 100, total 0 (1.3622ms)
+✔ validador rechaza objetos y arrays, y admite límites mínimos (0.2839ms)
+✔ HTTP propaga categoría y paginación con total 0 (1.929ms)
+✔ HTTP propaga categoría y paginación con total 3 (1.4673ms)
+✔ COUNT y SELECT comparten predicado y parámetros: categoría undefined (0.7343ms)
+✔ COUNT y SELECT comparten predicado y parámetros: categoría 2 (0.1837ms)
+✔ COUNT y SELECT comparten predicado y parámetros: categoría 2147483647 (0.1638ms)
+✔ error interno no filtra detalles ni adopta status del driver (2.7217ms)
+✔ repositorio: snapshot, parámetros y limpieza (null) (0.6854ms)
+✔ repositorio: snapshot, parámetros y limpieza (acquire) (0.5444ms)
+✔ repositorio: snapshot, parámetros y limpieza (isolation) (0.2082ms)
+✔ repositorio: snapshot, parámetros y limpieza (start) (0.1738ms)
+✔ repositorio: snapshot, parámetros y limpieza (count) (0.1843ms)
+✔ repositorio: snapshot, parámetros y limpieza (rows) (0.2387ms)
+✔ repositorio: snapshot, parámetros y limpieza (commit) (0.2239ms)
+✔ repositorio: snapshot, parámetros y limpieza (rollback) (0.2183ms)
+✔ busqueda invalida sin consultar BD: busqueda= (4.6297ms)
+✔ busqueda invalida sin consultar BD: busqueda=%20%20 (1.235ms)
+✔ busqueda invalida sin consultar BD: busqueda=a&busqueda=b (1.0471ms)
+✔ busqueda invalida sin consultar BD: busqueda[]=a (0.9114ms)
+✔ busqueda invalida sin consultar BD: busqueda[x]=a (0.9572ms)
+✔ busqueda invalida sin consultar BD: busqueda=%00 (0.9327ms)
+✔ busqueda invalida sin consultar BD: busqueda=%09a (0.9146ms)
+✔ busqueda invalida sin consultar BD: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa (0.9875ms)
+✔ busqueda invalida sin consultar BD: busqueda=a&categoria=0 (0.9322ms)
+✔ busqueda invalida sin consultar BD: busqueda=a&categoria=2&categoria=3 (0.8358ms)
+✔ busqueda invalida sin consultar BD: busqueda=a&categoria=2&limit=101 (0.6383ms)
+✔ busqueda invalida sin consultar BD: busqueda=%00&categoria=2 (0.6297ms)
+✔ busqueda invalida sin consultar BD: busqueda=a&busqueda=b&categoria=2 (0.6377ms)
+✔ valida tipo, longitud Unicode, espacios y controles de busqueda (0.2698ms)
+✔ HTTP busqueda normalizada y metadatos: 0 (1.2598ms)
+✔ HTTP busqueda normalizada y metadatos: 3 (0.9726ms)
+✔ SQL parametrizado y escape literal: undefined / Taladro (0.4993ms)
+✔ SQL parametrizado y escape literal: undefined / %_!\ (0.1286ms)
+✔ SQL parametrizado y escape literal: undefined / ' OR 1=1 -- (0.1172ms)
+✔ SQL parametrizado y escape literal: 2 / Taladro (0.1228ms)
+✔ SQL parametrizado y escape literal: 2 / %_!\ (0.1303ms)
+✔ SQL parametrizado y escape literal: 2 / ' OR 1=1 -- (0.1183ms)
+✔ SQL parametrizado y escape literal: 2147483647 / Taladro (0.1162ms)
+✔ SQL parametrizado y escape literal: 2147483647 / %_!\ (0.1079ms)
+✔ SQL parametrizado y escape literal: 2147483647 / ' OR 1=1 -- (0.0976ms)
+✔ validador combina filtros sin omitir validaciones individuales (0.1558ms)
+✔ HTTP combina filtros y pagina: 1/3 (3.0745ms)
+✔ HTTP combina filtros y pagina: 2/3 (1.0876ms)
+✔ HTTP combina filtros y pagina: 3/3 (0.9551ms)
+✔ HTTP combina filtros y pagina: 4/3 (5.79ms)
+✔ HTTP combina filtros y pagina: 1000000/3 (2.847ms)
+✔ HTTP combina filtros y pagina: 1/0 (1.1759ms)
+✔ HTTP combina filtros y pagina: 2/0 (0.7371ms)
+✔ público, contrato exacto, sin autenticación: undefined (50.0672ms)
+✔ público, contrato exacto, sin autenticación: jwt_token=invalido (5.3737ms)
+✔ vacío HTTP 200 (3.4322ms)
+✔ lista completa y orden preservado, sin depender de catálogo ni query (7.5044ms)
+✔ fallo del driver no filtra SQL, stack ni status (9.0594ms)
+✔ repositorio consulta solo categorías activas, orden SQL determinista parametrizado (2.365ms)
+✔ #178: ADMIN autenticado recibe 200 con lista vacía (58.6609ms)
+✔ #178: CLIENTE autenticado devuelve 403 sin ejecutar el controlador (6.3773ms)
+✔ #178: sin cookie devuelve 401 sin ejecutar el controlador (3.7248ms)
+✔ #178: token inválido devuelve 401 sin ejecutar el controlador (3.0425ms)
+✔ #178: token expirado devuelve 401 sin ejecutar el controlador (3.1082ms)
+✔ #175: /clientes, ADMIN: protección global sin duplicar guardas ni JWT (5.2307ms)
+✔ #175: /clientes, CLIENTE: protección global sin duplicar guardas ni JWT (3.5676ms)
+✔ #175: /clientes, sin sesión: protección global sin duplicar guardas ni JWT (3.2267ms)
+✔ #175: /clientes, token inválido: protección global sin duplicar guardas ni JWT (2.7349ms)
+✔ #175: /clientes, token expirado: protección global sin duplicar guardas ni JWT (3.2203ms)
+✔ #175: /test-only, ADMIN: protección global sin duplicar guardas ni JWT (2.9111ms)
+✔ #175: /test-only, CLIENTE: protección global sin duplicar guardas ni JWT (2.1259ms)
+✔ #175: /test-only, sin sesión: protección global sin duplicar guardas ni JWT (2.0092ms)
+✔ #175: /test-only, token inválido: protección global sin duplicar guardas ni JWT (1.7224ms)
+✔ #175: /test-only, token expirado: protección global sin duplicar guardas ni JWT (1.9985ms)
+✔ #175: /inexistente, ADMIN: protección global sin duplicar guardas ni JWT (1.9958ms)
+✔ #175: /inexistente, CLIENTE: protección global sin duplicar guardas ni JWT (1.7428ms)
+✔ #175: /inexistente, sin sesión: protección global sin duplicar guardas ni JWT (1.7342ms)
+✔ #175: /inexistente, token inválido: protección global sin duplicar guardas ni JWT (1.3522ms)
+✔ #175: /inexistente, token expirado: protección global sin duplicar guardas ni JWT (1.5136ms)
+✔ #179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB (2.6275ms)
+✔ repositorio selecciona email y fecha de USUARIO, exige asociación y rol CLIENTE, y ordena por registro e id (0.7943ms)
+✔ error de BD devuelve 500 genérico sin detalles internos (2.8553ms)
+✔ error de repositorio devuelve 500 genérico sin detalles internos (2.1644ms)
+✔ uncertain HTTP result: /api/admin/productos (63.5859ms)
+✔ uncertain HTTP result: /api/admin/productos/1 (8.9533ms)
+✔ uncertain HTTP result: /api/admin/productos/1/stock (6.1399ms)
+✔ uncertain HTTP result: /api/admin/productos/1/desactivar (10.5852ms)
+✔ uncertain HTTP result: /api/auth/register (6.1807ms)
+✔ login errors never log driver details (3.5085ms)
+✔ transaction lifecycle: none (1.9967ms)
+✔ transaction lifecycle: start (0.5692ms)
+✔ transaction lifecycle: work (0.2114ms)
+✔ transaction lifecycle: commit (0.301ms)
+✔ transaction lifecycle: rollback (0.2117ms)
+✔ uncertain result is explicit without leaking original query or credentials (0.3554ms)
+✔ logger never serializes SQL parameters or arbitrary error messages (0.3137ms)
+✔ PARTICULAR: prepara CLIENTE y conserva el hash sin mezclar tipoCliente (474.794ms)
+✔ PARTICULAR: el helper no toma un rol inyectado (217.3892ms)
+✔ PARTICULAR: POST rechaza el campo rol=ADMIN (36.4407ms)
+✔ PARTICULAR: POST rechaza el campo rol=CLIENTE (3.2507ms)
+✔ PARTICULAR: POST rechaza el campo rol=null (1.9414ms)
+✔ PARTICULAR: responde 201 con data.user sin credenciales ni cookie (2.0835ms)
+✔ EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente (461.8875ms)
+✔ EMPRESA: el helper no toma un rol inyectado (223.6645ms)
+✔ EMPRESA: POST rechaza el campo rol=ADMIN (2.2864ms)
+✔ EMPRESA: POST rechaza el campo rol=CLIENTE (1.5212ms)
+✔ EMPRESA: POST rechaza el campo rol=null (1.2871ms)
+✔ EMPRESA: responde 201 con data.user sin credenciales ni cookie (1.4672ms)
+ℹ tests 196
+ℹ suites 0
+ℹ pass 196
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5578.6933
+
+> ferrepatagonia-backend@0.1.0 test:integration
+> node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs
+
+{"database":"admin_products_test_113ccb414ab941f6bccc749a819c22dd","port":56434,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ Admin Products Endpoints (#197)
+  ✔ should return 401 when unauthenticated (25.0276ms)
+  ✔ should return 403 when authenticated as CLIENTE (3.3743ms)
+  ✔ should list all products for ADMIN (11.0075ms)
+  ✔ should return 400 on invalid product creation data, missing body, or fields exceeding max length (11.9868ms)
+  ✔ should create and update a product as ADMIN (26.375ms)
+  ✔ should soft-delete (deactivate) a product idempotently (14.7731ms)
+  ✔ should update product stock successfully (12.9289ms)
+  ✔ should return 400 when updating with negative stock (2.3109ms)
+  ✔ should return 400 when updating stock with invalid data types or out of range (10.6339ms)
+  ✔ should return 400 when updating stock without a body (0.9821ms)
+Error al leer el producto tras el INSERT, devolviendo datos persistidos:
+  ✔ should return persisted price precision (1.24 for 1.239) in fallback when post-INSERT SELECT fails (6.0963ms)
+  ✔ migration should trim leading and trailing spaces in SKU, validate UNIQUE index definition, and be idempotent (148.5269ms)
+  ✔ migration rejects blank and duplicate normalized SKUs before changing data or indexes (278.1818ms)
+✔ Admin Products Endpoints (#197) (679.8753ms)
+▶ /auth/me en MariaDB: login, restauración, estado persistido y logout
+  ✔ PARTICULAR (89.949ms)
+  ✔ EMPRESA (26.0146ms)
+  ✔ ADMIN sin cliente (14.6712ms)
+✔ /auth/me en MariaDB: login, restauración, estado persistido y logout (268.3646ms)
+▶ catálogo público real en MariaDB
+  ✔ filtra activos, conserva sin stock y pagina sin duplicar ni omitir productos (52.7574ms)
+  ✔ categoría activa: contrato HTTP y paginación sobre el subconjunto (25.8908ms)
+  ✔ categorías inactiva, vacía, solo productos inactivos e inexistente devuelven vacío (51.9711ms)
+  ✔ categoría inválida rechazada por HTTP real (3.6806ms)
+  ✔ catálogo vacío: ninguna página tiene anterior ni siguiente (16.725ms)
+  ✔ busqueda real: nombre/codigo, collation, literales y paginacion (927.9115ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda undefined (18.8904ms)
+  ✔ inserción concurrente conserva snapshot, categoría undefined, búsqueda catalog-3700c6d6-fc74-4b97-b01a-b9f2b0ac84e0 (5.6442ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda undefined (5.5193ms)
+  ✔ inserción concurrente conserva snapshot, categoría 2, búsqueda catalog-3700c6d6-fc74-4b97-b01a-b9f2b0ac84e0 (5.468ms)
+✔ catálogo público real en MariaDB (1402.9057ms)
+▶ listado HTTP de cuentas registradas en MariaDB
+  ✔ coincide con las cuentas CLIENTE asociadas y su orden, con sesión ADMIN (36.0452ms)
+  ✔ usa datos de cuenta, excluye clientes sin usuario y ADMIN, y desempata por id (17.8103ms)
+✔ listado HTTP de cuentas registradas en MariaDB (187.1224ms)
+database.query.slow { milliseconds: 5000 }
+database.query.failed
+Error al actualizar stock:
+✔ server timeout rolls back stock before HTTP error, with no late write (5415.8524ms)
+ℹ {"case":"timeout-write","status":500,"result":{"message":"Error interno del servidor"},"elapsed":5041,"stockBeforeUnlock":1,"stockAfterUnlock":1,"pendingWritesBeforeUnlock":0}
+Health: no se pudo consultar MariaDB. Revisá Docker y backend/.env.
+Error al consultar las categorías.
+✔ saturation rejects HTTP requests, does not queue, permits shutdown and recovery (14.2205ms)
+ℹ {"saturatedHealth":503,"saturatedCategory":500,"elapsed":7,"shutdown":"completed with pool occupied"}
+ℹ Recovered health and all five connections; no queued late acquisitions
+✔ slow registration logs diagnostics without secrets, then rolls back (5251.4926ms)
+ℹ {"case":"sensitive-slow-log","logging":false,"hashLeaked":false,"emailLeaked":false}
+database.query.failed
+database.query.failed
+✔ lost transaction connection yields an explicitly uncertain outcome and is not reused (73.6796ms)
+✔ schema metadata mirrors every active column, CHECK, index and FK (38.367ms)
+✔ all DDL automation stays disabled and password is hidden by default (1.7546ms)
+✔ real repository decimal, nullable fields and relations retain their shape (37.581ms)
+database.query.failed
+▶ registro transaccional en MariaDB
+  ✔ PARTICULAR: persiste ambas filas y revierte un duplicado (733.6449ms)
+database.query.failed
+  ✔ EMPRESA: persiste ambas filas y revierte un duplicado (684.5952ms)
+  ✔ error en INSERT USUARIO revierte CLIENTE y devuelve 500 genérico (230.4407ms)
+database.query.failed
+  ✔ dos registros simultáneos del mismo email crean solo un par (460.9008ms)
+  ✔ rol ADMIN y contraseña excesiva no crean filas (5.6438ms)
+  ✔ health sigue 200 después de las transacciones (2.5496ms)
+✔ registro transaccional en MariaDB (2273.2855ms)
+ℹ tests 45
+ℹ suites 1
+ℹ pass 45
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18310.0672
+{"schemaBefore":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","schemaAfter":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","unchanged":true}
+{"database":"categories_test_08c21f81a4d34959801e50c535c4fcee","port":56516,"version":[{"version":"11.4.13-MariaDB-ubu2404"}],"image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b"}
+▶ categorías HTTP y SQL real en MariaDB aislada
+  ✔ cero categorías (31.2556ms)
+  ✔ solo inactivas también devuelve vacío (2.9157ms)
+  ✔ activas sin productos, orden por collation y desempate por ID (7.2446ms)
+  ✔ paginación, búsqueda y venta no limitan categorías; catálogo sigue vacío (9.7808ms)
+  ✔ productos inactivos y sin stock no cambian el listado (6.3566ms)
+  ✔ más de 100 categorías no se truncan (196.7771ms)
+database.query.failed
+Error al consultar las categorías.
+  ✔ fallo SQL real responde 500 genérico (21.7499ms)
+✔ categorías HTTP y SQL real en MariaDB aislada (432.0681ms)
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias?page=2&limit=1&categoria=999&busqueda=nada&venta=0","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias?limit=1&page=999","status":200,"body":{"data":{"categorias":[{"id":3,"nombre":"Áridos"},{"id":4,"nombre":"aridos"},{"id":5,"nombre":"Áridos"},{"id":6,"nombre":"Fijaciones & tornillos ' %_"},{"id":7,"nombre":"Tornillos 000"},{"id":8,"nombre":"Tornillos 001"},{"id":9,"nombre":"Tornillos 002"},{"id":10,"nombre":"Tornillos 003"},{"id":11,"nombre":"Tornillos 004"},{"id":12,"nombre":"Tornillos 005"},{"id":13,"nombre":"Tornillos 006"},{"id":14,"nombre":"Tornillos 007"},{"id":15,"nombre":"Tornillos 008"},{"id":16,"nombre":"Tornillos 009"},{"id":17,"nombre":"Tornillos 010"},{"id":18,"nombre":"Tornillos 011"},{"id":19,"nombre":"Tornillos 012"},{"id":20,"nombre":"Tornillos 013"},{"id":21,"nombre":"Tornillos 014"},{"id":22,"nombre":"Tornillos 015"},{"id":23,"nombre":"Tornillos 016"},{"id":24,"nombre":"Tornillos 017"},{"id":25,"nombre":"Tornillos 018"},{"id":26,"nombre":"Tornillos 019"},{"id":27,"nombre":"Tornillos 020"},{"id":28,"nombre":"Tornillos 021"},{"id":29,"nombre":"Tornillos 022"},{"id":30,"nombre":"Tornillos 023"},{"id":31,"nombre":"Tornillos 024"},{"id":32,"nombre":"Tornillos 025"},{"id":33,"nombre":"Tornillos 026"},{"id":34,"nombre":"Tornillos 027"},{"id":35,"nombre":"Tornillos 028"},{"id":36,"nombre":"Tornillos 029"},{"id":37,"nombre":"Tornillos 030"},{"id":38,"nombre":"Tornillos 031"},{"id":39,"nombre":"Tornillos 032"},{"id":40,"nombre":"Tornillos 033"},{"id":41,"nombre":"Tornillos 034"},{"id":42,"nombre":"Tornillos 035"},{"id":43,"nombre":"Tornillos 036"},{"id":44,"nombre":"Tornillos 037"},{"id":45,"nombre":"Tornillos 038"},{"id":46,"nombre":"Tornillos 039"},{"id":47,"nombre":"Tornillos 040"},{"id":48,"nombre":"Tornillos 041"},{"id":49,"nombre":"Tornillos 042"},{"id":50,"nombre":"Tornillos 043"},{"id":51,"nombre":"Tornillos 044"},{"id":52,"nombre":"Tornillos 045"},{"id":53,"nombre":"Tornillos 046"},{"id":54,"nombre":"Tornillos 047"},{"id":55,"nombre":"Tornillos 048"},{"id":56,"nombre":"Tornillos 049"},{"id":57,"nombre":"Tornillos 050"},{"id":58,"nombre":"Tornillos 051"},{"id":59,"nombre":"Tornillos 052"},{"id":60,"nombre":"Tornillos 053"},{"id":61,"nombre":"Tornillos 054"},{"id":62,"nombre":"Tornillos 055"},{"id":63,"nombre":"Tornillos 056"},{"id":64,"nombre":"Tornillos 057"},{"id":65,"nombre":"Tornillos 058"},{"id":66,"nombre":"Tornillos 059"},{"id":67,"nombre":"Tornillos 060"},{"id":68,"nombre":"Tornillos 061"},{"id":69,"nombre":"Tornillos 062"},{"id":70,"nombre":"Tornillos 063"},{"id":71,"nombre":"Tornillos 064"},{"id":72,"nombre":"Tornillos 065"},{"id":73,"nombre":"Tornillos 066"},{"id":74,"nombre":"Tornillos 067"},{"id":75,"nombre":"Tornillos 068"},{"id":76,"nombre":"Tornillos 069"},{"id":77,"nombre":"Tornillos 070"},{"id":78,"nombre":"Tornillos 071"},{"id":79,"nombre":"Tornillos 072"},{"id":80,"nombre":"Tornillos 073"},{"id":81,"nombre":"Tornillos 074"},{"id":82,"nombre":"Tornillos 075"},{"id":83,"nombre":"Tornillos 076"},{"id":84,"nombre":"Tornillos 077"},{"id":85,"nombre":"Tornillos 078"},{"id":86,"nombre":"Tornillos 079"},{"id":87,"nombre":"Tornillos 080"},{"id":88,"nombre":"Tornillos 081"},{"id":89,"nombre":"Tornillos 082"},{"id":90,"nombre":"Tornillos 083"},{"id":91,"nombre":"Tornillos 084"},{"id":92,"nombre":"Tornillos 085"},{"id":93,"nombre":"Tornillos 086"},{"id":94,"nombre":"Tornillos 087"},{"id":95,"nombre":"Tornillos 088"},{"id":96,"nombre":"Tornillos 089"},{"id":97,"nombre":"Tornillos 090"},{"id":98,"nombre":"Tornillos 091"},{"id":99,"nombre":"Tornillos 092"},{"id":100,"nombre":"Tornillos 093"},{"id":101,"nombre":"Tornillos 094"},{"id":102,"nombre":"Tornillos 095"},{"id":103,"nombre":"Tornillos 096"},{"id":104,"nombre":"Tornillos 097"},{"id":105,"nombre":"Tornillos 098"},{"id":106,"nombre":"Tornillos 099"},{"id":107,"nombre":"Tornillos 100"},{"id":108,"nombre":"Tornillos 101"},{"id":109,"nombre":"Tornillos 102"},{"id":110,"nombre":"Tornillos 103"},{"id":111,"nombre":"Tornillos 104"},{"id":2,"nombre":"Zinc"}]}}}
+ℹ {"request":"GET /categorias (tabla no disponible)","status":500,"body":{"message":"Error interno del servidor."}}
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 786.5317
+{"schemaBefore":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","schemaAfter":"7a9e0906eba41a1c02e61a1a386df565cb3324b5249f9938229a9bdf51905886","unchanged":true}

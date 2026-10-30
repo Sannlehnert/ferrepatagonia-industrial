@@ -1,0 +1,3026 @@
+
+> ferrepatagonia-backend@0.1.0 test:unit
+> node --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs
+
+TAP version 13
+# Subtest: CLIENTE PARTICULAR: contrato exacto, SQL por id y sin renovar cookie
+ok 1 - CLIENTE PARTICULAR: contrato exacto, SQL por id y sin renovar cookie
+  ---
+  duration_ms: 147.9674
+  type: 'test'
+  ...
+# Subtest: CLIENTE EMPRESA: contrato exacto, SQL por id y sin renovar cookie
+ok 2 - CLIENTE EMPRESA: contrato exacto, SQL por id y sin renovar cookie
+  ---
+  duration_ms: 32.6115
+  type: 'test'
+  ...
+# Subtest: ADMIN null: contrato exacto, SQL por id y sin renovar cookie
+ok 3 - ADMIN null: contrato exacto, SQL por id y sin renovar cookie
+  ---
+  duration_ms: 17.0455
+  type: 'test'
+  ...
+# Subtest: sin cookie: 401 sin consultar BD
+ok 4 - sin cookie: 401 sin consultar BD
+  ---
+  duration_ms: 11.3272
+  type: 'test'
+  ...
+# Subtest: JWT inválido: 401 sin consultar BD
+ok 5 - JWT inválido: 401 sin consultar BD
+  ---
+  duration_ms: 7.8609
+  type: 'test'
+  ...
+# Subtest: JWT expirado: 401 sin consultar BD
+ok 6 - JWT expirado: 401 sin consultar BD
+  ---
+  duration_ms: 32.0992
+  type: 'test'
+  ...
+# Subtest: inexistente: 401
+ok 7 - inexistente: 401
+  ---
+  duration_ms: 19.2525
+  type: 'test'
+  ...
+# Subtest: inactivo: 401
+ok 8 - inactivo: 401
+  ---
+  duration_ms: 10.4397
+  type: 'test'
+  ...
+# Subtest: rol desactualizado: 401
+ok 9 - rol desactualizado: 401
+  ---
+  duration_ms: 23.6324
+  type: 'test'
+  ...
+# Subtest: error de BD: 500 sin detalles internos incluso si contiene status/code
+ok 10 - error de BD: 500 sin detalles internos incluso si contiene status/code
+  ---
+  duration_ms: 12.4731
+  type: 'test'
+  ...
+# Subtest: regresión login y coherencia con /me: PARTICULAR
+ok 11 - regresión login y coherencia con /me: PARTICULAR
+  ---
+  duration_ms: 60.2348
+  type: 'test'
+  ...
+# Subtest: regresión login y coherencia con /me: EMPRESA
+ok 12 - regresión login y coherencia con /me: EMPRESA
+  ---
+  duration_ms: 17.786
+  type: 'test'
+  ...
+# Subtest: regresión login y coherencia con /me: null
+ok 13 - regresión login y coherencia con /me: null
+  ---
+  duration_ms: 16.584
+  type: 'test'
+  ...
+# Subtest: authenticate: CLIENTE conserva solamente id y rol
+ok 14 - authenticate: CLIENTE conserva solamente id y rol
+  ---
+  duration_ms: 75.8377
+  type: 'test'
+  ...
+# Subtest: authenticate: ADMIN conserva solamente id y rol
+ok 15 - authenticate: ADMIN conserva solamente id y rol
+  ---
+  duration_ms: 8.9322
+  type: 'test'
+  ...
+# Subtest: authenticate: sin cookie devuelve 401 con message
+ok 16 - authenticate: sin cookie devuelve 401 con message
+  ---
+  duration_ms: 4.5286
+  type: 'test'
+  ...
+# Subtest: authenticate: token manipulado devuelve 401 con message
+ok 17 - authenticate: token manipulado devuelve 401 con message
+  ---
+  duration_ms: 6.9855
+  type: 'test'
+  ...
+# Subtest: authenticate: token expirado devuelve 401 con message
+ok 18 - authenticate: token expirado devuelve 401 con message
+  ---
+  duration_ms: 11.7868
+  type: 'test'
+  ...
+# Subtest: authenticate: rol EMPRESA devuelve 401 con message
+ok 19 - authenticate: rol EMPRESA devuelve 401 con message
+  ---
+  duration_ms: 4.3652
+  type: 'test'
+  ...
+# Subtest: authenticate: sin rol devuelve 401 con message
+ok 20 - authenticate: sin rol devuelve 401 con message
+  ---
+  duration_ms: 6.1638
+  type: 'test'
+  ...
+# Subtest: authenticate: payload string devuelve 401 con message
+ok 21 - authenticate: payload string devuelve 401 con message
+  ---
+  duration_ms: 6.0325
+  type: 'test'
+  ...
+# Subtest: authenticate: algoritmo distinto devuelve 401 con message
+ok 22 - authenticate: algoritmo distinto devuelve 401 con message
+  ---
+  duration_ms: 8.5421
+  type: 'test'
+  ...
+# Subtest: authenticate: firma con otro secreto devuelve 401 con message
+ok 23 - authenticate: firma con otro secreto devuelve 401 con message
+  ---
+  duration_ms: 4.8686
+  type: 'test'
+  ...
+# Subtest: authenticate: cookie JSON devuelve 401 con message
+ok 24 - authenticate: cookie JSON devuelve 401 con message
+  ---
+  duration_ms: 4.2407
+  type: 'test'
+  ...
+# Subtest: authenticate: token malformado devuelve 401 con message
+ok 25 - authenticate: token malformado devuelve 401 con message
+  ---
+  duration_ms: 4.7107
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido undefined devuelve 401 con message
+ok 26 - authenticate: id inválido undefined devuelve 401 con message
+  ---
+  duration_ms: 3.9668
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido null devuelve 401 con message
+ok 27 - authenticate: id inválido null devuelve 401 con message
+  ---
+  duration_ms: 5.6321
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 0 devuelve 401 con message
+ok 28 - authenticate: id inválido 0 devuelve 401 con message
+  ---
+  duration_ms: 3.1523
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido -1 devuelve 401 con message
+ok 29 - authenticate: id inválido -1 devuelve 401 con message
+  ---
+  duration_ms: 3.5433
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 1.5 devuelve 401 con message
+ok 30 - authenticate: id inválido 1.5 devuelve 401 con message
+  ---
+  duration_ms: 3.4584
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 7 devuelve 401 con message
+ok 31 - authenticate: id inválido 7 devuelve 401 con message
+  ---
+  duration_ms: 5.656
+  type: 'test'
+  ...
+# Subtest: authenticate: id inválido 9007199254740992 devuelve 401 con message
+ok 32 - authenticate: id inválido 9007199254740992 devuelve 401 con message
+  ---
+  duration_ms: 4.9905
+  type: 'test'
+  ...
+# Subtest: authenticate elimina un contexto previo si falla la autenticación
+ok 33 - authenticate elimina un contexto previo si falla la autenticación
+  ---
+  duration_ms: 0.4216
+  type: 'test'
+  ...
+# Subtest: authorizeRoles ADMIN devuelve 200 y ejecuta el handler
+ok 34 - authorizeRoles ADMIN devuelve 200 y ejecuta el handler
+  ---
+  duration_ms: 5.0669
+  type: 'test'
+  ...
+# Subtest: authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler
+ok 35 - authorizeRoles CLIENTE devuelve 403 con message sin ejecutar handler
+  ---
+  duration_ms: 5.5776
+  type: 'test'
+  ...
+# Subtest: ruta ADMIN: sin sesión devuelve 401 sin ejecutar handler
+ok 36 - ruta ADMIN: sin sesión devuelve 401 sin ejecutar handler
+  ---
+  duration_ms: 7.1548
+  type: 'test'
+  ...
+# Subtest: ruta ADMIN: token inválido devuelve 401 sin ejecutar handler
+ok 37 - ruta ADMIN: token inválido devuelve 401 sin ejecutar handler
+  ---
+  duration_ms: 3.3061
+  type: 'test'
+  ...
+# Subtest: ruta ADMIN: token expirado devuelve 401 sin ejecutar handler
+ok 38 - ruta ADMIN: token expirado devuelve 401 sin ejecutar handler
+  ---
+  duration_ms: 5.2801
+  type: 'test'
+  ...
+# Subtest: authorizeRoles no lee cookies ni vuelve a verificar JWT
+ok 39 - authorizeRoles no lee cookies ni vuelve a verificar JWT
+  ---
+  duration_ms: 0.994
+  type: 'test'
+  ...
+# Subtest: authorizeRoles permite múltiples roles y sin argumentos devuelve 403
+ok 40 - authorizeRoles permite múltiples roles y sin argumentos devuelve 403
+  ---
+  duration_ms: 0.3005
+  type: 'test'
+  ...
+# Subtest: authorizeRoles sin req.auth devuelve 401 aunque haya cookie
+ok 41 - authorizeRoles sin req.auth devuelve 401 aunque haya cookie
+  ---
+  duration_ms: 0.4831
+  type: 'test'
+  ...
+# Subtest: JWT_SECRET vacío impide cargar la configuración
+ok 42 - JWT_SECRET vacío impide cargar la configuración
+  ---
+  duration_ms: 94.09
+  type: 'test'
+  ...
+# Subtest: login emite JWT verificable sin cambiar sus datos públicos
+ok 43 - login emite JWT verificable sin cambiar sus datos públicos
+  ---
+  duration_ms: 8250.7283
+  type: 'test'
+  ...
+# Subtest: público con cookie undefined: contrato exacto y precio no publicado
+ok 44 - público con cookie undefined: contrato exacto y precio no publicado
+  ---
+  duration_ms: 119.5818
+  type: 'test'
+  ...
+# Subtest: público con cookie jwt_token=invalido: contrato exacto y precio no publicado
+ok 45 - público con cookie jwt_token=invalido: contrato exacto y precio no publicado
+  ---
+  duration_ms: 15.6863
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=0
+ok 46 - 400 sin consultar BD: page=0
+  ---
+  duration_ms: 11.016
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=-1
+ok 47 - 400 sin consultar BD: page=-1
+  ---
+  duration_ms: 8.5127
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1.5
+ok 48 - 400 sin consultar BD: page=1.5
+  ---
+  duration_ms: 11.5181
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1e2
+ok 49 - 400 sin consultar BD: page=1e2
+  ---
+  duration_ms: 8.9138
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=01
+ok 50 - 400 sin consultar BD: page=01
+  ---
+  duration_ms: 7.9574
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=
+ok 51 - 400 sin consultar BD: page=
+  ---
+  duration_ms: 6.7557
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=%20
+ok 52 - 400 sin consultar BD: page=%20
+  ---
+  duration_ms: 12.2223
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=%2B1
+ok 53 - 400 sin consultar BD: page=%2B1
+  ---
+  duration_ms: 9.1665
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1000001
+ok 54 - 400 sin consultar BD: page=1000001
+  ---
+  duration_ms: 6.8918
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=9007199254740992
+ok 55 - 400 sin consultar BD: page=9007199254740992
+  ---
+  duration_ms: 9.4981
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1&page=2
+ok 56 - 400 sin consultar BD: page=1&page=2
+  ---
+  duration_ms: 7.1004
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page[]=1
+ok 57 - 400 sin consultar BD: page[]=1
+  ---
+  duration_ms: 6.6711
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page[x]=1
+ok 58 - 400 sin consultar BD: page[x]=1
+  ---
+  duration_ms: 7.5257
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=0
+ok 59 - 400 sin consultar BD: limit=0
+  ---
+  duration_ms: 7.7975
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=-1
+ok 60 - 400 sin consultar BD: limit=-1
+  ---
+  duration_ms: 7.9227
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=101
+ok 61 - 400 sin consultar BD: limit=101
+  ---
+  duration_ms: 5.5676
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=1.5
+ok 62 - 400 sin consultar BD: limit=1.5
+  ---
+  duration_ms: 7.0913
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=1&limit=2
+ok 63 - 400 sin consultar BD: limit=1&limit=2
+  ---
+  duration_ms: 13.0512
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=
+ok 64 - 400 sin consultar BD: limit=
+  ---
+  duration_ms: 4.8595
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=abc
+ok 65 - 400 sin consultar BD: limit=abc
+  ---
+  duration_ms: 4.4278
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=01
+ok 66 - 400 sin consultar BD: limit=01
+  ---
+  duration_ms: 5.363
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: limit=1e2
+ok 67 - 400 sin consultar BD: limit=1e2
+  ---
+  duration_ms: 6.3308
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: q=taladro
+ok 68 - 400 sin consultar BD: q=taladro
+  ---
+  duration_ms: 4.4375
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=0
+ok 69 - 400 sin consultar BD: categoria=0
+  ---
+  duration_ms: 5.5363
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=-1
+ok 70 - 400 sin consultar BD: categoria=-1
+  ---
+  duration_ms: 5.1996
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=
+ok 71 - 400 sin consultar BD: categoria=
+  ---
+  duration_ms: 12.1145
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=01
+ok 72 - 400 sin consultar BD: categoria=01
+  ---
+  duration_ms: 6.3036
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1.5
+ok 73 - 400 sin consultar BD: categoria=1.5
+  ---
+  duration_ms: 5.7913
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1e2
+ok 74 - 400 sin consultar BD: categoria=1e2
+  ---
+  duration_ms: 5.994
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=%20
+ok 75 - 400 sin consultar BD: categoria=%20
+  ---
+  duration_ms: 7.8681
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=%2B1
+ok 76 - 400 sin consultar BD: categoria=%2B1
+  ---
+  duration_ms: 4.6286
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=abc
+ok 77 - 400 sin consultar BD: categoria=abc
+  ---
+  duration_ms: 5.2644
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=2147483648
+ok 78 - 400 sin consultar BD: categoria=2147483648
+  ---
+  duration_ms: 6.7484
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=9007199254740992
+ok 79 - 400 sin consultar BD: categoria=9007199254740992
+  ---
+  duration_ms: 6.6805
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1&categoria=2
+ok 80 - 400 sin consultar BD: categoria=1&categoria=2
+  ---
+  duration_ms: 7.5085
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria[]=1
+ok 81 - 400 sin consultar BD: categoria[]=1
+  ---
+  duration_ms: 7.3594
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria[id]=1
+ok 82 - 400 sin consultar BD: categoria[id]=1
+  ---
+  duration_ms: 4.7962
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: categoria=1%20OR%201=1
+ok 83 - 400 sin consultar BD: categoria=1%20OR%201=1
+  ---
+  duration_ms: 5.1964
+  type: 'test'
+  ...
+# Subtest: 400 sin consultar BD: page=1%20OR%201=1
+ok 84 - 400 sin consultar BD: page=1%20OR%201=1
+  ---
+  duration_ms: 5.69
+  type: 'test'
+  ...
+# Subtest: página 1, límite 20, total 0
+ok 85 - página 1, límite 20, total 0
+  ---
+  duration_ms: 7.0571
+  type: 'test'
+  ...
+# Subtest: página 1, límite 2, total 3
+ok 86 - página 1, límite 2, total 3
+  ---
+  duration_ms: 5.4323
+  type: 'test'
+  ...
+# Subtest: página 2, límite 2, total 3
+ok 87 - página 2, límite 2, total 3
+  ---
+  duration_ms: 5.398
+  type: 'test'
+  ...
+# Subtest: página 3, límite 2, total 3
+ok 88 - página 3, límite 2, total 3
+  ---
+  duration_ms: 4.8216
+  type: 'test'
+  ...
+# Subtest: página 4, límite 2, total 3
+ok 89 - página 4, límite 2, total 3
+  ---
+  duration_ms: 4.942
+  type: 'test'
+  ...
+# Subtest: página 1000000, límite 2, total 3
+ok 90 - página 1000000, límite 2, total 3
+  ---
+  duration_ms: 4.9163
+  type: 'test'
+  ...
+# Subtest: página 2, límite 20, total 0
+ok 91 - página 2, límite 20, total 0
+  ---
+  duration_ms: 5.6718
+  type: 'test'
+  ...
+# Subtest: página 3, límite 20, total 0
+ok 92 - página 3, límite 20, total 0
+  ---
+  duration_ms: 4.9575
+  type: 'test'
+  ...
+# Subtest: página 1000000, límite 100, total 0
+ok 93 - página 1000000, límite 100, total 0
+  ---
+  duration_ms: 4.8319
+  type: 'test'
+  ...
+# Subtest: validador rechaza objetos y arrays, y admite límites mínimos
+ok 94 - validador rechaza objetos y arrays, y admite límites mínimos
+  ---
+  duration_ms: 2.3562
+  type: 'test'
+  ...
+# Subtest: HTTP propaga categoría y paginación con total 0
+ok 95 - HTTP propaga categoría y paginación con total 0
+  ---
+  duration_ms: 7.4692
+  type: 'test'
+  ...
+# Subtest: HTTP propaga categoría y paginación con total 3
+ok 96 - HTTP propaga categoría y paginación con total 3
+  ---
+  duration_ms: 5.8632
+  type: 'test'
+  ...
+# Subtest: COUNT y SELECT comparten predicado y parámetros: categoría undefined
+ok 97 - COUNT y SELECT comparten predicado y parámetros: categoría undefined
+  ---
+  duration_ms: 1.859
+  type: 'test'
+  ...
+# Subtest: COUNT y SELECT comparten predicado y parámetros: categoría 2
+ok 98 - COUNT y SELECT comparten predicado y parámetros: categoría 2
+  ---
+  duration_ms: 0.4641
+  type: 'test'
+  ...
+# Subtest: COUNT y SELECT comparten predicado y parámetros: categoría 2147483647
+ok 99 - COUNT y SELECT comparten predicado y parámetros: categoría 2147483647
+  ---
+  duration_ms: 0.535
+  type: 'test'
+  ...
+# Subtest: error interno no filtra detalles ni adopta status del driver
+ok 100 - error interno no filtra detalles ni adopta status del driver
+  ---
+  duration_ms: 8.1195
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (null)
+ok 101 - repositorio: snapshot, parámetros y limpieza (null)
+  ---
+  duration_ms: 1.501
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (acquire)
+ok 102 - repositorio: snapshot, parámetros y limpieza (acquire)
+  ---
+  duration_ms: 1.3232
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (isolation)
+ok 103 - repositorio: snapshot, parámetros y limpieza (isolation)
+  ---
+  duration_ms: 0.7518
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (start)
+ok 104 - repositorio: snapshot, parámetros y limpieza (start)
+  ---
+  duration_ms: 1.7382
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (count)
+ok 105 - repositorio: snapshot, parámetros y limpieza (count)
+  ---
+  duration_ms: 0.8779
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (rows)
+ok 106 - repositorio: snapshot, parámetros y limpieza (rows)
+  ---
+  duration_ms: 0.8917
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (commit)
+ok 107 - repositorio: snapshot, parámetros y limpieza (commit)
+  ---
+  duration_ms: 0.6182
+  type: 'test'
+  ...
+# Subtest: repositorio: snapshot, parámetros y limpieza (rollback)
+ok 108 - repositorio: snapshot, parámetros y limpieza (rollback)
+  ---
+  duration_ms: 0.5505
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=
+ok 109 - busqueda invalida sin consultar BD: busqueda=
+  ---
+  duration_ms: 11.7663
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%20%20
+ok 110 - busqueda invalida sin consultar BD: busqueda=%20%20
+  ---
+  duration_ms: 4.3125
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&busqueda=b
+ok 111 - busqueda invalida sin consultar BD: busqueda=a&busqueda=b
+  ---
+  duration_ms: 4.3182
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda[]=a
+ok 112 - busqueda invalida sin consultar BD: busqueda[]=a
+  ---
+  duration_ms: 4.2256
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda[x]=a
+ok 113 - busqueda invalida sin consultar BD: busqueda[x]=a
+  ---
+  duration_ms: 4.5941
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%00
+ok 114 - busqueda invalida sin consultar BD: busqueda=%00
+  ---
+  duration_ms: 4.6946
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%09a
+ok 115 - busqueda invalida sin consultar BD: busqueda=%09a
+  ---
+  duration_ms: 4.0859
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ok 116 - busqueda invalida sin consultar BD: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  ---
+  duration_ms: 5.3726
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&categoria=0
+ok 117 - busqueda invalida sin consultar BD: busqueda=a&categoria=0
+  ---
+  duration_ms: 4.6256
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&categoria=2&categoria=3
+ok 118 - busqueda invalida sin consultar BD: busqueda=a&categoria=2&categoria=3
+  ---
+  duration_ms: 4.5827
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&categoria=2&limit=101
+ok 119 - busqueda invalida sin consultar BD: busqueda=a&categoria=2&limit=101
+  ---
+  duration_ms: 4.5908
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=%00&categoria=2
+ok 120 - busqueda invalida sin consultar BD: busqueda=%00&categoria=2
+  ---
+  duration_ms: 4.4303
+  type: 'test'
+  ...
+# Subtest: busqueda invalida sin consultar BD: busqueda=a&busqueda=b&categoria=2
+ok 121 - busqueda invalida sin consultar BD: busqueda=a&busqueda=b&categoria=2
+  ---
+  duration_ms: 5.8659
+  type: 'test'
+  ...
+# Subtest: valida tipo, longitud Unicode, espacios y controles de busqueda
+ok 122 - valida tipo, longitud Unicode, espacios y controles de busqueda
+  ---
+  duration_ms: 1.9773
+  type: 'test'
+  ...
+# Subtest: HTTP busqueda normalizada y metadatos: 0
+ok 123 - HTTP busqueda normalizada y metadatos: 0
+  ---
+  duration_ms: 5.4509
+  type: 'test'
+  ...
+# Subtest: HTTP busqueda normalizada y metadatos: 3
+ok 124 - HTTP busqueda normalizada y metadatos: 3
+  ---
+  duration_ms: 4.8981
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: undefined / Taladro
+ok 125 - SQL parametrizado y escape literal: undefined / Taladro
+  ---
+  duration_ms: 1.3678
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: undefined / %_!\\
+ok 126 - SQL parametrizado y escape literal: undefined / %_!\\
+  ---
+  duration_ms: 0.5753
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: undefined / ' OR 1=1 --
+ok 127 - SQL parametrizado y escape literal: undefined / ' OR 1=1 --
+  ---
+  duration_ms: 0.6489
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2 / Taladro
+ok 128 - SQL parametrizado y escape literal: 2 / Taladro
+  ---
+  duration_ms: 0.5411
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2 / %_!\\
+ok 129 - SQL parametrizado y escape literal: 2 / %_!\\
+  ---
+  duration_ms: 0.524
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2 / ' OR 1=1 --
+ok 130 - SQL parametrizado y escape literal: 2 / ' OR 1=1 --
+  ---
+  duration_ms: 0.5094
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2147483647 / Taladro
+ok 131 - SQL parametrizado y escape literal: 2147483647 / Taladro
+  ---
+  duration_ms: 0.7448
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2147483647 / %_!\\
+ok 132 - SQL parametrizado y escape literal: 2147483647 / %_!\\
+  ---
+  duration_ms: 0.6547
+  type: 'test'
+  ...
+# Subtest: SQL parametrizado y escape literal: 2147483647 / ' OR 1=1 --
+ok 133 - SQL parametrizado y escape literal: 2147483647 / ' OR 1=1 --
+  ---
+  duration_ms: 0.5162
+  type: 'test'
+  ...
+# Subtest: validador combina filtros sin omitir validaciones individuales
+ok 134 - validador combina filtros sin omitir validaciones individuales
+  ---
+  duration_ms: 1.9699
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 1/3
+ok 135 - HTTP combina filtros y pagina: 1/3
+  ---
+  duration_ms: 15.7698
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 2/3
+ok 136 - HTTP combina filtros y pagina: 2/3
+  ---
+  duration_ms: 5.5071
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 3/3
+ok 137 - HTTP combina filtros y pagina: 3/3
+  ---
+  duration_ms: 29.908
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 4/3
+ok 138 - HTTP combina filtros y pagina: 4/3
+  ---
+  duration_ms: 10.3568
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 1000000/3
+ok 139 - HTTP combina filtros y pagina: 1000000/3
+  ---
+  duration_ms: 8.0123
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 1/0
+ok 140 - HTTP combina filtros y pagina: 1/0
+  ---
+  duration_ms: 6.5896
+  type: 'test'
+  ...
+# Subtest: HTTP combina filtros y pagina: 2/0
+ok 141 - HTTP combina filtros y pagina: 2/0
+  ---
+  duration_ms: 4.2195
+  type: 'test'
+  ...
+# Subtest: público, contrato exacto, sin autenticación: undefined
+ok 142 - público, contrato exacto, sin autenticación: undefined
+  ---
+  duration_ms: 105.9549
+  type: 'test'
+  ...
+# Subtest: público, contrato exacto, sin autenticación: jwt_token=invalido
+ok 143 - público, contrato exacto, sin autenticación: jwt_token=invalido
+  ---
+  duration_ms: 14.6211
+  type: 'test'
+  ...
+# Subtest: vacío HTTP 200
+ok 144 - vacío HTTP 200
+  ---
+  duration_ms: 8.3486
+  type: 'test'
+  ...
+# Subtest: lista completa y orden preservado, sin depender de catálogo ni query
+ok 145 - lista completa y orden preservado, sin depender de catálogo ni query
+  ---
+  duration_ms: 24.225
+  type: 'test'
+  ...
+# Subtest: fallo del driver no filtra SQL, stack ni status
+ok 146 - fallo del driver no filtra SQL, stack ni status
+  ---
+  duration_ms: 20.7258
+  type: 'test'
+  ...
+# Subtest: repositorio consulta solo categorías activas, orden SQL determinista parametrizado
+ok 147 - repositorio consulta solo categorías activas, orden SQL determinista parametrizado
+  ---
+  duration_ms: 2.7479
+  type: 'test'
+  ...
+# Subtest: \#178: ADMIN autenticado recibe 200 con lista vacía
+ok 148 - \#178: ADMIN autenticado recibe 200 con lista vacía
+  ---
+  duration_ms: 146.0756
+  type: 'test'
+  ...
+# Subtest: \#178: CLIENTE autenticado devuelve 403 sin ejecutar el controlador
+ok 149 - \#178: CLIENTE autenticado devuelve 403 sin ejecutar el controlador
+  ---
+  duration_ms: 12.5841
+  type: 'test'
+  ...
+# Subtest: \#178: sin cookie devuelve 401 sin ejecutar el controlador
+ok 150 - \#178: sin cookie devuelve 401 sin ejecutar el controlador
+  ---
+  duration_ms: 8.4811
+  type: 'test'
+  ...
+# Subtest: \#178: token inválido devuelve 401 sin ejecutar el controlador
+ok 151 - \#178: token inválido devuelve 401 sin ejecutar el controlador
+  ---
+  duration_ms: 9.3466
+  type: 'test'
+  ...
+# Subtest: \#178: token expirado devuelve 401 sin ejecutar el controlador
+ok 152 - \#178: token expirado devuelve 401 sin ejecutar el controlador
+  ---
+  duration_ms: 8.8245
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, ADMIN: protección global sin duplicar guardas ni JWT
+ok 153 - \#175: /clientes, ADMIN: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 19.5665
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, CLIENTE: protección global sin duplicar guardas ni JWT
+ok 154 - \#175: /clientes, CLIENTE: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 9.0395
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, sin sesión: protección global sin duplicar guardas ni JWT
+ok 155 - \#175: /clientes, sin sesión: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 8.8181
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, token inválido: protección global sin duplicar guardas ni JWT
+ok 156 - \#175: /clientes, token inválido: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 16.655
+  type: 'test'
+  ...
+# Subtest: \#175: /clientes, token expirado: protección global sin duplicar guardas ni JWT
+ok 157 - \#175: /clientes, token expirado: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 11.0429
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, ADMIN: protección global sin duplicar guardas ni JWT
+ok 158 - \#175: /test-only, ADMIN: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 9.7175
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, CLIENTE: protección global sin duplicar guardas ni JWT
+ok 159 - \#175: /test-only, CLIENTE: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 9.0749
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, sin sesión: protección global sin duplicar guardas ni JWT
+ok 160 - \#175: /test-only, sin sesión: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 5.7496
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, token inválido: protección global sin duplicar guardas ni JWT
+ok 161 - \#175: /test-only, token inválido: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 8.4359
+  type: 'test'
+  ...
+# Subtest: \#175: /test-only, token expirado: protección global sin duplicar guardas ni JWT
+ok 162 - \#175: /test-only, token expirado: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 6.0279
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, ADMIN: protección global sin duplicar guardas ni JWT
+ok 163 - \#175: /inexistente, ADMIN: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 7.2454
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, CLIENTE: protección global sin duplicar guardas ni JWT
+ok 164 - \#175: /inexistente, CLIENTE: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 11.0911
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, sin sesión: protección global sin duplicar guardas ni JWT
+ok 165 - \#175: /inexistente, sin sesión: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 4.7055
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, token inválido: protección global sin duplicar guardas ni JWT
+ok 166 - \#175: /inexistente, token inválido: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 5.2229
+  type: 'test'
+  ...
+# Subtest: \#175: /inexistente, token expirado: protección global sin duplicar guardas ni JWT
+ok 167 - \#175: /inexistente, token expirado: protección global sin duplicar guardas ni JWT
+  ---
+  duration_ms: 7.4081
+  type: 'test'
+  ...
+# Subtest: \#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB
+ok 168 - \#179: mapea los cuatro campos y usa fecha_creacion, conservando el orden de MariaDB
+  ---
+  duration_ms: 9.4132
+  type: 'test'
+  ...
+# Subtest: repositorio selecciona email y fecha de USUARIO, exige asociación y rol CLIENTE, y ordena por registro e id
+ok 169 - repositorio selecciona email y fecha de USUARIO, exige asociación y rol CLIENTE, y ordena por registro e id
+  ---
+  duration_ms: 2.7118
+  type: 'test'
+  ...
+# Subtest: error de BD devuelve 500 genérico sin detalles internos
+ok 170 - error de BD devuelve 500 genérico sin detalles internos
+  ---
+  duration_ms: 8.6398
+  type: 'test'
+  ...
+# Subtest: error de repositorio devuelve 500 genérico sin detalles internos
+ok 171 - error de repositorio devuelve 500 genérico sin detalles internos
+  ---
+  duration_ms: 7.9076
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos
+ok 172 - uncertain HTTP result: /api/admin/productos
+  ---
+  duration_ms: 557.9237
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos/1
+ok 173 - uncertain HTTP result: /api/admin/productos/1
+  ---
+  duration_ms: 22.9778
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos/1/stock
+ok 174 - uncertain HTTP result: /api/admin/productos/1/stock
+  ---
+  duration_ms: 17.4701
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/admin/productos/1/desactivar
+ok 175 - uncertain HTTP result: /api/admin/productos/1/desactivar
+  ---
+  duration_ms: 13.7531
+  type: 'test'
+  ...
+# Subtest: uncertain HTTP result: /api/auth/register
+ok 176 - uncertain HTTP result: /api/auth/register
+  ---
+  duration_ms: 12.5853
+  type: 'test'
+  ...
+# Subtest: login errors never log driver details
+ok 177 - login errors never log driver details
+  ---
+  duration_ms: 9.1684
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: none
+ok 178 - transaction lifecycle: none
+  ---
+  duration_ms: 4.5622
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: start
+ok 179 - transaction lifecycle: start
+  ---
+  duration_ms: 1.427
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: work
+ok 180 - transaction lifecycle: work
+  ---
+  duration_ms: 0.7168
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: commit
+ok 181 - transaction lifecycle: commit
+  ---
+  duration_ms: 0.972
+  type: 'test'
+  ...
+# Subtest: transaction lifecycle: rollback
+ok 182 - transaction lifecycle: rollback
+  ---
+  duration_ms: 0.6292
+  type: 'test'
+  ...
+# Subtest: uncertain result is explicit without leaking original query or credentials
+ok 183 - uncertain result is explicit without leaking original query or credentials
+  ---
+  duration_ms: 1.3433
+  type: 'test'
+  ...
+# Subtest: logger never serializes SQL parameters or arbitrary error messages
+ok 184 - logger never serializes SQL parameters or arbitrary error messages
+  ---
+  duration_ms: 1.1102
+  type: 'test'
+  ...
+# Subtest: Login: invalid 0, 400 before service
+ok 185 - Login: invalid 0, 400 before service
+  ---
+  duration_ms: 106.0175
+  type: 'test'
+  ...
+# Subtest: Login: invalid 1, 400 before service
+ok 186 - Login: invalid 1, 400 before service
+  ---
+  duration_ms: 15.5267
+  type: 'test'
+  ...
+# Subtest: Login: invalid 2, 400 before service
+ok 187 - Login: invalid 2, 400 before service
+  ---
+  duration_ms: 6.1522
+  type: 'test'
+  ...
+# Subtest: Login: invalid 3, 400 before service
+ok 188 - Login: invalid 3, 400 before service
+  ---
+  duration_ms: 8.1721
+  type: 'test'
+  ...
+# Subtest: Login: invalid 4, 400 before service
+ok 189 - Login: invalid 4, 400 before service
+  ---
+  duration_ms: 5.9741
+  type: 'test'
+  ...
+# Subtest: Login: invalid 5, 400 before service
+ok 190 - Login: invalid 5, 400 before service
+  ---
+  duration_ms: 7.1157
+  type: 'test'
+  ...
+# Subtest: Login: invalid 6, 400 before service
+ok 191 - Login: invalid 6, 400 before service
+  ---
+  duration_ms: 5.8564
+  type: 'test'
+  ...
+# Subtest: Login: invalid 7, 400 before service
+ok 192 - Login: invalid 7, 400 before service
+  ---
+  duration_ms: 6.7733
+  type: 'test'
+  ...
+# Subtest: Login: invalid 8, 400 before service
+ok 193 - Login: invalid 8, 400 before service
+  ---
+  duration_ms: 16.1021
+  type: 'test'
+  ...
+# Subtest: Login: invalid 9, 400 before service
+ok 194 - Login: invalid 9, 400 before service
+  ---
+  duration_ms: 6.9178
+  type: 'test'
+  ...
+# Subtest: Login: invalid 10, 400 before service
+ok 195 - Login: invalid 10, 400 before service
+  ---
+  duration_ms: 6.3872
+  type: 'test'
+  ...
+# Subtest: Login: invalid 11, 400 before service
+ok 196 - Login: invalid 11, 400 before service
+  ---
+  duration_ms: 4.7866
+  type: 'test'
+  ...
+# Subtest: Login: invalid 12, 400 before service
+ok 197 - Login: invalid 12, 400 before service
+  ---
+  duration_ms: 4.0574
+  type: 'test'
+  ...
+# Subtest: Login: invalid 13, 400 before service
+ok 198 - Login: invalid 13, 400 before service
+  ---
+  duration_ms: 4.6502
+  type: 'test'
+  ...
+# Subtest: Login: invalid 14, 400 before service
+ok 199 - Login: invalid 14, 400 before service
+  ---
+  duration_ms: 3.4934
+  type: 'test'
+  ...
+# Subtest: Login: invalid 15, 400 before service
+ok 200 - Login: invalid 15, 400 before service
+  ---
+  duration_ms: 3.3056
+  type: 'test'
+  ...
+# Subtest: Login: invalid 16, 400 before service
+ok 201 - Login: invalid 16, 400 before service
+  ---
+  duration_ms: 4.7254
+  type: 'test'
+  ...
+# Subtest: Login: invalid 17, 400 before service
+ok 202 - Login: invalid 17, 400 before service
+  ---
+  duration_ms: 4.4449
+  type: 'test'
+  ...
+# Subtest: Login: invalid 18, 400 before service
+ok 203 - Login: invalid 18, 400 before service
+  ---
+  duration_ms: 4.05
+  type: 'test'
+  ...
+# Subtest: Login: invalid 19, 400 before service
+ok 204 - Login: invalid 19, 400 before service
+  ---
+  duration_ms: 3.352
+  type: 'test'
+  ...
+# Subtest: Login: invalid 20, 400 before service
+ok 205 - Login: invalid 20, 400 before service
+  ---
+  duration_ms: 3.8893
+  type: 'test'
+  ...
+# Subtest: Login: validated positive input reaches service
+ok 206 - Login: validated positive input reaches service
+  ---
+  duration_ms: 4.3665
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 0, 400 before service
+ok 207 - Registro: invalid 0, 400 before service
+  ---
+  duration_ms: 3.6688
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 1, 400 before service
+ok 208 - Registro: invalid 1, 400 before service
+  ---
+  duration_ms: 3.4084
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 2, 400 before service
+ok 209 - Registro: invalid 2, 400 before service
+  ---
+  duration_ms: 3.1851
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 3, 400 before service
+ok 210 - Registro: invalid 3, 400 before service
+  ---
+  duration_ms: 3.815
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 4, 400 before service
+ok 211 - Registro: invalid 4, 400 before service
+  ---
+  duration_ms: 3.1315
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 5, 400 before service
+ok 212 - Registro: invalid 5, 400 before service
+  ---
+  duration_ms: 3.1791
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 6, 400 before service
+ok 213 - Registro: invalid 6, 400 before service
+  ---
+  duration_ms: 2.9939
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 7, 400 before service
+ok 214 - Registro: invalid 7, 400 before service
+  ---
+  duration_ms: 3.8927
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 8, 400 before service
+ok 215 - Registro: invalid 8, 400 before service
+  ---
+  duration_ms: 3.6309
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 9, 400 before service
+ok 216 - Registro: invalid 9, 400 before service
+  ---
+  duration_ms: 4.271
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 10, 400 before service
+ok 217 - Registro: invalid 10, 400 before service
+  ---
+  duration_ms: 4.2073
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 11, 400 before service
+ok 218 - Registro: invalid 11, 400 before service
+  ---
+  duration_ms: 4.5983
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 12, 400 before service
+ok 219 - Registro: invalid 12, 400 before service
+  ---
+  duration_ms: 5.371
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 13, 400 before service
+ok 220 - Registro: invalid 13, 400 before service
+  ---
+  duration_ms: 4.5441
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 14, 400 before service
+ok 221 - Registro: invalid 14, 400 before service
+  ---
+  duration_ms: 3.6909
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 15, 400 before service
+ok 222 - Registro: invalid 15, 400 before service
+  ---
+  duration_ms: 3.2948
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 16, 400 before service
+ok 223 - Registro: invalid 16, 400 before service
+  ---
+  duration_ms: 3.1471
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 17, 400 before service
+ok 224 - Registro: invalid 17, 400 before service
+  ---
+  duration_ms: 3.455
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 18, 400 before service
+ok 225 - Registro: invalid 18, 400 before service
+  ---
+  duration_ms: 3.6533
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 19, 400 before service
+ok 226 - Registro: invalid 19, 400 before service
+  ---
+  duration_ms: 3.9365
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 20, 400 before service
+ok 227 - Registro: invalid 20, 400 before service
+  ---
+  duration_ms: 3.1685
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 21, 400 before service
+ok 228 - Registro: invalid 21, 400 before service
+  ---
+  duration_ms: 2.8272
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 22, 400 before service
+ok 229 - Registro: invalid 22, 400 before service
+  ---
+  duration_ms: 2.8236
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 23, 400 before service
+ok 230 - Registro: invalid 23, 400 before service
+  ---
+  duration_ms: 2.872
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 24, 400 before service
+ok 231 - Registro: invalid 24, 400 before service
+  ---
+  duration_ms: 2.9855
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 25, 400 before service
+ok 232 - Registro: invalid 25, 400 before service
+  ---
+  duration_ms: 3.5005
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 26, 400 before service
+ok 233 - Registro: invalid 26, 400 before service
+  ---
+  duration_ms: 4.5512
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 27, 400 before service
+ok 234 - Registro: invalid 27, 400 before service
+  ---
+  duration_ms: 2.9463
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 28, 400 before service
+ok 235 - Registro: invalid 28, 400 before service
+  ---
+  duration_ms: 3.2004
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 29, 400 before service
+ok 236 - Registro: invalid 29, 400 before service
+  ---
+  duration_ms: 3.1248
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 30, 400 before service
+ok 237 - Registro: invalid 30, 400 before service
+  ---
+  duration_ms: 3.4429
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 31, 400 before service
+ok 238 - Registro: invalid 31, 400 before service
+  ---
+  duration_ms: 3.1331
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 32, 400 before service
+ok 239 - Registro: invalid 32, 400 before service
+  ---
+  duration_ms: 3.5734
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 33, 400 before service
+ok 240 - Registro: invalid 33, 400 before service
+  ---
+  duration_ms: 2.9988
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 34, 400 before service
+ok 241 - Registro: invalid 34, 400 before service
+  ---
+  duration_ms: 3.2787
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 35, 400 before service
+ok 242 - Registro: invalid 35, 400 before service
+  ---
+  duration_ms: 3.4859
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 36, 400 before service
+ok 243 - Registro: invalid 36, 400 before service
+  ---
+  duration_ms: 2.8495
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 37, 400 before service
+ok 244 - Registro: invalid 37, 400 before service
+  ---
+  duration_ms: 2.5578
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 38, 400 before service
+ok 245 - Registro: invalid 38, 400 before service
+  ---
+  duration_ms: 3.1721
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 39, 400 before service
+ok 246 - Registro: invalid 39, 400 before service
+  ---
+  duration_ms: 10.9216
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 40, 400 before service
+ok 247 - Registro: invalid 40, 400 before service
+  ---
+  duration_ms: 3.004
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 41, 400 before service
+ok 248 - Registro: invalid 41, 400 before service
+  ---
+  duration_ms: 3.0947
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 42, 400 before service
+ok 249 - Registro: invalid 42, 400 before service
+  ---
+  duration_ms: 3.0937
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 43, 400 before service
+ok 250 - Registro: invalid 43, 400 before service
+  ---
+  duration_ms: 3.1259
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 44, 400 before service
+ok 251 - Registro: invalid 44, 400 before service
+  ---
+  duration_ms: 2.9142
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 45, 400 before service
+ok 252 - Registro: invalid 45, 400 before service
+  ---
+  duration_ms: 2.7817
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 46, 400 before service
+ok 253 - Registro: invalid 46, 400 before service
+  ---
+  duration_ms: 2.9719
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 47, 400 before service
+ok 254 - Registro: invalid 47, 400 before service
+  ---
+  duration_ms: 2.932
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 48, 400 before service
+ok 255 - Registro: invalid 48, 400 before service
+  ---
+  duration_ms: 3.2556
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 49, 400 before service
+ok 256 - Registro: invalid 49, 400 before service
+  ---
+  duration_ms: 3.41
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 50, 400 before service
+ok 257 - Registro: invalid 50, 400 before service
+  ---
+  duration_ms: 2.9489
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 51, 400 before service
+ok 258 - Registro: invalid 51, 400 before service
+  ---
+  duration_ms: 2.8259
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 52, 400 before service
+ok 259 - Registro: invalid 52, 400 before service
+  ---
+  duration_ms: 2.8634
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 53, 400 before service
+ok 260 - Registro: invalid 53, 400 before service
+  ---
+  duration_ms: 4.0237
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 54, 400 before service
+ok 261 - Registro: invalid 54, 400 before service
+  ---
+  duration_ms: 4.1454
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 55, 400 before service
+ok 262 - Registro: invalid 55, 400 before service
+  ---
+  duration_ms: 3.2543
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 56, 400 before service
+ok 263 - Registro: invalid 56, 400 before service
+  ---
+  duration_ms: 3.2017
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 57, 400 before service
+ok 264 - Registro: invalid 57, 400 before service
+  ---
+  duration_ms: 3.5987
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 58, 400 before service
+ok 265 - Registro: invalid 58, 400 before service
+  ---
+  duration_ms: 3.0373
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 59, 400 before service
+ok 266 - Registro: invalid 59, 400 before service
+  ---
+  duration_ms: 2.891
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 60, 400 before service
+ok 267 - Registro: invalid 60, 400 before service
+  ---
+  duration_ms: 3.0243
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 61, 400 before service
+ok 268 - Registro: invalid 61, 400 before service
+  ---
+  duration_ms: 3.1301
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 62, 400 before service
+ok 269 - Registro: invalid 62, 400 before service
+  ---
+  duration_ms: 3.2842
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 63, 400 before service
+ok 270 - Registro: invalid 63, 400 before service
+  ---
+  duration_ms: 3.0433
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 64, 400 before service
+ok 271 - Registro: invalid 64, 400 before service
+  ---
+  duration_ms: 3.3643
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 65, 400 before service
+ok 272 - Registro: invalid 65, 400 before service
+  ---
+  duration_ms: 2.9302
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 66, 400 before service
+ok 273 - Registro: invalid 66, 400 before service
+  ---
+  duration_ms: 2.9195
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 67, 400 before service
+ok 274 - Registro: invalid 67, 400 before service
+  ---
+  duration_ms: 3.5762
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 68, 400 before service
+ok 275 - Registro: invalid 68, 400 before service
+  ---
+  duration_ms: 3.0738
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 69, 400 before service
+ok 276 - Registro: invalid 69, 400 before service
+  ---
+  duration_ms: 3.1107
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 70, 400 before service
+ok 277 - Registro: invalid 70, 400 before service
+  ---
+  duration_ms: 3.3849
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 71, 400 before service
+ok 278 - Registro: invalid 71, 400 before service
+  ---
+  duration_ms: 3.1311
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 72, 400 before service
+ok 279 - Registro: invalid 72, 400 before service
+  ---
+  duration_ms: 3.1164
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 73, 400 before service
+ok 280 - Registro: invalid 73, 400 before service
+  ---
+  duration_ms: 3.0343
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 74, 400 before service
+ok 281 - Registro: invalid 74, 400 before service
+  ---
+  duration_ms: 3.16
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 75, 400 before service
+ok 282 - Registro: invalid 75, 400 before service
+  ---
+  duration_ms: 3.0378
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 76, 400 before service
+ok 283 - Registro: invalid 76, 400 before service
+  ---
+  duration_ms: 3.2912
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 77, 400 before service
+ok 284 - Registro: invalid 77, 400 before service
+  ---
+  duration_ms: 3.1223
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 78, 400 before service
+ok 285 - Registro: invalid 78, 400 before service
+  ---
+  duration_ms: 3.0124
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 79, 400 before service
+ok 286 - Registro: invalid 79, 400 before service
+  ---
+  duration_ms: 3.5003
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 80, 400 before service
+ok 287 - Registro: invalid 80, 400 before service
+  ---
+  duration_ms: 3.0754
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 81, 400 before service
+ok 288 - Registro: invalid 81, 400 before service
+  ---
+  duration_ms: 3.181
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 82, 400 before service
+ok 289 - Registro: invalid 82, 400 before service
+  ---
+  duration_ms: 3.3612
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 83, 400 before service
+ok 290 - Registro: invalid 83, 400 before service
+  ---
+  duration_ms: 2.8603
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 84, 400 before service
+ok 291 - Registro: invalid 84, 400 before service
+  ---
+  duration_ms: 3.2732
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 85, 400 before service
+ok 292 - Registro: invalid 85, 400 before service
+  ---
+  duration_ms: 3.0767
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 86, 400 before service
+ok 293 - Registro: invalid 86, 400 before service
+  ---
+  duration_ms: 3.0691
+  type: 'test'
+  ...
+# Subtest: Registro: invalid 87, 400 before service
+ok 294 - Registro: invalid 87, 400 before service
+  ---
+  duration_ms: 2.8777
+  type: 'test'
+  ...
+# Subtest: Registro: validated positive input reaches service
+ok 295 - Registro: validated positive input reaches service
+  ---
+  duration_ms: 3.1372
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 0, 400 before service
+ok 296 - CreateProduct: invalid 0, 400 before service
+  ---
+  duration_ms: 5.9647
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 1, 400 before service
+ok 297 - CreateProduct: invalid 1, 400 before service
+  ---
+  duration_ms: 3.4129
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 2, 400 before service
+ok 298 - CreateProduct: invalid 2, 400 before service
+  ---
+  duration_ms: 3.9985
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 3, 400 before service
+ok 299 - CreateProduct: invalid 3, 400 before service
+  ---
+  duration_ms: 3.5417
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 4, 400 before service
+ok 300 - CreateProduct: invalid 4, 400 before service
+  ---
+  duration_ms: 3.7094
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 5, 400 before service
+ok 301 - CreateProduct: invalid 5, 400 before service
+  ---
+  duration_ms: 5.4446
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 6, 400 before service
+ok 302 - CreateProduct: invalid 6, 400 before service
+  ---
+  duration_ms: 10.2826
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 7, 400 before service
+ok 303 - CreateProduct: invalid 7, 400 before service
+  ---
+  duration_ms: 5.8962
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 8, 400 before service
+ok 304 - CreateProduct: invalid 8, 400 before service
+  ---
+  duration_ms: 3.1562
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 9, 400 before service
+ok 305 - CreateProduct: invalid 9, 400 before service
+  ---
+  duration_ms: 2.929
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 10, 400 before service
+ok 306 - CreateProduct: invalid 10, 400 before service
+  ---
+  duration_ms: 3.0963
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 11, 400 before service
+ok 307 - CreateProduct: invalid 11, 400 before service
+  ---
+  duration_ms: 3.4153
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 12, 400 before service
+ok 308 - CreateProduct: invalid 12, 400 before service
+  ---
+  duration_ms: 4.02
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 13, 400 before service
+ok 309 - CreateProduct: invalid 13, 400 before service
+  ---
+  duration_ms: 4.0162
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 14, 400 before service
+ok 310 - CreateProduct: invalid 14, 400 before service
+  ---
+  duration_ms: 3.1344
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 15, 400 before service
+ok 311 - CreateProduct: invalid 15, 400 before service
+  ---
+  duration_ms: 3.6965
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 16, 400 before service
+ok 312 - CreateProduct: invalid 16, 400 before service
+  ---
+  duration_ms: 3.2972
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 17, 400 before service
+ok 313 - CreateProduct: invalid 17, 400 before service
+  ---
+  duration_ms: 3.0252
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 18, 400 before service
+ok 314 - CreateProduct: invalid 18, 400 before service
+  ---
+  duration_ms: 3.2726
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 19, 400 before service
+ok 315 - CreateProduct: invalid 19, 400 before service
+  ---
+  duration_ms: 3.262
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 20, 400 before service
+ok 316 - CreateProduct: invalid 20, 400 before service
+  ---
+  duration_ms: 3.2067
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 21, 400 before service
+ok 317 - CreateProduct: invalid 21, 400 before service
+  ---
+  duration_ms: 5.4599
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 22, 400 before service
+ok 318 - CreateProduct: invalid 22, 400 before service
+  ---
+  duration_ms: 4.4007
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 23, 400 before service
+ok 319 - CreateProduct: invalid 23, 400 before service
+  ---
+  duration_ms: 3.5995
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 24, 400 before service
+ok 320 - CreateProduct: invalid 24, 400 before service
+  ---
+  duration_ms: 3.8599
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 25, 400 before service
+ok 321 - CreateProduct: invalid 25, 400 before service
+  ---
+  duration_ms: 3.5593
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 26, 400 before service
+ok 322 - CreateProduct: invalid 26, 400 before service
+  ---
+  duration_ms: 3.8932
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 27, 400 before service
+ok 323 - CreateProduct: invalid 27, 400 before service
+  ---
+  duration_ms: 3.7123
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 28, 400 before service
+ok 324 - CreateProduct: invalid 28, 400 before service
+  ---
+  duration_ms: 3.407
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 29, 400 before service
+ok 325 - CreateProduct: invalid 29, 400 before service
+  ---
+  duration_ms: 3.6461
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 30, 400 before service
+ok 326 - CreateProduct: invalid 30, 400 before service
+  ---
+  duration_ms: 3.1233
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 31, 400 before service
+ok 327 - CreateProduct: invalid 31, 400 before service
+  ---
+  duration_ms: 3.1808
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 32, 400 before service
+ok 328 - CreateProduct: invalid 32, 400 before service
+  ---
+  duration_ms: 3.0711
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 33, 400 before service
+ok 329 - CreateProduct: invalid 33, 400 before service
+  ---
+  duration_ms: 3.6054
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 34, 400 before service
+ok 330 - CreateProduct: invalid 34, 400 before service
+  ---
+  duration_ms: 3.1349
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 35, 400 before service
+ok 331 - CreateProduct: invalid 35, 400 before service
+  ---
+  duration_ms: 3.1328
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 36, 400 before service
+ok 332 - CreateProduct: invalid 36, 400 before service
+  ---
+  duration_ms: 2.715
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 37, 400 before service
+ok 333 - CreateProduct: invalid 37, 400 before service
+  ---
+  duration_ms: 3.0655
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 38, 400 before service
+ok 334 - CreateProduct: invalid 38, 400 before service
+  ---
+  duration_ms: 3.1777
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 39, 400 before service
+ok 335 - CreateProduct: invalid 39, 400 before service
+  ---
+  duration_ms: 3.2447
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 40, 400 before service
+ok 336 - CreateProduct: invalid 40, 400 before service
+  ---
+  duration_ms: 3.4519
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 41, 400 before service
+ok 337 - CreateProduct: invalid 41, 400 before service
+  ---
+  duration_ms: 4.5322
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 42, 400 before service
+ok 338 - CreateProduct: invalid 42, 400 before service
+  ---
+  duration_ms: 3.3692
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 43, 400 before service
+ok 339 - CreateProduct: invalid 43, 400 before service
+  ---
+  duration_ms: 2.9559
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 44, 400 before service
+ok 340 - CreateProduct: invalid 44, 400 before service
+  ---
+  duration_ms: 3.2153
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 45, 400 before service
+ok 341 - CreateProduct: invalid 45, 400 before service
+  ---
+  duration_ms: 2.9263
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 46, 400 before service
+ok 342 - CreateProduct: invalid 46, 400 before service
+  ---
+  duration_ms: 3.0067
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 47, 400 before service
+ok 343 - CreateProduct: invalid 47, 400 before service
+  ---
+  duration_ms: 3.1682
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 48, 400 before service
+ok 344 - CreateProduct: invalid 48, 400 before service
+  ---
+  duration_ms: 3.6082
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 49, 400 before service
+ok 345 - CreateProduct: invalid 49, 400 before service
+  ---
+  duration_ms: 3.9949
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 50, 400 before service
+ok 346 - CreateProduct: invalid 50, 400 before service
+  ---
+  duration_ms: 4.4273
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 51, 400 before service
+ok 347 - CreateProduct: invalid 51, 400 before service
+  ---
+  duration_ms: 4.365
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 52, 400 before service
+ok 348 - CreateProduct: invalid 52, 400 before service
+  ---
+  duration_ms: 3.5068
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 53, 400 before service
+ok 349 - CreateProduct: invalid 53, 400 before service
+  ---
+  duration_ms: 3.1789
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 54, 400 before service
+ok 350 - CreateProduct: invalid 54, 400 before service
+  ---
+  duration_ms: 14.249
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 55, 400 before service
+ok 351 - CreateProduct: invalid 55, 400 before service
+  ---
+  duration_ms: 9.109
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 56, 400 before service
+ok 352 - CreateProduct: invalid 56, 400 before service
+  ---
+  duration_ms: 7.4265
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 57, 400 before service
+ok 353 - CreateProduct: invalid 57, 400 before service
+  ---
+  duration_ms: 6.702
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 58, 400 before service
+ok 354 - CreateProduct: invalid 58, 400 before service
+  ---
+  duration_ms: 4.0213
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 59, 400 before service
+ok 355 - CreateProduct: invalid 59, 400 before service
+  ---
+  duration_ms: 3.77
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 60, 400 before service
+ok 356 - CreateProduct: invalid 60, 400 before service
+  ---
+  duration_ms: 3.6187
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 61, 400 before service
+ok 357 - CreateProduct: invalid 61, 400 before service
+  ---
+  duration_ms: 7.5877
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 62, 400 before service
+ok 358 - CreateProduct: invalid 62, 400 before service
+  ---
+  duration_ms: 4.3308
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 63, 400 before service
+ok 359 - CreateProduct: invalid 63, 400 before service
+  ---
+  duration_ms: 4.0419
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 64, 400 before service
+ok 360 - CreateProduct: invalid 64, 400 before service
+  ---
+  duration_ms: 5.0561
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 65, 400 before service
+ok 361 - CreateProduct: invalid 65, 400 before service
+  ---
+  duration_ms: 3.7235
+  type: 'test'
+  ...
+# Subtest: CreateProduct: invalid 66, 400 before service
+ok 362 - CreateProduct: invalid 66, 400 before service
+  ---
+  duration_ms: 3.474
+  type: 'test'
+  ...
+# Subtest: CreateProduct: validated positive input reaches service
+ok 363 - CreateProduct: validated positive input reaches service
+  ---
+  duration_ms: 3.1069
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 0, 400 before service
+ok 364 - UpdateProduct: invalid 0, 400 before service
+  ---
+  duration_ms: 5.4121
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 1, 400 before service
+ok 365 - UpdateProduct: invalid 1, 400 before service
+  ---
+  duration_ms: 3.3498
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 2, 400 before service
+ok 366 - UpdateProduct: invalid 2, 400 before service
+  ---
+  duration_ms: 3.5116
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 3, 400 before service
+ok 367 - UpdateProduct: invalid 3, 400 before service
+  ---
+  duration_ms: 4.0449
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 4, 400 before service
+ok 368 - UpdateProduct: invalid 4, 400 before service
+  ---
+  duration_ms: 4.9933
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 5, 400 before service
+ok 369 - UpdateProduct: invalid 5, 400 before service
+  ---
+  duration_ms: 3.2785
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 6, 400 before service
+ok 370 - UpdateProduct: invalid 6, 400 before service
+  ---
+  duration_ms: 4.1438
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 7, 400 before service
+ok 371 - UpdateProduct: invalid 7, 400 before service
+  ---
+  duration_ms: 4.1058
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 8, 400 before service
+ok 372 - UpdateProduct: invalid 8, 400 before service
+  ---
+  duration_ms: 5.4645
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 9, 400 before service
+ok 373 - UpdateProduct: invalid 9, 400 before service
+  ---
+  duration_ms: 3.0986
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 10, 400 before service
+ok 374 - UpdateProduct: invalid 10, 400 before service
+  ---
+  duration_ms: 4.6879
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 11, 400 before service
+ok 375 - UpdateProduct: invalid 11, 400 before service
+  ---
+  duration_ms: 3.7713
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 12, 400 before service
+ok 376 - UpdateProduct: invalid 12, 400 before service
+  ---
+  duration_ms: 5.5633
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 13, 400 before service
+ok 377 - UpdateProduct: invalid 13, 400 before service
+  ---
+  duration_ms: 3.6129
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 14, 400 before service
+ok 378 - UpdateProduct: invalid 14, 400 before service
+  ---
+  duration_ms: 3.1648
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 15, 400 before service
+ok 379 - UpdateProduct: invalid 15, 400 before service
+  ---
+  duration_ms: 3.098
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 16, 400 before service
+ok 380 - UpdateProduct: invalid 16, 400 before service
+  ---
+  duration_ms: 5.0618
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 17, 400 before service
+ok 381 - UpdateProduct: invalid 17, 400 before service
+  ---
+  duration_ms: 3.2287
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 18, 400 before service
+ok 382 - UpdateProduct: invalid 18, 400 before service
+  ---
+  duration_ms: 3.4287
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 19, 400 before service
+ok 383 - UpdateProduct: invalid 19, 400 before service
+  ---
+  duration_ms: 3.0741
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 20, 400 before service
+ok 384 - UpdateProduct: invalid 20, 400 before service
+  ---
+  duration_ms: 6.8207
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 21, 400 before service
+ok 385 - UpdateProduct: invalid 21, 400 before service
+  ---
+  duration_ms: 4.1199
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 22, 400 before service
+ok 386 - UpdateProduct: invalid 22, 400 before service
+  ---
+  duration_ms: 3.3212
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 23, 400 before service
+ok 387 - UpdateProduct: invalid 23, 400 before service
+  ---
+  duration_ms: 3.2271
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: invalid 24, 400 before service
+ok 388 - UpdateProduct: invalid 24, 400 before service
+  ---
+  duration_ms: 5.3528
+  type: 'test'
+  ...
+# Subtest: UpdateProduct: validated positive input reaches service
+ok 389 - UpdateProduct: validated positive input reaches service
+  ---
+  duration_ms: 4.2103
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 0, 400 before service
+ok 390 - Stock: invalid 0, 400 before service
+  ---
+  duration_ms: 2.9068
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 1, 400 before service
+ok 391 - Stock: invalid 1, 400 before service
+  ---
+  duration_ms: 2.7786
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 2, 400 before service
+ok 392 - Stock: invalid 2, 400 before service
+  ---
+  duration_ms: 4.8022
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 3, 400 before service
+ok 393 - Stock: invalid 3, 400 before service
+  ---
+  duration_ms: 3.3715
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 4, 400 before service
+ok 394 - Stock: invalid 4, 400 before service
+  ---
+  duration_ms: 3.4608
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 5, 400 before service
+ok 395 - Stock: invalid 5, 400 before service
+  ---
+  duration_ms: 2.925
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 6, 400 before service
+ok 396 - Stock: invalid 6, 400 before service
+  ---
+  duration_ms: 3.5792
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 7, 400 before service
+ok 397 - Stock: invalid 7, 400 before service
+  ---
+  duration_ms: 5.5961
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 8, 400 before service
+ok 398 - Stock: invalid 8, 400 before service
+  ---
+  duration_ms: 3.0424
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 9, 400 before service
+ok 399 - Stock: invalid 9, 400 before service
+  ---
+  duration_ms: 9.065
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 10, 400 before service
+ok 400 - Stock: invalid 10, 400 before service
+  ---
+  duration_ms: 6.442
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 11, 400 before service
+ok 401 - Stock: invalid 11, 400 before service
+  ---
+  duration_ms: 3.1725
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 12, 400 before service
+ok 402 - Stock: invalid 12, 400 before service
+  ---
+  duration_ms: 4.0045
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 13, 400 before service
+ok 403 - Stock: invalid 13, 400 before service
+  ---
+  duration_ms: 4.9191
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 14, 400 before service
+ok 404 - Stock: invalid 14, 400 before service
+  ---
+  duration_ms: 3.4849
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 15, 400 before service
+ok 405 - Stock: invalid 15, 400 before service
+  ---
+  duration_ms: 3.1381
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 16, 400 before service
+ok 406 - Stock: invalid 16, 400 before service
+  ---
+  duration_ms: 3.3963
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 17, 400 before service
+ok 407 - Stock: invalid 17, 400 before service
+  ---
+  duration_ms: 3.6972
+  type: 'test'
+  ...
+# Subtest: Stock: invalid 18, 400 before service
+ok 408 - Stock: invalid 18, 400 before service
+  ---
+  duration_ms: 5.9496
+  type: 'test'
+  ...
+# Subtest: Stock: validated positive input reaches service
+ok 409 - Stock: validated positive input reaches service
+  ---
+  duration_ms: 4.4364
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 01
+ok 410 - ProductIdParams GET: 01
+  ---
+  duration_ms: 4.3072
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 01
+ok 411 - ProductIdParams PUT: 01
+  ---
+  duration_ms: 4.6613
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 01
+ok 412 - ProductIdParams PATCH/stock: 01
+  ---
+  duration_ms: 4.0537
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 01
+ok 413 - ProductIdParams PATCH/desactivar: 01
+  ---
+  duration_ms: 3.6694
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 1e0
+ok 414 - ProductIdParams GET: 1e0
+  ---
+  duration_ms: 3.4134
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 1e0
+ok 415 - ProductIdParams PUT: 1e0
+  ---
+  duration_ms: 4.5538
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 1e0
+ok 416 - ProductIdParams PATCH/stock: 1e0
+  ---
+  duration_ms: 3.2328
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 1e0
+ok 417 - ProductIdParams PATCH/desactivar: 1e0
+  ---
+  duration_ms: 3.6938
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 0x1
+ok 418 - ProductIdParams GET: 0x1
+  ---
+  duration_ms: 2.994
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 0x1
+ok 419 - ProductIdParams PUT: 0x1
+  ---
+  duration_ms: 3.4366
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 0x1
+ok 420 - ProductIdParams PATCH/stock: 0x1
+  ---
+  duration_ms: 5.7857
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 0x1
+ok 421 - ProductIdParams PATCH/desactivar: 0x1
+  ---
+  duration_ms: 4.8326
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: %2B1
+ok 422 - ProductIdParams GET: %2B1
+  ---
+  duration_ms: 3.5033
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: %2B1
+ok 423 - ProductIdParams PUT: %2B1
+  ---
+  duration_ms: 3.7741
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: %2B1
+ok 424 - ProductIdParams PATCH/stock: %2B1
+  ---
+  duration_ms: 4.178
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: %2B1
+ok 425 - ProductIdParams PATCH/desactivar: %2B1
+  ---
+  duration_ms: 4.4406
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: %201
+ok 426 - ProductIdParams GET: %201
+  ---
+  duration_ms: 4.3129
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: %201
+ok 427 - ProductIdParams PUT: %201
+  ---
+  duration_ms: 3.6802
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: %201
+ok 428 - ProductIdParams PATCH/stock: %201
+  ---
+  duration_ms: 4.7889
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: %201
+ok 429 - ProductIdParams PATCH/desactivar: %201
+  ---
+  duration_ms: 3.4811
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 1%20
+ok 430 - ProductIdParams GET: 1%20
+  ---
+  duration_ms: 2.7825
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 1%20
+ok 431 - ProductIdParams PUT: 1%20
+  ---
+  duration_ms: 2.9144
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 1%20
+ok 432 - ProductIdParams PATCH/stock: 1%20
+  ---
+  duration_ms: 3.8788
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 1%20
+ok 433 - ProductIdParams PATCH/desactivar: 1%20
+  ---
+  duration_ms: 3.4399
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 1.0
+ok 434 - ProductIdParams GET: 1.0
+  ---
+  duration_ms: 2.555
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 1.0
+ok 435 - ProductIdParams PUT: 1.0
+  ---
+  duration_ms: 3.2571
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 1.0
+ok 436 - ProductIdParams PATCH/stock: 1.0
+  ---
+  duration_ms: 2.8634
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 1.0
+ok 437 - ProductIdParams PATCH/desactivar: 1.0
+  ---
+  duration_ms: 3.5339
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 1x
+ok 438 - ProductIdParams GET: 1x
+  ---
+  duration_ms: 4.3788
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 1x
+ok 439 - ProductIdParams PUT: 1x
+  ---
+  duration_ms: 2.9211
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 1x
+ok 440 - ProductIdParams PATCH/stock: 1x
+  ---
+  duration_ms: 3.3759
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 1x
+ok 441 - ProductIdParams PATCH/desactivar: 1x
+  ---
+  duration_ms: 3.0318
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 0
+ok 442 - ProductIdParams GET: 0
+  ---
+  duration_ms: 3.9925
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 0
+ok 443 - ProductIdParams PUT: 0
+  ---
+  duration_ms: 3.4456
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 0
+ok 444 - ProductIdParams PATCH/stock: 0
+  ---
+  duration_ms: 3.4274
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 0
+ok 445 - ProductIdParams PATCH/desactivar: 0
+  ---
+  duration_ms: 2.8326
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: -1
+ok 446 - ProductIdParams GET: -1
+  ---
+  duration_ms: 2.9713
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: -1
+ok 447 - ProductIdParams PUT: -1
+  ---
+  duration_ms: 5.2833
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: -1
+ok 448 - ProductIdParams PATCH/stock: -1
+  ---
+  duration_ms: 2.9838
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: -1
+ok 449 - ProductIdParams PATCH/desactivar: -1
+  ---
+  duration_ms: 3.1246
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 2147483648
+ok 450 - ProductIdParams GET: 2147483648
+  ---
+  duration_ms: 2.9081
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 2147483648
+ok 451 - ProductIdParams PUT: 2147483648
+  ---
+  duration_ms: 4.0391
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 2147483648
+ok 452 - ProductIdParams PATCH/stock: 2147483648
+  ---
+  duration_ms: 4.5582
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 2147483648
+ok 453 - ProductIdParams PATCH/desactivar: 2147483648
+  ---
+  duration_ms: 2.798
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 9007199254740992
+ok 454 - ProductIdParams GET: 9007199254740992
+  ---
+  duration_ms: 3.0557
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 9007199254740992
+ok 455 - ProductIdParams PUT: 9007199254740992
+  ---
+  duration_ms: 10.0477
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 9007199254740992
+ok 456 - ProductIdParams PATCH/stock: 9007199254740992
+  ---
+  duration_ms: 4.9283
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 9007199254740992
+ok 457 - ProductIdParams PATCH/desactivar: 9007199254740992
+  ---
+  duration_ms: 5.0176
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: Infinity
+ok 458 - ProductIdParams GET: Infinity
+  ---
+  duration_ms: 11.7738
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: Infinity
+ok 459 - ProductIdParams PUT: Infinity
+  ---
+  duration_ms: 5.2053
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: Infinity
+ok 460 - ProductIdParams PATCH/stock: Infinity
+  ---
+  duration_ms: 6.1985
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: Infinity
+ok 461 - ProductIdParams PATCH/desactivar: Infinity
+  ---
+  duration_ms: 13.699
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: NaN
+ok 462 - ProductIdParams GET: NaN
+  ---
+  duration_ms: 4.6109
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: NaN
+ok 463 - ProductIdParams PUT: NaN
+  ---
+  duration_ms: 4.6931
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: NaN
+ok 464 - ProductIdParams PATCH/stock: NaN
+  ---
+  duration_ms: 13.8382
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: NaN
+ok 465 - ProductIdParams PATCH/desactivar: NaN
+  ---
+  duration_ms: 5.5628
+  type: 'test'
+  ...
+# Subtest: ProductIdParams GET: 1%5B%5D
+ok 466 - ProductIdParams GET: 1%5B%5D
+  ---
+  duration_ms: 4.9278
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PUT: 1%5B%5D
+ok 467 - ProductIdParams PUT: 1%5B%5D
+  ---
+  duration_ms: 9.6097
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/stock: 1%5B%5D
+ok 468 - ProductIdParams PATCH/stock: 1%5B%5D
+  ---
+  duration_ms: 3.4087
+  type: 'test'
+  ...
+# Subtest: ProductIdParams PATCH/desactivar: 1%5B%5D
+ok 469 - ProductIdParams PATCH/desactivar: 1%5B%5D
+  ---
+  duration_ms: 4.14
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: page=1&page=2
+ok 470 - CatalogQuery real Express 5 parser: page=1&page=2
+  ---
+  duration_ms: 3.2641
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: limit[]=1
+ok 471 - CatalogQuery real Express 5 parser: limit[]=1
+  ---
+  duration_ms: 2.9427
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: categoria[id]=1
+ok 472 - CatalogQuery real Express 5 parser: categoria[id]=1
+  ---
+  duration_ms: 6.9731
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: busqueda[]=x
+ok 473 - CatalogQuery real Express 5 parser: busqueda[]=x
+  ---
+  duration_ms: 4.6374
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: busqueda=a&busqueda=b
+ok 474 - CatalogQuery real Express 5 parser: busqueda=a&busqueda=b
+  ---
+  duration_ms: 3.0921
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: constructor=x
+ok 475 - CatalogQuery real Express 5 parser: constructor=x
+  ---
+  duration_ms: 2.7377
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: __proto__=x
+ok 476 - CatalogQuery real Express 5 parser: __proto__=x
+  ---
+  duration_ms: 1.9627
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: extra=x
+ok 477 - CatalogQuery real Express 5 parser: extra=x
+  ---
+  duration_ms: 1.9627
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: page=1e0
+ok 478 - CatalogQuery real Express 5 parser: page=1e0
+  ---
+  duration_ms: 3.4094
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: page=01
+ok 479 - CatalogQuery real Express 5 parser: page=01
+  ---
+  duration_ms: 2.84
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: page=
+ok 480 - CatalogQuery real Express 5 parser: page=
+  ---
+  duration_ms: 2.9563
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: page=Infinity
+ok 481 - CatalogQuery real Express 5 parser: page=Infinity
+  ---
+  duration_ms: 2.3025
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: page=1000001
+ok 482 - CatalogQuery real Express 5 parser: page=1000001
+  ---
+  duration_ms: 2.1559
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: limit=101
+ok 483 - CatalogQuery real Express 5 parser: limit=101
+  ---
+  duration_ms: 2.486
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: categoria=2147483648
+ok 484 - CatalogQuery real Express 5 parser: categoria=2147483648
+  ---
+  duration_ms: 2.6543
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: busqueda=%00
+ok 485 - CatalogQuery real Express 5 parser: busqueda=%00
+  ---
+  duration_ms: 3.5915
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: busqueda=%20
+ok 486 - CatalogQuery real Express 5 parser: busqueda=%20
+  ---
+  duration_ms: 3.1143
+  type: 'test'
+  ...
+# Subtest: CatalogQuery real Express 5 parser: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+ok 487 - CatalogQuery real Express 5 parser: busqueda=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  ---
+  duration_ms: 2.0759
+  type: 'test'
+  ...
+# Subtest: DTO boundaries, undefined, null, exact limits and prototype guards
+ok 488 - DTO boundaries, undefined, null, exact limits and prototype guards
+  ---
+  duration_ms: 2.9664
+  type: 'test'
+  ...
+# Subtest: validated inputs preserve service 404/409 and sanitized errors
+ok 489 - validated inputs preserve service 404/409 and sanitized errors
+  ---
+  duration_ms: 12.0571
+  type: 'test'
+  ...
+# Subtest: malformed JSON retains route-specific envelopes
+ok 490 - malformed JSON retains route-specific envelopes
+  ---
+  duration_ms: 5.38
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+ok 491 - PARTICULAR: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+  ---
+  duration_ms: 559.9084
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: el helper no toma un rol inyectado
+ok 492 - PARTICULAR: el helper no toma un rol inyectado
+  ---
+  duration_ms: 301.5746
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: POST rechaza el campo rol=ADMIN
+ok 493 - PARTICULAR: POST rechaza el campo rol=ADMIN
+  ---
+  duration_ms: 72.0709
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: POST rechaza el campo rol=CLIENTE
+ok 494 - PARTICULAR: POST rechaza el campo rol=CLIENTE
+  ---
+  duration_ms: 7.3149
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: POST rechaza el campo rol=null
+ok 495 - PARTICULAR: POST rechaza el campo rol=null
+  ---
+  duration_ms: 5.1557
+  type: 'test'
+  ...
+# Subtest: PARTICULAR: responde 201 con data.user sin credenciales ni cookie
+ok 496 - PARTICULAR: responde 201 con data.user sin credenciales ni cookie
+  ---
+  duration_ms: 7.6143
+  type: 'test'
+  ...
+# Subtest: EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+ok 497 - EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+  ---
+  duration_ms: 520.2338
+  type: 'test'
+  ...
+# Subtest: EMPRESA: el helper no toma un rol inyectado
+ok 498 - EMPRESA: el helper no toma un rol inyectado
+  ---
+  duration_ms: 255.1411
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=ADMIN
+ok 499 - EMPRESA: POST rechaza el campo rol=ADMIN
+  ---
+  duration_ms: 4.5876
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=CLIENTE
+ok 500 - EMPRESA: POST rechaza el campo rol=CLIENTE
+  ---
+  duration_ms: 4.1166
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=null
+ok 501 - EMPRESA: POST rechaza el campo rol=null
+  ---
+  duration_ms: 4.0872
+  type: 'test'
+  ...
+# Subtest: EMPRESA: responde 201 con data.user sin credenciales ni cookie
+ok 502 - EMPRESA: responde 201 con data.user sin credenciales ni cookie
+  ---
+  duration_ms: 3.4533
+  type: 'test'
+  ...
+1..502
+# tests 502
+# suites 0
+# pass 502
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 16524.4684
