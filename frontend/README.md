@@ -42,6 +42,22 @@ Tailwind CSS v4. La Home definitiva corresponde a la tarea #220 de Bruno y se
 integra por separado; debe validarse visualmente junto con estas pantallas
 antes del release.
 
+### Importación administrativa de productos
+
+La pantalla `/admin/productos/importar` descarga una plantilla CSV y acepta
+archivos delimitados por coma o punto y coma (incluida la exportación CSV de
+Excel). Los encabezados son `codigo`, `nombre`, `id_categoria`, `precio`,
+`stock`, `descripcion`, `imagen` y `activo`; los últimos tres son opcionales.
+La categoría se identifica con su ID activo y el precio admite punto o coma
+decimal, con hasta dos decimales.
+
+La validación y previsualización se realizan antes de confirmar. La importación
+usa el endpoint administrativo existente para crear productos, una fila por
+solicitud; no es una operación atómica. Los rechazos se informan en el reporte
+CSV, y ante una respuesta ambigua se detiene el proceso para evitar reintentos
+automáticos que puedan duplicar productos. La pantalla permite reintentar
+rechazos confirmados y volver a cargar la planilla.
+
 ### Compile and Hot-Reload for Development
 
 ```sh
