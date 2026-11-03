@@ -284,4 +284,107 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.strictEqual(report.valid, false);
         assert.ok(report.errors.some((e) => e.field === 'precio'));
     });
+    await t.test('H01: AE y Æ se detectan como distintos (no duplican) según reglas SQL', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAE,A,1,10,1\nÆ,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test.csv');
+
+        assert.equal(report.duplicateInFileCount, 0);
+        // Valid porque la BD (y el Collator) los trata como distintos
+        assert.equal(report.valid, true);
+    });
+
+    await t.test('H01: AB y A\\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
+        // \u200D es un carácter invisible que SQL y el Collator ignoran, por lo que cuentan como el mismo SKU.
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAB,A,1,10,1\nA\u200DB,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test.csv');
+
+        assert.equal(report.valid, false);
+        assert.equal(report.duplicateInFileCount, 1);
+        const dupError = report.errors.find((e) => e.field === 'codigo' && e.message.includes('repetido dentro del archivo'));
+        assert.ok(dupError);
+    });
+    await t.test('H03: XLSX con inlineStr y fragmentos <t> múltiples conserva el texto completo', async () => {
+        // Simula celda con inlineStr dividida en múltiples etiquetas <t>
+        const sheetXml = '<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>' +
+            '<row r="1"><c r="A1" t="inlineStr"><is><t>codigo</t></is></c><c r="B1" t="inlineStr"><is><t>nombre</t></is></c><c r="C1" t="inlineStr"><is><t>id_categoria</t></is></c><c r="D1" t="inlineStr"><is><t>precio</t></is></c><c r="E1" t="inlineStr"><is><t>stock</t></is></c></row>' +
+            '<row r="2"><c r="A2" t="inlineStr"><is><t>SKU-</t><t>COMPLETO</t></is></c><c r="B2" t="inlineStr"><is><t>Prod</t></is></c><c r="C2" t="n"><v>1</v></c><c r="D2" t="n"><v>100</v></c><c r="E2" t="n"><v>5</v></c></row>' +
+            '</sheetData></worksheet>';
+
+        const zip = require('node:zlib');
+        const deflate = (buf) => zip.deflateRawSync(buf);
+        const fName = Buffer.from('xl/worksheets/sheet1.xml');
+        const fData = Buffer.from(sheetXml, 'utf8');
+        const fComp = deflate(fData);
+
+        const lh = Buffer.alloc(30);
+        lh.writeUInt32LE(0x04034b50, 0);
+        lh.writeUInt16LE(20, 4);
+        lh.writeUInt16LE(8, 8);
+        lh.writeUInt32LE(fComp.length, 18);
+        lh.writeUInt32LE(fData.length, 22);
+        lh.writeUInt16LE(fName.length, 26);
+
+        const ch = Buffer.alloc(46);
+        ch.writeUInt32LE(0x02014b50, 0);
+        ch.writeUInt16LE(20, 4);
+        ch.writeUInt16LE(20, 6);
+        ch.writeUInt16LE(8, 10);
+        ch.writeUInt32LE(fComp.length, 20);
+        ch.writeUInt32LE(fData.length, 24);
+        ch.writeUInt16LE(fName.length, 28);
+
+        const cd = Buffer.concat([ch, fName]);
+        const eocd = Buffer.alloc(22);
+        eocd.writeUInt32LE(0x06054b50, 0);
+        eocd.writeUInt16LE(1, 8);
+        eocd.writeUInt16LE(1, 10);
+        eocd.writeUInt32LE(cd.length, 12);
+        eocd.writeUInt32LE(lh.length + fName.length + fComp.length, 16);
+
+        const xlsxBuf = Buffer.concat([lh, fName, fComp, cd, eocd]);
+        const report = await validateProductImportFile(xlsxBuf, 'inline_str.xlsx');
+
+        assert.equal(report.valid, true);
+        assert.equal(report.validRows[0].codigo, 'SKU-COMPLETO');
+    });
+
+    await t.test('H04: rechaza archivo XLSX que excede el presupuesto de descompresión (Zip Bomb)', async () => {
+        // XML que infla a más de 10 MiB para disparar el guard de descompresión
+        const hugePayload = Buffer.from('<worksheet>' + ' '.repeat(11 * 1024 * 1024) + '</worksheet>', 'utf8');
+        const zip = require('node:zlib');
+        const comp = zip.deflateRawSync(hugePayload);
+        const name = Buffer.from('xl/worksheets/sheet1.xml');
+
+        const lh = Buffer.alloc(30);
+        lh.writeUInt32LE(0x04034b50, 0);
+        lh.writeUInt16LE(20, 4);
+        lh.writeUInt16LE(8, 8);
+        lh.writeUInt32LE(comp.length, 18);
+        lh.writeUInt32LE(hugePayload.length, 22);
+        lh.writeUInt16LE(name.length, 26);
+
+        const ch = Buffer.alloc(46);
+        ch.writeUInt32LE(0x02014b50, 0);
+        ch.writeUInt16LE(20, 4);
+        ch.writeUInt16LE(20, 6);
+        ch.writeUInt16LE(8, 10);
+        ch.writeUInt32LE(comp.length, 20);
+        ch.writeUInt32LE(hugePayload.length, 24);
+        ch.writeUInt16LE(name.length, 28);
+
+        const cd = Buffer.concat([ch, name]);
+        const eocd = Buffer.alloc(22);
+        eocd.writeUInt32LE(0x06054b50, 0);
+        eocd.writeUInt16LE(1, 8);
+        eocd.writeUInt16LE(1, 10);
+        eocd.writeUInt32LE(cd.length, 12);
+        eocd.writeUInt32LE(lh.length + name.length + comp.length, 16);
+
+        const bombBuf = Buffer.concat([lh, name, comp, cd, eocd]);
+
+        await assert.rejects(
+            validateProductImportFile(bombBuf, 'bomb.xlsx'),
+            (err) => err instanceof FileImportValidationError && (err.message.includes('límite') || err.message.includes('tamaño') || err.message.includes('descompresión') || err.message.includes('corrupto'))
+        );
+    });
 });
