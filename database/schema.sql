@@ -17,6 +17,7 @@ CREATE TABLE PRODUCTO (
     stock INT NOT NULL,
     imagen VARCHAR(2048) NULL,
     activo BOOLEAN NOT NULL,
+    descuento_especial_pct DECIMAL(5,2) NULL,
     fecha_actualizacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id_producto),
@@ -26,7 +27,31 @@ CREATE TABLE PRODUCTO (
         REFERENCES CATEGORIA (id_categoria) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_producto_precio CHECK (precio >= 0),
     CONSTRAINT chk_producto_stock CHECK (stock >= 0),
+    CONSTRAINT chk_producto_descuento CHECK (descuento_especial_pct IS NULL OR (descuento_especial_pct >= 0 AND descuento_especial_pct <= 99.99)),
     CONSTRAINT chk_producto_activo CHECK (activo IN (0, 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE LISTA_PRECIO (
+    id_lista_precio INT NOT NULL AUTO_INCREMENT,
+    nombre VARCHAR(150) NOT NULL,
+    porcentaje_descuento DECIMAL(5,2) NOT NULL,
+    activa BOOLEAN NOT NULL DEFAULT 1,
+    PRIMARY KEY (id_lista_precio),
+    CONSTRAINT chk_lista_precio_porcentaje CHECK (porcentaje_descuento >= 0 AND porcentaje_descuento <= 99.99),
+    CONSTRAINT chk_lista_precio_activa CHECK (activa IN (0, 1))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE COTIZACION (
+    id_cotizacion INT NOT NULL AUTO_INCREMENT,
+    tasa DECIMAL(20,8) NOT NULL,
+    fecha_referencia DATE NOT NULL,
+    fecha_carga DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actor VARCHAR(200) NOT NULL,
+    valida BOOLEAN NOT NULL DEFAULT 1,
+    PRIMARY KEY (id_cotizacion),
+    UNIQUE KEY uq_cotizacion_fecha (fecha_referencia),
+    CONSTRAINT chk_cotizacion_tasa CHECK (tasa > 0),
+    CONSTRAINT chk_cotizacion_valida CHECK (valida IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE CLIENTE (
@@ -41,8 +66,10 @@ CREATE TABLE CLIENTE (
     estado_aprobacion_empresa VARCHAR(20) COLLATE utf8mb4_bin NULL,
     es_fiel BOOLEAN NOT NULL,
     activo BOOLEAN NOT NULL,
+    id_lista_precio INT NULL,
     fecha_alta DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id_cliente),
+    KEY idx_cliente_lista_precio (id_lista_precio),
     CONSTRAINT chk_cliente_tipo CHECK (tipo_cliente IN ('PARTICULAR', 'EMPRESA')),
     CONSTRAINT chk_cliente_estado_empresa CHECK (
         estado_aprobacion_empresa IS NULL
@@ -53,6 +80,8 @@ CREATE TABLE CLIENTE (
         (tipo_cliente = 'PARTICULAR' AND estado_aprobacion_empresa IS NULL)
         OR (tipo_cliente = 'EMPRESA' AND estado_aprobacion_empresa IS NOT NULL)
     ),
+    CONSTRAINT fk_cliente_lista_precio FOREIGN KEY (id_lista_precio)
+        REFERENCES LISTA_PRECIO (id_lista_precio) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_cliente_fiel CHECK (es_fiel IN (0, 1)),
     CONSTRAINT chk_cliente_activo CHECK (activo IN (0, 1))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
