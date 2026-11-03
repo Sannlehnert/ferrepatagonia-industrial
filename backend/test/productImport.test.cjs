@@ -271,4 +271,17 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(body.totalRows, 1);
         assert.equal(body.validRowsCount, 1);
     });
+    await t.test('H01: detecta SKUs equivalentes con acentos (CAFE/café) en archivo', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nCAFE,A,1,10,1\ncafé,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test.csv');
+        assert.strictEqual(report.valid, false);
+        assert.strictEqual(report.duplicateInFileCount, 1);
+    });
+
+    await t.test('H02: rechaza decimales con exceso de escala que perderían precisión', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nSKU-1,A,1,1.00000000000001,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test.csv');
+        assert.strictEqual(report.valid, false);
+        assert.ok(report.errors.some((e) => e.field === 'precio'));
+    });
 });
