@@ -45,18 +45,29 @@ antes del release.
 ### Importación administrativa de productos
 
 La pantalla `/admin/productos/importar` descarga una plantilla CSV y acepta
-archivos delimitados por coma o punto y coma (incluida la exportación CSV de
-Excel). Los encabezados son `codigo`, `nombre`, `id_categoria`, `precio`,
-`stock`, `descripcion`, `imagen` y `activo`; los últimos tres son opcionales.
-La categoría se identifica con su ID activo y el precio admite punto o coma
-decimal, con hasta dos decimales.
+archivos CSV delimitados por coma o punto y coma, y archivos XLSX (se procesa
+la primera hoja). Ambos formatos usan los encabezados `codigo`, `nombre`,
+`id_categoria`, `precio`, `stock`, `descripcion`, `imagen` y `activo`; los
+últimos tres son opcionales. En XLSX, los SKU deben guardarse como texto para
+preservar ceros iniciales. La categoría se identifica con su ID activo y el
+precio admite punto o coma decimal, con hasta dos decimales.
 
 La validación y previsualización se realizan antes de confirmar. La importación
 usa el endpoint administrativo existente para crear productos, una fila por
 solicitud; no es una operación atómica. Los rechazos se informan en el reporte
-CSV, y ante una respuesta ambigua se detiene el proceso para evitar reintentos
-automáticos que puedan duplicar productos. La pantalla permite reintentar
-rechazos confirmados y volver a cargar la planilla.
+CSV, y la unicidad de SKU queda a cargo del índice único de MariaDB mediante el
+backend. Los archivos tienen un límite de 5 MB y 1000 filas; se muestran como
+máximo 100 filas en la previsualización. Descripción, URL de imagen y estado
+activo/inactivo son visibles antes de confirmar.
+
+El estado y los resultados se guardan en la sesión del navegador. Las altas
+secuenciales tienen un timeout de 30 segundos; ante timeout, cancelación o
+respuesta ambigua se marca la fila como incierta y se detiene el proceso para
+evitar reintentos automáticos. Al salir de la pantalla se cancela la solicitud
+activa y se conserva un estado recuperable. La pantalla permite reintentar solo
+rechazos confirmados y vuelve a cargar productos y categorías después de
+importar y antes de validar otra planilla. La API bulk de FER-16 no forma parte
+de este flujo hasta que su contrato esté disponible.
 
 ### Compile and Hot-Reload for Development
 

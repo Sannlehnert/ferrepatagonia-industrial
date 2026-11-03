@@ -1,8 +1,14 @@
+import { readSheet } from 'read-excel-file/browser'
 import type {
-    AdminProduct,
     CategoryOption,
     ProductPayload,
 } from './adminProductService'
+
+export const PRODUCT_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024
+export const PRODUCT_IMPORT_MAX_ROWS = 1000
+export const PRODUCT_IMPORT_PREVIEW_ROWS = 100
+export const PRODUCT_IMPORT_REQUEST_TIMEOUT_MS = 30_000
+export const PRODUCT_IMPORT_RECOVERY_KEY = 'admin-product-import:v1'
 
 export const PRODUCT_IMPORT_HEADERS = [
     'codigo',
@@ -30,6 +36,9 @@ export interface ProductImportItem {
     categoryId: string
     price: string
     stock: string
+    description: string
+    image: string
+    active: string
     payload: ProductPayload | null
     errors: string[]
     status: ProductImportStatus
@@ -38,6 +47,116 @@ export interface ProductImportItem {
 interface CsvRecord {
     cells: string[]
     line: number
+}
+
+export interface ProductImportRecovery {
+    fileName: string
+    items: ProductImportItem[]
+}
+
+interface ProductImportStorage {
+    getItem(key: string): string | null
+    setItem(key: string, value: string): void
+}
+
+const utf8Encoder = new TextEncoder()
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isProductPayload(value: unknown): value is ProductPayload {
+    return (
+        isRecord(value) &&
+        typeof value.nombre === 'string' &&
+        typeof value.codigo === 'string' &&
+        Number.isSafeInteger(value.id_categoria) &&
+        typeof value.precio === 'number' &&
+        Number.isFinite(value.precio) &&
+        Number.isSafeInteger(value.stock) &&
+        (typeof value.descripcion === 'string' || value.descripcion === null) &&
+        (typeof value.imagen === 'string' || value.imagen === null) &&
+        typeof value.activo === 'boolean'
+    )
+}
+
+function isProductImportStatus(value: unknown): value is ProductImportStatus {
+    return (
+        value === 'ready' ||
+        value === 'invalid' ||
+        value === 'creating' ||
+        value === 'created' ||
+        value === 'rejected' ||
+        value === 'uncertain'
+    )
+}
+
+function isProductImportItem(value: unknown): value is ProductImportItem {
+    return (
+        isRecord(value) &&
+        Number.isSafeInteger(value.line) &&
+        typeof value.codigo === 'string' &&
+        typeof value.nombre === 'string' &&
+        typeof value.categoryId === 'string' &&
+        typeof value.price === 'string' &&
+        typeof value.stock === 'string' &&
+        typeof value.description === 'string' &&
+        typeof value.image === 'string' &&
+        typeof value.active === 'string' &&
+        (value.payload === null || isProductPayload(value.payload)) &&
+        Array.isArray(value.errors) &&
+        value.errors.every((error) => typeof error === 'string') &&
+        isProductImportStatus(value.status)
+    )
+}
+
+export function saveProductImportRecovery(
+    storage: ProductImportStorage,
+    recovery: ProductImportRecovery,
+): void {
+    storage.setItem(
+        PRODUCT_IMPORT_RECOVERY_KEY,
+        JSON.stringify({ version: 1, ...recovery }),
+    )
+}
+
+export function readProductImportRecovery(
+    storage: ProductImportStorage,
+): ProductImportRecovery | null {
+    const stored = storage.getItem(PRODUCT_IMPORT_RECOVERY_KEY)
+    if (stored === null) return null
+
+    let value: unknown
+    try {
+        value = JSON.parse(stored)
+    } catch {
+        throw new Error('El registro de importación guardado está dañado.')
+    }
+
+    if (
+        !isRecord(value) ||
+        value.version !== 1 ||
+        typeof value.fileName !== 'string' ||
+        !Array.isArray(value.items) ||
+        !value.items.every(isProductImportItem)
+    ) {
+        throw new Error('El registro de importación guardado no es válido.')
+    }
+
+    return {
+        fileName: value.fileName,
+        items: value.items.map((item) => {
+            if (item.status !== 'creating') return item
+            return {
+                ...item,
+                status: 'uncertain',
+                errors: [
+                    ...item.errors,
+                    'La sesión se interrumpió durante esta solicitud. Revisá el catálogo antes de reintentar.',
+                ],
+            }
+        }),
+    }
 }
 
 function parseCsv(content: string): CsvRecord[] {
@@ -146,8 +265,11 @@ function parsePrice(value: string): number | null {
 export function parseProductImportCsv(
     content: string,
     categories: readonly CategoryOption[],
-    products: readonly AdminProduct[],
 ): ProductImportItem[] {
+    if (utf8Encoder.encode(content).length > PRODUCT_IMPORT_MAX_FILE_SIZE) {
+        throw new Error('El archivo supera el límite de 5 MB.')
+    }
+
     let records: CsvRecord[]
     try {
         records = parseCsv(content.replace(/^\uFEFF/, ''))
@@ -157,6 +279,33 @@ export function parseProductImportCsv(
         )
     }
 
+    return parseProductImportRecords(records, categories)
+}
+
+export async function parseProductImportXlsx(
+    file: File,
+    categories: readonly CategoryOption[],
+): Promise<ProductImportItem[]> {
+    if (file.size > PRODUCT_IMPORT_MAX_FILE_SIZE) {
+        throw new Error('El archivo supera el límite de 5 MB.')
+    }
+
+    const rows = await readSheet(file)
+    const records = rows.map((row, index) => ({
+        cells: row.map((cell) => {
+            if (cell === null || cell === undefined) return ''
+            if (cell instanceof Date) return cell.toISOString()
+            return String(cell)
+        }),
+        line: index + 1,
+    }))
+    return parseProductImportRecords(records, categories)
+}
+
+function parseProductImportRecords(
+    records: CsvRecord[],
+    categories: readonly CategoryOption[],
+): ProductImportItem[] {
     if (records.length < 2) {
         throw new Error('La planilla debe incluir encabezados y al menos una fila.')
     }
@@ -195,12 +344,16 @@ export function parseProductImportCsv(
             .filter((category) => category.activo === undefined || Boolean(category.activo))
             .map((category) => Number(category.id_categoria)),
     )
-    const existingCodes = new Set(
-        products.map((product) => product.codigo.trim()),
+    const dataRecords = records.slice(1)
+    const nonEmptyRecords = dataRecords.filter(
+        ({ cells }) => !cells.every((value) => value.trim() === ''),
     )
-    const importedCodes = new Set<string>()
+    if (nonEmptyRecords.length > PRODUCT_IMPORT_MAX_ROWS) {
+        throw new Error(`La planilla supera el máximo de ${PRODUCT_IMPORT_MAX_ROWS} filas.`)
+    }
+
     const items: ProductImportItem[] = []
-    for (const record of records.slice(1)) {
+    for (const record of dataRecords) {
         const row = record.cells
         const line = record.line
         if (row.every((value) => value.trim() === '')) continue
@@ -220,9 +373,6 @@ export function parseProductImportCsv(
         }
         if (!codigo) errors.push('El código SKU es obligatorio.')
         else if (codigo.length > 100) errors.push('El código SKU supera los 100 caracteres.')
-        if (existingCodes.has(codigo)) errors.push('El código SKU ya existe en el catálogo.')
-        if (importedCodes.has(codigo)) errors.push('El código SKU está repetido en la planilla.')
-        if (codigo) importedCodes.add(codigo)
 
         if (!nombre) errors.push('El nombre del producto es obligatorio.')
         else if (nombre.length > 200) errors.push('El nombre supera los 200 caracteres.')
@@ -244,7 +394,7 @@ export function parseProductImportCsv(
             errors.push('El stock debe ser un entero entre 0 y 2147483647.')
         }
 
-        if (new TextEncoder().encode(description).length > 65535) {
+        if (utf8Encoder.encode(description).length > 65535) {
             errors.push('La descripción supera el máximo de 65535 bytes.')
         }
         if (image.length > 2048) errors.push('La URL de imagen supera los 2048 caracteres.')
@@ -277,6 +427,9 @@ export function parseProductImportCsv(
             categoryId: categoryText,
             price: priceText,
             stock: stockText,
+            description,
+            image,
+            active: activeText,
             payload,
             errors,
             status: errors.length === 0 ? 'ready' : 'invalid',
@@ -292,7 +445,8 @@ export function createProductImportTemplate(): string {
 }
 
 function csvCell(value: string): string {
-    const safeValue = /^[\t\r ]*[=+\-@]/.test(value) ? `'${value}` : value
+    const sanitized = value.replace(/[\p{Cc}\p{Cf}]/gu, ' ')
+    const safeValue = /^[\s]*[=+\-@]/u.test(sanitized) ? `'${sanitized}` : sanitized
     return `"${safeValue.replaceAll('"', '""')}"`
 }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
     getActiveCategories,
     getAdminProducts,
@@ -11,7 +11,13 @@ import {
 import {
     createProductImportErrorReport,
     createProductImportTemplate,
+    parseProductImportXlsx,
     parseProductImportCsv,
+    readProductImportRecovery,
+    saveProductImportRecovery,
+    PRODUCT_IMPORT_MAX_FILE_SIZE,
+    PRODUCT_IMPORT_PREVIEW_ROWS,
+    PRODUCT_IMPORT_REQUEST_TIMEOUT_MS,
     type ProductImportItem,
 } from '@/services/adminProductImport'
 
@@ -21,12 +27,24 @@ const items = ref<ProductImportItem[]>([])
 const selectedFileName = ref('')
 const referenceError = ref('')
 const fileError = ref('')
+const recoveryError = ref('')
+const isRecovered = ref(false)
+const previewPage = ref(0)
 const isLoadingReferences = ref(true)
 const isImporting = ref(false)
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const readyItems = computed(() => items.value.filter((item) => item.status === 'ready'))
+const previewPageCount = computed(
+    () => Math.ceil(items.value.length / PRODUCT_IMPORT_PREVIEW_ROWS),
+)
+const visibleItems = computed(() =>
+    items.value.slice(
+        previewPage.value * PRODUCT_IMPORT_PREVIEW_ROWS,
+        (previewPage.value + 1) * PRODUCT_IMPORT_PREVIEW_ROWS,
+    ),
+)
 const invalidItems = computed(() => items.value.filter((item) => item.status === 'invalid'))
 const rejectedItems = computed(() => items.value.filter((item) => item.status === 'rejected'))
 const uncertainItems = computed(() => items.value.filter((item) => item.status === 'uncertain'))
@@ -51,6 +69,7 @@ const canImport = computed(
     () =>
         !isLoadingReferences.value &&
         !referenceError.value &&
+        !recoveryError.value &&
         !isImporting.value &&
         readyItems.value.length > 0,
 )
@@ -61,6 +80,8 @@ const categoryNames = computed(
     ])),
 )
 let fileSelectionGeneration = 0
+let activeImportController: AbortController | null = null
+let isUnmounting = false
 
 function errorMessage(error: unknown, fallback: string): string {
     if (axios.isAxiosError(error)) {
@@ -94,31 +115,81 @@ async function loadReferences() {
     }
 }
 
+function persistRecovery(): boolean {
+    try {
+        saveProductImportRecovery(window.sessionStorage, {
+            fileName: selectedFileName.value,
+            items: items.value,
+        })
+        recoveryError.value = ''
+        return true
+    } catch (error: unknown) {
+        recoveryError.value = errorMessage(
+            error,
+            'No se pudo guardar el estado recuperable de la importación.',
+        )
+        return false
+    }
+}
+
+function restoreRecovery() {
+    try {
+        const recovery = readProductImportRecovery(window.sessionStorage)
+        if (!recovery) return
+        selectedFileName.value = recovery.fileName
+        items.value = recovery.items
+        previewPage.value = 0
+        isRecovered.value = true
+        if (recovery.items.some((item) => item.status === 'uncertain')) {
+            persistRecovery()
+        }
+    } catch (error: unknown) {
+        recoveryError.value = errorMessage(
+            error,
+            'No se pudo recuperar el estado de la importación anterior.',
+        )
+    }
+}
+
 async function selectFile(file: File | undefined) {
     if (isImporting.value) return
     const generation = ++fileSelectionGeneration
     fileError.value = ''
-    items.value = []
-    selectedFileName.value = ''
     if (!file) return
 
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-        fileError.value = 'Seleccioná un archivo CSV. Podés guardar la planilla de Excel como CSV.'
+    const extension = file.name.toLowerCase().split('.').pop()
+    if (extension !== 'csv' && extension !== 'xlsx') {
+        fileError.value = 'Seleccioná un archivo CSV o XLSX.'
         return
     }
-    if (isLoadingReferences.value || referenceError.value) {
-        fileError.value = 'Primero cargá los productos y categorías para validar la planilla.'
+    if (file.size > PRODUCT_IMPORT_MAX_FILE_SIZE) {
+        fileError.value = 'El archivo supera el límite de 5 MB.'
         return
     }
 
-    selectedFileName.value = file.name
     try {
-        const content = await file.text()
+        await loadReferences()
         if (generation !== fileSelectionGeneration) return
-        items.value = parseProductImportCsv(content, categories.value, products.value)
+        if (referenceError.value) {
+            fileError.value = 'No se pudieron cargar las referencias. Reintentá la carga antes de validar.'
+            return
+        }
+        const parsedItems =
+            extension === 'xlsx'
+                ? await parseProductImportXlsx(file, categories.value)
+                : parseProductImportCsv(await file.text(), categories.value)
+        if (generation !== fileSelectionGeneration) return
+        saveProductImportRecovery(window.sessionStorage, {
+            fileName: file.name,
+            items: parsedItems,
+        })
+        items.value = parsedItems
+        selectedFileName.value = file.name
+        previewPage.value = 0
+        isRecovered.value = false
+        recoveryError.value = ''
     } catch (error: unknown) {
         if (generation !== fileSelectionGeneration) return
-        selectedFileName.value = ''
         fileError.value = errorMessage(error, 'No se pudo leer la planilla.')
     }
 }
@@ -164,23 +235,47 @@ function isDefinitiveRejection(error: unknown): boolean {
 }
 
 async function importProducts(retryRejected = false) {
-    if (isImporting.value || referenceError.value) return
+    if (
+        isImporting.value ||
+        isLoadingReferences.value ||
+        referenceError.value ||
+        recoveryError.value
+    ) return
     const targets = items.value.filter((item) =>
         retryRejected ? item.status === 'rejected' : item.status === 'ready',
     )
     if (targets.length === 0) return
 
+    if (!persistRecovery()) return
     isImporting.value = true
+    const controller = new AbortController()
+    activeImportController = controller
     try {
         for (const item of targets) {
             if (!item.payload) continue
             item.status = 'creating'
             item.errors = []
+            if (!persistRecovery()) {
+                item.status = 'ready'
+                break
+            }
 
+            let shouldStop = false
             try {
-                await saveAdminProduct(item.payload)
+                await saveAdminProduct(item.payload, undefined, {
+                    signal: controller.signal,
+                    timeout: PRODUCT_IMPORT_REQUEST_TIMEOUT_MS,
+                })
+                if (isUnmounting || controller.signal.aborted) {
+                    item.status = 'uncertain'
+                    item.errors = [
+                        'La pantalla se cerró antes de confirmar el resultado. Revisá el catálogo antes de reintentar.',
+                    ]
+                    break
+                }
                 item.status = 'created'
             } catch (error: unknown) {
+                if (isUnmounting) break
                 item.errors = [
                     errorMessage(error, 'No se pudo confirmar la creación del producto.'),
                 ]
@@ -189,22 +284,46 @@ async function importProducts(retryRejected = false) {
                     const status = axios.isAxiosError(error)
                         ? error.response?.status
                         : undefined
-                    if (status === 401 || status === 403 || status === 429) break
+                    shouldStop = status === 401 || status === 403 || status === 429
                 } else {
                     item.status = 'uncertain'
                     item.errors.push(
                         'El resultado puede haberse guardado. Revisá el catálogo antes de reintentar.',
                     )
-                    break
+                    shouldStop = true
                 }
             }
+            if (!persistRecovery()) break
+            if (shouldStop) break
         }
     } finally {
         isImporting.value = false
+        activeImportController = null
+        if (!isUnmounting) await loadReferences()
     }
 }
 
-onMounted(loadReferences)
+function recoverInterruptedImport() {
+    isUnmounting = true
+    if (!activeImportController) return
+    activeImportController.abort()
+    const inFlightItem = items.value.find((item) => item.status === 'creating')
+    if (inFlightItem) {
+        inFlightItem.status = 'uncertain'
+        inFlightItem.errors = [
+            'La pantalla se cerró mientras la solicitud estaba pendiente. Revisá el catálogo antes de reintentar.',
+        ]
+    }
+    if (!persistRecovery()) {
+        console.error('No se pudo guardar la importación interrumpida.', recoveryError.value)
+    }
+}
+
+onMounted(() => {
+    restoreRecovery()
+    void loadReferences()
+})
+onBeforeUnmount(recoverInterruptedImport)
 </script>
 
 <template>
@@ -213,7 +332,7 @@ onMounted(loadReferences)
             <div>
                 <h1 class="text-2xl font-bold text-[#0B2438]">Importar productos</h1>
                 <p class="mt-1 text-sm text-slate-600">
-                    Cargá una planilla CSV, revisá cada fila y confirmá la importación.
+                    Cargá una planilla CSV o XLSX, revisá cada fila y confirmá la importación.
                 </p>
             </div>
             <button
@@ -236,7 +355,8 @@ onMounted(loadReferences)
                 Usá los encabezados de la plantilla. Código, nombre, categoría, precio y stock
                 son obligatorios; descripción, imagen y activo son opcionales. La categoría se
                 identifica con su ID y el precio admite punto o coma decimal, con hasta dos
-                decimales. Los SKU existentes o repetidos se informan como errores.
+                decimales. Se procesa la primera hoja XLSX y los SKU deben estar almacenados como
+                texto para conservar ceros iniciales. La unicidad de los SKU se confirma en el servidor.
             </p>
             <p class="mt-2 text-sm text-slate-600">
                 Categorías activas:
@@ -245,6 +365,9 @@ onMounted(loadReferences)
                     {{ categories.map((category) => `${category.id_categoria}: ${category.nombre}`).join(' · ') }}
                 </span>
                 <span v-else>no hay categorías activas disponibles.</span>
+            </p>
+            <p class="mt-2 text-sm text-slate-600">
+                Productos del catálogo consultados: {{ products.length }}.
             </p>
         </section>
 
@@ -270,6 +393,14 @@ onMounted(loadReferences)
             </button>
         </div>
 
+        <div
+            v-if="recoveryError"
+            role="alert"
+            class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+        >
+            {{ recoveryError }} No se iniciarán altas hasta poder guardar el estado recuperable.
+        </div>
+
         <section aria-labelledby="file-title" class="flex flex-col gap-3">
             <h2 id="file-title" class="font-semibold text-[#0B2438]">
                 Seleccionar archivo
@@ -283,18 +414,18 @@ onMounted(loadReferences)
                 @drop.prevent="handleDrop"
             >
                 <p class="text-sm text-slate-700">
-                    Arrastrá tu archivo CSV acá o seleccionalo desde tu dispositivo.
+                    Arrastrá tu archivo CSV o XLSX acá o seleccionalo desde tu dispositivo.
                 </p>
                 <label
                     for="product-import-file"
                     class="mt-3 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md bg-[#103A5C] px-4 py-2 text-sm font-semibold text-white hover:bg-[#145A8D] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[#145A8D]"
                 >
-                    Elegir archivo CSV
+                    Elegir archivo CSV o XLSX
                     <input
                         id="product-import-file"
                         ref="fileInput"
                         type="file"
-                        accept=".csv,text/csv"
+                        accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         class="sr-only"
                         :disabled="isLoadingReferences || Boolean(referenceError) || isImporting"
                         @change="handleFileChange"
@@ -302,6 +433,9 @@ onMounted(loadReferences)
                 </label>
                 <p v-if="selectedFileName" class="mt-3 text-sm font-medium text-slate-700">
                     Archivo: {{ selectedFileName }}
+                </p>
+                <p v-if="isRecovered" class="mt-2 text-sm text-amber-800" role="status">
+                    Se recuperó el estado guardado de esta importación.
                 </p>
             </div>
             <p v-if="fileError" role="alert" class="text-sm text-red-700">
@@ -319,6 +453,9 @@ onMounted(loadReferences)
                         {{ readyItems.length }} listas para importar ·
                         {{ items.filter((item) => item.status === 'invalid' || item.status === 'rejected' || item.status === 'uncertain').length }}
                         con errores o resultado a revisar
+                    </p>
+                    <p v-if="items.length > visibleItems.length" class="text-sm text-slate-600">
+                        Mostrando filas {{ previewPage * PRODUCT_IMPORT_PREVIEW_ROWS + 1 }}–{{ Math.min((previewPage + 1) * PRODUCT_IMPORT_PREVIEW_ROWS, items.length) }} de {{ items.length }}.
                     </p>
                 </div>
                 <div class="flex flex-col gap-2 sm:flex-row">
@@ -391,7 +528,7 @@ onMounted(loadReferences)
             </div>
 
             <div class="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-                <table class="w-full min-w-[760px] border-collapse text-left text-sm">
+                <table class="w-full min-w-[1280px] border-collapse text-left text-sm">
                     <caption class="sr-only">Detalle de validación y resultado de cada fila</caption>
                     <thead class="bg-slate-100 text-[#0B2438]">
                         <tr>
@@ -401,12 +538,15 @@ onMounted(loadReferences)
                             <th scope="col" class="p-3">Categoría</th>
                             <th scope="col" class="p-3">Precio</th>
                             <th scope="col" class="p-3">Stock</th>
+                            <th scope="col" class="p-3">Descripción</th>
+                            <th scope="col" class="p-3">Imagen (URL)</th>
+                            <th scope="col" class="p-3">Estado activo</th>
                             <th scope="col" class="p-3">Estado y detalle</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr
-                            v-for="item in items"
+                            v-for="item in visibleItems"
                             :key="item.line"
                             class="border-t border-slate-200 align-top"
                         >
@@ -422,6 +562,23 @@ onMounted(loadReferences)
                             </td>
                             <td class="p-3">{{ item.price || '—' }}</td>
                             <td class="p-3">{{ item.stock || '—' }}</td>
+                            <td class="max-w-xs p-3">
+                                <span class="block max-h-24 overflow-auto whitespace-pre-wrap break-words">
+                                    {{ item.description || '—' }}
+                                </span>
+                            </td>
+                            <td class="max-w-xs p-3">
+                                <span class="block max-h-24 overflow-auto break-all">
+                                    {{ item.image || '—' }}
+                                </span>
+                            </td>
+                            <td class="p-3">
+                                {{
+                                    item.payload
+                                        ? (item.payload.activo ? 'Activo' : 'Inactivo')
+                                        : item.active || '—'
+                                }}
+                            </td>
                             <td class="max-w-sm p-3">
                                 <span class="font-semibold">
                                     {{
@@ -441,6 +598,31 @@ onMounted(loadReferences)
                     </tbody>
                 </table>
             </div>
+            <nav
+                v-if="previewPageCount > 1"
+                class="flex items-center justify-between gap-3"
+                aria-label="Páginas de la previsualización"
+            >
+                <button
+                    type="button"
+                    class="min-h-11 rounded-md border border-slate-400 bg-white px-4 py-2 font-semibold hover:bg-slate-100 disabled:opacity-50"
+                    :disabled="previewPage === 0"
+                    @click="previewPage -= 1"
+                >
+                    Anterior
+                </button>
+                <span class="text-sm text-slate-600">
+                    Página {{ previewPage + 1 }} de {{ previewPageCount }}
+                </span>
+                <button
+                    type="button"
+                    class="min-h-11 rounded-md border border-slate-400 bg-white px-4 py-2 font-semibold hover:bg-slate-100 disabled:opacity-50"
+                    :disabled="previewPage + 1 >= previewPageCount"
+                    @click="previewPage += 1"
+                >
+                    Siguiente
+                </button>
+            </nav>
         </section>
     </section>
 </template>

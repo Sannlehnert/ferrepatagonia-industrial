@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios';
 import api from '@/services/api';
 
 export interface AdminProduct {
@@ -80,13 +81,22 @@ export async function getActiveCategories(): Promise<CategoryOption[]> {
 
 export async function saveAdminProduct(
     payload: ProductPayload,
-    productId?: number
+    productId?: number,
+    requestConfig?: Pick<AxiosRequestConfig, 'signal' | 'timeout'>,
 ): Promise<AdminProduct> {
     if (productId) {
-        const response = await api.put<AdminProduct>(`/admin/productos/${productId}`, payload);
+        const response = await api.put<AdminProduct>(
+            `/admin/productos/${productId}`,
+            payload,
+            requestConfig,
+        );
         return response.data;
     } else {
-        const response = await api.post<AdminProduct>('/admin/productos', payload);
+        const response = await api.post<AdminProduct>(
+            '/admin/productos',
+            payload,
+            requestConfig,
+        );
         return response.data;
     }
 }
