@@ -17,6 +17,29 @@ class MaxUtf8BytesConstraint implements ValidatorConstraintInterface {
     }
 }
 
+@ValidatorConstraint({ name: 'strictDecimalScale', async: false })
+class StrictDecimalScaleConstraint implements ValidatorConstraintInterface {
+    validate(value: unknown): boolean {
+        if (value === undefined || value === null || value === '') {
+            return true;
+        }
+        if (typeof value === 'number') {
+            if (!Number.isFinite(value)) {
+                return false;
+            }
+            return /^-?\d+(\.\d{1,2})?$/.test(value.toString());
+        }
+        if (typeof value === 'string') {
+            return /^-?\d+(\.\d{1,2})?$/.test(value.trim());
+        }
+        return false;
+    }
+
+    defaultMessage(): string {
+        return 'El precio debe ser un número válido con hasta 2 decimales.';
+    }
+}
+
 export class ProductImportRowDto {
     @IsDefined({ message: 'El código SKU es obligatorio.' })
     @IsString({ message: 'El código SKU debe ser texto.' })
@@ -37,9 +60,10 @@ export class ProductImportRowDto {
     id_categoria!: number;
 
     @IsDefined({ message: 'El precio es obligatorio.' })
+    @Validate(StrictDecimalScaleConstraint)
     @IsNumber(
-        { allowNaN: false, allowInfinity: false, maxDecimalPlaces: 2 },
-        { message: 'El precio debe ser un número válido con hasta 2 decimales.' }
+        { allowNaN: false, allowInfinity: false },
+        { message: 'El precio debe ser un valor numérico válido.' }
     )
     @Min(0, { message: 'El precio debe ser mayor o igual a 0.' })
     @Max(9999999999.99, { message: 'El precio no debe superar 9999999999.99.' })
@@ -115,7 +139,7 @@ const parseStrictDecimal = (raw: unknown): unknown => {
         if (trimmed === '') {
             return undefined;
         }
-        if (!/^-?\d+(\.\d+)?$/.test(trimmed)) {
+        if (!/^-?\d+(\.\d{1,2})?$/.test(trimmed)) {
             return Number.NaN;
         }
         return Number(trimmed);

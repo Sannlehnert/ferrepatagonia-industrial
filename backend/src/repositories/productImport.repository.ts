@@ -1,12 +1,16 @@
 import { dataSource } from '../config/database.config';
 import { CategoriaSchema, ProductoSchema } from '../entities/active.schemas';
 
+export const normalizeSkuForComparison = (sku: string): string => {
+    return sku.trim().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/ß/gi, 'SS').replace(/æ/gi, 'AE').replace(/œ/gi, 'OE').toUpperCase();
+};
+
 export const findExistingSkus = async (skus: string[]): Promise<Set<string>> => {
-    const normalizedSkus = Array.from(
+    const uniqueSkus = Array.from(
         new Set(skus.map((sku) => sku.trim()).filter((sku) => sku.length > 0))
     );
 
-    if (normalizedSkus.length === 0) {
+    if (uniqueSkus.length === 0) {
         return new Set<string>();
     }
 
@@ -14,10 +18,10 @@ export const findExistingSkus = async (skus: string[]): Promise<Set<string>> => 
         .getRepository(ProductoSchema)
         .createQueryBuilder('p')
         .select('p.codigo', 'codigo')
-        .where('p.codigo IN (:...skus)', { skus: normalizedSkus })
+        .where('p.codigo IN (:...skus)', { skus: uniqueSkus })
         .getRawMany<{ codigo: string }>();
 
-    return new Set(rows.map((row) => String(row.codigo).trim().toUpperCase()));
+    return new Set(rows.map((row) => normalizeSkuForComparison(String(row.codigo).trim())));
 };
 
 export const findExistingCategoryIds = async (categoryIds: number[]): Promise<Set<number>> => {
