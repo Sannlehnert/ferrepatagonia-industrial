@@ -104,7 +104,7 @@ export const validateProductImportFile = async (
                 errors.push({
                     row: rowNumber,
                     field: 'id_categoria',
-                    message: `La categoría con ID ${dto.id_categoria} no existe en la base de datos.`
+                    message: `La categoría con ID ${dto.id_categoria} no existe o no se encuentra activa en la base de datos.`
                 });
             }
         }

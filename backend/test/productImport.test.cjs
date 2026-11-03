@@ -271,6 +271,16 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(body.totalRows, 1);
         assert.equal(body.validRowsCount, 1);
     });
+    await t.test('Rechaza productos asignados a categorías inactivas o inexistentes', async () => {
+        // repo.findExistingCategoryIds devuelve Set([1, 2]) como activas; la categoría 3 está inactiva/inexistente
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nSKU-CAT-INACTIVA,Prod,3,100,5\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test.csv');
+
+        assert.equal(report.valid, false);
+        const catError = report.errors.find((e) => e.field === 'id_categoria');
+        assert.ok(catError);
+        assert.match(catError.message, /no existe o no se encuentra activa/);
+    });
     await t.test('H01: detecta SKUs equivalentes con acentos (CAFE/café) en archivo', async () => {
         const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nCAFE,A,1,10,1\ncafé,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test.csv');

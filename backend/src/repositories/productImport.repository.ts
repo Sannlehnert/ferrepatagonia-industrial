@@ -46,6 +46,7 @@ export const findExistingCategoryIds = async (categoryIds: number[]): Promise<Se
         .createQueryBuilder('c')
         .select('c.id_categoria', 'id_categoria')
         .where('c.id_categoria IN (:...ids)', { ids: uniqueIds })
+        .andWhere('c.activo = 1')
         .getRawMany<{ id_categoria: number }>();
 
     return new Set(rows.map((row) => Number(row.id_categoria)));
