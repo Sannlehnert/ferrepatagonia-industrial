@@ -11,6 +11,7 @@ const filename = path.resolve(__dirname, '../src/services/adminProductImport.ts'
 const source = fs.readFileSync(filename, 'utf8');
 let xlsxRows = [];
 let readSheetCalls = 0;
+let unzipSyncCalls = 0;
 const code = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -35,6 +36,14 @@ new Function('require', 'module', 'exports', code)(
               category.activo === 1 ||
               category.activo === '1' ||
               category.activo === 'true',
+          }
+      : name === 'fflate'
+        ? {
+            ...require(name),
+            unzipSync: (...args) => {
+              unzipSyncCalls += 1;
+              return require(name).unzipSync(...args);
+            },
           }
       : require(name),
   compiledModule,
@@ -140,6 +149,53 @@ function makeAmbiguousXlsxFile() {
     hiddenEndRecord,
     Buffer.from('tail'),
   ]);
+  return {
+    size: archive.byteLength,
+    arrayBuffer: async () =>
+      archive.buffer.slice(
+        archive.byteOffset,
+        archive.byteOffset + archive.byteLength,
+      ),
+  };
+}
+
+function makeSharedStoredBlockXlsxFile(declaredSize) {
+  const contents = zipSync({
+    'item-00.bin': [
+      strToU8('x'.repeat(2 * 1024 * 1024)),
+      { level: 0 },
+    ],
+  });
+  const view = new DataView(contents.buffer, contents.byteOffset, contents.byteLength);
+  let endRecordOffset = contents.length - 22;
+  while (view.getUint32(endRecordOffset, true) !== 0x06054b50) {
+    endRecordOffset -= 1;
+  }
+
+  const directoryOffset = view.getUint32(endRecordOffset + 16, true);
+  const directorySize = view.getUint32(endRecordOffset + 12, true);
+  const entry = contents.slice(directoryOffset, directoryOffset + directorySize);
+  const filenameLength = view.getUint16(directoryOffset + 28, true);
+  assert.equal(filenameLength, Buffer.byteLength('item-00.bin'));
+  const entryLength = 46 + filenameLength;
+  assert.equal(directorySize, entryLength);
+
+  const entries = Buffer.alloc(entryLength * 13);
+  for (let index = 0; index < 13; index += 1) {
+    const offset = index * entryLength;
+    entries.set(entry, offset);
+    entries.write(`item-${String(index).padStart(2, '0')}.bin`, offset + 46);
+    entries.writeUInt32LE(declaredSize, offset + 24);
+  }
+
+  const localFile = contents.slice(0, directoryOffset);
+  const endRecord = Buffer.from(contents.slice(directoryOffset + directorySize));
+  endRecord.writeUInt16LE(13, 8);
+  endRecord.writeUInt16LE(13, 10);
+  endRecord.writeUInt32LE(entries.length, 12);
+  endRecord.writeUInt32LE(localFile.length, 16);
+  const archive = Buffer.concat([localFile, entries, endRecord]);
+
   return {
     size: archive.byteLength,
     arrayBuffer: async () =>
@@ -372,6 +428,30 @@ test('rejects a 27 KB XLSX with conflicting ZIP directories before parsing', asy
     /directorios ZIP ambiguos/,
   );
   assert.equal(readSheetCalls, callsBefore);
+});
+
+test('rejects STORE entries whose declared size is smaller than the extracted block', async () => {
+  const file = makeSharedStoredBlockXlsxFile(1);
+  const callsBefore = unzipSyncCalls;
+
+  assert.ok(file.size < PRODUCT_IMPORT_MAX_FILE_SIZE);
+  await assert.rejects(
+    parseProductImportXlsx(file, categories),
+    /entrada STORE con tamaños ZIP inconsistentes/,
+  );
+  assert.equal(unzipSyncCalls, callsBefore);
+});
+
+test('enforces the XLSX expansion budget before extracting shared STORE blocks', async () => {
+  const file = makeSharedStoredBlockXlsxFile(2 * 1024 * 1024);
+  const callsBefore = unzipSyncCalls;
+
+  assert.ok(file.size < PRODUCT_IMPORT_MAX_FILE_SIZE);
+  await assert.rejects(
+    parseProductImportXlsx(file, categories),
+    /24 MB descomprimidos/,
+  );
+  assert.equal(unzipSyncCalls, callsBefore);
 });
 
 test('reads a namespaced XLSX workbook with the actual browser parser', async () => {

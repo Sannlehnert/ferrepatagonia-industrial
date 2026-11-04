@@ -487,6 +487,7 @@ function validateXlsxArchive(contents: ArrayBuffer): void {
         }
 
         const flags = view.getUint16(offset + 8, true)
+        const compressionMethod = view.getUint16(offset + 10, true)
         const compressedSize = view.getUint32(offset + 20, true)
         const uncompressedSize = view.getUint32(offset + 24, true)
         const nameLength = view.getUint16(offset + 28, true)
@@ -497,13 +498,20 @@ function validateXlsxArchive(contents: ArrayBuffer): void {
         if (
             entryEnd > directoryOffset + directorySize ||
             (flags & 1) !== 0 ||
+            (compressionMethod !== 0 && compressionMethod !== 8) ||
             compressedSize === 0xffffffff ||
             uncompressedSize === 0xffffffff
         ) {
             throw new Error('El archivo XLSX contiene una entrada ZIP no compatible.')
         }
 
-        expandedSize += uncompressedSize
+        if (compressionMethod === 0 && compressedSize !== uncompressedSize) {
+            throw new Error(
+                'El archivo XLSX contiene una entrada STORE con tamaños ZIP inconsistentes.',
+            )
+        }
+
+        expandedSize += compressionMethod === 0 ? compressedSize : uncompressedSize
         if (expandedSize > PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE) {
             throw new Error('El XLSX supera el límite de 24 MB descomprimidos.')
         }
