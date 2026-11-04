@@ -1,1 +1,1 @@
-codigo,nombre,id_categoria,descripcion,precio_base_usd,descuento_especial_pct,stock,imagen_url,activo
+codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo

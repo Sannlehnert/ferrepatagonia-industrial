@@ -1,280 +1,194 @@
-# #234 — Plantilla y contrato de importación de productos
+# #234 — Contrato de importación FER-16
 
-Estado: borrador técnico para revisión.
-Historia: FER-16 / #187.
-Responsable: Bruno Vagnola. Auditor: Zahir Timm.
+Estado: borrador revisado para coordinación; propuesta FER16-v1 transitoria.
+Historia: FER-16 / #187. Responsable: Bruno Vagnola. Auditor: Zahir Timm.
 
-## 1. Objetivo y referencias
+## 1. Objetivo y alcance
 
-Definir una plantilla común para importar productos mediante CSV y XLSX,
-con validación por fila y previsualización antes de guardar.
+Definir el formato común de CSV/XLSX, las plantillas y los resultados esperados
+para #235 (validación), #236 (confirmación), #237 (interfaz) y #238 (regresión).
 
-Referencias:
-- #235: carga y validación de archivos, sin persistir productos.
-- #236: previsualización y confirmación segura.
-- #237: interfaz administrativa.
-- #238: pruebas de importación y regresión.
-- [Política de precios FER-17](../decisiones/fer-15-politica-precios.md).
-- [Productos administrativos](../api/admin-productos.md).
+Referencias: [política FER-15/17](../decisiones/fer-15-politica-precios.md),
+[productos administrativos](../api/admin-productos.md) y PR #60, #61, #62 y #63.
 
-Este documento propone el contrato del archivo. No implica que el
-procesamiento, las rutas o la persistencia ya estén implementados.
+La revisión propone adoptar las ocho columnas actuales y 5 MiB/1.000 productos,
+según la coordinación con Lucci. No acredita acuerdo final del equipo ni
+integración de todas las reglas. No modifica la política FER-15.
 
-## 2. Formatos propuestos
+## 2. Archivo y límites
 
-- CSV UTF-8, con o sin BOM, separado por comas.
-- Comillas dobles para valores que contengan comas, comillas o saltos
-  de línea; las comillas internas se duplican.
-- XLSX con una única hoja llamada Productos.
-- Primera fila: encabezados exactos, sin duplicados.
-- Mismos encabezados y significado en ambos formatos.
-- Todas las columnas deben existir; algunas permiten celdas vacías.
-- Columnas desconocidas se rechazan para detectar errores de plantilla.
-- No se admiten XLS, XLSM, archivos cifrados ni celdas con fórmulas.
-- Límite inicial propuesto: 10 MiB por archivo y 5.000 filas de datos.
-  Coordinar estos límites con #235 y probar al menos unas 900 filas.
-- Un archivo vacío o con solo encabezados se rechaza.
-- Las filas completamente vacías se ignoran, conservando la numeración
-  de las demás filas en los reportes.
+- CSV UTF-8 con o sin BOM, separado por comas. Entrecomillar campos con comas,
+  comillas o saltos de línea; duplicar comillas internas.
+- XLSX con una única hoja Productos. Primera fila: encabezados.
+- La plantilla oficial contiene las ocho columnas, en este orden:
+  codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo.
+- Las cinco columnas obligatorias son codigo, nombre, id_categoria, precio y stock.
+  descripcion, imagen y activo pueden omitirse; la plantilla las incluye para
+  facilitar su uso. Una celda opcional vacía tiene las reglas de la sección 3.
+- Los encabezados se normalizan quitando BOM inicial, espacios laterales y
+  diferencias entre mayúsculas/minúsculas. No se permiten nombres desconocidos,
+  repetidos ni vacíos. El orden del archivo puede variar; la plantilla usa el oficial.
+- Máximo 5 MiB por archivo (5.242.880 bytes) y 1.000 filas de productos.
+  Las filas completamente vacías no son productos y se informan aparte.
+- Para XLSX: máximo 10 MiB reales acumulados al extraer las entradas relevantes;
+  no confiar únicamente en tamaños declarados en el ZIP.
+- Archivos vacíos, con solo encabezados, malformados, XLS, XLSM y cifrados se rechazan.
+- La propuesta no admite fórmulas. Su rechazo explícito y la selección de hoja
+  deben verificarse en #235 antes de declarar cerrado el contrato.
+- Se debe probar una carga de al menos 900 productos y los límites 1.000/1.001.
 
-## 3. Columnas propuestas
+## 3. Columnas y valores
 
 | Columna | Celda obligatoria | Regla |
 | --- | --- | --- |
-| codigo | Sí | Texto no vacío, hasta 100 caracteres. Identifica el producto. |
-| nombre | Sí | Texto no vacío, hasta 200 caracteres. |
-| id_categoria | Sí | Entero positivo; categoría existente y activa. |
-| descripcion | No | Texto de hasta 65.535 bytes UTF-8; vacío significa ausencia. |
-| precio_base_usd | No | Decimal no negativo, hasta 9999999999.99 y máximo dos decimales. Vacío significa precio ausente. |
-| descuento_especial_pct | No | Decimal entre 0 y 99.99, máximo dos decimales. Vacío significa ausencia de especial. |
-| stock | Sí | Entero entre 0 y 2147483647. |
-| imagen_url | No | URL absoluta HTTP/HTTPS, hasta 2.048 caracteres. Vacío significa ausencia. |
-| activo | Sí | Únicamente true o false. En XLSX también se admiten valores booleanos nativos. |
+| codigo | Sí | Texto no vacío, máximo 100 caracteres; conservar ceros iniciales. |
+| nombre | Sí | Texto no vacío, máximo 200 caracteres. |
+| id_categoria | Sí | Entero positivo, hasta 2147483647; categoría existente y activa. |
+| precio | Sí | Importe administrativo no negativo, hasta 9999999999.99 y máximo dos decimales. No implica moneda de venta aprobada. |
+| stock | Sí | Entero de 0 a 2147483647. |
+| descripcion | No | Hasta 65.535 bytes UTF-8; vacío/omitido significa ausencia. |
+| imagen | No | URL absoluta HTTP/HTTPS hasta 2.048 caracteres; vacío/omitido significa ausencia. Validación de esquema pendiente de verificar en #235. |
+| activo | No | La plantilla usa true/false; vacío/omitido tiene default true, como el backend actual. |
 
-Los nombres anteriores pertenecen al archivo. No son nombres definitivos
-de columnas SQL ni de campos de una API existente.
+Para compatibilidad con #235, activo también admite 1/0, si/sí/no y activo/inactivo,
+sin distinguir mayúsculas. Otros valores se rechazan. XLSX admite booleanos nativos.
 
-Las categorías no se crean automáticamente. Se usa su ID porque los
-nombres no tienen una restricción de unicidad en el esquema actual.
+Conservar codigo como texto, incluidos ceros iniciales. Recortar sus espacios
+laterales y los de nombre sin cambiar contenido interno o guardar una versión
+normalizada del SKU. No reconstruir ceros perdidos por Excel.
 
-## 4. Interpretación de valores
+Los decimales canónicos usan punto, sin separadores de miles, símbolo de moneda,
+porcentaje ni notación científica. Para interoperabilidad con #235, una coma decimal
+puede aceptarse si llega como una sola celda y no es ambigua; en CSV debe ir
+entrecomillada. Las plantillas publicadas usan punto.
 
-- Conservar codigo como texto, incluidos los ceros iniciales.
-- En XLSX, la columna codigo debe guardarse como texto. No reconstruir
-  ceros que Excel haya eliminado.
-- Recortar espacios laterales de codigo y nombre, sin cambiar su
-  contenido interno ni convertir el SKU a mayúsculas.
-- Los decimales usan punto, sin separadores de miles, símbolos monetarios,
-  porcentajes escritos con %, ni notación científica.
-- Para decimales en XLSX se recomienda texto. Una celda numérica debe
-  validarse sin introducir aproximaciones monetarias silenciosas.
-- Rechazar negativos, valores no finitos, exceso de escala y desbordamientos.
-- No redondear una entrada inválida para conseguir que pase la validación.
-- No usar cero para reemplazar una celda vacía.
-- Un precio ausente se interpreta como null.
-- Un precio 0.00 es un valor explícito distinto de null.
-- La URL se valida como dato. La importación no descarga imágenes,
-  no importa archivos locales y no verifica la disponibilidad del servidor.
-- No ejecutar fórmulas ni interpretar el texto como código o HTML.
+En XLSX se recomienda texto para SKU y decimales exactos. Rechazar valores no
+finitos, exceso de escala y desbordamientos antes de perder precisión; no redondear
+una entrada inválida para aceptarla. Un precio vacío es error en FER16-v1;
+0.00 es un valor explícito permitido, nunca un sustituto del vacío.
 
-## 5. Reglas de precios
+La URL se valida como dato; la importación no descarga imágenes ni carga archivos
+locales. No garantiza disponibilidad de la URL. No ejecutar fórmulas, código o HTML.
 
-La base se expresa en USD e incluye IVA según el supuesto académico
-documentado en FER-17.
+## 4. Precios y transición a FER-17
 
-El especial es un porcentaje público global del producto. La importación
-no asigna listas a clientes ni importa precios específicos por lista.
+FER16-v1 utiliza precio por compatibilidad con el contrato administrativo actual.
+No lo denomina automáticamente precio base USD ni acredita que precios históricos
+o pendientes estén expresados en USD. No habilita por sí mismo venta, cálculo de
+precios por cliente, impuestos adicionales, descuentos ni conversiones de moneda.
 
-El descuento efectivo y el precio final serán calculados por el backend
-de precios; no se reciben como importes confiables desde el archivo.
+La política FER-15/17 define base USD, especial público opcional y diferencia entre
+precio ausente y cero. Esas definiciones siguen vigentes: no se eliminan ni se
+declaran implementadas por este formato transitorio.
 
-Un producto con base ausente o cero puede permanecer visible, pero no
-es comprable ni agregable según la política FER-17. La previsualización
-debe informar esta condición sin inventar un precio.
+Una versión posterior del archivo deberá acordar con #240/#241/#243:
 
-### Dependencia de persistencia
+- Nombre y significado del campo de base USD; puede mapearse desde precio solo
+  mediante una decisión explícita y verificable de unidad y migración.
+- Representación de precio ausente, distinta de cero, en SQL, ORM y archivo.
+- descuento_especial_pct opcional, rango 0–99.99 y escala máxima dos decimales.
+- Preview de precio ausente/cero y condición de producto no comprable.
+- Versión del contrato y compatibilidad de archivos anteriores; no ignorar columnas
+  nuevas silenciosamente ni reinterpretar archivos ya previsualizados.
 
-El esquema actual exige PRODUCTO.precio NOT NULL y todavía no contiene
-el descuento especial. No debe usarse cero como sustituto de ausencia,
-descartarse el especial ni reinterpretarse el precio actual como USD
-sin una decisión de migración.
+En FER16-v1, precio_base_usd, descuento_especial_pct e imagen_url no son encabezados
+aceptados: se rechazan como desconocidos. El nombre actual de imagen es imagen.
+La importación no asigna listas a clientes ni recibe precios finales calculados.
 
-La persistencia debe coordinarse con #240 y el contrato técnico de FER-17.
-Hasta contar con soporte compatible, la confirmación debe bloquear los
-datos que no pueda representar fielmente y explicar el motivo.
+Esta transición requiere revisión explícita del equipo sobre su compatibilidad con
+FER-15 antes del cierre de #234. El PR #63 no está aprobado por su mera existencia;
+sus pendientes de precio ausente no se ocultan sustituyendo ausencias por cero.
 
-## 6. SKU y productos existentes
+## 5. SKU y categorías
 
-Política propuesta para la versión 1: altas nuevas, sin actualizar ni
-sobrescribir productos existentes. Requiere revisión con el responsable
-de #235/#236 antes de aprobar este contrato.
+Propuesta de versión 1: solo altas nuevas; sin actualizar ni sobrescribir existentes.
+SKU repetidos dentro del archivo o existentes en BD son errores, incluso si el
+producto existente está inactivo. No crear categorías automáticamente.
 
-Se rechazan:
-- SKU repetidos dentro del archivo.
-- SKU existentes en la base, aunque el producto esté inactivo.
-- SKU creados por otra operación entre la previsualización y la confirmación.
+La identidad debe coincidir con la restricción UNIQUE y la collation efectiva de
+PRODUCTO.codigo. Una normalización manual en JavaScript no acredita equivalencia.
+Probar con MariaDB real tanto códigos equivalentes como códigos distintos.
 
-Los duplicados internos se informan en todas las filas involucradas,
-sin elegir automáticamente una fila ganadora.
+Propuesta de reporte: marcar todas las filas de un grupo duplicado, sin elegir una
+ganadora. El conteo de filas duplicadas es un subconjunto de las inválidas; no se
+suma dos veces al total. Esta semántica todavía debe alinearse con #235, cuyo
+reporte actual marca las apariciones posteriores.
 
-La comparación debe respetar la unicidad efectiva de MariaDB, incluida
-su collation. No alcanza con comparar cadenas estrictamente en
-JavaScript ni con convertirlas únicamente a mayúsculas.
+Categorías por ID, existentes y activas. La unicidad se revalida al confirmar,
+incluidos SKU creados concurrentemente. Conservar UNIQUE como garantía final.
 
-La restricción UNIQUE de la base se conserva como garantía final.
-Un conflicto concurrente no debe generar duplicados ni sobrescrituras.
+## 6. Validación, previsualización y confirmación
 
-Importar nuevamente un archivo ya confirmado no crea nuevos productos:
-si se genera una nueva previsualización, sus SKU aparecen como existentes.
-El reintento de la misma confirmación se trata según la sección 7.
+Las reglas de confirmación siguientes continúan como propuesta para #236/#237;
+no se declara que la interfaz del PR #60 ya las implemente.
 
-Una futura actualización masiva requiere un modo explícito y un contrato
-propio que defina los campos modificables y el tratamiento de ausencias.
+### Validación
 
-## 7. Validación, previsualización y confirmación
+Carga, validación y preview no escriben productos, categorías, asignaciones ni
+registros de importación. Para archivos dentro de límites y estructuralmente
+válidos, reportar todos los errores por fila/campo. Los errores de estructura
+pueden impedir analizar filas; no inventar conteos de filas no procesadas.
 
-Las reglas siguientes son la propuesta técnica de #234 para revisión
-con los responsables de #235, #236 y #237.
+El reporte propone filas leídas, válidas, inválidas, duplicadas, existentes y vacías
+ignoradas; fila lógica, campo, código de error y mensaje comprensible. Válidas e
+inválidas son excluyentes; duplicadas son un subconjunto. Conservar numeración de
+registros lógicos aun con saltos de línea dentro de una celda CSV.
 
-### 7.1 Validación sin escrituras
+### Lote y concurrencia
 
-La carga, validación y previsualización no realizan escrituras en la base:
-no crean productos, categorías, asignaciones ni registros de importación.
+Propuesta: confirmación atómica del lote completo. Si hay errores o un impedimento
+de persistencia, bloquear confirmación; conservar el reporte sin guardar las filas
+válidas por separado. ADMIN revisa y confirma explícitamente.
 
-El reporte incluye:
-- Filas de datos leídas, válidas e inválidas.
-- Filas completamente vacías ignoradas.
-- Número de fila, campo, código de error y mensaje comprensible.
-- SKU duplicados dentro del archivo y existentes en la base.
-- Advertencias comerciales, como precio ausente o cero.
-- Impedimentos técnicos para persistir fielmente los datos.
+La confirmación se vincula al contenido validado, versión del contrato y ADMIN.
+El servidor detecta cambios y vencimiento; #236 define el mecanismo. Revalidar
+sesión, categoría activa, restricciones, vigencia y unicidad frente a BD actual.
+Un conflicto bloquea o revierte todo el lote; no deja altas parciales.
 
-Las filas válidas e inválidas forman grupos excluyentes.
-Las filas duplicadas son un subconjunto de las inválidas: no se suman
-otra vez al total. Las filas vacías se cuentan aparte.
+La operación tiene un identificador estable validado por el servidor. Doble clic,
+concurrencia y reintentos no ejecutan dos veces la misma importación. Productos y
+registro de confirmación exitosa quedan en una transacción. Antes del commit,
+un fallo revierte todo; una respuesta perdida deja estado desconocido hasta
+consultar o reintentar la misma operación de forma segura.
 
-Los errores de estructura o límites pueden impedir analizar filas.
-En archivos estructuralmente válidos y dentro de límites, se informan
-los errores de todas las filas, no solamente el primero.
+Una confirmación ya terminada devuelve su resultado original. #236 ofrece consulta
+autorizada de estado sin intervención manual en BD. Una nueva preview de un archivo
+ya importado informa los SKU existentes, sin nuevas altas.
 
-Las advertencias no equivalen a errores. Por ejemplo, precio ausente
-puede ser válido según FER-17, pero su confirmación requiere soporte
-de persistencia compatible según la sección 5.
+### Resultado e interfaz
 
-### 7.2 Política del lote
+Resultado con identificador, estado y conteos importados/omitidos/rechazados.
+No omitir silenciosamente existentes. Vacías se informan aparte. Éxito significa
+todo el lote importado; rollback confirmado significa cero importados; un estado
+desconocido no permite afirmar éxito ni reversión.
 
-La versión 1 propone confirmación atómica del lote completo.
+#237 ofrece descarga de plantilla, selección/arrastre, estados de carga/error,
+preview y errores descargables, confirmación y recuperación del resultado incierto.
+Flujo responsive y accesible. Reporte seguro sin SQL, trazas ni ejecución de celdas.
+Solo ADMIN: servidor devuelve 401 sin sesión válida y 403 sin autorización.
 
-Si hay alguna fila inválida o un impedimento de persistencia:
-- No se habilita la confirmación.
-- Se conserva el reporte para corregir el archivo.
-- No se guardan las filas válidas por separado.
+## 7. Pendientes para cerrar el contrato
 
-Si todas las filas son válidas, el administrador debe revisar la
-previsualización y confirmar explícitamente.
+- Acordar esta versión transitoria y la dependencia comercial/técnica FER-17.
+- Revisar con #235 las reglas aún no acreditadas: URL, fórmulas/hoja, formato y
+  códigos del reporte, conteo/marcado de duplicados y filas vacías.
+- Corregir la lectura XML con namespaces en #235: los XLSX publicados son válidos
+  y usan prefijo x: del namespace SpreadsheetML; el parser de 26e8f90 busca row/c
+  sin prefijo y rechaza estos libros como si no tuvieran encabezados. Debe leer
+  el namespace, no depender de que el XML use un prefijo o namespace por defecto.
+- Resolver la identidad de SKU pendiente de la auditoría de #61. La categoría
+  activa ya se comprobó en 26e8f90; eso no certifica el resto del contrato.
+- Acordar y probar atomicidad/reintentos con #236 y su consumo en #237.
+- Reauditoría independiente de Zahir. Mantener PR #62 como Draft hasta entonces.
 
-La interfaz no sustituye la validación del servidor.
+## 8. Plantillas y ejemplos
 
-### 7.3 Vinculación con la previsualización
+- [Plantilla CSV](plantillas/productos.csv) y [XLSX](plantillas/productos.xlsx).
+- [Válidos CSV](ejemplos/validos.csv) y [XLSX](ejemplos/validos.xlsx).
+- [Inválidos CSV](ejemplos/invalidos.csv) y [XLSX](ejemplos/invalidos.xlsx).
+- [Resultados esperados y preparación](ejemplos/RESULTADOS-ESPERADOS.md).
+- [Carga de 900 productos](ejemplos/carga_900.csv).
 
-La confirmación debe corresponder exactamente al contenido validado,
-a la versión del contrato y al administrador que lo revisó.
-
-El servidor debe detectar cambios del archivo o de los valores después
-de la validación. No debe aceptar productos o importes modificados por
-el navegador como sustitutos del contenido previsualizado.
-
-La implementación de #236 definirá el mecanismo y vencimiento de esa
-vinculación respetando la previsualización sin escrituras.
-
-Si la previsualización vence o cambia el archivo, debe validarse otra vez.
-
-Al confirmar se revalidan:
-- Sesión y rol ADMIN.
-- Vigencia e identidad de la previsualización.
-- Categorías existentes y activas.
-- Restricciones de los productos y soporte de persistencia.
-- Unicidad de SKU frente al estado actual de la base.
-
-Un conflicto detectado en esta etapa impide confirmar todo el lote.
-
-### 7.4 Concurrencia y reintentos
-
-Cada operación de confirmación debe tener un identificador estable,
-validado por el servidor y vinculado al administrador y al contenido.
-
-La misma operación no puede ejecutar dos veces la importación,
-aunque haya doble clic, solicitudes concurrentes o reintentos.
-
-La escritura de productos y el registro de confirmación satisfactoria
-deben quedar en la misma transacción. Si falla antes del commit,
-se revierte todo el lote y no se registra un éxito.
-
-Si la operación ya terminó, repetir su confirmación debe permitir
-recuperar el resultado original sin ejecutar nuevas altas.
-
-Si está en curso, la interfaz debe informarlo y evitar que el usuario
-inicie otra confirmación equivalente.
-
-Si se pierde la respuesta, el estado es desconocido hasta consultar
-el resultado por el mismo identificador o reintentar de forma segura.
-No mostrar un éxito ni afirmar una reversión sin confirmación.
-
-#236 debe ofrecer un mecanismo autorizado para recuperar ese resultado,
-sin exigir consultas manuales a la base de datos.
-
-### 7.5 Resultado y experiencia administrativa
-
-El resultado final incluye identificador de operación, estado y conteos
-de productos importados, omitidos y rechazados.
-
-En la versión 1 no se omiten silenciosamente productos existentes:
-son errores de validación. Las filas vacías ignoradas se informan aparte.
-
-Un éxito del lote implica que todos sus productos se importaron.
-Una reversión confirmada implica cero importados.
-Un resultado desconocido no debe presentarse como un conteo definitivo.
-
-#237 debe permitir:
-- Descargar las plantillas CSV y XLSX.
-- Seleccionar o arrastrar el archivo.
-- Ver estados de carga, validación y previsualización.
-- Revisar productos, errores y advertencias antes de confirmar.
-- Descargar el reporte de errores.
-- Confirmar explícitamente, mostrando cuántos productos se crearán.
-- Ver el resultado o recuperar el estado de una operación incierta.
-- Corregir y volver a validar, sin intervenir manualmente en la base.
-
-El reporte descargable debe incluir como mínimo:
-fila, campo, codigo_error y mensaje.
-
-Los mensajes no deben exponer SQL, trazas internas ni ejecutar contenido
-de celdas. La descarga debe tratar los datos como texto seguro.
-
-Todo el flujo es exclusivo de ADMIN. El backend debe responder 401
-sin autenticación válida y 403 cuando el usuario carezca de autorización.
-
-## 8. Entregables y aceptación
-
-- Plantillas descargables CSV y XLSX con el mismo contrato.
-- Ejemplos válidos e inválidos, con resultados esperados.
-- Contrato revisado con los responsables de #235 y #236.
-- Dependencias de precios y persistencia identificadas.
-- Auditoría independiente de Zahir.
-- Enlaces desde este documento a las plantillas y ejemplos al incorporarlos.
-
-La existencia de las plantillas no acredita que el importador o sus
-pruebas ya estén implementados.
-
-## 9. Plantillas y ejemplos del borrador
-
-- [Plantilla CSV](plantillas/productos.csv).
-- [Plantilla XLSX](plantillas/productos.xlsx).
-- [Ejemplo válido CSV](ejemplos/validos.csv).
-- [Ejemplo válido XLSX](ejemplos/validos.xlsx).
-- [Ejemplo inválido CSV](ejemplos/invalidos.csv).
-- [Ejemplo inválido XLSX](ejemplos/invalidos.xlsx).
-- [Resultados esperados y condiciones de prueba](ejemplos/RESULTADOS-ESPERADOS.md).
-
-Las plantillas contienen únicamente encabezados y deben completarse.
-Los ejemplos son datos ficticios del borrador, sujetos a revisión.
+Datos ficticios para pruebas aisladas. Las plantillas contienen solo encabezados
+y deben completarse. Los resultados esperados describen la propuesta, no pruebas
+de integración ejecutadas ni funcionalidades ya disponibles.
