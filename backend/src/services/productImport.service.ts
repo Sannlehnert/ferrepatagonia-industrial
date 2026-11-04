@@ -1,6 +1,15 @@
 import path from 'node:path';
-import { ProductImportRowDto, RowFieldError, buildProductImportDto, validateProductImportDto } from '../dtos/products/productImport.dto';
-import { findExistingCategoryIds, findExistingSkus, normalizeSkuForComparison } from '../repositories/productImport.repository';
+import {
+    ProductImportRowDto,
+    RowFieldError,
+    buildProductImportDto,
+    validateProductImportDto
+} from '../dtos/products/productImport.dto';
+import {
+    findExistingCategoryIds,
+    findExistingSkuRows,
+    findFileSkuDuplicates
+} from '../repositories/productImport.repository';
 import { FileImportValidationError, ParsedSheetRow } from '../utils/import.utils';
 import { parseCsvBuffer } from '../utils/csvParser.util';
 import { parseXlsxBuffer } from '../utils/xlsxParser.util';
@@ -37,61 +46,58 @@ export const validateProductImportFile = async (
 
     const errors: RowFieldError[] = [];
     const candidateDtos: { rowNumber: number; dto: ProductImportRowDto }[] = [];
-    const seenSkusInFile = new Map<string, number>();
-    let duplicateInFileCount = 0;
 
     for (const item of parsedRows) {
         const dto = buildProductImportDto(item.raw);
         const dtoErrors = await validateProductImportDto(dto, item.rowNumber);
         errors.push(...dtoErrors);
-
-        if (typeof dto.codigo === 'string' && dto.codigo.length > 0 && dto.codigo.length <= 100) {
-            const normalizedSku = normalizeSkuForComparison(dto.codigo);
-            const firstSeenRow = seenSkusInFile.get(normalizedSku);
-            if (firstSeenRow !== undefined) {
-                duplicateInFileCount++;
-                errors.push({
-                    row: item.rowNumber,
-                    field: 'codigo',
-                    message: `El código SKU "${dto.codigo}" está repetido dentro del archivo (aparece primero en la fila ${firstSeenRow}).`
-                });
-            } else {
-                seenSkusInFile.set(normalizedSku, item.rowNumber);
-            }
-        }
-
         candidateDtos.push({ rowNumber: item.rowNumber, dto });
     }
 
-    const allCandidateSkus = candidateDtos
-        .map((c) => c.dto.codigo)
-        .filter((sku): sku is string => typeof sku === 'string' && sku.length > 0 && sku.length <= 100);
+    const candidateSkuItems: Array<{ rowNumber: number; codigo: string }> = [];
+    for (const { rowNumber, dto } of candidateDtos) {
+        if (typeof dto.codigo === 'string' && dto.codigo.trim().length > 0 && dto.codigo.trim().length <= 100) {
+            candidateSkuItems.push({ rowNumber, codigo: dto.codigo.trim() });
+        }
+    }
 
     const allCandidateCategoryIds = candidateDtos
         .map((c) => c.dto.id_categoria)
         .filter((id): id is number => typeof id === 'number' && Number.isInteger(id) && id > 0 && id <= 2147483647);
 
-    const [rawExistingSkusSet, existingCategoryIdsSet] = await Promise.all([
-        findExistingSkus(allCandidateSkus),
+    const [internalDuplicates, existingSkuRowNumbers, existingCategoryIdsSet] = await Promise.all([
+        findFileSkuDuplicates(candidateSkuItems),
+        findExistingSkuRows(candidateSkuItems),
         findExistingCategoryIds(allCandidateCategoryIds)
     ]);
 
-    const existingSkusSet = new Set(
-        Array.from(rawExistingSkusSet, (sku) => normalizeSkuForComparison(String(sku)))
-    );
-
-    let existingInDbCount = 0;
+    let duplicateInFileCount = 0;
+    const duplicateRowMap = new Map<number, number>();
+    for (const dup of internalDuplicates) {
+        duplicateRowMap.set(dup.rowNumber, dup.firstSeenRow);
+    }
 
     for (const { rowNumber, dto } of candidateDtos) {
-        if (typeof dto.codigo === 'string' && dto.codigo.length > 0 && dto.codigo.length <= 100) {
-            if (existingSkusSet.has(normalizeSkuForComparison(dto.codigo))) {
-                existingInDbCount++;
-                errors.push({
-                    row: rowNumber,
-                    field: 'codigo',
-                    message: `El código SKU "${dto.codigo}" ya existe en la base de datos.`
-                });
-            }
+        const firstSeenRow = duplicateRowMap.get(rowNumber);
+        if (firstSeenRow !== undefined) {
+            duplicateInFileCount++;
+            errors.push({
+                row: rowNumber,
+                field: 'codigo',
+                message: `El código SKU "${dto.codigo}" está repetido dentro del archivo (aparece primero en la fila ${firstSeenRow}).`
+            });
+        }
+    }
+
+    let existingInDbCount = 0;
+    for (const { rowNumber, dto } of candidateDtos) {
+        if (existingSkuRowNumbers.has(rowNumber)) {
+            existingInDbCount++;
+            errors.push({
+                row: rowNumber,
+                field: 'codigo',
+                message: `El código SKU "${dto.codigo}" ya existe en la base de datos.`
+            });
         }
 
         if (

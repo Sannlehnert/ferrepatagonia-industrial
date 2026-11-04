@@ -294,25 +294,6 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.strictEqual(report.valid, false);
         assert.ok(report.errors.some((e) => e.field === 'precio'));
     });
-    await t.test('H01: AE y Æ se detectan como distintos (no duplican) según reglas SQL', async () => {
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAE,A,1,10,1\nÆ,B,1,10,1\n', 'utf8');
-        const report = await validateProductImportFile(csv, 'test.csv');
-
-        assert.equal(report.duplicateInFileCount, 0);
-        // Valid porque la BD (y el Collator) los trata como distintos
-        assert.equal(report.valid, true);
-    });
-
-    await t.test('H01: AB y A\\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
-        // \u200D es un carácter invisible que SQL y el Collator ignoran, por lo que cuentan como el mismo SKU.
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAB,A,1,10,1\nA\u200DB,B,1,10,1\n', 'utf8');
-        const report = await validateProductImportFile(csv, 'test.csv');
-
-        assert.equal(report.valid, false);
-        assert.equal(report.duplicateInFileCount, 1);
-        const dupError = report.errors.find((e) => e.field === 'codigo' && e.message.includes('repetido dentro del archivo'));
-        assert.ok(dupError);
-    });
     await t.test('H03: XLSX con inlineStr y fragmentos <t> múltiples conserva el texto completo', async () => {
         // Simula celda con inlineStr dividida en múltiples etiquetas <t>
         const sheetXml = '<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>' +
@@ -396,5 +377,29 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
             validateProductImportFile(bombBuf, 'bomb.xlsx'),
             (err) => err instanceof FileImportValidationError && (err.message.includes('límite') || err.message.includes('tamaño') || err.message.includes('descompresión') || err.message.includes('corrupto'))
         );
+    });
+    await t.test('H01: AE y Æ se detectan como distintos (no duplican) según reglas SQL', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAE,A,1,10,1\nÆ,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test-ae.csv');
+
+        assert.equal(report.duplicateInFileCount, 0);
+        assert.equal(report.valid, true);
+    });
+
+    await t.test('H01: AB y A\\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAB,A,1,10,1\nA\u200DB,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test-zwj.csv');
+
+        assert.equal(report.valid, false);
+        assert.equal(report.duplicateInFileCount, 1);
+        assert.ok(report.errors.some((e) => e.field === 'codigo' && e.message.includes('repetido dentro del archivo')));
+    });
+
+    await t.test('H01: ss y ß se detectan como colisión según reglas SQL', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nss,A,1,10,1\nß,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test-ss.csv');
+
+        assert.equal(report.valid, false);
+        assert.equal(report.duplicateInFileCount, 1);
     });
 });
