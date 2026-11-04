@@ -94,6 +94,62 @@ function makeXlsxFile(sheetXml = '<worksheet/>') {
   };
 }
 
+function makeAmbiguousXlsxFile() {
+  const contents = zipSync({
+    'xl/worksheets/sheet1.xml': strToU8(
+      'x'.repeat(PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE + 1),
+    ),
+  });
+  const view = new DataView(contents.buffer, contents.byteOffset, contents.byteLength);
+  let endRecordOffset = contents.length - 22;
+  while (view.getUint32(endRecordOffset, true) !== 0x06054b50) {
+    endRecordOffset -= 1;
+  }
+  const directoryOffset = view.getUint32(endRecordOffset + 16, true);
+  const directorySize = view.getUint32(endRecordOffset + 12, true);
+  const localFile = contents.slice(0, directoryOffset);
+  const hiddenDirectory = contents.slice(directoryOffset, directoryOffset + directorySize);
+  const visibleDirectory = hiddenDirectory.slice();
+  new DataView(
+    visibleDirectory.buffer,
+    visibleDirectory.byteOffset,
+    visibleDirectory.byteLength,
+  ).setUint32(24, 1, true);
+
+  const visibleDirectoryOffset = localFile.length;
+  const hiddenDirectoryOffset = visibleDirectoryOffset + visibleDirectory.length;
+  const visibleEndRecord = Buffer.alloc(22);
+  visibleEndRecord.writeUInt32LE(0x06054b50, 0);
+  visibleEndRecord.writeUInt16LE(1, 8);
+  visibleEndRecord.writeUInt16LE(1, 10);
+  visibleEndRecord.writeUInt32LE(visibleDirectory.length, 12);
+  visibleEndRecord.writeUInt32LE(visibleDirectoryOffset, 16);
+  visibleEndRecord.writeUInt16LE(26, 20);
+
+  const hiddenEndRecord = Buffer.alloc(22);
+  hiddenEndRecord.writeUInt32LE(0x06054b50, 0);
+  hiddenEndRecord.writeUInt16LE(1, 8);
+  hiddenEndRecord.writeUInt16LE(1, 10);
+  hiddenEndRecord.writeUInt32LE(hiddenDirectory.length, 12);
+  hiddenEndRecord.writeUInt32LE(hiddenDirectoryOffset, 16);
+  const archive = Buffer.concat([
+    localFile,
+    visibleDirectory,
+    hiddenDirectory,
+    visibleEndRecord,
+    hiddenEndRecord,
+    Buffer.from('tail'),
+  ]);
+  return {
+    size: archive.byteLength,
+    arrayBuffer: async () =>
+      archive.buffer.slice(
+        archive.byteOffset,
+        archive.byteOffset + archive.byteLength,
+      ),
+  };
+}
+
 test('parses quoted CSV fields, escaped quotes, line breaks, and zero stock', () => {
   const csv = [
     headers,
@@ -265,6 +321,23 @@ test('rejects formula cells with cached values before converting the worksheet',
   assert.equal(readSheetCalls, callsBefore);
 });
 
+test('rejects formulas with XML-encoded cell coordinates before converting the worksheet', async () => {
+  const inlineCell = (reference, value) =>
+    `<c r="${reference}" t="inlineStr"><is><t>${value}</t></is></c>`;
+  const headerCells = headers
+    .split(',')
+    .map((header, index) => inlineCell(`${String.fromCharCode(65 + index)}1`, header))
+    .join('');
+  const worksheet = `<worksheet><sheetData><row r="1">${headerCells}</row><row r="2"><c r="A2" t="inlineStr"><is><t>SKU-1</t></is></c><c r="B2" t="inlineStr"><is><t>Producto</t></is></c><c r="C2"><v>3</v></c><c r="D&#50;"><f>5+99</f><v>10.25</v></c><c r="E2"><v>1</v></c></row></sheetData></worksheet>`;
+  const callsBefore = readSheetCalls;
+
+  await assert.rejects(
+    parseProductImportXlsx(makeXlsxFile(worksheet), categories),
+    /fila 2, campo "precio"/,
+  );
+  assert.equal(readSheetCalls, callsBefore);
+});
+
 test('rejects XLSX expansion above 24 MB before parsing a small compressed file', async () => {
   const contents = zipSync({
     'xl/worksheets/sheet1.xml': strToU8(
@@ -285,6 +358,18 @@ test('rejects XLSX expansion above 24 MB before parsing a small compressed file'
   await assert.rejects(
     parseProductImportXlsx(file, categories),
     /24 MB descomprimidos/,
+  );
+  assert.equal(readSheetCalls, callsBefore);
+});
+
+test('rejects a 27 KB XLSX with conflicting ZIP directories before parsing', async () => {
+  const file = makeAmbiguousXlsxFile();
+  const callsBefore = readSheetCalls;
+
+  assert.ok(file.size < 28 * 1024);
+  await assert.rejects(
+    parseProductImportXlsx(file, categories),
+    /directorios ZIP ambiguos/,
   );
   assert.equal(readSheetCalls, callsBefore);
 });
@@ -559,6 +644,83 @@ test('blocks confirmation during a new file read and keeps POST results with the
   await importing;
   assert.equal(state.items[0].codigo, 'SKU-NEW');
   assert.equal(state.items[0].status, 'created');
+});
+
+test('ignores a pending file read from an unmounted importer after a new batch starts', async (t) => {
+  let releaseOldRead;
+  let releaseCreate;
+  let markOldReadStarted;
+  let markCreateStarted;
+  const oldReadStarted = new Promise((resolve) => { markOldReadStarted = resolve; });
+  const createStarted = new Promise((resolve) => { markCreateStarted = resolve; });
+  const storage = {
+    value: '',
+    async getItem() { return this.value || null; },
+    async setItem(_key, value) { this.value = value; },
+  };
+  const oldService = {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async () => assert.fail('the old importer must not submit products'),
+  };
+  const oldInstance = await mountImportView(t, oldService, { storage });
+  await oldInstance.state.selectFile({
+    name: 'old.csv',
+    text: async () => [
+      headers,
+      'OLD1,Producto viejo 1,3,10,1,,,true',
+      'OLD2,Producto viejo 2,3,20,2,,,true',
+    ].join('\n'),
+  });
+  const pendingOldRead = oldInstance.state.selectFile({
+    name: 'pending.csv',
+    text: () => {
+      markOldReadStarted();
+      return new Promise((resolve) => { releaseOldRead = resolve; });
+    },
+  });
+  await oldReadStarted;
+  oldInstance.app.unmount();
+
+  const calls = [];
+  const newInstance = await mountImportView(t, {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async (payload) => {
+      calls.push(payload.codigo);
+      if (payload.codigo === 'NEXT1') {
+        markCreateStarted();
+        await new Promise((resolve) => { releaseCreate = resolve; });
+      }
+    },
+  }, { storage });
+  await newInstance.state.selectFile({
+    name: 'next.csv',
+    text: async () => [
+      headers,
+      'NEXT1,Producto nuevo 1,3,10,1,,,true',
+      'NEXT2,Producto nuevo 2,3,20,2,,,true',
+    ].join('\n'),
+  });
+  const importing = newInstance.state.importProducts();
+  await createStarted;
+  try {
+    assert.deepEqual(calls, ['NEXT1']);
+
+    releaseOldRead(`${headers}\nSTALE,Producto obsoleto,3,30,3,,,true`);
+    await pendingOldRead;
+    const stored = JSON.parse(storage.value);
+    assert.equal(stored.fileName, 'next.csv');
+    assert.deepEqual(stored.items.map((item) => item.codigo), ['NEXT1', 'NEXT2']);
+    assert.equal(stored.items[0].status, 'creating');
+  } finally {
+    releaseCreate();
+    await importing;
+  }
+  assert.deepEqual(
+    newInstance.state.items.map((item) => item.status),
+    ['created', 'created'],
+  );
 });
 
 test('times out reference GETs after creation, shows a recoverable error, and allows retry', async (t) => {

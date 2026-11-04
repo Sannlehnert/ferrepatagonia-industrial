@@ -158,7 +158,9 @@ async function persistRecovery(
         fileName: selectedFileName.value,
         items: items.value,
     },
+    allowUnmounted = false,
 ): Promise<boolean> {
+    if (isUnmounting && !allowUnmounted) return false
     try {
         await saveProductImportRecovery(
             getRecoveryStorage(),
@@ -185,6 +187,7 @@ async function restoreRecovery() {
             throw new Error('No se pudo asociar la recuperación a una sesión administrativa.')
         }
         await auth.fetchSession()
+        if (isUnmounting) return
         if (auth.user?.id !== ownerId || auth.rol !== 'ADMIN') {
             recoveryError.value = 'La sesión administrativa cambió. Recargá la pantalla para continuar.'
             return
@@ -193,6 +196,7 @@ async function restoreRecovery() {
             getRecoveryStorage(),
             getRecoveryKey(),
         )
+        if (isUnmounting) return
         if (!recovery) return
         currentBatchId += 1
         selectedFileName.value = recovery.fileName
@@ -208,12 +212,12 @@ async function restoreRecovery() {
             'No se pudo recuperar el estado de la importación anterior.',
         )
     } finally {
-        isLoadingRecovery.value = false
+        if (!isUnmounting) isLoadingRecovery.value = false
     }
 }
 
 async function selectFile(file: File | undefined) {
-    if (isImporting.value || isLoadingRecovery.value || auth.rol !== 'ADMIN') return
+    if (isUnmounting || isImporting.value || isLoadingRecovery.value || auth.rol !== 'ADMIN') return
     if (!file) return
     const generation = ++fileSelectionGeneration
     fileError.value = ''
@@ -456,6 +460,7 @@ watch(
 
 function recoverInterruptedImport() {
     isUnmounting = true
+    fileSelectionGeneration += 1
     if (!activeImportController) return
     activeImportController.abort()
     const inFlightItem = items.value.find((item) => item.status === 'creating')
@@ -465,7 +470,7 @@ function recoverInterruptedImport() {
             'La pantalla se cerró mientras la solicitud estaba pendiente. Revisá el catálogo antes de reintentar.',
         ]
     }
-    void persistRecovery()
+    void persistRecovery(undefined, true)
 }
 
 onMounted(() => {

@@ -67,6 +67,7 @@ interface ProductImportStorage {
 const utf8Encoder = new TextEncoder()
 const RECOVERY_DATABASE_NAME = 'ferrepatagonia-admin-product-import'
 const RECOVERY_STORE_NAME = 'recoveries'
+const recoveryWriteQueues = new Map<string, Promise<void>>()
 
 export function getProductImportTabId(
     providedStorage?: Pick<Storage, 'getItem' | 'setItem'>,
@@ -214,7 +215,16 @@ export async function saveProductImportRecovery(
     recovery: ProductImportRecovery,
     key = PRODUCT_IMPORT_RECOVERY_KEY,
 ): Promise<void> {
-    await storage.setItem(key, JSON.stringify({ version: 1, ...recovery }))
+    const previousWrite = recoveryWriteQueues.get(key) ?? Promise.resolve()
+    const write = previousWrite.catch(() => undefined).then(() =>
+        storage.setItem(key, JSON.stringify({ version: 1, ...recovery })),
+    )
+    recoveryWriteQueues.set(key, write)
+    try {
+        await write
+    } finally {
+        if (recoveryWriteQueues.get(key) === write) recoveryWriteQueues.delete(key)
+    }
 }
 
 export async function readProductImportRecovery(
@@ -392,7 +402,15 @@ export async function parseProductImportXlsx(
 
     const contents = await file.arrayBuffer()
     validateXlsxArchive(contents)
-    rejectXlsxFormulas(unzipSync(new Uint8Array(contents)))
+    const files = unzipSync(new Uint8Array(contents))
+    const expandedSize = Object.values(files).reduce(
+        (total, entry) => total + entry.byteLength,
+        0,
+    )
+    if (expandedSize > PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE) {
+        throw new Error('El XLSX supera el límite de 24 MB descomprimidos.')
+    }
+    rejectXlsxFormulas(files)
 
     const rows = await readSheet(contents)
     const records = rows.map((row, index) => ({
@@ -424,6 +442,17 @@ function validateXlsxArchive(contents: ArrayBuffer): void {
 
     if (endRecordOffset < 0) {
         throw new Error('El archivo XLSX no contiene un directorio ZIP válido.')
+    }
+
+    let fflateEndRecordOffset = bytes.length - 22
+    while (
+        fflateEndRecordOffset >= earliestEndRecord &&
+        view.getUint32(fflateEndRecordOffset, true) !== 0x06054b50
+    ) {
+        fflateEndRecordOffset -= 1
+    }
+    if (fflateEndRecordOffset !== endRecordOffset) {
+        throw new Error('El archivo XLSX contiene directorios ZIP ambiguos.')
     }
 
     const diskNumber = view.getUint16(endRecordOffset + 4, true)
@@ -480,12 +509,15 @@ function validateXlsxArchive(contents: ArrayBuffer): void {
         }
         offset = entryEnd
     }
+    if (offset !== directoryOffset + directorySize) {
+        throw new Error('El archivo XLSX contiene un directorio ZIP ambiguo.')
+    }
 }
 
 function getXmlAttribute(attributes: string, name: string): string | null {
     const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const match = new RegExp(`(?:^|\\s)${escapedName}\\s*=\\s*(["'])(.*?)\\1`).exec(attributes)
-    return match?.[2] ?? null
+    return match ? decodeXmlText(match[2] ?? '') : null
 }
 
 function decodeXmlText(value: string): string {
