@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import {
     getActiveCategories,
     getAdminProducts,
@@ -11,6 +12,9 @@ import {
 import {
     createProductImportErrorReport,
     createProductImportTemplate,
+    createProductImportRecoveryStorage,
+    getProductImportRecoveryKey,
+    getProductImportTabId,
     parseProductImportXlsx,
     parseProductImportCsv,
     readProductImportRecovery,
@@ -24,6 +28,8 @@ import {
 const categories = ref<CategoryOption[]>([])
 const products = ref<AdminProduct[]>([])
 const items = ref<ProductImportItem[]>([])
+const auth = useAuthStore()
+const recoveryOwnerId = auth.user?.id ?? null
 const selectedFileName = ref('')
 const referenceError = ref('')
 const fileError = ref('')
@@ -31,6 +37,7 @@ const recoveryError = ref('')
 const isRecovered = ref(false)
 const previewPage = ref(0)
 const isLoadingReferences = ref(true)
+const isLoadingRecovery = ref(true)
 const isImporting = ref(false)
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -68,6 +75,7 @@ const progressPercent = computed(() => {
 const canImport = computed(
     () =>
         !isLoadingReferences.value &&
+        !isLoadingRecovery.value &&
         !referenceError.value &&
         !recoveryError.value &&
         !isImporting.value &&
@@ -82,6 +90,9 @@ const categoryNames = computed(
 let fileSelectionGeneration = 0
 let activeImportController: AbortController | null = null
 let isUnmounting = false
+let referencesRequest: Promise<void> | null = null
+let recoveryStorage: ReturnType<typeof createProductImportRecoveryStorage> | null = null
+let recoveryTabId: string | null = null
 
 function errorMessage(error: unknown, fallback: string): string {
     if (axios.isAxiosError(error)) {
@@ -95,32 +106,48 @@ function errorMessage(error: unknown, fallback: string): string {
     return error instanceof Error ? error.message : fallback
 }
 
-async function loadReferences() {
+function loadReferences(): Promise<void> {
+    if (referencesRequest) return referencesRequest
     isLoadingReferences.value = true
     referenceError.value = ''
-    try {
-        const [loadedProducts, loadedCategories] = await Promise.all([
-            getAdminProducts(),
-            getActiveCategories(),
-        ])
-        products.value = loadedProducts
-        categories.value = loadedCategories
-    } catch (error: unknown) {
-        referenceError.value = errorMessage(
-            error,
-            'No se pudieron cargar los productos y categorías para validar la planilla.',
-        )
-    } finally {
-        isLoadingReferences.value = false
-    }
+    referencesRequest = (async () => {
+        try {
+            const [loadedProducts, loadedCategories] = await Promise.all([
+                getAdminProducts(),
+                getActiveCategories(),
+            ])
+            products.value = loadedProducts
+            categories.value = loadedCategories
+        } catch (error: unknown) {
+            referenceError.value = errorMessage(
+                error,
+                'No se pudieron cargar los productos y categorías para validar la planilla.',
+            )
+        } finally {
+            isLoadingReferences.value = false
+            referencesRequest = null
+        }
+    })()
+    return referencesRequest
 }
 
-function persistRecovery(): boolean {
+function getRecoveryStorage() {
+    recoveryStorage ??= createProductImportRecoveryStorage()
+    return recoveryStorage
+}
+
+function getRecoveryKey() {
+    recoveryTabId ??= getProductImportTabId()
+    return getProductImportRecoveryKey(recoveryOwnerId ?? NaN, recoveryTabId)
+}
+
+async function persistRecovery(): Promise<boolean> {
     try {
-        saveProductImportRecovery(window.sessionStorage, {
-            fileName: selectedFileName.value,
-            items: items.value,
-        })
+        await saveProductImportRecovery(
+            getRecoveryStorage(),
+            { fileName: selectedFileName.value, items: items.value },
+            getRecoveryKey(),
+        )
         recoveryError.value = ''
         return true
     } catch (error: unknown) {
@@ -132,27 +159,41 @@ function persistRecovery(): boolean {
     }
 }
 
-function restoreRecovery() {
+async function restoreRecovery() {
     try {
-        const recovery = readProductImportRecovery(window.sessionStorage)
+        const ownerId = recoveryOwnerId
+        if (ownerId === null) {
+            throw new Error('No se pudo asociar la recuperación a una sesión administrativa.')
+        }
+        await auth.fetchSession()
+        if (auth.user?.id !== ownerId || auth.rol !== 'ADMIN') {
+            recoveryError.value = 'La sesión administrativa cambió. Recargá la pantalla para continuar.'
+            return
+        }
+        const recovery = await readProductImportRecovery(
+            getRecoveryStorage(),
+            getRecoveryKey(),
+        )
         if (!recovery) return
         selectedFileName.value = recovery.fileName
         items.value = recovery.items
         previewPage.value = 0
         isRecovered.value = true
         if (recovery.items.some((item) => item.status === 'uncertain')) {
-            persistRecovery()
+            await persistRecovery()
         }
     } catch (error: unknown) {
         recoveryError.value = errorMessage(
             error,
             'No se pudo recuperar el estado de la importación anterior.',
         )
+    } finally {
+        isLoadingRecovery.value = false
     }
 }
 
 async function selectFile(file: File | undefined) {
-    if (isImporting.value) return
+    if (isImporting.value || isLoadingRecovery.value || auth.rol !== 'ADMIN') return
     const generation = ++fileSelectionGeneration
     fileError.value = ''
     if (!file) return
@@ -179,15 +220,11 @@ async function selectFile(file: File | undefined) {
                 ? await parseProductImportXlsx(file, categories.value)
                 : parseProductImportCsv(await file.text(), categories.value)
         if (generation !== fileSelectionGeneration) return
-        saveProductImportRecovery(window.sessionStorage, {
-            fileName: file.name,
-            items: parsedItems,
-        })
         items.value = parsedItems
         selectedFileName.value = file.name
         previewPage.value = 0
         isRecovered.value = false
-        recoveryError.value = ''
+        if (!(await persistRecovery())) return
     } catch (error: unknown) {
         if (generation !== fileSelectionGeneration) return
         fileError.value = errorMessage(error, 'No se pudo leer la planilla.')
@@ -237,25 +274,59 @@ function isDefinitiveRejection(error: unknown): boolean {
 async function importProducts(retryRejected = false) {
     if (
         isImporting.value ||
+        isLoadingRecovery.value ||
         isLoadingReferences.value ||
         referenceError.value ||
-        recoveryError.value
+        recoveryError.value ||
+        auth.rol !== 'ADMIN'
     ) return
     const targets = items.value.filter((item) =>
         retryRejected ? item.status === 'rejected' : item.status === 'ready',
     )
     if (targets.length === 0) return
 
-    if (!persistRecovery()) return
     isImporting.value = true
-    const controller = new AbortController()
-    activeImportController = controller
+    let sessionVersion = auth.sessionVersion
+    let controller: AbortController | null = null
     try {
+        const ownerId = recoveryOwnerId
+        if (ownerId === null) return
+        try {
+            await auth.fetchSession()
+        } catch (error: unknown) {
+            referenceError.value = errorMessage(
+                error,
+                'No se pudo verificar la sesión administrativa. Reintentá antes de importar.',
+            )
+            return
+        }
+        if (
+            isUnmounting ||
+            auth.sessionVersion !== sessionVersion ||
+            auth.user?.id !== ownerId ||
+            auth.rol !== 'ADMIN'
+        ) {
+            items.value = []
+            selectedFileName.value = ''
+            isRecovered.value = false
+            recoveryError.value = 'La sesión administrativa cambió. Recargá la pantalla para continuar.'
+            return
+        }
+        sessionVersion = auth.sessionVersion
+        controller = new AbortController()
+        activeImportController = controller
+        if (!(await persistRecovery())) return
         for (const item of targets) {
+            if (
+                isUnmounting ||
+                controller.signal.aborted ||
+                auth.sessionVersion !== sessionVersion ||
+                auth.rol !== 'ADMIN'
+            ) break
             if (!item.payload) continue
             item.status = 'creating'
             item.errors = []
-            if (!persistRecovery()) {
+            if (!(await persistRecovery())) {
                 item.status = 'ready'
                 break
             }
@@ -266,42 +337,79 @@ async function importProducts(retryRejected = false) {
                     signal: controller.signal,
                     timeout: PRODUCT_IMPORT_REQUEST_TIMEOUT_MS,
                 })
-                if (isUnmounting || controller.signal.aborted) {
+                if (
+                    isUnmounting ||
+                    controller.signal.aborted ||
+                    auth.sessionVersion !== sessionVersion
+                ) {
                     item.status = 'uncertain'
                     item.errors = [
-                        'La pantalla se cerró antes de confirmar el resultado. Revisá el catálogo antes de reintentar.',
+                        'La pantalla o la sesión cambió antes de confirmar el resultado. Revisá el catálogo antes de reintentar.',
                     ]
                     break
                 }
                 item.status = 'created'
             } catch (error: unknown) {
                 if (isUnmounting) break
-                item.errors = [
-                    errorMessage(error, 'No se pudo confirmar la creación del producto.'),
-                ]
-                if (isDefinitiveRejection(error)) {
+                if (auth.sessionVersion !== sessionVersion) {
+                    item.status = 'uncertain'
+                    item.errors = [
+                        'La sesión cambió mientras la solicitud estaba pendiente. Revisá el catálogo antes de reintentar.',
+                    ]
+                    shouldStop = true
+                } else if (isDefinitiveRejection(error)) {
                     item.status = 'rejected'
+                    item.errors = [
+                        errorMessage(error, 'No se pudo confirmar la creación del producto.'),
+                    ]
                     const status = axios.isAxiosError(error)
                         ? error.response?.status
                         : undefined
                     shouldStop = status === 401 || status === 403 || status === 429
                 } else {
                     item.status = 'uncertain'
-                    item.errors.push(
+                    item.errors = [
+                        errorMessage(error, 'No se pudo confirmar la creación del producto.'),
                         'El resultado puede haberse guardado. Revisá el catálogo antes de reintentar.',
-                    )
+                    ]
                     shouldStop = true
                 }
             }
-            if (!persistRecovery()) break
+            if (!(await persistRecovery())) {
+                if (item.status === 'created') {
+                    item.status = 'uncertain'
+                    item.errors = [
+                        'El producto pudo haberse guardado, pero no se pudo guardar el resultado de recuperación. Revisá el catálogo antes de reintentar.',
+                    ]
+                }
+                break
+            }
             if (shouldStop) break
         }
     } finally {
         isImporting.value = false
         activeImportController = null
-        if (!isUnmounting) await loadReferences()
+        if (!isUnmounting && auth.sessionVersion === sessionVersion) {
+            await loadReferences()
+        }
     }
 }
+
+watch(
+    () => auth.sessionVersion,
+    () => {
+        if (!activeImportController) return
+        activeImportController.abort()
+        const inFlightItem = items.value.find((item) => item.status === 'creating')
+        if (inFlightItem) {
+            inFlightItem.status = 'uncertain'
+            inFlightItem.errors = [
+                'La sesión cambió mientras la solicitud estaba pendiente. Revisá el catálogo antes de reintentar.',
+            ]
+            void persistRecovery()
+        }
+    },
+)
 
 function recoverInterruptedImport() {
     isUnmounting = true
@@ -314,13 +422,11 @@ function recoverInterruptedImport() {
             'La pantalla se cerró mientras la solicitud estaba pendiente. Revisá el catálogo antes de reintentar.',
         ]
     }
-    if (!persistRecovery()) {
-        console.error('No se pudo guardar la importación interrumpida.', recoveryError.value)
-    }
+    void persistRecovery()
 }
 
 onMounted(() => {
-    restoreRecovery()
+    void restoreRecovery()
     void loadReferences()
 })
 onBeforeUnmount(recoverInterruptedImport)
@@ -379,6 +485,13 @@ onBeforeUnmount(recoverInterruptedImport)
             Cargando productos y categorías para validar…
         </div>
         <div
+            v-if="isLoadingRecovery"
+            role="status"
+            class="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700"
+        >
+            Recuperando el estado de la importación…
+        </div>
+        <div
             v-else-if="referenceError"
             role="alert"
             class="rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-800"
@@ -427,7 +540,7 @@ onBeforeUnmount(recoverInterruptedImport)
                         type="file"
                         accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         class="sr-only"
-                        :disabled="isLoadingReferences || Boolean(referenceError) || isImporting"
+                        :disabled="isLoadingRecovery || isLoadingReferences || Boolean(referenceError) || isImporting"
                         @change="handleFileChange"
                     >
                 </label>

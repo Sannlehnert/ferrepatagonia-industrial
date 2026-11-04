@@ -60,14 +60,19 @@ backend. Los archivos tienen un límite de 5 MB y 1000 filas; se muestran como
 máximo 100 filas en la previsualización. Descripción, URL de imagen y estado
 activo/inactivo son visibles antes de confirmar.
 
-El estado y los resultados se guardan en la sesión del navegador. Las altas
-secuenciales tienen un timeout de 30 segundos; ante timeout, cancelación o
-respuesta ambigua se marca la fila como incierta y se detiene el proceso para
-evitar reintentos automáticos. Al salir de la pantalla se cancela la solicitud
-activa y se conserva un estado recuperable. La pantalla permite reintentar solo
-rechazos confirmados y vuelve a cargar productos y categorías después de
-importar y antes de validar otra planilla. La API bulk de FER-16 no forma parte
-de este flujo hasta que su contrato esté disponible.
+El estado y los resultados se guardan localmente en IndexedDB, separados por
+usuario administrativo y pestaña del navegador. Las altas secuenciales tienen
+un timeout de 30 segundos; ante timeout, cancelación o respuesta ambigua se
+marca la fila como incierta y se detiene el proceso para evitar reintentos
+automáticos. Al salir de la pantalla se cancela la solicitud activa y se
+conserva un estado recuperable. La pantalla permite reintentar solo rechazos
+confirmados y vuelve a cargar productos y categorías después de importar y
+antes de validar otra planilla. Al cambiar la sesión se aborta la solicitud
+activa y su resultado queda como incierto. Los SKU exactamente
+duplicados dentro del archivo se marcan antes de confirmar; la unicidad final,
+incluidas equivalencias según la collation, sigue siendo responsabilidad del
+servidor. La API bulk de FER-16 no forma parte de este flujo hasta que su contrato
+esté disponible.
 
 ### Compile and Hot-Reload for Development
 

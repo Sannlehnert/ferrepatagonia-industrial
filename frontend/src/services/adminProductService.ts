@@ -17,7 +17,17 @@ export interface AdminProduct {
 export interface CategoryOption {
     id_categoria: number;
     nombre: string;
-    activo?: boolean | number;
+    activo?: boolean | number | string;
+}
+
+export function isCategoryActive(category: Pick<CategoryOption, 'activo'>): boolean {
+    return (
+        category.activo === undefined ||
+        category.activo === true ||
+        category.activo === 1 ||
+        category.activo === '1' ||
+        category.activo === 'true'
+    );
 }
 
 export interface ProductPayload {
@@ -71,7 +81,7 @@ export async function getActiveCategories(): Promise<CategoryOption[]> {
     }
 
     return list
-        .filter((c) => c && (c.activo === undefined || Boolean(c.activo)))
+        .filter((c) => c && isCategoryActive(c))
         .map((c) => ({
             id_categoria: Number(c.id_categoria ?? c.id),
             nombre: String(c.nombre ?? ''),

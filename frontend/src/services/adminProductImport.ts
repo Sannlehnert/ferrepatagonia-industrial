@@ -3,12 +3,14 @@ import type {
     CategoryOption,
     ProductPayload,
 } from './adminProductService'
+import { isCategoryActive } from './adminProductService'
 
 export const PRODUCT_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024
 export const PRODUCT_IMPORT_MAX_ROWS = 1000
 export const PRODUCT_IMPORT_PREVIEW_ROWS = 100
 export const PRODUCT_IMPORT_REQUEST_TIMEOUT_MS = 30_000
 export const PRODUCT_IMPORT_RECOVERY_KEY = 'admin-product-import:v1'
+export const PRODUCT_IMPORT_TAB_ID_KEY = 'admin-product-import:tab:v1'
 
 export const PRODUCT_IMPORT_HEADERS = [
     'codigo',
@@ -55,11 +57,105 @@ export interface ProductImportRecovery {
 }
 
 interface ProductImportStorage {
-    getItem(key: string): string | null
-    setItem(key: string, value: string): void
+    getItem(key: string): string | null | Promise<string | null>
+    setItem(key: string, value: string): void | Promise<void>
 }
 
 const utf8Encoder = new TextEncoder()
+const RECOVERY_DATABASE_NAME = 'ferrepatagonia-admin-product-import'
+const RECOVERY_STORE_NAME = 'recoveries'
+
+export function getProductImportTabId(
+    providedStorage?: Pick<Storage, 'getItem' | 'setItem'>,
+): string {
+    try {
+        const storage =
+            providedStorage ??
+            (typeof window === 'undefined' ? undefined : window.sessionStorage)
+        if (!storage) {
+            throw new Error('No hay almacenamiento de sesión disponible.')
+        }
+        const existingId = storage.getItem(PRODUCT_IMPORT_TAB_ID_KEY)
+        if (existingId && /^[a-f0-9-]{36}$/i.test(existingId)) return existingId
+        const tabId = globalThis.crypto.randomUUID()
+        storage.setItem(PRODUCT_IMPORT_TAB_ID_KEY, tabId)
+        return tabId
+    } catch {
+        throw new Error('No se pudo identificar la pestaña para recuperar la importación.')
+    }
+}
+
+export function getProductImportRecoveryKey(userId: number, tabId: string): string {
+    if (!Number.isSafeInteger(userId) || userId <= 0) {
+        throw new Error('No se pudo asociar la recuperación a una sesión administrativa.')
+    }
+    if (!/^[a-f0-9-]{36}$/i.test(tabId)) {
+        throw new Error('No se pudo asociar la recuperación a esta pestaña.')
+    }
+    return `${PRODUCT_IMPORT_RECOVERY_KEY}:${userId}:${tabId}`
+}
+
+export function createProductImportRecoveryStorage(
+    factory: IDBFactory | undefined = globalThis.indexedDB,
+): ProductImportStorage {
+    if (!factory) {
+        throw new Error('El navegador no permite almacenar la recuperación de la importación.')
+    }
+
+    let databasePromise: Promise<IDBDatabase> | null = null
+    const openDatabase = (): Promise<IDBDatabase> => {
+        if (databasePromise) return databasePromise
+        const opening = new Promise<IDBDatabase>((resolve, reject) => {
+            const request = factory.open(RECOVERY_DATABASE_NAME, 1)
+            request.onupgradeneeded = () => {
+                const database = request.result
+                if (!database.objectStoreNames.contains(RECOVERY_STORE_NAME)) {
+                    database.createObjectStore(RECOVERY_STORE_NAME)
+                }
+            }
+            request.onerror = () => reject(new Error('No se pudo abrir el almacenamiento de recuperación.'))
+            request.onblocked = () => reject(new Error('El almacenamiento de recuperación está bloqueado por otra pestaña.'))
+            request.onsuccess = () => {
+                const database = request.result
+                database.onversionchange = () => database.close()
+                resolve(database)
+            }
+        }).catch((error: unknown) => {
+            databasePromise = null
+            throw error
+        })
+        databasePromise = opening
+        return opening
+    }
+
+    return {
+        async getItem(key) {
+            const database = await openDatabase()
+            return new Promise<string | null>((resolve, reject) => {
+                const transaction = database.transaction(RECOVERY_STORE_NAME, 'readonly')
+                const request = transaction.objectStore(RECOVERY_STORE_NAME).get(key)
+                let result: unknown
+                request.onsuccess = () => {
+                    result = request.result
+                }
+                request.onerror = () => reject(new Error('No se pudo leer la recuperación de la importación.'))
+                transaction.oncomplete = () => resolve(typeof result === 'string' ? result : null)
+                transaction.onerror = () => reject(new Error('No se pudo leer la recuperación de la importación.'))
+                transaction.onabort = () => reject(new Error('No se pudo leer la recuperación de la importación.'))
+            })
+        },
+        async setItem(key, value) {
+            const database = await openDatabase()
+            await new Promise<void>((resolve, reject) => {
+                const transaction = database.transaction(RECOVERY_STORE_NAME, 'readwrite')
+                transaction.objectStore(RECOVERY_STORE_NAME).put(value, key)
+                transaction.oncomplete = () => resolve()
+                transaction.onerror = () => reject(new Error('No se pudo guardar la recuperación de la importación.'))
+                transaction.onabort = () => reject(new Error('No se pudo guardar la recuperación de la importación.'))
+            })
+        },
+    }
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -110,20 +206,19 @@ function isProductImportItem(value: unknown): value is ProductImportItem {
     )
 }
 
-export function saveProductImportRecovery(
+export async function saveProductImportRecovery(
     storage: ProductImportStorage,
     recovery: ProductImportRecovery,
-): void {
-    storage.setItem(
-        PRODUCT_IMPORT_RECOVERY_KEY,
-        JSON.stringify({ version: 1, ...recovery }),
-    )
+    key = PRODUCT_IMPORT_RECOVERY_KEY,
+): Promise<void> {
+    await storage.setItem(key, JSON.stringify({ version: 1, ...recovery }))
 }
 
-export function readProductImportRecovery(
+export async function readProductImportRecovery(
     storage: ProductImportStorage,
-): ProductImportRecovery | null {
-    const stored = storage.getItem(PRODUCT_IMPORT_RECOVERY_KEY)
+    key = PRODUCT_IMPORT_RECOVERY_KEY,
+): Promise<ProductImportRecovery | null> {
+    const stored = await storage.getItem(key)
     if (stored === null) return null
 
     let value: unknown
@@ -341,7 +436,7 @@ function parseProductImportRecords(
         row[columns.get(name) ?? -1]?.trim() ?? ''
     const categoryIds = new Set(
         categories
-            .filter((category) => category.activo === undefined || Boolean(category.activo))
+            .filter(isCategoryActive)
             .map((category) => Number(category.id_categoria)),
     )
     const dataRecords = records.slice(1)
@@ -437,6 +532,23 @@ function parseProductImportRecords(
     }
 
     if (items.length === 0) throw new Error('La planilla no contiene filas con productos.')
+
+    const skuRows = new Map<string, ProductImportItem[]>()
+    for (const item of items) {
+        if (!item.codigo) continue
+        const rows = skuRows.get(item.codigo) ?? []
+        rows.push(item)
+        skuRows.set(item.codigo, rows)
+    }
+    for (const rows of skuRows.values()) {
+        if (rows.length < 2) continue
+        for (const item of rows) {
+            item.errors.push('El código SKU está repetido dentro de la planilla.')
+            item.payload = null
+            item.status = 'invalid'
+        }
+    }
+
     return items
 }
 

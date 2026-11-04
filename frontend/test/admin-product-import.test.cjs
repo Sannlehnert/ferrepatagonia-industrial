@@ -20,6 +20,15 @@ new Function('require', 'module', 'exports', code)(
   (name) =>
     name === 'read-excel-file/browser'
       ? { readSheet: async () => xlsxRows }
+      : name === './adminProductService'
+        ? {
+            isCategoryActive: (category) =>
+              category.activo === undefined ||
+              category.activo === true ||
+              category.activo === 1 ||
+              category.activo === '1' ||
+              category.activo === 'true',
+          }
       : require(name),
   compiledModule,
   compiledModule.exports,
@@ -31,7 +40,10 @@ const {
   parseProductImportXlsx,
   readProductImportRecovery,
   saveProductImportRecovery,
+  getProductImportRecoveryKey,
+  getProductImportTabId,
   PRODUCT_IMPORT_RECOVERY_KEY,
+  PRODUCT_IMPORT_TAB_ID_KEY,
   PRODUCT_IMPORT_MAX_FILE_SIZE,
   PRODUCT_IMPORT_MAX_ROWS,
   PRODUCT_IMPORT_PREVIEW_ROWS,
@@ -52,6 +64,7 @@ const renderer = vue.createRenderer({
 
 const categories = [{ id_categoria: 3, nombre: 'Herramientas', activo: 1 }];
 const headers = 'codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo';
+const recoveryTabId = '00000000-0000-4000-8000-000000000001';
 
 test('parses quoted CSV fields, escaped quotes, line breaks, and zero stock', () => {
   const csv = [
@@ -177,7 +190,39 @@ test('parses XLSX rows through the same product contract', async () => {
   );
 });
 
-test('limits parsed rows and recovers interrupted imports as uncertain', () => {
+test('reads a namespaced XLSX workbook with the actual browser parser', async () => {
+  const browserModule = { exports: {} };
+  new Function('require', 'module', 'exports', code)(
+    (name) =>
+      name === 'read-excel-file/browser'
+        ? require('read-excel-file/browser')
+        : name === './adminProductService'
+          ? {
+              isCategoryActive: (category) =>
+                category.activo === undefined ||
+                category.activo === true ||
+                category.activo === 1 ||
+                category.activo === '1' ||
+                category.activo === 'true',
+            }
+          : require(name),
+    browserModule,
+    browserModule.exports,
+  );
+  const fixture = fs.readFileSync(
+    path.resolve(__dirname, 'fixtures/product-import-namespaced.xlsx'),
+  );
+  const file = new File([fixture], 'catalogo.xlsx');
+  const [item] = await browserModule.exports.parseProductImportXlsx(file, categories);
+
+  assert.equal(item.codigo, '000123');
+  assert.equal(item.payload.precio, 10.5);
+  assert.equal(item.payload.stock, 0);
+  assert.equal(item.payload.activo, false);
+  assert.deepEqual(item.errors, []);
+});
+
+test('limits parsed rows and recovers interrupted imports as uncertain', async () => {
   assert.throws(
     () => parseProductImportCsv('x'.repeat(PRODUCT_IMPORT_MAX_FILE_SIZE + 1), categories),
     /5 MB/,
@@ -200,18 +245,39 @@ test('limits parsed rows and recovers interrupted imports as uncertain', () => {
     `${headers}\nSKU-1,Producto,3,10,1,,,true`,
     categories,
   );
-  saveProductImportRecovery(storage, {
+  await saveProductImportRecovery(storage, {
     fileName: 'catalogo.csv',
     items: [{ ...item, status: 'creating' }],
   });
-  assert.ok(storage.getItem(PRODUCT_IMPORT_RECOVERY_KEY));
-  const recovered = readProductImportRecovery(storage);
+  assert.ok(await storage.getItem(PRODUCT_IMPORT_RECOVERY_KEY));
+  const recovered = await readProductImportRecovery(storage);
   assert.equal(recovered.fileName, 'catalogo.csv');
   assert.equal(recovered.items[0].status, 'uncertain');
   assert.match(recovered.items[0].errors[0], /sesión se interrumpió/);
 });
 
-async function mountImportView(t, service) {
+test('isolates recovery by administrator and browser tab', () => {
+  const values = new Map();
+  const storage = {
+    getItem: (key) => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, value),
+  };
+  const tabId = getProductImportTabId(storage);
+
+  assert.match(tabId, /^[a-f0-9-]{36}$/i);
+  assert.equal(getProductImportTabId(storage), tabId);
+  assert.equal(values.get(PRODUCT_IMPORT_TAB_ID_KEY), tabId);
+  assert.notEqual(
+    getProductImportRecoveryKey(21, tabId),
+    getProductImportRecoveryKey(21, '00000000-0000-4000-8000-000000000001'),
+  );
+  assert.notEqual(
+    getProductImportRecoveryKey(21, tabId),
+    getProductImportRecoveryKey(22, tabId),
+  );
+});
+
+async function mountImportView(t, service, options = {}) {
   const viewPath = path.resolve(
     __dirname,
     '../src/views/admin/AdminProductImportView.vue',
@@ -230,6 +296,17 @@ async function mountImportView(t, service) {
   const viewModule = { exports: {} };
   const previousWindow = global.window;
   const values = new Map();
+  values.set(PRODUCT_IMPORT_TAB_ID_KEY, recoveryTabId);
+  const storage = options.storage ?? {
+    async getItem(key) { return values.get(key) ?? null; },
+    async setItem(key, value) { values.set(key, value); },
+  };
+  const auth = options.auth ?? vue.reactive({
+    user: { id: 21, rol: 'ADMIN' },
+    rol: 'ADMIN',
+    sessionVersion: 1,
+    async fetchSession() {},
+  });
   global.window = {
     sessionStorage: {
       getItem: (key) => values.get(key) ?? null,
@@ -239,8 +316,12 @@ async function mountImportView(t, service) {
   new Function('require', 'module', 'exports', compiled)(
     (name) => {
       if (name === '@/services/adminProductService') return service;
+      if (name === '@/stores/auth') return { useAuthStore: () => auth };
       if (name === '@/services/adminProductImport') {
-        return compiledModule.exports;
+        return {
+          ...compiledModule.exports,
+          createProductImportRecoveryStorage: () => storage,
+        };
       }
       return require(name);
     },
@@ -263,7 +344,8 @@ async function mountImportView(t, service) {
   return {
     state: app._instance.setupState,
     app,
-    storage: global.window.sessionStorage,
+    storage,
+    auth,
   };
 }
 
@@ -286,6 +368,7 @@ test('previews valid rows, imports sequentially, and retries only rejected rows'
           isAxiosError: true,
           response: { status: 409, data: { message: 'SKU duplicado' } },
         });
+
       }
     },
   };
@@ -314,6 +397,25 @@ test('previews valid rows, imports sequentially, and retries only rejected rows'
     state.items.map((item) => item.status),
     ['created', 'created'],
   );
+});
+
+test('marks exact duplicate SKUs invalid before any product can be confirmed', () => {
+  const items = parseProductImportCsv(
+    `${headers}\nSKU-DUP,Producto 1,3,10,1,,,true\nSKU-DUP,Producto 2,3,20,2,,,true`,
+    categories,
+  );
+  assert.deepEqual(items.map((item) => item.status), ['invalid', 'invalid']);
+  assert.ok(items.every((item) => item.payload === null));
+  assert.ok(items.every((item) => item.errors.some((error) => error.includes('repetido'))));
+});
+
+test('does not treat a string zero category status as active', () => {
+  const [item] = parseProductImportCsv(
+    `${headers}\nSKU-1,Producto,3,10,1,,,true`,
+    [{ id_categoria: 3, nombre: 'Inactiva', activo: '0' }],
+  );
+  assert.equal(item.status, 'invalid');
+  assert.ok(item.errors.some((error) => error.includes('no existe o no está activa')));
 });
 
 test('parses XLSX files and renders only the bounded preview', async (t) => {
@@ -393,7 +495,7 @@ test('marks timed-out requests uncertain and never retries them automatically', 
     ['uncertain', 'ready'],
   );
   assert.deepEqual(
-    readProductImportRecovery(storage).items.map((item) => item.status),
+    (await readProductImportRecovery(storage, getProductImportRecoveryKey(21, recoveryTabId))).items.map((item) => item.status),
     ['uncertain', 'ready'],
   );
 });
@@ -427,11 +529,159 @@ test('aborts an in-flight create and recovers its result when leaving the screen
   app.unmount();
   await importPromise;
 
-  const recovered = readProductImportRecovery(storage);
+  const recovered = await readProductImportRecovery(storage, getProductImportRecoveryKey(21, recoveryTabId));
   assert.deepEqual(calls, ['SKU-1']);
   assert.equal(requestSignal.aborted, true);
   assert.deepEqual(
     recovered.items.map((item) => item.status),
     ['uncertain', 'ready'],
   );
+});
+
+test('stores recovery separately for each authenticated admin', async (t) => {
+  const storage = {
+    values: new Map(),
+    async getItem(key) { return this.values.get(key) ?? null; },
+    async setItem(key, value) { this.values.set(key, value); },
+  };
+  const [item] = parseProductImportCsv(
+    `${headers}\nSKU-PRIVATE,Producto privado,3,10,1,,,true`,
+    categories,
+  );
+  await saveProductImportRecovery(
+    storage,
+    { fileName: 'privado.csv', items: [item] },
+    getProductImportRecoveryKey(22, recoveryTabId),
+  );
+  const { state } = await mountImportView(t, {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async () => {},
+  }, { storage });
+
+  assert.notEqual(
+    getProductImportRecoveryKey(21, recoveryTabId),
+    getProductImportRecoveryKey(22, recoveryTabId),
+  );
+  assert.equal(state.items.length, 0);
+  assert.equal(state.isRecovered, false);
+});
+
+test('blocks product requests when durable recovery storage fails', async (t) => {
+  let createCalls = 0;
+  const storage = {
+    async getItem() { return null; },
+    async setItem() { throw new Error('QuotaExceededError'); },
+  };
+  const { state } = await mountImportView(t, {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async () => { createCalls += 1; },
+  }, { storage });
+  await state.selectFile({
+    name: 'catalogo.csv',
+    text: async () => `${headers}\nSKU-1,Producto,3,10,1,,,true`,
+  });
+
+  await state.importProducts();
+  assert.equal(state.recoveryError, 'QuotaExceededError');
+  assert.equal(createCalls, 0);
+});
+
+test('a concurrent confirmation call cannot duplicate an in-flight batch', async (t) => {
+  const calls = [];
+  let releaseCreate;
+  const service = {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async (payload) => {
+      calls.push(payload.codigo);
+      await new Promise((resolve) => { releaseCreate = resolve; });
+    },
+  };
+  const { state } = await mountImportView(t, service);
+  await state.selectFile({
+    name: 'catalogo.csv',
+    text: async () => `${headers}\nSKU-1,Producto 1,3,10,1,,,true`,
+  });
+
+  const firstImport = state.importProducts();
+  const secondImport = state.importProducts();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, ['SKU-1']);
+  releaseCreate();
+  await Promise.all([firstImport, secondImport]);
+  assert.deepEqual(state.items.map((item) => item.status), ['created']);
+});
+
+test('stops the batch and marks its in-flight row uncertain when the session changes', async (t) => {
+  const calls = [];
+  let requestSignal;
+  const service = {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async (payload, _productId, requestConfig) => {
+      calls.push(payload.codigo);
+      requestSignal = requestConfig.signal;
+      return new Promise((_resolve, reject) => {
+        requestSignal.addEventListener('abort', () => {
+          reject(Object.assign(new Error('request aborted'), { name: 'CanceledError' }));
+        });
+      });
+    },
+  };
+  const { state, auth, storage } = await mountImportView(t, service);
+  await state.selectFile({
+    name: 'catalogo.csv',
+    text: async () => [
+      headers,
+      'SKU-1,Producto 1,3,10,1,,,true',
+      'SKU-2,Producto 2,3,20,2,,,true',
+    ].join('\n'),
+  });
+
+  const importPromise = state.importProducts();
+  await new Promise((resolve) => setImmediate(resolve));
+  auth.sessionVersion += 1;
+  await vue.nextTick();
+  await importPromise;
+
+  assert.equal(requestSignal.aborted, true);
+  assert.deepEqual(calls, ['SKU-1']);
+  assert.deepEqual(state.items.map((item) => item.status), ['uncertain', 'ready']);
+  assert.deepEqual(
+    (await readProductImportRecovery(storage, getProductImportRecoveryKey(21, recoveryTabId))).items.map((item) => item.status),
+    ['uncertain', 'ready'],
+  );
+});
+
+test('refuses to submit a preview when the authenticated account changed in another tab', async (t) => {
+  let sessionChecks = 0;
+  const auth = vue.reactive({
+    user: { id: 21, rol: 'ADMIN' },
+    rol: 'ADMIN',
+    sessionVersion: 1,
+    async fetchSession() {
+      sessionChecks += 1;
+      if (sessionChecks === 2) {
+        this.user = { id: 22, rol: 'ADMIN' };
+        this.sessionVersion += 1;
+      }
+    },
+  });
+  let createCalls = 0;
+  const { state } = await mountImportView(t, {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async () => { createCalls += 1; },
+  }, { auth });
+  await state.selectFile({
+    name: 'catalogo.csv',
+    text: async () => `${headers}\nSKU-1,Producto,3,10,1,,,true`,
+  });
+
+  await state.importProducts();
+  assert.equal(createCalls, 0);
+  assert.equal(state.items.length, 0);
+  assert.match(state.recoveryError, /sesión administrativa cambió/);
 });
