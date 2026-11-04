@@ -455,6 +455,15 @@ function validateXlsxArchive(contents: ArrayBuffer): void {
         throw new Error('El archivo XLSX contiene directorios ZIP ambiguos.')
     }
 
+    // fflate follows a ZIP64 locator here even without sentinel EOCD fields.
+    // Reject that interpretation before budgeting the conventional directory.
+    if (
+        endRecordOffset >= 20 &&
+        view.getUint32(endRecordOffset - 20, true) === 0x07064b50
+    ) {
+        throw new Error('El archivo XLSX usa ZIP64, que no está admitido.')
+    }
+
     const diskNumber = view.getUint16(endRecordOffset + 4, true)
     const directoryDiskNumber = view.getUint16(endRecordOffset + 6, true)
     const entriesOnDisk = view.getUint16(endRecordOffset + 8, true)

@@ -206,6 +206,84 @@ function makeSharedStoredBlockXlsxFile(declaredSize) {
   };
 }
 
+async function makeZip64AlternateDirectoryFile() {
+  const shared = makeSharedStoredBlockXlsxFile(2 * 1024 * 1024);
+  const bytes = Buffer.from(await shared.arrayBuffer());
+  const end = bytes.length - 22;
+  const offset = bytes.readUInt32LE(end + 16);
+  const directory = bytes.subarray(offset, end);
+  const visible = Buffer.from(directory.subarray(0, 46 + directory.readUInt16LE(28)));
+  visible.writeUInt32LE(1, 20);
+  visible.writeUInt32LE(1, 24);
+  const zip64 = Buffer.alloc(56);
+  zip64.writeUInt32LE(0x06064b50, 0);
+  zip64.writeBigUInt64LE(44n, 4);
+  zip64.writeUInt16LE(45, 12);
+  zip64.writeUInt16LE(45, 14);
+  zip64.writeBigUInt64LE(13n, 24);
+  zip64.writeBigUInt64LE(13n, 32);
+  zip64.writeBigUInt64LE(BigInt(directory.length), 40);
+  zip64.writeBigUInt64LE(BigInt(offset), 48);
+  const locator = Buffer.alloc(20);
+  locator.writeUInt32LE(0x07064b50, 0);
+  locator.writeBigUInt64LE(BigInt(offset + directory.length), 8);
+  locator.writeUInt32LE(1, 16);
+  const eocd = Buffer.alloc(22);
+  eocd.writeUInt32LE(0x06054b50, 0);
+  eocd.writeUInt16LE(1, 8);
+  eocd.writeUInt16LE(1, 10);
+  eocd.writeUInt32LE(visible.length, 12);
+  eocd.writeUInt32LE(offset + directory.length + zip64.length, 16);
+  return new File([
+    bytes.subarray(0, offset), directory, zip64, visible, locator, eocd,
+  ], 'zip64.xlsx');
+}
+
+test('rejects ZIP64 redirection before extraction and preserves the previous batch', async (t) => {
+  let posts = 0;
+  const { state, storage } = await mountImportView(t, {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async () => { posts += 1; },
+  });
+  await state.selectFile({ name: 'valid.csv', text: async () => `${headers}\nKEEP,Producto,3,10,1,,,true` });
+  const key = getProductImportRecoveryKey(21, recoveryTabId);
+  const previous = await readProductImportRecovery(storage, key);
+  const callsBefore = unzipSyncCalls;
+  const readerBefore = readSheetCalls;
+  await state.selectFile(await makeZip64AlternateDirectoryFile());
+  assert.match(state.fileError, /ZIP64/);
+  assert.equal(unzipSyncCalls, callsBefore);
+  assert.equal(readSheetCalls, readerBefore);
+  assert.equal(posts, 0);
+  assert.deepEqual(await readProductImportRecovery(storage, key), previous);
+  assert.deepEqual(state.items.map((item) => item.codigo), ['KEEP']);
+});
+
+test('rejects EOCD ZIP64 sentinel fields before extraction', async () => {
+  for (const [offset, width] of [[8, 2], [10, 2], [12, 4], [16, 4]]) {
+    const bytes = Buffer.from(await makeXlsxFile().arrayBuffer());
+    const end = bytes.length - 22;
+    if (width === 2) bytes.writeUInt16LE(0xffff, end + offset);
+    else bytes.writeUInt32LE(0xffffffff, end + offset);
+    const callsBefore = unzipSyncCalls;
+    await assert.rejects(parseProductImportXlsx(new File([bytes], 'sentinel.xlsx'), categories), /ZIP no compatible/);
+    assert.equal(unzipSyncCalls, callsBefore);
+  }
+});
+
+test('allows conventional STORE and DEFLATE with incidental ZIP64 signatures in file data', async () => {
+  for (const level of [0, 6]) {
+    const bytes = zipSync({ 'notes.bin': strToU8('PK\u0006\u0007 ZIP64 PK\u0006\u0006') }, { level });
+    xlsxRows = [headers.split(','), ['000123', 'Producto', 3, 10, 1, '', '', true]];
+    const callsBefore = unzipSyncCalls;
+    const [item] = await parseProductImportXlsx(new File([bytes], 'ordinary.xlsx'), categories);
+    assert.equal(unzipSyncCalls, callsBefore + 1);
+    assert.equal(item.codigo, '000123');
+    assert.equal(item.status, 'ready');
+  }
+});
+
 test('parses quoted CSV fields, escaped quotes, line breaks, and zero stock', () => {
   const csv = [
     headers,
