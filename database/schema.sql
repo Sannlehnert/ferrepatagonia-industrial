@@ -13,7 +13,7 @@ CREATE TABLE PRODUCTO (
     codigo VARCHAR(100) NOT NULL,
     nombre VARCHAR(200) NOT NULL,
     descripcion TEXT NULL,
-    precio DECIMAL(12,2) NOT NULL,
+    precio DECIMAL(12,2) NULL DEFAULT NULL,
     stock INT NOT NULL,
     imagen VARCHAR(2048) NULL,
     activo BOOLEAN NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE PRODUCTO (
     KEY idx_producto_categoria (id_categoria),
     CONSTRAINT fk_producto_categoria FOREIGN KEY (id_categoria)
         REFERENCES CATEGORIA (id_categoria) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT chk_producto_precio CHECK (precio >= 0),
+    CONSTRAINT chk_producto_precio CHECK (precio IS NULL OR precio >= 0),
     CONSTRAINT chk_producto_stock CHECK (stock >= 0),
     CONSTRAINT chk_producto_descuento CHECK (descuento_especial_pct IS NULL OR (descuento_especial_pct >= 0 AND descuento_especial_pct <= 99.99)),
     CONSTRAINT chk_producto_activo CHECK (activo IN (0, 1))
@@ -75,7 +75,6 @@ CREATE TABLE CLIENTE (
         estado_aprobacion_empresa IS NULL
         OR estado_aprobacion_empresa IN ('PENDIENTE', 'APROBADA', 'RECHAZADA')
     ),
-    -- IS NOT NULL explicito evita que UNKNOWN permita empresas sin estado.
     CONSTRAINT chk_cliente_aprobacion_tipo CHECK (
         (tipo_cliente = 'PARTICULAR' AND estado_aprobacion_empresa IS NULL)
         OR (tipo_cliente = 'EMPRESA' AND estado_aprobacion_empresa IS NOT NULL)
@@ -148,8 +147,6 @@ CREATE TABLE DETALLE_PEDIDO (
     CONSTRAINT chk_detalle_subtotal CHECK (subtotal >= 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- La FK garantiza existencia y UNIQUE garantiza a lo sumo una cuenta por cliente.
--- Tipo EMPRESA, aprobacion y habilitacion requieren controles del backend.
 CREATE TABLE CUENTA_CORRIENTE (
     id_cuenta_corriente INT NOT NULL AUTO_INCREMENT,
     id_cliente INT NOT NULL,

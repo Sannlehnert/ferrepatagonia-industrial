@@ -13,7 +13,7 @@ export interface Cotizacion { id_cotizacion: number; tasa: string; fecha_referen
 export interface Categoria { id_categoria: number; nombre: string; descripcion: string | null; activo: number; productos?: Producto[]; }
 export interface Producto {
     id_producto: number; id_categoria: number; codigo: string; nombre: string;
-    descripcion: string | null; precio: string; descuento_especial_pct: string | null;
+    descripcion: string | null; precio: string | null; descuento_especial_pct: string | null;
     stock: number; imagen: string | null; activo: number; fecha_actualizacion: Date; categoria?: Categoria;
 }
 export interface Cliente {
@@ -80,14 +80,14 @@ export const ProductoSchema = new EntitySchema<Producto>({
     name: 'Producto', tableName: 'PRODUCTO',
     columns: {
         id_producto: id, id_categoria: { type: 'int' }, codigo: text(100), nombre: text(200),
-        descripcion: { type: 'text', nullable: true }, precio: { type: 'decimal', precision: 12, scale: 2 },
+        descripcion: { type: 'text', nullable: true }, precio: { type: 'decimal', precision: 12, scale: 2, nullable: true },
         descuento_especial_pct: { ...percentage, nullable: true },
         stock: { type: 'int' }, imagen: text(2048, true), activo: flag,
         fecha_actualizacion: { ...created, onUpdate: 'CURRENT_TIMESTAMP' },
     },
     indices: [{ name: 'uq_producto_codigo', columns: ['codigo'], unique: true }, { name: 'idx_producto_categoria', columns: ['id_categoria'] }],
     checks: [
-        { name: 'chk_producto_precio', expression: 'precio >= 0' },
+        { name: 'chk_producto_precio', expression: 'precio IS NULL OR precio >= 0' },
         { name: 'chk_producto_descuento', expression: 'descuento_especial_pct IS NULL OR (descuento_especial_pct >= 0 AND descuento_especial_pct <= 99.99)' },
         { name: 'chk_producto_stock', expression: 'stock >= 0' },
         { name: 'chk_producto_activo', expression: 'activo IN (0, 1)' },
