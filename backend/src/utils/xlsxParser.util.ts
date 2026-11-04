@@ -1,5 +1,12 @@
 import zlib from 'node:zlib';
-import {FileImportValidationError,ParsedSheetRow,validateHeaders,isRowCompletelyEmpty,MAX_IMPORT_ROWS,MAX_IMPORT_COLUMNS} from './import.utils';
+import {
+    FileImportValidationError,
+    ParsedSheetRow,
+    validateHeaders,
+    isRowCompletelyEmpty,
+    MAX_IMPORT_ROWS,
+    MAX_IMPORT_COLUMNS
+} from './import.utils';
 
 const MAX_XLSX_UNCOMPRESSED_BYTES = 10 * 1024 * 1024; // 10 MB anti Zip-Bomb
 const MAX_XLSX_ENTRIES = 100;
@@ -135,12 +142,13 @@ const parseSharedStringsXml = (xml: string | undefined): string[] => {
         return [];
     }
     const strings: string[] = [];
-    const siRegex = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
+    const siRegex = /<(?:[a-zA-Z0-9_-]+:)?si\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?si>/g;
     let siMatch: RegExpExecArray | null;
 
     while ((siMatch = siRegex.exec(xml)) !== null) {
         const siBody = siMatch[1];
-        const tRegex = /<t(?:\s+[^>]*)?>([\s\S]*?)<\/t>/g;
+        // H05: Soporte para elementos <t> o <x:t>
+        const tRegex = /<(?:[a-zA-Z0-9_-]+:)?t(?:\s+[^>]*)?>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?t>/g;
         let tMatch: RegExpExecArray | null;
         let combined = '';
         while ((tMatch = tRegex.exec(siBody)) !== null) {
@@ -153,9 +161,10 @@ const parseSharedStringsXml = (xml: string | undefined): string[] => {
 };
 
 const columnLettersToIndex = (letters: string): number => {
+    const upper = letters.toUpperCase();
     let index = 0;
-    for (let i = 0; i < letters.length; i++) {
-        index = index * 26 + (letters.charCodeAt(i) - 64);
+    for (let i = 0; i < upper.length; i++) {
+        index = index * 26 + (upper.charCodeAt(i) - 64);
     }
     return index - 1;
 };
@@ -176,7 +185,8 @@ export const parseXlsxBuffer = (buffer: Buffer): ParsedSheetRow[] => {
         throw new FileImportValidationError('El archivo Excel no contiene hojas con datos.');
     }
 
-    const rowRegex = /<row\b([^>]*)>([\s\S]*?)<\/row>/g;
+    // H05: Soporte para <row> o <x:row> (incluyendo etiquetas autocontenidas)
+    const rowRegex = /<(?:[a-zA-Z0-9_-]+:)?row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?row>)/g;
     let rowMatch: RegExpExecArray | null;
     let headers: string[] | null = null;
     const dataRows: ParsedSheetRow[] = [];
@@ -185,11 +195,11 @@ export const parseXlsxBuffer = (buffer: Buffer): ParsedSheetRow[] => {
     while ((rowMatch = rowRegex.exec(sheetXml)) !== null) {
         sequentialRowIndex++;
         const rowAttrs = rowMatch[1];
-        const rowBody = rowMatch[2];
-        const rAttrMatch = /\br="(\d+)"/.exec(rowAttrs);
+        const rowBody = rowMatch[2] ?? '';
+        const rAttrMatch = /\b(?:[a-zA-Z0-9_-]+:)?r="(\d+)"/.exec(rowAttrs);
         const rowNumber = rAttrMatch ? parseInt(rAttrMatch[1], 10) : sequentialRowIndex;
 
-        const cellRegex = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+        const cellRegex = /<(?:[a-zA-Z0-9_-]+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?c>)/g;
         let cellMatch: RegExpExecArray | null;
         const rowValues: string[] = [];
         let nextColIdx = 0;
@@ -198,7 +208,7 @@ export const parseXlsxBuffer = (buffer: Buffer): ParsedSheetRow[] => {
             const cellAttrs = cellMatch[1];
             const cellBody = cellMatch[2] ?? '';
 
-            const refMatch = /\br="([A-Z]+)\d+"/.exec(cellAttrs);
+            const refMatch = /\b(?:[a-zA-Z0-9_-]+:)?r="([A-Za-z]+)\d+"/.exec(cellAttrs);
             const colIdx = refMatch ? columnLettersToIndex(refMatch[1]) : nextColIdx;
             nextColIdx = colIdx + 1;
 
@@ -208,12 +218,12 @@ export const parseXlsxBuffer = (buffer: Buffer): ParsedSheetRow[] => {
                 );
             }
 
-            const typeMatch = /\bt="([^"]+)"/.exec(cellAttrs);
+            const typeMatch = /\b(?:[a-zA-Z0-9_-]+:)?t="([^"]+)"/.exec(cellAttrs);
             const cellType = typeMatch ? typeMatch[1] : 'n';
 
             let cellText = '';
             if (cellType === 'inlineStr') {
-                const tRegex = /<t(?:\s+[^>]*)?>([\s\S]*?)<\/t>/g;
+                const tRegex = /<(?:[a-zA-Z0-9_-]+:)?t(?:\s+[^>]*)?>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?t>/g;
                 let tMatch: RegExpExecArray | null;
                 let combined = '';
                 while ((tMatch = tRegex.exec(cellBody)) !== null) {
@@ -221,7 +231,8 @@ export const parseXlsxBuffer = (buffer: Buffer): ParsedSheetRow[] => {
                 }
                 cellText = combined;
             } else {
-                const vMatch = /<v\b[^>]*>([\s\S]*?)<\/v>/.exec(cellBody);
+                // H05: Soporte para <v> o <x:v>
+                const vMatch = /<(?:[a-zA-Z0-9_-]+:)?v\b[^>]*>([\s\S]*?)<\/(?:[a-zA-Z0-9_-]+:)?v>/.exec(cellBody);
                 const rawV = vMatch ? decodeXmlEntities(vMatch[1]).trim() : '';
 
                 if (cellType === 's') {

@@ -41,7 +41,9 @@ after(async () => {
     await destroyDatabase();
 });
 
-function buildTestXlsxBuffer(rows) {
+function buildTestXlsxBuffer(rows, prefix = '') {
+    const p = prefix ? `${prefix}:` : '';
+    const ns = prefix ? ` xmlns:${prefix}="http://schemas.openxmlformats.org/spreadsheetml/2006/main"` : '';
     const sharedStrings = [];
     const getSharedIndex = (str) => {
         let idx = sharedStrings.indexOf(str);
@@ -61,19 +63,19 @@ function buildTestXlsxBuffer(rows) {
         row.forEach((cellVal, cIdx) => {
             const ref = `${colLetter(cIdx)}${rowNum}`;
             if (typeof cellVal === 'number') {
-                cellsXml += `<c r="${ref}" t="n"><v>${cellVal}</v></c>`;
+                cellsXml += `<${p}c r="${ref}" t="n"><${p}v>${cellVal}</${p}v></${p}c>`;
             } else if (typeof cellVal === 'boolean') {
-                cellsXml += `<c r="${ref}" t="b"><v>${cellVal ? 1 : 0}</v></c>`;
+                cellsXml += `<${p}c r="${ref}" t="b"><${p}v>${cellVal ? 1 : 0}</${p}v></${p}c>`;
             } else {
                 const sIdx = getSharedIndex(String(cellVal ?? ''));
-                cellsXml += `<c r="${ref}" t="s"><v>${sIdx}</v></c>`;
+                cellsXml += `<${p}c r="${ref}" t="s"><${p}v>${sIdx}</${p}v></${p}c>`;
             }
         });
-        sheetRowsXml += `<row r="${rowNum}">${cellsXml}</row>`;
+        sheetRowsXml += `<${p}row r="${rowNum}">${cellsXml}</${p}row>`;
     });
 
-    const sheetXml = `<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>${sheetRowsXml}</sheetData></worksheet>`;
-    const sharedXml = `<?xml version="1.0" encoding="UTF-8"?><sst>${sharedStrings.map((s) => `<si><t>${s}</t></si>`).join('')}</sst>`;
+    const sheetXml = `<?xml version="1.0" encoding="UTF-8"?><${p}worksheet${ns}><${p}sheetData>${sheetRowsXml}</${p}sheetData></${p}worksheet>`;
+    const sharedXml = `<?xml version="1.0" encoding="UTF-8"?><${p}sst${ns}>${sharedStrings.map((s) => `<${p}si><${p}t>${s}</${p}t></${p}si>`).join('')}</${p}sst>`;
 
     const files = [
         { name: 'xl/sharedStrings.xml', data: Buffer.from(sharedXml, 'utf8') },
@@ -401,5 +403,22 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
 
         assert.equal(report.valid, false);
         assert.equal(report.duplicateInFileCount, 1);
+    });
+    await t.test('H05: valida correctamente XLSX con etiquetas prefijadas con namespaces XML (x:row, x:c, x:v)', async () => {
+        const buffer = buildTestXlsxBuffer([
+            ['codigo', 'nombre', 'id_categoria', 'precio', 'stock', 'activo'],
+            ['000123', 'Taladro', 1, 250.50, 10, true]
+        ], 'x');
+
+        const report = await validateProductImportFile(buffer, 'prefixed.xlsx');
+
+        assert.equal(report.valid, true);
+        assert.equal(report.validRowsCount, 1);
+        assert.equal(report.validRows[0].codigo, '000123');
+        assert.equal(report.validRows[0].nombre, 'Taladro');
+        assert.equal(report.validRows[0].id_categoria, 1);
+        assert.equal(report.validRows[0].precio, 250.5);
+        assert.equal(report.validRows[0].stock, 10);
+        assert.equal(report.validRows[0].activo, true);
     });
 });
