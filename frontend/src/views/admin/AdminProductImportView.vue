@@ -39,6 +39,7 @@ const previewPage = ref(0)
 const isLoadingReferences = ref(true)
 const isLoadingRecovery = ref(true)
 const isImporting = ref(false)
+const isReadingFile = ref(false)
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
@@ -78,6 +79,7 @@ const canImport = computed(
         !isLoadingRecovery.value &&
         !referenceError.value &&
         !recoveryError.value &&
+        !isReadingFile.value &&
         !isImporting.value &&
         readyItems.value.length > 0,
 )
@@ -88,6 +90,7 @@ const categoryNames = computed(
     ])),
 )
 let fileSelectionGeneration = 0
+let currentBatchId = 0
 let activeImportController: AbortController | null = null
 let isUnmounting = false
 let referencesRequest: Promise<void> | null = null
@@ -113,8 +116,8 @@ function loadReferences(): Promise<void> {
     referencesRequest = (async () => {
         try {
             const [loadedProducts, loadedCategories] = await Promise.all([
-                getAdminProducts(),
-                getActiveCategories(),
+                getAdminProducts({ timeout: PRODUCT_IMPORT_REQUEST_TIMEOUT_MS }),
+                getActiveCategories({ timeout: PRODUCT_IMPORT_REQUEST_TIMEOUT_MS }),
             ])
             products.value = loadedProducts
             categories.value = loadedCategories
@@ -141,20 +144,36 @@ function getRecoveryKey() {
     return getProductImportRecoveryKey(recoveryOwnerId ?? NaN, recoveryTabId)
 }
 
-async function persistRecovery(): Promise<boolean> {
+function isCurrentBatch(batch: {
+    id: number
+    fileName: string
+}): boolean {
+    return batch.id === currentBatchId &&
+        batch.fileName === selectedFileName.value
+}
+
+async function persistRecovery(
+    batch = {
+        id: currentBatchId,
+        fileName: selectedFileName.value,
+        items: items.value,
+    },
+): Promise<boolean> {
     try {
         await saveProductImportRecovery(
             getRecoveryStorage(),
-            { fileName: selectedFileName.value, items: items.value },
+            { fileName: batch.fileName, items: batch.items },
             getRecoveryKey(),
         )
-        recoveryError.value = ''
+        if (isCurrentBatch(batch)) recoveryError.value = ''
         return true
     } catch (error: unknown) {
-        recoveryError.value = errorMessage(
-            error,
-            'No se pudo guardar el estado recuperable de la importación.',
-        )
+        if (isCurrentBatch(batch)) {
+            recoveryError.value = errorMessage(
+                error,
+                'No se pudo guardar el estado recuperable de la importación.',
+            )
+        }
         return false
     }
 }
@@ -175,6 +194,7 @@ async function restoreRecovery() {
             getRecoveryKey(),
         )
         if (!recovery) return
+        currentBatchId += 1
         selectedFileName.value = recovery.fileName
         items.value = recovery.items
         previewPage.value = 0
@@ -194,9 +214,10 @@ async function restoreRecovery() {
 
 async function selectFile(file: File | undefined) {
     if (isImporting.value || isLoadingRecovery.value || auth.rol !== 'ADMIN') return
+    if (!file) return
     const generation = ++fileSelectionGeneration
     fileError.value = ''
-    if (!file) return
+    isReadingFile.value = false
 
     const extension = file.name.toLowerCase().split('.').pop()
     if (extension !== 'csv' && extension !== 'xlsx') {
@@ -208,6 +229,7 @@ async function selectFile(file: File | undefined) {
         return
     }
 
+    isReadingFile.value = true
     try {
         await loadReferences()
         if (generation !== fileSelectionGeneration) return
@@ -217,17 +239,28 @@ async function selectFile(file: File | undefined) {
         }
         const parsedItems =
             extension === 'xlsx'
-                ? await parseProductImportXlsx(file, categories.value)
-                : parseProductImportCsv(await file.text(), categories.value)
+                ? await parseProductImportXlsx(file, categories.value, products.value)
+                : parseProductImportCsv(
+                    await file.text(),
+                    categories.value,
+                    products.value,
+                )
         if (generation !== fileSelectionGeneration) return
-        items.value = parsedItems
-        selectedFileName.value = file.name
+        const batch = {
+            id: ++currentBatchId,
+            fileName: file.name,
+            items: parsedItems,
+        }
+        items.value = batch.items
+        selectedFileName.value = batch.fileName
         previewPage.value = 0
         isRecovered.value = false
-        if (!(await persistRecovery())) return
+        if (!(await persistRecovery(batch))) return
     } catch (error: unknown) {
         if (generation !== fileSelectionGeneration) return
         fileError.value = errorMessage(error, 'No se pudo leer la planilla.')
+    } finally {
+        if (generation === fileSelectionGeneration) isReadingFile.value = false
     }
 }
 
@@ -274,13 +307,20 @@ function isDefinitiveRejection(error: unknown): boolean {
 async function importProducts(retryRejected = false) {
     if (
         isImporting.value ||
+        isReadingFile.value ||
         isLoadingRecovery.value ||
         isLoadingReferences.value ||
         referenceError.value ||
         recoveryError.value ||
         auth.rol !== 'ADMIN'
     ) return
-    const targets = items.value.filter((item) =>
+    const batch = {
+        id: currentBatchId,
+        fileName: selectedFileName.value,
+        items: items.value,
+    }
+    if (!isCurrentBatch(batch)) return
+    const targets = batch.items.filter((item) =>
         retryRejected ? item.status === 'rejected' : item.status === 'ready',
     )
     if (targets.length === 0) return
@@ -302,6 +342,7 @@ async function importProducts(retryRejected = false) {
         }
         if (
             isUnmounting ||
+            !isCurrentBatch(batch) ||
             auth.sessionVersion !== sessionVersion ||
             auth.user?.id !== ownerId ||
             auth.rol !== 'ADMIN'
@@ -315,10 +356,11 @@ async function importProducts(retryRejected = false) {
         sessionVersion = auth.sessionVersion
         controller = new AbortController()
         activeImportController = controller
-        if (!(await persistRecovery())) return
+        if (!(await persistRecovery(batch))) return
         for (const item of targets) {
             if (
                 isUnmounting ||
+                !isCurrentBatch(batch) ||
                 controller.signal.aborted ||
                 auth.sessionVersion !== sessionVersion ||
                 auth.rol !== 'ADMIN'
@@ -326,7 +368,7 @@ async function importProducts(retryRejected = false) {
             if (!item.payload) continue
             item.status = 'creating'
             item.errors = []
-            if (!(await persistRecovery())) {
+            if (!(await persistRecovery(batch))) {
                 item.status = 'ready'
                 break
             }
@@ -339,6 +381,7 @@ async function importProducts(retryRejected = false) {
                 })
                 if (
                     isUnmounting ||
+                    !isCurrentBatch(batch) ||
                     controller.signal.aborted ||
                     auth.sessionVersion !== sessionVersion
                 ) {
@@ -375,7 +418,7 @@ async function importProducts(retryRejected = false) {
                     shouldStop = true
                 }
             }
-            if (!(await persistRecovery())) {
+            if (!(await persistRecovery(batch))) {
                 if (item.status === 'created') {
                     item.status = 'uncertain'
                     item.errors = [
@@ -540,7 +583,7 @@ onBeforeUnmount(recoverInterruptedImport)
                         type="file"
                         accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                         class="sr-only"
-                        :disabled="isLoadingRecovery || isLoadingReferences || Boolean(referenceError) || isImporting"
+                        :disabled="isLoadingRecovery || isLoadingReferences || Boolean(referenceError) || isImporting || isReadingFile"
                         @change="handleFileChange"
                     >
                 </label>
@@ -551,6 +594,9 @@ onBeforeUnmount(recoverInterruptedImport)
                     Se recuperó el estado guardado de esta importación.
                 </p>
             </div>
+            <p v-if="isReadingFile" role="status" class="text-sm text-slate-600">
+                Leyendo y validando la planilla…
+            </p>
             <p v-if="fileError" role="alert" class="text-sm text-red-700">
                 {{ fileError }}
             </p>
@@ -576,7 +622,7 @@ onBeforeUnmount(recoverInterruptedImport)
                         v-if="rejectedItems.length"
                         type="button"
                         class="min-h-11 rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 disabled:opacity-50"
-                        :disabled="isImporting"
+                        :disabled="isImporting || isReadingFile"
                         @click="importProducts(true)"
                     >
                         Reintentar filas rechazadas ({{ rejectedItems.length }})
@@ -632,7 +678,7 @@ onBeforeUnmount(recoverInterruptedImport)
                     <button
                         type="button"
                         class="min-h-11 rounded-md border border-slate-400 bg-white px-4 py-2 font-semibold hover:bg-slate-100 disabled:opacity-50"
-                        :disabled="isImporting"
+                        :disabled="isImporting || isReadingFile"
                         @click="fileInput?.click()"
                     >
                         Seleccionar otra planilla

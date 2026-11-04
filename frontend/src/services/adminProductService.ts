@@ -41,8 +41,12 @@ export interface ProductPayload {
     activo: boolean;
 }
 
-export async function getAdminProducts(): Promise<AdminProduct[]> {
-    const response = await api.get<any>('/admin/productos');
+export async function getAdminProducts(
+    requestConfig?: Pick<AxiosRequestConfig, 'signal' | 'timeout'>,
+): Promise<AdminProduct[]> {
+    const response = requestConfig
+        ? await api.get<any>('/admin/productos', requestConfig)
+        : await api.get<any>('/admin/productos');
     const raw = response.data;
 
     if (Array.isArray(raw)) return raw;
@@ -62,8 +66,12 @@ export async function updateAdminProductStock(productId: number, stock: number):
     await api.patch(`/admin/productos/${productId}/stock`, { stock });
 }
 
-export async function getActiveCategories(): Promise<CategoryOption[]> {
-    const response = await api.get<any>('/categorias');
+export async function getActiveCategories(
+    requestConfig?: Pick<AxiosRequestConfig, 'signal' | 'timeout'>,
+): Promise<CategoryOption[]> {
+    const response = requestConfig
+        ? await api.get<any>('/categorias', requestConfig)
+        : await api.get<any>('/categorias');
     const raw = response.data;
 
     // Extraemos de forma segura el arreglo independientemente de la estructura del backend

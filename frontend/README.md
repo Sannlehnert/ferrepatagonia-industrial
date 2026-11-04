@@ -55,10 +55,13 @@ precio admite punto o coma decimal, con hasta dos decimales.
 La validación y previsualización se realizan antes de confirmar. La importación
 usa el endpoint administrativo existente para crear productos, una fila por
 solicitud; no es una operación atómica. Los rechazos se informan en el reporte
-CSV, y la unicidad de SKU queda a cargo del índice único de MariaDB mediante el
-backend. Los archivos tienen un límite de 5 MB y 1000 filas; se muestran como
-máximo 100 filas en la previsualización. Descripción, URL de imagen y estado
-activo/inactivo son visibles antes de confirmar.
+CSV. Los SKU que ya aparecen en el catálogo o repetidos en el archivo se marcan
+en la previsualización sin distinguir mayúsculas; el índice único de MariaDB
+en el backend conserva la validación definitiva. Los archivos tienen un límite
+de 5 MB, 1000 filas y, para XLSX, 24 MB de contenido descomprimido. Las celdas
+con fórmulas se rechazan antes de leer sus valores almacenados. Se muestran
+como máximo 100 filas en la previsualización. Descripción, URL de imagen y
+estado activo/inactivo son visibles antes de confirmar.
 
 El estado y los resultados se guardan localmente en IndexedDB, separados por
 usuario administrativo y pestaña del navegador. Las altas secuenciales tienen
@@ -67,9 +70,10 @@ marca la fila como incierta y se detiene el proceso para evitar reintentos
 automáticos. Al salir de la pantalla se cancela la solicitud activa y se
 conserva un estado recuperable. La pantalla permite reintentar solo rechazos
 confirmados y vuelve a cargar productos y categorías después de importar y
-antes de validar otra planilla. Al cambiar la sesión se aborta la solicitud
-activa y su resultado queda como incierto. Los SKU exactamente
-duplicados dentro del archivo se marcan antes de confirmar; la unicidad final,
+antes de validar otra planilla. Las consultas de referencias tienen un timeout
+de 30 segundos y muestran una opción para reintentar; la confirmación queda
+bloqueada mientras se lee una nueva planilla. Al cambiar la sesión se aborta la
+solicitud activa y su resultado queda como incierto. La unicidad final,
 incluidas equivalencias según la collation, sigue siendo responsabilidad del
 servidor. La API bulk de FER-16 no forma parte de este flujo hasta que su contrato
 esté disponible.

@@ -1,11 +1,14 @@
 import { readSheet } from 'read-excel-file/browser'
+import { unzipSync } from 'fflate'
 import type {
+    AdminProduct,
     CategoryOption,
     ProductPayload,
 } from './adminProductService'
 import { isCategoryActive } from './adminProductService'
 
 export const PRODUCT_IMPORT_MAX_FILE_SIZE = 5 * 1024 * 1024
+export const PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE = 24 * 1024 * 1024
 export const PRODUCT_IMPORT_MAX_ROWS = 1000
 export const PRODUCT_IMPORT_PREVIEW_ROWS = 100
 export const PRODUCT_IMPORT_REQUEST_TIMEOUT_MS = 30_000
@@ -360,6 +363,7 @@ function parsePrice(value: string): number | null {
 export function parseProductImportCsv(
     content: string,
     categories: readonly CategoryOption[],
+    existingProducts: readonly Pick<AdminProduct, 'codigo'>[] = [],
 ): ProductImportItem[] {
     if (utf8Encoder.encode(content).length > PRODUCT_IMPORT_MAX_FILE_SIZE) {
         throw new Error('El archivo supera el límite de 5 MB.')
@@ -374,18 +378,23 @@ export function parseProductImportCsv(
         )
     }
 
-    return parseProductImportRecords(records, categories)
+    return parseProductImportRecords(records, categories, existingProducts)
 }
 
 export async function parseProductImportXlsx(
     file: File,
     categories: readonly CategoryOption[],
+    existingProducts: readonly Pick<AdminProduct, 'codigo'>[] = [],
 ): Promise<ProductImportItem[]> {
     if (file.size > PRODUCT_IMPORT_MAX_FILE_SIZE) {
         throw new Error('El archivo supera el límite de 5 MB.')
     }
 
-    const rows = await readSheet(file)
+    const contents = await file.arrayBuffer()
+    validateXlsxArchive(contents)
+    rejectXlsxFormulas(unzipSync(new Uint8Array(contents)))
+
+    const rows = await readSheet(contents)
     const records = rows.map((row, index) => ({
         cells: row.map((cell) => {
             if (cell === null || cell === undefined) return ''
@@ -394,12 +403,214 @@ export async function parseProductImportXlsx(
         }),
         line: index + 1,
     }))
-    return parseProductImportRecords(records, categories)
+    return parseProductImportRecords(records, categories, existingProducts)
+}
+
+function validateXlsxArchive(contents: ArrayBuffer): void {
+    const bytes = new Uint8Array(contents)
+    const view = new DataView(contents)
+    const earliestEndRecord = Math.max(0, bytes.length - 22 - 0xffff)
+    let endRecordOffset = -1
+
+    for (let offset = bytes.length - 22; offset >= earliestEndRecord; offset -= 1) {
+        if (
+            view.getUint32(offset, true) === 0x06054b50 &&
+            offset + 22 + view.getUint16(offset + 20, true) === bytes.length
+        ) {
+            endRecordOffset = offset
+            break
+        }
+    }
+
+    if (endRecordOffset < 0) {
+        throw new Error('El archivo XLSX no contiene un directorio ZIP válido.')
+    }
+
+    const diskNumber = view.getUint16(endRecordOffset + 4, true)
+    const directoryDiskNumber = view.getUint16(endRecordOffset + 6, true)
+    const entriesOnDisk = view.getUint16(endRecordOffset + 8, true)
+    const entryCount = view.getUint16(endRecordOffset + 10, true)
+    const directorySize = view.getUint32(endRecordOffset + 12, true)
+    const directoryOffset = view.getUint32(endRecordOffset + 16, true)
+    if (
+        diskNumber !== 0 ||
+        directoryDiskNumber !== 0 ||
+        entriesOnDisk !== entryCount ||
+        entryCount === 0xffff ||
+        directorySize === 0xffffffff ||
+        directoryOffset === 0xffffffff ||
+        directoryOffset + directorySize > endRecordOffset
+    ) {
+        throw new Error('El archivo XLSX usa una estructura ZIP no compatible.')
+    }
+    if (entryCount > 512) {
+        throw new Error('El archivo XLSX supera el máximo de 512 entradas ZIP.')
+    }
+
+    let expandedSize = 0
+    let offset = directoryOffset
+    for (let index = 0; index < entryCount; index += 1) {
+        if (
+            offset + 46 > directoryOffset + directorySize ||
+            view.getUint32(offset, true) !== 0x02014b50
+        ) {
+            throw new Error('El archivo XLSX contiene un directorio ZIP inválido.')
+        }
+
+        const flags = view.getUint16(offset + 8, true)
+        const compressedSize = view.getUint32(offset + 20, true)
+        const uncompressedSize = view.getUint32(offset + 24, true)
+        const nameLength = view.getUint16(offset + 28, true)
+        const extraLength = view.getUint16(offset + 30, true)
+        const commentLength = view.getUint16(offset + 32, true)
+        const entryEnd = offset + 46 + nameLength + extraLength + commentLength
+
+        if (
+            entryEnd > directoryOffset + directorySize ||
+            (flags & 1) !== 0 ||
+            compressedSize === 0xffffffff ||
+            uncompressedSize === 0xffffffff
+        ) {
+            throw new Error('El archivo XLSX contiene una entrada ZIP no compatible.')
+        }
+
+        expandedSize += uncompressedSize
+        if (expandedSize > PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE) {
+            throw new Error('El XLSX supera el límite de 24 MB descomprimidos.')
+        }
+        offset = entryEnd
+    }
+}
+
+function getXmlAttribute(attributes: string, name: string): string | null {
+    const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const match = new RegExp(`(?:^|\\s)${escapedName}\\s*=\\s*(["'])(.*?)\\1`).exec(attributes)
+    return match?.[2] ?? null
+}
+
+function decodeXmlText(value: string): string {
+    return value.replace(
+        /&(#x[\da-f]+|#\d+|amp|lt|gt|quot|apos);/gi,
+        (entity, name: string) => {
+            if (name[0] === '#') {
+                const codePoint = name[1]?.toLowerCase() === 'x'
+                    ? Number.parseInt(name.slice(2), 16)
+                    : Number.parseInt(name.slice(1), 10)
+                return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity
+            }
+            return {
+                amp: '&',
+                lt: '<',
+                gt: '>',
+                quot: '"',
+                apos: "'",
+            }[name.toLowerCase()] ?? entity
+        },
+    )
+}
+
+function getWorksheetPath(files: Record<string, Uint8Array>): string {
+    const decoder = new TextDecoder()
+    const workbook = files['xl/workbook.xml']
+    const relationships = files['xl/_rels/workbook.xml.rels']
+    if (!workbook || !relationships) return 'xl/worksheets/sheet1.xml'
+
+    const sheetTag = /<(?:[\w.-]+:)?sheet\b([^>]*)\/?>/.exec(
+        decoder.decode(workbook),
+    )?.[1]
+    const relationshipId = sheetTag
+        ? getXmlAttribute(sheetTag, 'r:id')
+        : null
+    if (!relationshipId) return 'xl/worksheets/sheet1.xml'
+
+    const relationshipTags = decoder.decode(relationships).matchAll(
+        /<(?:[\w.-]+:)?Relationship\b([^>]*)\/?>/g,
+    )
+    for (const [, attributes] of relationshipTags) {
+        if (getXmlAttribute(attributes ?? '', 'Id') !== relationshipId) continue
+        const target = getXmlAttribute(attributes ?? '', 'Target')
+        if (!target) break
+        const pathParts: string[] = []
+        for (const part of (target.startsWith('/') ? target.slice(1) : `xl/${target}`).split('/')) {
+            if (part === '..') pathParts.pop()
+            else if (part !== '.' && part !== '') pathParts.push(part)
+        }
+        return pathParts.join('/')
+    }
+
+    return 'xl/worksheets/sheet1.xml'
+}
+
+function rejectXlsxFormulas(files: Record<string, Uint8Array>): void {
+    const worksheet = files[getWorksheetPath(files)]
+    if (!worksheet) return
+
+    const decoder = new TextDecoder()
+    const worksheetXml = decoder.decode(worksheet)
+    const sharedStringsXml = files['xl/sharedStrings.xml']
+    const sharedStrings = sharedStringsXml
+        ? Array.from(decoder.decode(sharedStringsXml).matchAll(
+            /<(?:[\w.-]+:)?si\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?si\s*>/g,
+        ))
+            .map(([, item]) =>
+                Array.from(item?.matchAll(
+                    /<(?:[\w.-]+:)?t\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?t\s*>/g,
+                ) ?? [])
+                    .map(([, text]) => decodeXmlText(text ?? ''))
+                    .join(''),
+            )
+        : []
+    const headers = new Map<number, string>()
+    const cells = worksheetXml.matchAll(
+        /<(?:[\w.-]+:)?c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/(?:[\w.-]+:)?c\s*>)/g,
+    )
+
+    for (const [, attributes = '', content = ''] of cells) {
+        const reference = getXmlAttribute(attributes, 'r') ?? ''
+        const coordinates = /^([A-Z]+)(\d+)$/i.exec(reference)
+        if (!coordinates) continue
+
+        const columnLetters = coordinates[1]?.toUpperCase() ?? ''
+        const rowNumber = Number(coordinates[2])
+        let columnNumber = 0
+        for (const letter of columnLetters) {
+            columnNumber = columnNumber * 26 + letter.charCodeAt(0) - 64
+        }
+        const columnIndex = columnNumber - 1
+
+        if (rowNumber === 1) {
+            const cellType = getXmlAttribute(attributes, 't')
+            const value = /<(?:[\w.-]+:)?v\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?v\s*>/.exec(
+                content,
+            )?.[1]
+            const inlineText = Array.from(content.matchAll(
+                /<(?:[\w.-]+:)?t\b[^>]*>([\s\S]*?)<\/(?:[\w.-]+:)?t\s*>/g,
+            ))
+                .map(([, text]) => decodeXmlText(text ?? ''))
+                .join('')
+            const header = cellType === 's' && value !== undefined
+                ? sharedStrings[Number(value)] ?? ''
+                : cellType === 'inlineStr'
+                    ? inlineText
+                    : value === undefined
+                        ? ''
+                        : decodeXmlText(value)
+            if (header) headers.set(columnIndex, header.trim().toLowerCase())
+        }
+
+        if (/<(?:[\w.-]+:)?f\b[^>]*(?:\/>|>[\s\S]*?<\/(?:[\w.-]+:)?f\s*>)/.test(content)) {
+            const columnName = headers.get(columnIndex) ?? `columna ${columnLetters}`
+            throw new Error(
+                `No se permiten fórmulas en la fila ${rowNumber}, campo "${columnName}".`,
+            )
+        }
+    }
 }
 
 function parseProductImportRecords(
     records: CsvRecord[],
     categories: readonly CategoryOption[],
+    existingProducts: readonly Pick<AdminProduct, 'codigo'>[] = [],
 ): ProductImportItem[] {
     if (records.length < 2) {
         throw new Error('La planilla debe incluir encabezados y al menos una fila.')
@@ -439,6 +650,9 @@ function parseProductImportRecords(
             .filter(isCategoryActive)
             .map((category) => Number(category.id_categoria)),
     )
+    const existingSkuCodes = new Set(
+        existingProducts.map((product) => product.codigo.toLowerCase()),
+    )
     const dataRecords = records.slice(1)
     const nonEmptyRecords = dataRecords.filter(
         ({ cells }) => !cells.every((value) => value.trim() === ''),
@@ -468,6 +682,9 @@ function parseProductImportRecords(
         }
         if (!codigo) errors.push('El código SKU es obligatorio.')
         else if (codigo.length > 100) errors.push('El código SKU supera los 100 caracteres.')
+        else if (existingSkuCodes.has(codigo.toLowerCase())) {
+            errors.push('El código SKU ya existe en el catálogo.')
+        }
 
         if (!nombre) errors.push('El nombre del producto es obligatorio.')
         else if (nombre.length > 200) errors.push('El nombre supera los 200 caracteres.')
@@ -536,9 +753,10 @@ function parseProductImportRecords(
     const skuRows = new Map<string, ProductImportItem[]>()
     for (const item of items) {
         if (!item.codigo) continue
-        const rows = skuRows.get(item.codigo) ?? []
+        const normalizedCode = item.codigo.toLowerCase()
+        const rows = skuRows.get(normalizedCode) ?? []
         rows.push(item)
-        skuRows.set(item.codigo, rows)
+        skuRows.set(normalizedCode, rows)
     }
     for (const rows of skuRows.values()) {
         if (rows.length < 2) continue
@@ -558,7 +776,9 @@ export function createProductImportTemplate(): string {
 
 function csvCell(value: string): string {
     const sanitized = value.replace(/[\p{Cc}\p{Cf}]/gu, ' ')
-    const safeValue = /^[\s]*[=+\-@]/u.test(sanitized) ? `'${sanitized}` : sanitized
+    const safeValue = /^[\s]*[=+\-@]/u.test(sanitized.normalize('NFKC'))
+        ? `'${sanitized}`
+        : sanitized
     return `"${safeValue.replaceAll('"', '""')}"`
 }
 

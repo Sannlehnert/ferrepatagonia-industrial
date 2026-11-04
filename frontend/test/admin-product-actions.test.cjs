@@ -94,5 +94,7 @@ test('service calls shared Axios with real route methods and minimal payloads',a
  const service=load('services/adminProductService.ts',{'@/services/api':api});
  await service.setAdminProductActive(7,false);await service.setAdminProductActive(7,true);await service.updateAdminProductStock(7,0);assert.deepEqual(await service.getAdminProducts(),[product]);
  assert.deepEqual(calls,[['patch','/admin/productos/7/desactivar'],['put','/admin/productos/7',{activo:true}],['patch','/admin/productos/7/stock',{stock:0}],['get','/admin/productos']]);
+ const requestConfig={timeout:123};await service.getAdminProducts(requestConfig);await service.getActiveCategories(requestConfig);
+ assert.deepEqual(calls.slice(-2),[['get','/admin/productos',requestConfig],['get','/categorias',requestConfig]]);
  api.get=async()=>({data:'<html>error</html>'});await assert.rejects(service.getAdminProducts(),/no es válida/);
 });

@@ -4,11 +4,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ts = require('typescript');
 const vue = require('vue');
+const { strToU8, zipSync } = require('fflate');
 const { parse, compileScript } = require('@vue/compiler-sfc');
 
 const filename = path.resolve(__dirname, '../src/services/adminProductImport.ts');
 const source = fs.readFileSync(filename, 'utf8');
 let xlsxRows = [];
+let readSheetCalls = 0;
 const code = ts.transpileModule(source, {
   compilerOptions: {
     module: ts.ModuleKind.CommonJS,
@@ -19,7 +21,12 @@ const compiledModule = { exports: {} };
 new Function('require', 'module', 'exports', code)(
   (name) =>
     name === 'read-excel-file/browser'
-      ? { readSheet: async () => xlsxRows }
+    ? {
+        readSheet: async () => {
+          readSheetCalls += 1;
+          return xlsxRows;
+        },
+      }
       : name === './adminProductService'
         ? {
             isCategoryActive: (category) =>
@@ -45,6 +52,7 @@ const {
   PRODUCT_IMPORT_RECOVERY_KEY,
   PRODUCT_IMPORT_TAB_ID_KEY,
   PRODUCT_IMPORT_MAX_FILE_SIZE,
+  PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE,
   PRODUCT_IMPORT_MAX_ROWS,
   PRODUCT_IMPORT_PREVIEW_ROWS,
   PRODUCT_IMPORT_REQUEST_TIMEOUT_MS,
@@ -65,6 +73,26 @@ const renderer = vue.createRenderer({
 const categories = [{ id_categoria: 3, nombre: 'Herramientas', activo: 1 }];
 const headers = 'codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo';
 const recoveryTabId = '00000000-0000-4000-8000-000000000001';
+
+function makeXlsxFile(sheetXml = '<worksheet/>') {
+  const contents = zipSync({
+    'xl/workbook.xml': strToU8(
+      '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Productos" sheetId="1" r:id="rId1"/></sheets></workbook>',
+    ),
+    'xl/_rels/workbook.xml.rels': strToU8(
+      '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+    ),
+    'xl/worksheets/sheet1.xml': strToU8(sheetXml),
+  });
+  const buffer = contents.buffer.slice(
+    contents.byteOffset,
+    contents.byteOffset + contents.byteLength,
+  );
+  return {
+    size: contents.byteLength,
+    arrayBuffer: async () => buffer,
+  };
+}
 
 test('parses quoted CSV fields, escaped quotes, line breaks, and zero stock', () => {
   const csv = [
@@ -108,7 +136,7 @@ test('defers SKU uniqueness to the backend and reports invalid fields', () => {
     headers,
     'EXISTENTE,Producto,3,10,1,,,true',
     'SKU-2,Producto,99,-1,1.5,,,no',
-    'sku-2,Producto,3,10,1,,,true',
+    'sku-3,Producto,3,10,1,,,true',
   ].join('\n');
 
   const items = parseProductImportCsv(csv, categories);
@@ -119,6 +147,20 @@ test('defers SKU uniqueness to the backend and reports invalid fields', () => {
   assert.ok(items[1].errors.some((error) => error.includes('stock')));
   assert.ok(items[1].errors.some((error) => error.includes('true o false')));
   assert.equal(items[2].status, 'ready');
+});
+
+test('marks catalog SKUs invalid case-insensitively while leaving final uniqueness to the backend', () => {
+  const [existing, newItem] = parseProductImportCsv(
+    `${headers}\nknown-sku,Producto existente,3,10,1,,,true\nNEW-SKU,Producto nuevo,3,10,1,,,true`,
+    categories,
+    [{ codigo: 'Known-Sku' }],
+  );
+
+  assert.equal(existing.status, 'invalid');
+  assert.equal(existing.payload, null);
+  assert.ok(existing.errors.some((error) => error.includes('ya existe en el catálogo')));
+  assert.equal(newItem.status, 'ready');
+  assert.ok(newItem.payload);
 });
 
 test('rejects malformed or incomplete CSV headers and unclosed quotes', () => {
@@ -148,7 +190,16 @@ test('creates a template and neutralizes formulas and control characters in repo
       line: 3,
       codigo: '\u0000=1+1',
       nombre: '\t@SUM(1,1)',
-      errors: ['Error\r\n=HYPERLINK("https://example.test")\u0000'],
+      errors: [
+        'Error\r\n=HYPERLINK("https://example.test")\u0000',
+      ],
+    },
+    {
+      ...item,
+      line: 4,
+      codigo: '＝1+1',
+      nombre: '＋SUM(1,1)',
+      errors: ['－1+1 ＠SUM(1,1)'],
     },
   ]);
 
@@ -158,6 +209,13 @@ test('creates a template and neutralizes formulas and control characters in repo
   assert.ok(report.includes('"Error de validación"'));
   assert.ok(report.includes(`"' =1+1"`));
   assert.ok(report.includes(`"' @SUM(1,1)"`));
+  assert.ok(report.includes('＝1+1'));
+  assert.ok(report.includes('＋SUM(1,1)'));
+  assert.ok(report.includes('－1+1'));
+  assert.ok(report.includes('＠SUM(1,1)'));
+  assert.ok(report.includes(`"'＝1+1"`));
+  assert.ok(report.includes(`"'＋SUM(1,1)"`));
+  assert.ok(report.includes(`"'－1+1 ＠SUM(1,1)"`));
   assert.ok(report.includes('Error  =HYPERLINK('));
   assert.equal(/[\u0000-\u001F\u007F-\u009F]/.test(report.replaceAll('\r\n', '')), false);
 });
@@ -168,7 +226,7 @@ test('parses XLSX rows through the same product contract', async () => {
     ['SKU-XLSX', 'Taladro', 3, 10.5, 0, 'Descripción', 'https://example.test/img.png', false],
   ];
 
-  const [item] = await parseProductImportXlsx({ size: 1024 }, categories);
+  const [item] = await parseProductImportXlsx(makeXlsxFile(), categories);
   assert.equal(item.line, 2);
   assert.deepEqual(item.errors, []);
   assert.deepEqual(item.payload, {
@@ -188,6 +246,47 @@ test('parses XLSX rows through the same product contract', async () => {
     ),
     /5 MB/,
   );
+});
+
+test('rejects formula cells with cached values before converting the worksheet', async () => {
+  const inlineCell = (reference, value) =>
+    `<c r="${reference}" t="inlineStr"><is><t>${value}</t></is></c>`;
+  const headerCells = headers
+    .split(',')
+    .map((header, index) => inlineCell(`${String.fromCharCode(65 + index)}1`, header))
+    .join('');
+  const worksheet = `<worksheet><sheetData><row r="1">${headerCells}</row><row r="2"><c r="A2" t="inlineStr"><is><t>SKU-1</t></is></c><c r="B2" t="inlineStr"><is><t>Producto</t></is></c><c r="C2"><v>3</v></c><x:c r="D2"><x:f>5+99</x:f><x:v>10.25</x:v></x:c><c r="E2"><v>1</v></c></row></sheetData></worksheet>`;
+  const callsBefore = readSheetCalls;
+
+  await assert.rejects(
+    parseProductImportXlsx(makeXlsxFile(worksheet), categories),
+    /fila 2, campo "precio"/,
+  );
+  assert.equal(readSheetCalls, callsBefore);
+});
+
+test('rejects XLSX expansion above 24 MB before parsing a small compressed file', async () => {
+  const contents = zipSync({
+    'xl/worksheets/sheet1.xml': strToU8(
+      'x'.repeat(PRODUCT_IMPORT_MAX_UNCOMPRESSED_SIZE + 1),
+    ),
+  });
+  const buffer = contents.buffer.slice(
+    contents.byteOffset,
+    contents.byteOffset + contents.byteLength,
+  );
+  const file = {
+    size: contents.byteLength,
+    arrayBuffer: async () => buffer,
+  };
+  const callsBefore = readSheetCalls;
+
+  assert.ok(file.size < 26 * 1024);
+  await assert.rejects(
+    parseProductImportXlsx(file, categories),
+    /24 MB descomprimidos/,
+  );
+  assert.equal(readSheetCalls, callsBefore);
 });
 
 test('reads a namespaced XLSX workbook with the actual browser parser', async () => {
@@ -399,6 +498,110 @@ test('previews valid rows, imports sequentially, and retries only rejected rows'
   );
 });
 
+test('marks a SKU already returned by the references GET as invalid in the preview', async (t) => {
+  const service = {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [{ codigo: 'EXISTING-SKU' }],
+    saveAdminProduct: async () => assert.fail('an existing SKU must not be submitted'),
+  };
+  const { state } = await mountImportView(t, service);
+  await state.selectFile({
+    name: 'catalogo.csv',
+    text: async () => `${headers}\nexisting-sku,Producto,3,10,1,,,true`,
+  });
+
+  assert.equal(state.items[0].status, 'invalid');
+  assert.equal(state.items[0].payload, null);
+  assert.ok(state.items[0].errors.some((error) => error.includes('ya existe en el catálogo')));
+  await state.importProducts();
+});
+
+test('blocks confirmation during a new file read and keeps POST results with their batch', async (t) => {
+  const calls = [];
+  let releaseRead;
+  let releaseCreate;
+  const service = {
+    getActiveCategories: async () => categories,
+    getAdminProducts: async () => [],
+    saveAdminProduct: async (payload) => {
+      calls.push(payload.codigo);
+      await new Promise((resolve) => { releaseCreate = resolve; });
+    },
+  };
+  const { state } = await mountImportView(t, service);
+  await state.selectFile({
+    name: 'anterior.csv',
+    text: async () => `${headers}\nSKU-OLD,Producto anterior,3,10,1,,,true`,
+  });
+
+  const reading = state.selectFile({
+    name: 'nuevo.csv',
+    text: () => new Promise((resolve) => { releaseRead = resolve; }),
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(state.isReadingFile, true);
+  assert.equal(state.canImport, false);
+  await state.importProducts();
+  assert.deepEqual(calls, []);
+
+  releaseRead(`${headers}\nSKU-NEW,Producto nuevo,3,20,2,,,true`);
+  await reading;
+  const importing = state.importProducts();
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(calls, ['SKU-NEW']);
+  await state.selectFile({
+    name: 'no-debe-reemplazar.csv',
+    text: async () => `${headers}\nSKU-OTHER,Otro producto,3,30,3,,,true`,
+  });
+  assert.equal(state.items[0].codigo, 'SKU-NEW');
+
+  releaseCreate();
+  await importing;
+  assert.equal(state.items[0].codigo, 'SKU-NEW');
+  assert.equal(state.items[0].status, 'created');
+});
+
+test('times out reference GETs after creation, shows a recoverable error, and allows retry', async (t) => {
+  const requestTimeouts = [];
+  let productLoads = 0;
+  const service = {
+    getActiveCategories: async (config) => {
+      requestTimeouts.push(config.timeout);
+      return categories;
+    },
+    getAdminProducts: async (config) => {
+      requestTimeouts.push(config.timeout);
+      productLoads += 1;
+      if (productLoads === 3) {
+        throw Object.assign(new Error('timeout of 30000ms exceeded'), {
+          isAxiosError: true,
+          code: 'ECONNABORTED',
+        });
+      }
+      return [];
+    },
+    saveAdminProduct: async () => {},
+  };
+  const { state } = await mountImportView(t, service);
+  await state.selectFile({
+    name: 'catalogo.csv',
+    text: async () => `${headers}\nSKU-1,Producto,3,10,1,,,true`,
+  });
+
+  await state.importProducts();
+  assert.match(state.referenceError, /timeout of 30000ms exceeded/);
+  assert.ok(requestTimeouts.every((timeout) => timeout === PRODUCT_IMPORT_REQUEST_TIMEOUT_MS));
+  await state.loadReferences();
+  assert.equal(state.referenceError, '');
+
+  const viewSource = fs.readFileSync(
+    path.resolve(__dirname, '../src/views/admin/AdminProductImportView.vue'),
+    'utf8',
+  );
+  assert.ok(viewSource.includes('Reintentar carga'));
+  assert.ok(viewSource.includes('role="alert"'));
+});
+
 test('marks exact duplicate SKUs invalid before any product can be confirmed', () => {
   const items = parseProductImportCsv(
     `${headers}\nSKU-DUP,Producto 1,3,10,1,,,true\nSKU-DUP,Producto 2,3,20,2,,,true`,
@@ -439,7 +642,7 @@ test('parses XLSX files and renders only the bounded preview', async (t) => {
   };
   const { state } = await mountImportView(t, service);
 
-  await state.selectFile({ name: 'catalogo.xlsx', size: 1024 });
+  await state.selectFile({ name: 'catalogo.xlsx', ...makeXlsxFile() });
   assert.equal(state.items.length, PRODUCT_IMPORT_PREVIEW_ROWS + 1);
   assert.equal(state.visibleItems.length, PRODUCT_IMPORT_PREVIEW_ROWS);
   assert.equal(state.previewPageCount, 2);
