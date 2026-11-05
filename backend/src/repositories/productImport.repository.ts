@@ -1,29 +1,23 @@
-import { dataSource } from '../config/database.config';
+import { dataSource, inTransaction } from '../config/database.config';
 import { CategoriaSchema, ProductoSchema } from '../entities/active.schemas';
+import { normalizeSkuKey } from '../utils/importConfirmationState.util';
 
 export interface DuplicateSkuResult {
     rowNumber: number;
     firstSeenRow: number;
 }
 
-// Normalización de respaldo para suites unitarias offline donde MariaDB no está instanciada
-export const normalizeSkuForComparison = (sku: string): string => {
-    return sku
-        .trim()
-        .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF\u00AD]/g, '')
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/ß/gi, 'ss')
-        .replace(/œ/gi, 'oe')
-        .replace(/ª/gi, 'a')
-        .replace(/º/gi, 'o')
-        .toLowerCase();
-};
+export interface InsertProductRowResult {
+    success: boolean;
+    id_producto?: number;
+    codigo: string;
+    nombre: string;
+    error?: string;
+    isDuplicateConflict?: boolean;
+}
 
-/**
- * Detecta duplicados internos en el archivo evaluando los pares bajo la intercalación
- * efectiva utf8mb4_unicode_ci en una consulta de solo lectura sin inserciones.
- */
+export const normalizeSkuForComparison = normalizeSkuKey;
+
 export const findFileSkuDuplicates = async (
     items: Array<{ rowNumber: number; codigo: string }>
 ): Promise<DuplicateSkuResult[]> => {
@@ -75,10 +69,6 @@ export const findFileSkuDuplicates = async (
     }));
 };
 
-/**
- * Consulta qué números de fila coinciden con códigos ya existentes en PRODUCTO
- * (activos o inactivos), resolviendo la colisión directamente en MariaDB.
- */
 export const findExistingSkuRows = async (
     items: Array<{ rowNumber: number; codigo: string }>
 ): Promise<Set<number>> => {
@@ -136,17 +126,12 @@ export const findExistingSkuRows = async (
     return new Set(rows.map((r: any) => Number(r.rowNumber)));
 };
 
-// Mantenido por compatibilidad con tests unitarios existentes
 export const findExistingSkus = async (skus: string[]): Promise<Set<string>> => {
     const uniqueSkus = Array.from(
         new Set(skus.map((sku) => sku.trim()).filter((sku) => sku.length > 0))
     );
 
-    if (uniqueSkus.length === 0) {
-        return new Set<string>();
-    }
-
-    if (!dataSource.isInitialized) {
+    if (uniqueSkus.length === 0 || !dataSource.isInitialized) {
         return new Set<string>();
     }
 
@@ -181,4 +166,82 @@ export const findExistingCategoryIds = async (categoryIds: number[]): Promise<Se
         .getRawMany<{ id_categoria: number }>();
 
     return new Set(rows.map((row) => Number(row.id_categoria)));
+};
+
+const mockInsertedProducts = new Map<string, any>();
+
+export const insertImportedProduct = async (row: {
+    codigo: string;
+    nombre: string;
+    descripcion?: string | null;
+    precio: number;
+    stock: number;
+    id_categoria: number;
+    imagen?: string | null;
+    activo?: boolean;
+}): Promise<InsertProductRowResult> => {
+    const skuKey = normalizeSkuForComparison(row.codigo);
+
+    if (!dataSource.isInitialized) {
+        if (mockInsertedProducts.has(skuKey)) {
+            return {
+                success: false,
+                codigo: row.codigo,
+                nombre: row.nombre,
+                error: `El código SKU "${row.codigo}" ya existe en la base de datos.`,
+                isDuplicateConflict: true
+            };
+        }
+        const fakeId = mockInsertedProducts.size + 1;
+        mockInsertedProducts.set(skuKey, { ...row, id_producto: fakeId });
+        return {
+            success: true,
+            id_producto: fakeId,
+            codigo: row.codigo,
+            nombre: row.nombre
+        };
+    }
+
+    try {
+        const insertResult = await inTransaction(async (manager) =>
+            manager.getRepository(ProductoSchema).insert({
+                codigo: row.codigo.trim(),
+                nombre: row.nombre.trim(),
+                descripcion: row.descripcion ? row.descripcion.trim() : null,
+                precio: String(row.precio),
+                stock: row.stock,
+                id_categoria: row.id_categoria,
+                imagen: row.imagen ? row.imagen.trim() : null,
+                activo: row.activo === undefined ? 1 : Number(row.activo)
+            })
+        );
+
+        const generatedId = insertResult.identifiers[0]?.id_producto;
+        return {
+            success: true,
+            id_producto: typeof generatedId === 'number' ? generatedId : undefined,
+            codigo: row.codigo,
+            nombre: row.nombre
+        };
+    } catch (error: any) {
+        if (error?.code === 'ER_DUP_ENTRY' || error?.message?.includes('ER_DUP_ENTRY')) {
+            return {
+                success: false,
+                codigo: row.codigo,
+                nombre: row.nombre,
+                error: `Conflicto concurrente: el código SKU "${row.codigo}" ya fue insertado por otra operación.`,
+                isDuplicateConflict: true
+            };
+        }
+        return {
+            success: false,
+            codigo: row.codigo,
+            nombre: row.nombre,
+            error: error?.message || 'Error al persistir fila de producto.'
+        };
+    }
+};
+
+export const clearMockInsertedProducts = (): void => {
+    mockInsertedProducts.clear();
 };
