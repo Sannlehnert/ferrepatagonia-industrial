@@ -74,14 +74,15 @@ watch(
         fieldErrors.value = {};
 
         if (props.product) {
+            const rawPrecio = props.product.precio;
+            const hasPrecio = rawPrecio !== null && rawPrecio !== undefined && (rawPrecio as unknown) !== '';
+
             form.value = {
                 nombre: props.product.nombre ?? '',
                 codigo: props.product.codigo ?? '',
                 id_categoria: Number(props.product.id_categoria) || 1,
-                // H05: Si no es null ni undefined, tomamos el valor; si es null/undefined dejamos string vacío
-                precio: props.product.precio !== null && props.product.precio !== undefined
-                    ? props.product.precio
-                    : '',
+                // H05: Si no tiene precio dejamos ''; si tiene precio, Number() normaliza "150.00" a 150
+                precio: hasPrecio ? Number(rawPrecio) : '',
                 stock: Number(props.product.stock ?? 0),
                 descripcion: props.product.descripcion ?? '',
                 imagen: props.product.imagen ?? '',
@@ -150,7 +151,7 @@ const validateForm = (): boolean => {
         stockNum < 0 ||
         stockNum > 2147483647
     ) {
-        errors.stock = 'El stock debe ser un número entero mayor o igual a 0 (sin decimales).';
+        errors.stock = 'El stock debe ser un entero mayor o igual a 0.';
     }
 
     fieldErrors.value = errors;
