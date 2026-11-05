@@ -2,6 +2,7 @@ import { Router, json } from 'express';
 import { uploadCatalogFile } from '../middlewares/fileUpload.middleware';
 import {
     confirmProductImportController,
+    getImportConfirmationStatusController,
     validateProductFile
 } from '../controllers/productImport.controller';
 
@@ -17,3 +18,6 @@ productImportRouter.post('/preview', uploadCatalogFile, validateProductFile);
 // Confirmación explícita con control de idempotencia
 productImportRouter.post('/confirmar', json(), confirmProductImportController);
 productImportRouter.post('/confirm', json(), confirmProductImportController);
+
+// Consulta de estado de confirmación / conciliación ante resultado incierto
+productImportRouter.get('/confirmaciones/:previewToken', getImportConfirmationStatusController);
