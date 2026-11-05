@@ -88,13 +88,14 @@ npm run build
 node --require ./test/helpers/test-env.cjs --test test/pricing.test.cjs test/pricing.http.test.cjs
 node test/helpers/run-pricing-mariadb.cjs
 node test/helpers/run-e2e.cjs e2e/catalog e2e/auth
+node test/helpers/run-e2e.cjs
 ```
 
 Desde raíz: `git diff --check`.
 
 Resultados finales: 159/159 frontend (124 existentes + 35 nuevas); focales 35/35
 incluidas en ese total; type-check y build frontend aprobados; build backend
-aprobado; 90/90 precios/HTTP backend; 40/40 MariaDB; 50/50 E2E Chromium.
+aprobado; 90/90 precios/HTTP backend; 40/40 MariaDB; 50/50 E2E focales y 60/60 E2E integrales Chromium.
 Sin fallos ni skips en estas ejecuciones finales. diff --check aprobado.
 
 Las 50 E2E comprenden 30 regresiones existentes, 17 nuevas con HTTP interceptado y
@@ -106,6 +107,11 @@ Los casos de descuentos distintos, sin lista, especial mayor, lista mayor y redo
 se comprobaron además con el servicio real en las 40 pruebas MariaDB de #241;
 sus fixtures sintéticos están identificados y confinados a bases desechables.
 No se fabricó evidencia de datos comerciales reales para conseguir un precio visible.
+
+La primera CI integral detectó otra expectativa histórica de Agregar habilitado en
+la regresión administrativa de stock. Se conservan sus aserciones de stock y
+persistencia; ahora exige botón deshabilitado, descripción accesible y precio
+pendiente de evidencia para ambos estados de stock. No cambia código productivo.
 
 La ejecución E2E inicial no encontró Chromium en el perfil por defecto. Se utilizó
 el navegador ya instalado mediante PLAYWRIGHT_BROWSERS_PATH apuntando a
