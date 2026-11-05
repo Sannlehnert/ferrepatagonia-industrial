@@ -39,6 +39,41 @@ async function attestPrice(id){
     SELECT id_producto,precio,'SINTETICO test USD',999,'2020-01-01 12:00:00',1,1 FROM PRODUCTO WHERE id_producto=? AND precio IS NOT NULL
     ON DUPLICATE KEY UPDATE precio_verificado=VALUES(precio_verificado),valida=1`,[id]);
 }
+for(const [label,evidence,rejectedByDatabase] of [
+  ['tabulación','\t',false],['salto de línea','\n',false],['CRLF','\r\n',false],
+  ['espacios','   ',true],['vacía','',true],['NULL',null,true],['ausente',undefined,false],
+])test(`H02 evidencia ${label} no acredita base legacy 173.12 por HTTP productivo`,async()=>{
+  await dataSource.query('DELETE FROM PRECIO_USD_EVIDENCIA');
+  await dataSource.query('UPDATE PRODUCTO SET precio=173.12 WHERE id_producto=701');
+  if(evidence!==undefined){
+    const insert=()=>dataSource.query(`INSERT INTO PRECIO_USD_EVIDENCIA
+      (id_producto,precio_verificado,evidencia,id_admin,verificado_utc,valida,sintetica)
+      VALUES(701,173.12,?,999,'2020-01-01 12:00:00',1,0)`,[evidence]);
+    if(rejectedByDatabase)await assert.rejects(insert);
+    else await insert();
+  }
+  const snapshot=await source.load(901,[701],new Date());
+  assert.equal(snapshot.products[0].baseVerified,false);
+  assert.equal(Object.hasOwn(snapshot.products[0],'evidence'),false);
+  for(const [route,id] of [['/precios',undefined],['/precios/mios',901]]){
+    const r=await http(route,id);
+    assert.equal(r.status,200);assert.equal(r.body.data.totalUSD,null);
+    const line=r.body.data.productos[0];
+    assert.equal(line.estadoPrecio,'BASE_NO_VERIFICADA');assert.equal(line.precioComprable,false);
+    assert.equal(line.precioBaseUSD,null);assert.equal(line.precioUnitarioUSD,null);assert.equal(line.subtotalUSD,null);
+    assert.equal(Object.hasOwn(line,'evidenciaBaseUSD'),false);
+  }
+});
+test('H02 evidencia documental con espacios exteriores conserva acreditación y cálculo',async()=>{
+  const evidence=' \tDOC-USD-VERIFICADO\n ';
+  await dataSource.query('UPDATE PRODUCTO SET precio=173.12 WHERE id_producto=701');
+  await dataSource.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=173.12,evidencia=? WHERE id_producto=701',[evidence]);
+  const r=await http('/precios',undefined);
+  assert.equal(r.status,200);assert.equal(r.body.data.totalUSD,'164.46');
+  const line=r.body.data.productos[0];
+  assert.equal(line.estadoPrecio,'DEFINIDO');assert.equal(line.precioComprable,true);
+  assert.equal(line.evidenciaBaseUSD.reference,evidence);
+});
 async function verifiedARS(at=new Date(),daysOverride){
   const day=new Date(civilDate(at)+'T12:00:00Z'),days={};
   for(let n=0;n<12;n++){day.setUTCDate(day.getUTCDate()-1);days[day.toISOString().slice(0,10)]=![0,6].includes(day.getUTCDay());}

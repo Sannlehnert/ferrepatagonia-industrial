@@ -65,9 +65,11 @@ export class MariaDbPricingSource implements PricingSource {
         .where('p.id_producto IN (:...ids)', { ids: [...ids] }).andWhere('p.activo=1 AND c.activo=1').orderBy('p.id_producto', 'ASC')
         .getRawMany<{ id: number; baseUSD: string | null; specialPercent: string | null; verifiedBy: number | null;
           evidence: string | null; verifiedAt: string; synthetic: number }>();
-      const products = rawProducts.map(p => ({ id: p.id, baseUSD: p.baseUSD, specialPercent: p.specialPercent,
-        baseVerified: p.verifiedBy !== null,
-        ...(p.verifiedBy !== null ? { evidence: { reference: p.evidence!, verifiedAt: p.verifiedAt, synthetic: p.synthetic === 1 } } : {}) }));
+      const products = rawProducts.map(p => {
+        const baseVerified = p.verifiedBy !== null && typeof p.evidence === 'string' && p.evidence.trim().length > 0;
+        return { id: p.id, baseUSD: p.baseUSD, specialPercent: p.specialPercent, baseVerified,
+          ...(baseVerified ? { evidence: { reference: p.evidence!, verifiedAt: p.verifiedAt, synthetic: p.synthetic === 1 } } : {}) };
+      });
       let calendar: VerifiedCalendar | null = null;
       let quote: CommercialSnapshot['quote'] = null;
       if (currency === 'ARS') {
