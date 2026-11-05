@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import {
     ProductImportRowDto,
@@ -10,14 +11,22 @@ import {
     findExistingSkuRows,
     findFileSkuDuplicates
 } from '../repositories/productImport.repository';
+import { registerConfirmationToken } from '../utils/importConfirmationState.util';
 import { FileImportValidationError, ParsedSheetRow } from '../utils/import.utils';
 import { parseCsvBuffer } from '../utils/csvParser.util';
 import { parseXlsxBuffer } from '../utils/xlsxParser.util';
 
 export { FileImportValidationError };
+export {
+    confirmProductImport,
+    ConfirmImportItemDetail,
+    ConfirmImportPayload,
+    ImportConfirmationReport
+} from './productImportConfirm.service';
 
 export interface FileValidationReport {
     valid: boolean;
+    previewToken: string;
     totalRows: number;
     validRowsCount: number;
     invalidRowsCount: number;
@@ -123,8 +132,12 @@ export const validateProductImportFile = async (
         .filter((c) => !rowsWithErrors.has(c.rowNumber))
         .map((c) => c.dto);
 
+    const previewToken = crypto.randomUUID();
+    registerConfirmationToken(previewToken);
+
     return {
         valid: errors.length === 0,
+        previewToken,
         totalRows: parsedRows.length,
         validRowsCount: validRows.length,
         invalidRowsCount: rowsWithErrors.size,
