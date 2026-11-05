@@ -18,6 +18,9 @@ export interface AdminPriceListOption {
     porcentajeDescuento: string
 }
 
+export type AdminPriceList = AdminPriceListOption & { activa: boolean }
+export type AdminPriceListInput = Omit<AdminPriceList, 'id'>
+
 export interface AdminClientPriceList {
     idListaPrecio: number
     nombre: string

@@ -3,6 +3,8 @@ import type {
     AdminClient,
     AdminClientPriceList,
     AdminClientPriceLists,
+    AdminPriceList,
+    AdminPriceListInput,
     AdminClientsResponse,
 } from '@/types/adminClient'
 
@@ -21,5 +23,17 @@ export async function saveAdminClientPriceList(idCliente: number, idListaPrecio:
         `/admin/clientes/${idCliente}/lista-precio`,
         { idListaPrecio },
     )
+    return response.data.data.lista
+}
+
+export async function getAdminPriceLists() {
+    const response = await api.get<{ data: { listas: AdminPriceList[] } }>('/admin/listas-precio')
+    return response.data.data.listas
+}
+
+export async function saveAdminPriceList(input: AdminPriceListInput, id?: number) {
+    const response = id === undefined
+        ? await api.post<{ data: { lista: AdminPriceList } }>('/admin/listas-precio', input)
+        : await api.put<{ data: { lista: AdminPriceList } }>(`/admin/listas-precio/${id}`, input)
     return response.data.data.lista
 }

@@ -19,6 +19,18 @@ export const clientIdPolicy: DtoPolicy<ClientIdParams> = {
   objectError: 'ID de cliente inválido.',
 };
 
+class PriceListIdParams {
+  @Rule(value => integer(value, 1) ? null : 'ID de lista inválido.')
+  id!: number;
+}
+
+export const priceListIdPolicy: DtoPolicy<PriceListIdParams> = {
+  ...clientIdPolicy,
+  type: PriceListIdParams,
+  unknownError: 'ID de lista inválido.',
+  objectError: 'ID de lista inválido.',
+};
+
 export const priceListAssignmentPolicy: DtoPolicy<PriceListAssignment> = {
   type: PriceListAssignment,
   fields: ['idListaPrecio'],

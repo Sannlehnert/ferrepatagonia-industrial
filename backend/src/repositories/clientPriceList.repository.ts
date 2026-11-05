@@ -1,5 +1,42 @@
 import { dataSource, inTransaction } from '../config/database.config';
-import { ClienteSchema, ListaPrecioSchema } from '../entities/active.schemas';
+import { ClienteSchema, ListaPrecioSchema, type ListaPrecio } from '../entities/active.schemas';
+import type { PriceListInput } from '../dtos/clients/price-list.dto';
+
+function presentList(list: ListaPrecio) {
+  return {
+    id: list.id_lista_precio, nombre: list.nombre,
+    porcentajeDescuento: list.porcentaje_descuento, activa: Boolean(list.activa),
+  };
+}
+
+export async function findAdminPriceLists() {
+  const lists = await dataSource.getRepository(ListaPrecioSchema).find({
+    order: { nombre: 'ASC', id_lista_precio: 'ASC' },
+  });
+  return lists.map(presentList);
+}
+
+export function savePriceList(input: PriceListInput, id?: number) {
+  const [whole, fraction = ''] = input.porcentajeDescuento.split('.');
+  const values = {
+    nombre: input.nombre, porcentaje_descuento: `${Number(whole)}.${fraction.padEnd(2, '0')}`,
+    activa: Number(input.activa),
+  };
+  return inTransaction(async manager => {
+    const lists = manager.getRepository(ListaPrecioSchema);
+    if (id === undefined) {
+      const result = await lists.insert(values);
+      return { lista: presentList({ ...values, id_lista_precio: Number(result.identifiers[0].id_lista_precio) }), changed: true };
+    }
+
+    const current = await lists.findOne({ where: { id_lista_precio: id }, lock: { mode: 'pessimistic_write' } });
+    if (!current) return null;
+    const changed = current.nombre !== values.nombre || current.porcentaje_descuento !== values.porcentaje_descuento
+      || current.activa !== values.activa;
+    if (changed) await lists.update(id, values);
+    return { lista: presentList({ ...values, id_lista_precio: id }), changed };
+  });
+}
 
 type AssignedListRow = {
   idCliente: number;

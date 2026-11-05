@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import axios from 'axios'
+import AdminPriceListsPanel from './AdminPriceListsPanel.vue'
 import { getAdminClients, getAdminClientPriceLists, saveAdminClientPriceList } from '@/services/adminClientService'
 import type { AdminClient, AdminClientPriceList, AdminPriceListOption } from '@/types/adminClient'
 
@@ -14,6 +15,7 @@ const feedback = ref<Record<number, { text: string; error: boolean }>>({})
 const priceListsLoading = ref(true)
 const priceListsError = ref<string | null>(null)
 const savingClientId = ref<number | null>(null)
+const managingPriceLists = ref(false)
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
     dateStyle: 'short',
@@ -53,7 +55,7 @@ function selectedList(id: number) {
 
 function canSavePriceList(id: number) {
     const selected = selectedList(id)
-    return savingClientId.value === null && !priceListsLoading.value && !priceListsError.value &&
+    return savingClientId.value === null && !managingPriceLists.value && !priceListsLoading.value && !priceListsError.value &&
         selected !== (assignments.value[id]?.idListaPrecio ?? null) &&
         (selected === null || hasAvailableList(selected))
 }
@@ -113,6 +115,8 @@ onMounted(() => {
             <p class="m-0 leading-6 text-slate-600">Listado de clientes particulares y empresas registrados.</p>
         </header>
 
+        <AdminPriceListsPanel :disabled="savingClientId !== null" @changed="loadPriceLists" @busy="managingPriceLists = $event" />
+
         <p v-if="isLoading" role="status" class="text-slate-600">Cargando clientes…</p>
 
         <div v-else-if="errorMessage" class="rounded-lg border border-slate-200 bg-slate-50 p-5">
@@ -167,7 +171,7 @@ onMounted(() => {
                                     <select
                                         :value="selections[client.id] ?? ''"
                                         :aria-label="`Lista de precios de ${client.nombreRazonSocial}`"
-                                        :disabled="savingClientId !== null"
+                                        :disabled="savingClientId !== null || managingPriceLists"
                                         class="min-h-11 min-w-0 rounded-md border border-slate-300 px-2"
                                         @change="selections[client.id] = Number(($event.target as HTMLSelectElement).value) || ''"
                                     >
