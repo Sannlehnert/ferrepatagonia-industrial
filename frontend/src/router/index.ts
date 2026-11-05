@@ -56,6 +56,11 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminProductsListView.vue'),
         },
         {
+          path: 'productos/importar',
+          name: 'admin-product-import',
+          component: () => import('@/views/admin/AdminProductImportView.vue'),
+        },
+        {
           path: 'categorias',
           name: 'admin-categories',
           component: () =>
