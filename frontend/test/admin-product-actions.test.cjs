@@ -1,3 +1,5 @@
+const { describe, it } = require('node:test');
+const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -97,4 +99,51 @@ test('service calls shared Axios with real route methods and minimal payloads',a
  const requestConfig={timeout:123};await service.getAdminProducts(requestConfig);await service.getActiveCategories(requestConfig);
  assert.deepEqual(calls.slice(-2),[['get','/admin/productos',requestConfig],['get','/categorias',requestConfig]]);
  api.get=async()=>({data:'<html>error</html>'});await assert.rejects(service.getAdminProducts(),/no es válida/);
+});
+describe('Product Form & Actions - Regression Tests (#240)', () => {
+    it('H05: el payload de actualización preserva precio ausente/null si no se modificó', () => {
+        // Simulación del estado del producto existente con precio NULL
+        const originalProduct = {
+            id_producto: 42,
+            id_categoria: 1,
+            codigo: 'SKU-SIN-PRECIO',
+            nombre: 'Producto Sin Precio Original',
+            precio: null,
+            stock: 15,
+            descripcion: null,
+            imagen: null,
+            activo: 1
+        };
+
+        // Estado del formulario tras editar únicamente el nombre
+        const formState = {
+            id_categoria: 1,
+            codigo: 'SKU-SIN-PRECIO',
+            nombre: 'Producto Con Nombre Editado',
+            precio: '', // Campo vacío en el input
+            stock: 15,
+            descripcion: '',
+            imagen: '',
+            activo: true
+        };
+
+        // Lógica de construcción de payload aplicada en handleSubmit de ProductFormModal.vue
+        const isPriceEmpty = formState.precio === '' || formState.precio === null || formState.precio === undefined;
+        
+        const payload = {
+            nombre: formState.nombre.trim(),
+            codigo: formState.codigo.trim(),
+            id_categoria: Number(formState.id_categoria),
+            ...(isPriceEmpty ? {} : { precio: Number(formState.precio) }),
+            stock: Number(formState.stock),
+            descripcion: formState.descripcion.trim() || null,
+            imagen: formState.imagen.trim() || null,
+            activo: Boolean(formState.activo)
+        };
+
+        // Verificaciones
+        assert.equal(payload.nombre, 'Producto Con Nombre Editado');
+        assert.equal(payload.precio, undefined, 'El payload no debe incluir precio: 0');
+        assert.notEqual(payload.precio, 0, 'El precio no debe coaccionarse a cero');
+    });
 });

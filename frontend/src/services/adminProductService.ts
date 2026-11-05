@@ -8,10 +8,10 @@ export interface AdminProduct {
     codigo: string;
     nombre: string;
     descripcion: string | null;
-    precio: number;
+    precio: number | string | null; // <-- Permitir null y string además de number
     stock: number;
     imagen: string | null;
-    activo: boolean | number;
+    activo: number | boolean;
 }
 
 export interface CategoryOption {

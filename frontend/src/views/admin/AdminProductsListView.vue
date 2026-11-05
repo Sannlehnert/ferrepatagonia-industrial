@@ -89,8 +89,12 @@ const productosFiltrados = computed(() => {
     );
 });
 
-const formatPrice = (value: number) =>
-    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+const formatPrice = (value: number | string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '—';
+    const num = Number(value);
+    if (isNaN(num)) return '—';
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+};
 
 const openCreateModal = () => {
     if (actionsDisabled.value) return;
@@ -284,8 +288,8 @@ onMounted(() => {
                         </div>
                         <div class="flex flex-col min-w-0 text-right">
                             <span class="text-[10px] text-[#64748B] uppercase font-semibold">Precio USD</span>
-                            <span class="font-bold text-[#103A5C] text-sm break-words">
-                                ${{ formatPrice(prod.precio) }}
+                            <span class="font-bold text-[#103A5C] text-lg">
+                                {{ prod.precio !== null && prod.precio !== undefined ? `USD $${formatPrice(prod.precio)}` : 'Sin precio' }}
                             </span>
                         </div>
                     </div>
