@@ -74,22 +74,25 @@ watch(
         fieldErrors.value = {};
 
         if (props.product) {
+            const rawPrecio = props.product.precio;
+            const hasPrecio = rawPrecio !== null && rawPrecio !== undefined && (rawPrecio as unknown) !== '';
+
             form.value = {
                 nombre: props.product.nombre ?? '',
                 codigo: props.product.codigo ?? '',
-                id_categoria: Number(props.product.id_categoria) || '',
-                precio: Number(props.product.precio ?? 0),
+                id_categoria: Number(props.product.id_categoria) || 1,
+                // H05: Si no tiene precio dejamos ''; si tiene precio, Number() normaliza "150.00" a 150
+                precio: hasPrecio ? Number(rawPrecio) : '',
                 stock: Number(props.product.stock ?? 0),
                 descripcion: props.product.descripcion ?? '',
                 imagen: props.product.imagen ?? '',
                 activo: Boolean(props.product.activo)
             };
         } else {
-            const firstCategory = props.categories?.[0];
             form.value = {
                 nombre: '',
                 codigo: '',
-                id_categoria: firstCategory ? firstCategory.id_categoria : '',
+                id_categoria: props.categories?.[0]?.id_categoria ?? 1,
                 precio: '',
                 stock: '',
                 descripcion: '',
@@ -113,27 +116,41 @@ watch(
 
 const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    const nombre = form.value.nombre.trim();
-    const codigo = form.value.codigo.trim();
+
+    if (!form.value.nombre || form.value.nombre.trim() === '') {
+        errors.nombre = 'El nombre del producto es obligatorio.';
+    }
+
+    if (!form.value.codigo || form.value.codigo.trim() === '') {
+        errors.codigo = 'El código SKU es obligatorio.';
+    }
+
     const catId = Number(form.value.id_categoria);
-    const precio = Number(form.value.precio);
-    const stock = Number(form.value.stock);
-
-    if (!nombre) errors.nombre = 'El nombre del producto es obligatorio.';
-    else if (nombre.length > 200) errors.nombre = 'Máximo 200 caracteres.';
-
-    if (!codigo) errors.codigo = 'El código SKU es obligatorio.';
-    else if (codigo.length > 100) errors.codigo = 'Máximo 100 caracteres.';
-
-    if (!form.value.id_categoria || !Number.isInteger(catId) || catId <= 0) {
-        errors.id_categoria = 'Seleccioná una categoría válida.';
+    if (!Number.isInteger(catId) || catId <= 0) {
+        errors.id_categoria = 'Seleccioná una categoría válida (entero mayor a 0).';
     }
 
-    if (form.value.precio === '' || isNaN(precio) || precio < 0 || precio > 9999999999.99) {
-        errors.precio = 'Ingresá un precio válido mayor o igual a 0.';
+    // H05: Permitir precio vacío solo si el producto original ya no tenía precio
+    const isOriginalPriceNull = isEditMode.value && (props.product?.precio === null || props.product?.precio === undefined);
+    const isPriceEmpty = form.value.precio === '' || form.value.precio === null || form.value.precio === undefined;
+
+    if (!isPriceEmpty) {
+        const precioNum = Number(form.value.precio);
+        if (isNaN(precioNum) || precioNum < 0) {
+            errors.precio = 'El precio debe ser un número mayor o igual a 0.';
+        }
+    } else if (!isOriginalPriceNull) {
+        errors.precio = 'El precio debe ser un número mayor o igual a 0.';
     }
 
-    if (form.value.stock === '' || !Number.isInteger(stock) || stock < 0 || stock > 2147483647) {
+    const stockNum = Number(form.value.stock);
+    if (
+        form.value.stock === '' ||
+        form.value.stock === null ||
+        !Number.isInteger(stockNum) ||
+        stockNum < 0 ||
+        stockNum > 2147483647
+    ) {
         errors.stock = 'El stock debe ser un entero mayor o igual a 0.';
     }
 
@@ -151,11 +168,13 @@ const handleSubmit = async () => {
 
     isSubmitting.value = true;
     try {
+        const isPriceEmpty = form.value.precio === '' || form.value.precio === null || form.value.precio === undefined;
+
         const payload = {
             nombre: form.value.nombre.trim(),
             codigo: form.value.codigo.trim(),
             id_categoria: Number(form.value.id_categoria),
-            precio: Number(form.value.precio),
+            ...(isPriceEmpty ? {} : { precio: Number(form.value.precio) }),
             stock: Number(form.value.stock),
             descripcion: form.value.descripcion.trim() || null,
             imagen: form.value.imagen.trim() || null,
@@ -163,13 +182,20 @@ const handleSubmit = async () => {
         };
 
         const original = props.product;
+        const priceUnchanged = original !== null && (
+            isPriceEmpty
+                ? (original.precio === null || original.precio === undefined)
+                : (original.precio !== null && original.precio !== undefined && payload.precio === Number(original.precio))
+        );
+
         const onlyStockChanged = original !== null && payload.stock !== Number(original.stock) &&
             payload.nombre === original.nombre.trim() && payload.codigo === original.codigo.trim() &&
-            payload.id_categoria === Number(original.id_categoria) && payload.precio === Number(original.precio) &&
+            payload.id_categoria === Number(original.id_categoria) && priceUnchanged &&
             payload.descripcion === (original.descripcion?.trim() || null) &&
             payload.imagen === (original.imagen?.trim() || null) && payload.activo === Boolean(original.activo);
+
         if (onlyStockChanged) await updateAdminProductStock(original!.id_producto, payload.stock);
-        else await saveAdminProduct(payload, props.product?.id_producto);
+        else await saveAdminProduct(payload as Parameters<typeof saveAdminProduct>[0], props.product?.id_producto);
 
         emit(
             'saved',

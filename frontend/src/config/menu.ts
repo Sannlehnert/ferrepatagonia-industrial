@@ -65,6 +65,12 @@ export const adminMenu: readonly MenuItem[] = [
         permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
     {
+        id: 'admin-product-import',
+        label: 'Importar productos',
+        routeName: 'admin-product-import',
+        permission: PERMISSIONS.MANAGE_PRODUCTS,
+    },
+    {
         id: 'admin-categories',
         label: 'Categorías',
         routeName: 'admin-categories',
