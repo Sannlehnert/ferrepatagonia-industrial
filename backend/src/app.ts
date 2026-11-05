@@ -22,6 +22,9 @@ app.use(express.json());
 app.use('/api', healthRouter);
 app.use('/api', catalogRouter);
 app.use('/api', categoryRouter);
+// FER17 pricing composition remains disabled: #240 has no verified calendar,
+// quote-verification evidence or inactive-list audit sink, and legacy USD needs
+// dataset evidence. See docs/integracion-241-on-240.md before mounting its router.
 app.use('/api/admin', adminRouter);
 
 app.use((_req, res) => {

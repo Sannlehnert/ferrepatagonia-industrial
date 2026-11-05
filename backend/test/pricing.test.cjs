@@ -188,3 +188,14 @@ test('lunes feriado, fin de semana y frontera de fecha Buenos Aires', () => {
 test('no redondea entradas fuera de escala aunque terminen en cero', () => {
   assert.throws(() => decimal('1.000', 2, MONEY_MAX));
 });
+
+for (const [loadedAt, accepted] of [
+  ['2026-10-01T12:00:00Z', false],
+  ['2026-11-02T02:59:59Z', false], // Still Nov 1 in Buenos Aires.
+  ['2026-11-02T00:00:00-03:00', true],
+  ['2026-11-03T01:00:00+02:00', true],
+]) test(`H01 cronología civil de carga: ${loadedAt}`, () => {
+  const run = () => resolveQuote(calendar, { ...quote, loadedAt }, now);
+  if (accepted) assert.equal(run().fechaReferencia, '2026-11-02');
+  else assert.throws(run, { code: 'COTIZACION_INVALIDA' });
+});

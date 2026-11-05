@@ -39,6 +39,9 @@ export function resolveQuote(calendar: VerifiedCalendar | null, quote: VerifiedQ
     throw new PricingError('COTIZACION_INVALIDA');
   }
   const loaded = verifiedTime(quote.loadedAt, now);
+  const loadedDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires',
+    year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(loaded));
+  if (loadedDate < reference) throw new PricingError('COTIZACION_INVALIDA');
   if (verifiedTime(quote.verifiedAt, now) < loaded) throw new PricingError('COTIZACION_INVALIDA');
   const rate = decimal(quote.rate, 8, 99999999999999999999n, 'COTIZACION_INVALIDA');
   if (!rate) throw new PricingError('COTIZACION_INVALIDA');
