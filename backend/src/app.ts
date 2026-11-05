@@ -9,6 +9,9 @@ import { categoryRouter } from './routes/category.routes';
 import { cartRouter } from './routes/cart.routes';
 import { env } from './config/env.config';
 import { httpSecurity } from './middlewares/http-security.middleware';
+import { MariaDbPricingSource } from './repositories/pricing.source';
+import { PricingService } from './services/pricing/pricing.service';
+import { createPricingRouter } from './routes/pricing.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
@@ -23,6 +26,7 @@ app.use(express.json());
 app.use('/api', healthRouter);
 app.use('/api', catalogRouter);
 app.use('/api', categoryRouter);
+app.use('/api', createPricingRouter(new PricingService(new MariaDbPricingSource())));
 app.use('/api/admin', adminRouter);
 app.use('/api/carrito', cartRouter);
 
