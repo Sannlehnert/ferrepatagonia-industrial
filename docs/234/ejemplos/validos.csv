@@ -1,6 +1,6 @@
-codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo
-000123,Broca de prueba,1,19.99,12,"Acero, diámetro 8 mm",https://example.com/imagenes/broca.png,true
+codigo,nombre,id_categoria,precio_base_usd,stock,descripcion,imagen,activo,descuento_especial_pct
+000123,Broca de prueba,1,19.99,12,"Acero, diámetro 8 mm",https://example.com/imagenes/broca.png,true,12.50
 IMP234-GUANTE,Guante de prueba,1,8.50,0,"Modelo ""Industrial""
-Talle grande",,true
-IMP234-BASE-CERO,Producto con precio cero,1,0.00,4,,,false
-IMP234-SIN-IMAGEN,Producto sin imagen,1,10.00,3,,,true
+Talle grande",,true,
+IMP234-BASE-CERO,Producto con precio cero,1,0.00,4,,,true,0.00
+IMP234-PRECIO-AUSENTE,Producto sin precio,1,,3,,,true,

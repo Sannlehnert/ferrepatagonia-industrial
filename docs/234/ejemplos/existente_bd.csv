@@ -1,2 +1,2 @@
-codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo
-IMP234-EXISTENTE,Producto de prueba,1,10.00,1,,,true
+codigo,nombre,id_categoria,precio_base_usd,stock,descripcion,imagen,activo,descuento_especial_pct
+IMP234-EXISTENTE,Producto de prueba,1,10.00,1,,,true,

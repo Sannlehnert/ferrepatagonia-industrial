@@ -1,82 +1,51 @@
-# Ejemplos FER16-v1 — #234
+# Resultados esperados de FER16-v2 · #234
 
-Borrador de ocho columnas y 5 MiB/1.000 productos. Consultar el
-[contrato](../README.md) y la [política FER-15/17](../../decisiones/fer-15-politica-precios.md).
-Estos resultados no acreditan una implementación completa del importador.
-
-Comprobación con servicio de #235 en 26e8f90 y repositorios simulados: validos.csv
-pasa con cuatro filas y conserva 000123. Los XLSX usan XML SpreadsheetML válido
-con prefijo x:, pero el lector actual busca etiquetas sin prefijo y los rechaza
-como si no hubiera encabezados. Esto es un pendiente de integración de #235;
-no cambiar datos o declarar equivalencia de comportamiento para ocultarlo.
+Casos de referencia para el [contrato](../README.md). Los resultados siguientes describen lo que debe comprobarse cuando la API y la interfaz consuman FER16-v2. La verificación de estos archivos comprueba encabezados, datos y equivalencia CSV/XLSX.
 
 ## Preparación
 
-Solo usar una BD aislada y descartable, categoría ID 1 existente/activa y SKU libres,
-salvo existente_bd. Preparar ADMIN autenticado y origen permitido. Nunca cargar
-fixtures en bases compartidas. Los identificadores de error se acuerdan con #235.
+Usar una base descartable, un ADMIN autenticado y la categoría 1 existente y activa. Dejar libres los SKU de cada archivo, salvo donde se indica. La plantilla contiene solo encabezados. Al editar CSV con Excel, importar `codigo` como texto para conservar `000123`.
 
-XLSX: una hoja Productos, datos como texto, sin fórmulas. En CSV abrir mediante
-asistente y seleccionar codigo como Texto para conservar 000123. Las plantillas
-solo tienen encabezados; sin completar se rechazan por falta de productos.
+## Válidos en CSV y XLSX
 
-## Válidos CSV y XLSX
-
-Ambos archivos contienen las mismas cuatro filas lógicas, en registros 2–5.
-La descripción con salto de línea no representa otro producto.
-
-| Fila | Caso | Esperado |
+| Fila | Caso | Resultado esperado |
 | --- | --- | --- |
-| 2 | 000123, precio 19.99, URL de ejemplo | Conservar SKU y decimal. No afirmar que la imagen existe. |
-| 3 | Descripción con comillas/salto de línea, precio 8.50, stock 0 | Conservar texto, fila válida sin disponibilidad de stock. |
-| 4 | Precio 0.00 y activo false | Cero explícito e inactividad; no sustituir un precio vacío. |
-| 5 | Precio 10.00, imagen/descripcion vacías | Ausencias opcionales, fila válida. |
+| 2 | SKU `000123`, base `19.99`, especial `12.50`, URL HTTPS | Conservar SKU, precio, descuento y URL. |
+| 3 | Base `8.50`, stock `0`, descripción con comillas y salto de línea | Conservar el texto como una celda y el stock cero. Guardar especial `NULL`. |
+| 4 | Base `0.00`, especial `0.00`, producto activo | Guardar ambos ceros explícitos. El precio cero impide comprar o agregar al carrito según FER-17. |
+| 5 | Base y especial vacíos, producto activo | Guardar ambos como `NULL`. La base ausente impide comprar o agregar al carrito según FER-17. |
 
-Conteos propuestos: 4 leídas, 4 válidas, 0 inválidas/duplicadas/vacías.
-Validación sin escrituras. Confirmación: solo cuando #236 implemente y verifique
-la propuesta; importar cuatro o revertir las cuatro. precio no declara moneda USD
-por sí mismo ni habilita precios públicos o ventas FER-17.
+La preview cuenta 4 filas, 4 elegibles, 0 descartadas y 0 escrituras. La confirmación explícita importa 4, omite 0, rechaza 0 y deja 0 pendientes. Repetir la confirmación devuelve el resultado registrado. MariaDB conserva exactamente cuatro SKU nuevos.
 
-## Inválidos CSV y XLSX
+## Inválidos en CSV y XLSX
 
-| Fila | Campo | Error esperado |
-| --- | --- | --- |
-| 2 | codigo | Obligatorio vacío. |
-| 3 | stock | -1. |
-| 4 | precio | 1.234: exceso de escala, sin redondeo. |
-| 5 | precio | Vacío: inválido en FER16-v1. No convertirlo a cero. |
-| 6 | imagen | file: no permitido por la propuesta HTTP/HTTPS; regla pendiente de verificar en #235. |
-| 7 | id_categoria | 0. |
-| 8 | activo | tal_vez: no es booleano ni alias compatible. si es alias admitido por #235. |
-| 9 | nombre | Obligatorio vacío. |
-| 10 y 11 | codigo | IMP234-DUP repetido: propuesta de marcar ambas filas. |
+Es un archivo mixto. La primera aparición de `IMP234-DUP` es elegible y las diez filas restantes se rechazan.
 
-Objetivo del contrato: 10 leídas, 0 válidas, 10 inválidas, 2 duplicadas como
-subconjunto. Esta cifra presupone las reglas URL y marcado de todas las filas:
-el backend actual no acredita ambas, por lo que hay que alinear esos puntos antes
-de usar estos números como aserción de integración. Confirmación bloqueada.
-
-## Otros archivos
-
-| Archivo | Preparación y resultado esperado |
+| Fila | Caso y resultado esperado |
 | --- | --- |
-| duplicados_colacion.csv | Dos códigos con acentos equivalentes bajo utf8mb4_unicode_ci. Rechazar el lote. La propuesta marca ambas filas; conteo aún por acordar con #235. |
-| existente_bd.csv | Preparar IMP234-EXISTENTE activo y luego inactivo. En ambos casos, una fila inválida por existente; no actualizarlo. |
-| columnas_faltantes.csv | Falta stock, columna obligatoria: error estructural, sin confirmación. |
-| vacio.csv | Cero bytes: rechazo sin escrituras. |
-| malformado.csv | Comillas sin cierre: error estructural. |
-| carga_900.csv | 900 SKU libres, categoría 1 activa, precio 10.00: 900 válidas, sin duplicados. Confirmación atómica pendiente de #236: todo o nada. |
+| 2 | `codigo` vacío. Rechazar por campo obligatorio. |
+| 3 | `stock = -1`. Rechazar por rango. |
+| 4 | `precio_base_usd = 1.234`. Rechazar por escala. |
+| 5 | `descuento_especial_pct = 100`. Rechazar por rango. |
+| 6 | `imagen` con esquema `file:`. Rechazar por esquema. |
+| 7 | `id_categoria = 0`. Rechazar por rango. |
+| 8 | `activo = tal_vez`. Rechazar por valor inválido. |
+| 9 | `nombre` vacío. Rechazar por campo obligatorio. |
+| 10 | Primera aparición de `IMP234-DUP`. Elegible si el SKU está libre. |
+| 11 | Segunda aparición de `IMP234-DUP`. Rechazar como duplicado interno. |
+| 12 | `descuento_especial_pct = 12.345`. Rechazar por escala. |
 
-## Casos adicionales para #235/#236/#238
+La preview cuenta 11 filas, 1 elegible, 10 descartadas y 1 duplicada interna. Tras confirmar, el reporte mantiene las 11 filas y sus motivos. Resultado esperado con la base inicial sin cambios entre preview y confirmación: 1 importada (fila 10), 0 omitidas, 10 rechazadas y 0 pendientes.
 
-- Archivo 5 MiB y 5 MiB + 1 byte; 1.000 y 1.001 productos; filas vacías aparte.
-- Categoría inactiva o inexistente; SKU equivalentes y distintos según MariaDB real.
-- Columnas futuras precio_base_usd/descuento_especial_pct/imagen_url: rechazadas
-  como desconocidas en esta versión, nunca ignoradas silenciosamente.
-- Precio vacío inválido frente a cero explícito; transición FER-17 requiere otra versión.
-- Fórmulas y varias hojas: comprobar rechazo propuesto, no presumirlo implementado.
-- Doble confirmación, concurrencia, cambios de SKU/categoría, rollback y respuesta perdida.
-- Preview sin escrituras; visitante/CLIENTE sin acceso; reporte descargable seguro.
+## Casos adicionales
 
-Los resultados de confirmación y el estado comercial FER-17 son dependencias,
-no comportamiento acreditado por la generación de estos archivos.
+| Archivo | Resultado esperado |
+| --- | --- |
+| `duplicados_colacion.csv` | `IMP234-ACENTO` e `imp234-ácénto` son equivalentes bajo `utf8mb4_unicode_ci`. La fila 2 es elegible y la fila 3 se rechaza. |
+| `existente_bd.csv` | Preparar `IMP234-EXISTENTE` activo y repetir con el producto inactivo. En ambos casos la fila se informa como omitida por SKU existente. Al quedar 0 elegibles, se bloquea la confirmación y se conserva el producto. |
+| `columnas_faltantes.csv` | Falta el encabezado obligatorio `stock`. Error de estructura antes de confirmar. |
+| `vacio.csv` | Archivo de cero bytes. Rechazar antes de confirmar. |
+| `malformado.csv` | Comillas sin cierre. Rechazar antes de confirmar. |
+| `carga_900.csv` | 900 SKU distintos con URL HTTPS de ejemplo. La preview conserva las 900 URLs y no inserta productos. Tras confirmar en la base preparada, 900 importados y 0 omitidos, rechazados y pendientes. |
+
+La #238 complementa estos ejemplos con pruebas de tamaños y cantidad de filas, permisos, categorías inactivas, formato XLSX inválido, doble confirmación, concurrencia y recuperación tras perder la respuesta. Al simular una escritura de resultado incierto, comprobar que quede `por_verificar` hasta conciliar el lote.

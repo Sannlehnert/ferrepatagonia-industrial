@@ -1,8 +1,8 @@
 # #234 · Contrato de importación FER16-v2
 
-Estado **contrato de referencia para revisión en el PR 62**. Alcance #235 (validación), #236 (confirmación), #237 (interfaz) y #238 (pruebas). El modelo de la #240 ya está integrado. El lector XLSX de la #235 se verificó con las planillas anteriores. El PR 65 de confirmación sigue en revisión.
+Estado **contrato de referencia para revisión en el PR 62**. Alcance #235 (validación), #236 (confirmación), #237 (interfaz) y #238 (pruebas). El modelo de la #240 ya está integrado. El lector XLSX de la #235 se verificó con las planillas anteriores. El PR 65 de confirmación sigue en revisión. Las plantillas y los ejemplos de este PR corresponden a FER16-v2.
 
-Santi dio el visto bueno a los campos de precios y a confirmar las filas válidas con un reporte de todos los descartes. Queda por validar la correspondencia técnica entre el contrato, la API y la pantalla de importación antes de actualizar las plantillas oficiales.
+Santi dio el visto bueno a los campos de precios y a confirmar las filas válidas con un reporte de todos los descartes. Lucci revisó el diseño del contrato y confirmó la compatibilidad con #240. La correspondencia entre API e interfaz queda pendiente en #236 y #237.
 
 ## Plantilla y precios
 
@@ -75,9 +75,9 @@ Base `/api/admin/productos/importar`. Todas las operaciones exigen sesión ADMIN
 
 1. Revisar este contrato con Lucci, Zahir y Santi, en particular la transición desde el formato anterior y las respuestas de confirmación y reintento. Coordinar quién adapta backend e interfaz.
 2. Alinear backend e interfaz según la tabla anterior. Verificar el nuevo SHA del PR 65 después de corregir H01–H04. Documentar los nombres y las respuestas definitivas tras probarlos, incluido cómo se vincula el token con las filas y cómo se recupera el resultado ante un reintento.
-3. Actualizar README, plantillas CSV/XLSX, ejemplos y resultados esperados tras el acuerdo. Verificar los tres casos de precios, los descartes y la confirmación en MariaDB descartable con el flujo acordado. Los casos de reintento, doble confirmación y carga de 900 filas también alimentan la #238.
+3. Validar las plantillas y los ejemplos FER16-v2 contra el importador cuando implemente este contrato. Verificar los tres casos de precios, los descartes y la confirmación en MariaDB descartable con el flujo acordado. Los casos de reintento, doble confirmación y carga de 900 filas también alimentan la #238.
 4. Pedir a Zahir la revisión del nuevo commit del PR 62. Registrar en el PR la evidencia ya obtenida del lector XLSX y el resultado de la validación conjunta del nuevo contrato.
 
-## Material de prueba del formato anterior
+## Plantillas y ejemplos FER16-v2
 
-Las [plantillas CSV](plantillas/productos.csv) y [XLSX](plantillas/productos.xlsx) y los [ejemplos](ejemplos/RESULTADOS-ESPERADOS.md) de este PR todavía corresponden al formato con encabezado `precio`. Sirven para las regresiones de la implementación actual. Las plantillas de FER16-v2 se preparan después de revisar este contrato.
+[Plantilla CSV](plantillas/productos.csv) y [plantilla XLSX](plantillas/productos.xlsx). [Resultados esperados y casos de prueba](ejemplos/RESULTADOS-ESPERADOS.md). La validación del contenido de los archivos es independiente de la validación de la integración con el importador.
