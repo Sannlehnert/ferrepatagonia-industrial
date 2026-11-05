@@ -98,7 +98,7 @@ export const updateAdminProduct = async (id: number, payload: UpdateProductDTO) 
         ...payload,
         ...(payload.codigo !== undefined ? { codigo: payload.codigo.trim() } : {}),
         ...(payload.nombre !== undefined ? { nombre: payload.nombre.trim() } : {}),
-        ...(payload.precio !== undefined ? { precio: roundSqlDecimal2(payload.precio) } : {})
+        ...(payload.precio !== undefined && payload.precio !== null ? { precio: roundSqlDecimal2(payload.precio) } : {})
     };
 
     await update(id, normalizedPayload);
