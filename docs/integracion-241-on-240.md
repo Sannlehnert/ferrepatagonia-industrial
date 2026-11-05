@@ -1,5 +1,9 @@
 # Integración local #241 sobre #240 — 05/11/2026
 
+> INFORME HISTÓRICO de la rama temporal. El estado vigente de la rama oficial está
+> en [API de precios](api/precios.md) y [operación](operaciones-precios.md). Los
+> bloqueos y cifras siguientes corresponden exclusivamente a aquel ensayo.
+
 **IMPLEMENTACIÓN PARCIAL. Rama exclusivamente local, sin publicación ni PR.**
 Este informe complementa `api/precios.md`: las cifras de aquella entrega describen
 el PR #64 original, no los resultados nuevos de esta rama temporal.

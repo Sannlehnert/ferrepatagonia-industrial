@@ -2,7 +2,7 @@ import type { AuthContext } from '../../types/auth';
 import { bounded, decimal, format, MONEY_MAX, PricingError } from './money';
 import { calculateLine } from './pricing.engine';
 import { resolveQuote } from './pricing.quote';
-import type { PriceRequest, PriceResult, PricingSource } from './pricing.types';
+import type { CommercialSnapshot, PriceRequest, PriceResult, PricingSource } from './pricing.types';
 
 export function parsePriceRequest(input: unknown): PriceRequest {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new PricingError('SOLICITUD_INVALIDA', 400);
@@ -33,38 +33,43 @@ export class PricingService {
     }
     const request = parsePriceRequest(input);
     const at = this.clock();
-    const snapshot = await this.source.load(channel === 'CLIENTE' ? auth!.id : null,
-      request.productos.map(item => item.productoId), at);
-    let listPercent = '0.00';
-    if (channel === 'CLIENTE') {
-      const client = snapshot.client;
-      if (!client || client.active !== true || client.usuarioId !== auth!.id
-        || !Number.isInteger(client.clienteId) || client.clienteId < 1) throw new PricingError('NO_AUTORIZADO', 403);
-      if (client.assignedListId === null && client.list !== null) throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
-      if (client.assignedListId !== null) {
-        if (!Number.isInteger(client.assignedListId) || client.assignedListId < 1
-          || !client.list || client.list.id !== client.assignedListId) throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
-        if (typeof client.list.active !== 'boolean') throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
-        if (client.list.active) listPercent = client.list.percent;
-        else await this.source.recordInactiveList({ usuarioId: auth!.id, clienteId: client.clienteId,
-          listaId: client.list.id, at: at.toISOString() });
+    const calculate = async (snapshot: CommercialSnapshot): Promise<PriceResult> => {
+      let listPercent = '0.00';
+      if (channel === 'CLIENTE') {
+        const client = snapshot.client;
+        if (!client || client.active !== true || client.usuarioId !== auth!.id
+          || !Number.isInteger(client.clienteId) || client.clienteId < 1) throw new PricingError('NO_AUTORIZADO', 403);
+        if (client.assignedListId === null && client.list !== null) throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
+        if (client.assignedListId !== null) {
+          if (!Number.isInteger(client.assignedListId) || client.assignedListId < 1
+            || !client.list || client.list.id !== client.assignedListId) throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
+          if (typeof client.list.active !== 'boolean') throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
+          if (client.list.active) listPercent = client.list.percent;
+          else await (snapshot.recordInactiveList ?? this.source.recordInactiveList.bind(this.source))({ usuarioId: auth!.id, clienteId: client.clienteId,
+            listaId: client.list.id, at: at.toISOString() });
+        }
       }
-    }
-    const quote = request.moneda === 'ARS' ? resolveQuote(snapshot.calendar, snapshot.quote, at) : null;
-    const products = new Map(snapshot.products.map(product => [product.id, product]));
-    if (products.size !== snapshot.products.length) throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
-    const lines = request.productos.map(item => {
-      const product = products.get(item.productoId);
-      if (!product) throw new PricingError('PRODUCTO_INEXISTENTE', 404);
-      return calculateLine(product, item, listPercent, quote?.valor ?? null);
-    });
-    const sum = (field: 'subtotalUSD' | 'subtotalARS') => format(bounded(lines.reduce((total, line) =>
-      total + decimal(line[field], 2, MONEY_MAX), 0n)));
-    // Never publish a partial payable total when one line has no usable price.
-    const allUSD = lines.every(line => line.precioUnitarioUSD !== null && line.precioUnitarioUSD !== '0.00');
-    return { regla: 'FER17-v1', ivaIncluido: true, moneda: request.moneda, productos: lines,
-      totalUSD: allUSD ? sum('subtotalUSD') : null,
-      totalARS: quote && lines.every(line => line.precioComprable) ? sum('subtotalARS') : null,
-      cotizacion: quote };
+      const quote = request.moneda === 'ARS' ? resolveQuote(snapshot.calendar, snapshot.quote, at) : null;
+      const products = new Map(snapshot.products.map(product => [product.id, product]));
+      if (products.size !== snapshot.products.length) throw new PricingError('DATOS_COMERCIALES_INVALIDOS');
+      const lines = request.productos.map(item => {
+        const product = products.get(item.productoId);
+        if (!product) throw new PricingError('PRODUCTO_INEXISTENTE', 404);
+        return calculateLine(product, item, listPercent, quote?.valor ?? null);
+      });
+      const sum = (field: 'subtotalUSD' | 'subtotalARS') => format(bounded(lines.reduce((total, line) =>
+        total + decimal(line[field], 2, MONEY_MAX), 0n)));
+      // Never publish a partial payable total when one line has no usable price.
+      const allUSD = lines.every(line => line.precioUnitarioUSD !== null && line.precioUnitarioUSD !== '0.00');
+      return { regla: 'FER17-v1', ivaIncluido: true, moneda: request.moneda, productos: lines,
+        datosSinteticos: lines.some(line => line.evidenciaBaseUSD?.synthetic) || !!quote?.sintetica,
+        totalUSD: allUSD ? sum('subtotalUSD') : null,
+        totalARS: quote && lines.every(line => line.precioComprable) ? sum('subtotalARS') : null,
+        cotizacion: quote };
+    };
+    const id = channel === 'CLIENTE' ? auth!.id : null;
+    const ids = request.productos.map(item => item.productoId);
+    return this.source.withSnapshot ? this.source.withSnapshot(id, ids, at, calculate, request.moneda)
+      : calculate(await this.source.load(id, ids, at, request.moneda));
   }
 }

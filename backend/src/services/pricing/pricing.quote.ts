@@ -15,11 +15,30 @@ function verifiedTime(value: string, now: Date): number {
 }
 export function resolveQuote(calendar: VerifiedCalendar | null, quote: VerifiedQuote | null,
   now: Date): NonNullable<PriceResult['cotizacion']> {
+  const reference = resolveReference(calendar, now);
+  if (!quote) throw new PricingError('COTIZACION_AUSENTE');
+  if (quote.valid !== true || quote.referenceDate !== reference || ![quote.id, quote.actor, quote.evidence].every(present)) {
+    throw new PricingError('COTIZACION_INVALIDA');
+  }
+  const loaded = verifiedTime(quote.loadedAt, now);
+  const loadedDate = civilDate(new Date(loaded));
+  if (loadedDate < reference) throw new PricingError('COTIZACION_INVALIDA');
+  if (verifiedTime(quote.verifiedAt, now) < loaded) throw new PricingError('COTIZACION_INVALIDA');
+  const rate = decimal(quote.rate, 8, 99999999999999999999n, 'COTIZACION_INVALIDA');
+  if (!rate) throw new PricingError('COTIZACION_INVALIDA');
+  return { id: quote.id, valor: format(rate, 8), fechaReferencia: reference,
+    fechaCarga: quote.loadedAt, verificadaEn: quote.verifiedAt, evidencia: quote.evidence,
+    calendarioVersion: calendar!.version, calendarioEvidencia: calendar!.evidence,
+    calendarioVerificadoEn: calendar!.verifiedAt, sintetica: !!(calendar!.synthetic || quote.synthetic) };
+}
+export const civilDate = (now: Date): string => new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+
+export function resolveReference(calendar: VerifiedCalendar | null, now: Date): string {
   if (!calendar) throw new PricingError('CALENDARIO_NO_VERIFICADO');
   if (![calendar.version, calendar.verifiedBy, calendar.evidence].every(present)) throw new PricingError('CALENDARIO_NO_VERIFICADO');
   verifiedTime(calendar.verifiedAt, now);
-  const date = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric', month: '2-digit', day: '2-digit' }).format(now);
+  const date = civilDate(now);
   const previous = new Date(`${date}T12:00:00Z`);
   let reference: string | undefined;
   // A bounded walk also rejects malformed/uncovered calendars deterministically.
@@ -34,18 +53,5 @@ export function resolveQuote(calendar: VerifiedCalendar | null, quote: VerifiedQ
     if (calendar.days[key]) { reference = key; break; }
   }
   if (!reference) throw new PricingError('CALENDARIO_NO_VERIFICADO');
-  if (!quote) throw new PricingError('COTIZACION_AUSENTE');
-  if (quote.valid !== true || quote.referenceDate !== reference || ![quote.id, quote.actor, quote.evidence].every(present)) {
-    throw new PricingError('COTIZACION_INVALIDA');
-  }
-  const loaded = verifiedTime(quote.loadedAt, now);
-  const loadedDate = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires',
-    year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(loaded));
-  if (loadedDate < reference) throw new PricingError('COTIZACION_INVALIDA');
-  if (verifiedTime(quote.verifiedAt, now) < loaded) throw new PricingError('COTIZACION_INVALIDA');
-  const rate = decimal(quote.rate, 8, 99999999999999999999n, 'COTIZACION_INVALIDA');
-  if (!rate) throw new PricingError('COTIZACION_INVALIDA');
-  return { id: quote.id, valor: format(rate, 8), fechaReferencia: reference,
-    fechaCarga: quote.loadedAt, verificadaEn: quote.verifiedAt, evidencia: quote.evidence,
-    calendarioVersion: calendar.version };
+  return reference;
 }

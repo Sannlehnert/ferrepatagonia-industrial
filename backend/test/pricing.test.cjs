@@ -189,6 +189,16 @@ test('no redondea entradas fuera de escala aunque terminen en cero', () => {
   assert.throws(() => decimal('1.000', 2, MONEY_MAX));
 });
 
+test('base positiva legacy no acreditada no se etiqueta como importe USD ni se totaliza', () => {
+  const r=calculateLine({...product,baseVerified:false},{productoId:7,cantidad:2},'10');
+  assert.equal(r.estadoPrecio,'BASE_NO_VERIFICADA'); assert.equal(r.precioBaseUSD,null);
+  assert.equal(r.precioUnitarioUSD,null); assert.equal(r.subtotalUSD,null); assert.equal(r.precioComprable,false);
+});
+test('ausencia y cero siguen diferenciados sin evidencia USD', () => {
+  assert.equal(calculateLine({...product,baseUSD:null,baseVerified:false},{productoId:7,cantidad:1},'0').estadoPrecio,'PRECIO_AUSENTE');
+  assert.equal(calculateLine({...product,baseUSD:'0',baseVerified:false},{productoId:7,cantidad:1},'0').estadoPrecio,'BASE_CERO');
+});
+
 for (const [loadedAt, accepted] of [
   ['2026-10-01T12:00:00Z', false],
   ['2026-11-02T02:59:59Z', false], // Still Nov 1 in Buenos Aires.

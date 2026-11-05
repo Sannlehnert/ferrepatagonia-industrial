@@ -100,12 +100,12 @@ test('ARS sin calendario devuelve error comercial controlado', async () => {
   assert.equal(response.status, 422);
   assert.equal((await response.json()).code, 'CALENDARIO_NO_VERIFICADO');
 });
-test('router no se habilita prematuramente en aplicación real', async () => {
+test('aplicación real monta el router con fuente productiva, sin base simulada', async () => {
   const realServer = productionApp.listen(0, '127.0.0.1');
   await once(realServer, 'listening');
   try {
     const response = await fetch(`http://127.0.0.1:${realServer.address().port}/api/precios`, {
       method: 'POST', headers: { 'Content-Type': 'application/json', Origin: process.env.APP_PUBLIC_ORIGIN }, body: JSON.stringify(body) });
-    assert.equal(response.status, 404);
+    assert.equal(response.status, 500); // No DB initialized in this unit process.
   } finally { await new Promise(resolve => realServer.close(resolve)); }
 });
