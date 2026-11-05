@@ -1,13 +1,30 @@
+import { ProductImportRowDto, RowFieldIssue } from '../dtos/products/productImport.dto';
+
+export type ImportBatchGlobalState = 'pendiente' | 'procesando' | 'por_verificar' | 'completado';
+export type ImportBatchRowState = 'importado' | 'omitido' | 'rechazado' | 'pendiente';
+
+export interface PreviewBatchRowEntry {
+    row: number;
+    codigo: string;
+    dto: ProductImportRowDto;
+    estado: ImportBatchRowState;
+    id_producto?: number;
+    motivos: RowFieldIssue[];
+}
+
 export interface ConfirmationTokenRecord {
     token: string;
-    createdAt: number;
-    status: 'PENDING' | 'PROCESSING' | 'COMPLETED';
-    result?: unknown;
+    adminId: string | null;
+    createdAtMs: number;
+    expiresAtMs: number;
+    status: ImportBatchGlobalState;
+    rows: PreviewBatchRowEntry[];
+    attemptedSkus: Set<string>;
 }
 
 const confirmationTokens = new Map<string, ConfirmationTokenRecord>();
 const activeImportSkuLocks = new Set<string>();
-const TOKEN_TTL_MS = 30 * 60 * 1000;
+export const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
 
 export const normalizeSkuKey = (sku: string): string => {
     return sku
@@ -22,46 +39,51 @@ export const normalizeSkuKey = (sku: string): string => {
         .toLowerCase();
 };
 
-const cleanExpiredTokens = (): void => {
+export const registerConfirmationToken = (
+    token: string,
+    rows: PreviewBatchRowEntry[] = [],
+    adminId?: number | string | null,
+    ttlMs: number = TOKEN_TTL_MS
+): ConfirmationTokenRecord => {
     const now = Date.now();
-    for (const [token, record] of confirmationTokens.entries()) {
-        if (now - record.createdAt > TOKEN_TTL_MS) {
-            confirmationTokens.delete(token);
-        }
-    }
-};
-
-export const registerConfirmationToken = (token: string): void => {
-    cleanExpiredTokens();
-    confirmationTokens.set(token, {
+    const record: ConfirmationTokenRecord = {
         token,
-        createdAt: Date.now(),
-        status: 'PENDING'
-    });
+        adminId: adminId !== undefined && adminId !== null ? String(adminId) : null,
+        createdAtMs: now,
+        expiresAtMs: now + ttlMs,
+        status: 'pendiente',
+        rows: rows.map((r) => ({
+            ...r,
+            motivos: [...r.motivos]
+        })),
+        attemptedSkus: new Set<string>()
+    };
+    confirmationTokens.set(token, record);
+    return record;
 };
 
-export const getConfirmationTokenRecord = (token: string): ConfirmationTokenRecord | undefined => {
-    cleanExpiredTokens();
+export const getConfirmationTokenRecordRaw = (token: string): ConfirmationTokenRecord | undefined => {
     return confirmationTokens.get(token);
 };
 
-export const markConfirmationTokenProcessing = (token: string): void => {
-    const record = confirmationTokens.get(token);
-    if (record) {
-        record.status = 'PROCESSING';
-    }
+export const isConfirmationTokenExpired = (record: ConfirmationTokenRecord): boolean => {
+    return record.status === 'pendiente' && Date.now() > record.expiresAtMs;
 };
 
-export const markConfirmationTokenCompleted = (token: string, result: unknown): void => {
+export const setConfirmationTokenStatus = (
+    token: string,
+    status: ImportBatchGlobalState
+): void => {
     const record = confirmationTokens.get(token);
     if (record) {
-        record.status = 'COMPLETED';
-        record.result = result;
+        record.status = status;
     }
 };
 
 export const tryAcquireSkuLocks = (skus: string[]): boolean => {
-    const normalized = skus.map((s) => normalizeSkuKey(s));
+    const normalized = Array.from(
+        new Set(skus.map((s) => normalizeSkuKey(s)).filter((s) => s.length > 0))
+    );
     for (const sku of normalized) {
         if (activeImportSkuLocks.has(sku)) {
             return false;
@@ -74,8 +96,25 @@ export const tryAcquireSkuLocks = (skus: string[]): boolean => {
 };
 
 export const releaseSkuLocks = (skus: string[]): void => {
-    const normalized = skus.map((s) => normalizeSkuKey(s));
+    const normalized = Array.from(
+        new Set(skus.map((s) => normalizeSkuKey(s)).filter((s) => s.length > 0))
+    );
     for (const sku of normalized) {
         activeImportSkuLocks.delete(sku);
     }
+};
+
+export const clearConfirmationTokensForTesting = (): void => {
+    confirmationTokens.clear();
+    activeImportSkuLocks.clear();
+};
+
+export const getConfirmationTokenRecord = getConfirmationTokenRecordRaw;
+
+export const markConfirmationTokenProcessing = (token: string): void => {
+    setConfirmationTokenStatus(token, 'procesando');
+};
+
+export const markConfirmationTokenCompleted = (token: string, _result?: unknown): void => {
+    setConfirmationTokenStatus(token, 'completado');
 };

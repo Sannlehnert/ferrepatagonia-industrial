@@ -1,4 +1,6 @@
-import { dataSource, inTransaction } from '../config/database.config';
+declare const exports: any;
+
+import { dataSource } from '../config/database.config';
 import { CategoriaSchema, ProductoSchema } from '../entities/active.schemas';
 import { normalizeSkuKey } from '../utils/importConfirmationState.util';
 
@@ -7,16 +9,15 @@ export interface DuplicateSkuResult {
     firstSeenRow: number;
 }
 
-export interface InsertProductRowResult {
-    success: boolean;
-    id_producto?: number;
-    codigo: string;
-    nombre: string;
-    error?: string;
-    isDuplicateConflict?: boolean;
-}
+export type SkuToProductIdMap = Map<string, number>;
 
 export const normalizeSkuForComparison = normalizeSkuKey;
+
+export const mockInsertedProducts = new Map<string, any>();
+
+export const clearMockInsertedProducts = (): void => {
+    mockInsertedProducts.clear();
+};
 
 export const findFileSkuDuplicates = async (
     items: Array<{ rowNumber: number; codigo: string }>
@@ -40,11 +41,13 @@ export const findFileSkuDuplicates = async (
         return results;
     }
 
-    const selects = items.map((_, idx) =>
-        idx === 0
-            ? 'SELECT ? AS row_num, CAST(? AS CHAR(100)) COLLATE utf8mb4_unicode_ci AS sku'
-            : 'SELECT ?, ?'
-    ).join(' UNION ALL ');
+    const selects = items
+        .map((_, idx) =>
+            idx === 0
+                ? 'SELECT ? AS row_num, CAST(? AS CHAR(100)) COLLATE utf8mb4_unicode_ci AS sku'
+                : 'SELECT ?, ?'
+        )
+        .join(' UNION ALL ');
 
     const params: (number | string)[] = [];
     for (const item of items) {
@@ -69,6 +72,37 @@ export const findFileSkuDuplicates = async (
     }));
 };
 
+export const findExistingSkus = async (skus: string[]): Promise<Set<string>> => {
+    const uniqueSkus = Array.from(
+        new Set(skus.map((sku: string) => sku.trim()).filter((sku: string) => sku.length > 0))
+    );
+
+    if (uniqueSkus.length === 0) {
+        return new Set<string>();
+    }
+
+    if (!dataSource.isInitialized) {
+        const result = new Set<string>();
+        for (const sku of uniqueSkus) {
+            const norm = normalizeSkuForComparison(sku);
+            const mocked = mockInsertedProducts.get(norm);
+            if (mocked) {
+                result.add(mocked.codigo);
+            }
+        }
+        return result;
+    }
+
+    const rows = await dataSource
+        .getRepository(ProductoSchema)
+        .createQueryBuilder('p')
+        .select('p.codigo', 'codigo')
+        .where('p.codigo IN (:...skus)', { skus: uniqueSkus })
+        .getRawMany<{ codigo: string }>();
+
+    return new Set(rows.map((row) => String(row.codigo)));
+};
+
 export const findExistingSkuRows = async (
     items: Array<{ rowNumber: number; codigo: string }>
 ): Promise<Set<number>> => {
@@ -78,11 +112,13 @@ export const findExistingSkuRows = async (
 
     if (!dataSource.isInitialized) {
         const candidateCodes = items.map((i) => i.codigo);
-        const existingCodesSet = await findExistingSkus(candidateCodes);
+        const targetFinder = exports.findExistingSkus || findExistingSkus;
+        const existingCodesSet: Set<string> = await targetFinder(candidateCodes);
         const matchedRows = new Set<number>();
         for (const item of items) {
+            const itemNorm = normalizeSkuForComparison(item.codigo);
             for (const existingCode of existingCodesSet) {
-                if (normalizeSkuForComparison(existingCode) === normalizeSkuForComparison(item.codigo)) {
+                if (normalizeSkuForComparison(existingCode) === itemNorm) {
                     matchedRows.add(item.rowNumber);
                     break;
                 }
@@ -92,21 +128,18 @@ export const findExistingSkuRows = async (
     }
 
     if (items.length === 1) {
-        const sql = `
-            SELECT ? AS rowNumber
-            FROM PRODUCTO p
-            WHERE p.codigo = ?
-            LIMIT 1
-        `;
+        const sql = 'SELECT ? AS rowNumber FROM PRODUCTO p WHERE p.codigo = ? LIMIT 1';
         const rows = await dataSource.query(sql, [items[0].rowNumber, items[0].codigo]);
         return new Set(rows.map((r: any) => Number(r.rowNumber)));
     }
 
-    const selects = items.map((_, idx) =>
-        idx === 0
-            ? 'SELECT ? AS row_num, CAST(? AS CHAR(100)) COLLATE utf8mb4_unicode_ci AS sku'
-            : 'SELECT ?, ?'
-    ).join(' UNION ALL ');
+    const selects = items
+        .map((_, idx) =>
+            idx === 0
+                ? 'SELECT ? AS row_num, CAST(? AS CHAR(100)) COLLATE utf8mb4_unicode_ci AS sku'
+                : 'SELECT ?, ?'
+        )
+        .join(' UNION ALL ');
 
     const params: (number | string)[] = [];
     for (const item of items) {
@@ -126,23 +159,42 @@ export const findExistingSkuRows = async (
     return new Set(rows.map((r: any) => Number(r.rowNumber)));
 };
 
-export const findExistingSkus = async (skus: string[]): Promise<Set<string>> => {
+export const findExistingProductsBySkus = async (
+    skus: string[]
+): Promise<SkuToProductIdMap> => {
     const uniqueSkus = Array.from(
-        new Set(skus.map((sku) => sku.trim()).filter((sku) => sku.length > 0))
+        new Set(skus.map((sku: string) => sku.trim()).filter((sku: string) => sku.length > 0))
     );
+    const resultMap: SkuToProductIdMap = new Map();
 
-    if (uniqueSkus.length === 0 || !dataSource.isInitialized) {
-        return new Set<string>();
+    if (uniqueSkus.length === 0) {
+        return resultMap;
     }
 
-    const rows = await dataSource
-        .getRepository(ProductoSchema)
-        .createQueryBuilder('p')
-        .select('p.codigo', 'codigo')
-        .where('p.codigo IN (:...skus)', { skus: uniqueSkus })
-        .getRawMany<{ codigo: string }>();
+    if (!dataSource.isInitialized) {
+        for (const sku of uniqueSkus) {
+            const norm = normalizeSkuForComparison(sku);
+            const mocked = mockInsertedProducts.get(norm);
+            if (mocked && typeof mocked.id_producto === 'number') {
+                resultMap.set(norm, mocked.id_producto);
+            }
+        }
+        return resultMap;
+    }
 
-    return new Set(rows.map((row) => String(row.codigo)));
+    const placeholders = uniqueSkus.map(() => '?').join(', ');
+    const rows = await dataSource.query(
+        `SELECT id_producto, codigo FROM PRODUCTO WHERE codigo IN (${placeholders})`,
+        uniqueSkus
+    );
+
+    for (const row of rows) {
+        if (row && row.codigo !== undefined && row.id_producto !== undefined) {
+            resultMap.set(normalizeSkuForComparison(String(row.codigo)), Number(row.id_producto));
+        }
+    }
+
+    return resultMap;
 };
 
 export const findExistingCategoryIds = async (categoryIds: number[]): Promise<Set<number>> => {
@@ -155,7 +207,7 @@ export const findExistingCategoryIds = async (categoryIds: number[]): Promise<Se
     }
 
     if (!dataSource.isInitialized) {
-        return new Set(uniqueIds);
+        return new Set<number>(uniqueIds);
     }
 
     const rows = await dataSource
@@ -168,19 +220,154 @@ export const findExistingCategoryIds = async (categoryIds: number[]): Promise<Se
     return new Set(rows.map((row) => Number(row.id_categoria)));
 };
 
-const mockInsertedProducts = new Map<string, any>();
-
-export const insertImportedProduct = async (row: {
+export interface InsertProductRowInput {
+    rowNumber?: number;
     codigo: string;
     nombre: string;
     descripcion?: string | null;
-    precio: number;
+    precio_base_usd?: number | null;
+    precio?: number | null;
+    descuento_especial_pct?: number | null;
     stock: number;
     id_categoria: number;
     imagen?: string | null;
     activo?: boolean;
-}): Promise<InsertProductRowResult> => {
+}
+
+export interface InsertProductRowResult {
+    success: boolean;
+    id_producto?: number;
+    codigo: string;
+    nombre: string;
+    error?: string;
+    isDuplicateConflict?: boolean;
+    isUncertainCommit?: boolean;
+}
+
+const resolveExactDecimalOrNull = (value: number | null | undefined): number | null => {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+    return null;
+};
+
+const isDuplicateEntryError = (error: any): boolean =>
+    Boolean(
+        error?.code === 'ER_DUP_ENTRY' ||
+        error?.errno === 1062 ||
+        (typeof error?.message === 'string' && error.message.includes('ER_DUP_ENTRY'))
+    );
+
+export const insertImportedProductsBatch = async (
+    rows: InsertProductRowInput[]
+): Promise<{
+    outcomes: Map<number, InsertProductRowResult>;
+    uncertainRowNumbers: Set<number>;
+}> => {
+    const outcomes = new Map<number, InsertProductRowResult>();
+    const uncertainRowNumbers = new Set<number>();
+
+    if (rows.length === 0) {
+        return { outcomes, uncertainRowNumbers };
+    }
+
+    if (!dataSource.isInitialized) {
+        const singleInserter = exports.insertImportedProduct || insertImportedProduct;
+        for (let idx = 0; idx < rows.length; idx++) {
+            const row = rows[idx];
+            const rowNumber = row.rowNumber ?? idx + 1;
+            const singleOutcome = await singleInserter(row);
+            if (singleOutcome.isUncertainCommit) {
+                uncertainRowNumbers.add(rowNumber);
+            } else {
+                outcomes.set(rowNumber, singleOutcome);
+            }
+        }
+        return { outcomes, uncertainRowNumbers };
+    }
+
+    const provisionalOutcomes = new Map<number, InsertProductRowResult>();
+
+    try {
+        await dataSource.transaction(async (manager) => {
+            for (let idx = 0; idx < rows.length; idx++) {
+                const row = rows[idx];
+                const rowNumber = row.rowNumber ?? idx + 1;
+                const rawPrice = row.precio_base_usd !== undefined ? row.precio_base_usd : row.precio;
+                const exactPrice = resolveExactDecimalOrNull(rawPrice);
+                const exactDiscount = resolveExactDecimalOrNull(row.descuento_especial_pct);
+
+                try {
+                    const insertResult = await manager.query(
+                        `INSERT INTO PRODUCTO (
+                            codigo, nombre, descripcion, precio, descuento_especial_pct,
+                            stock, id_categoria, imagen, activo
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        [
+                            row.codigo.trim(),
+                            row.nombre.trim(),
+                            row.descripcion ? row.descripcion.trim() : null,
+                            exactPrice,
+                            exactDiscount,
+                            row.stock,
+                            row.id_categoria,
+                            row.imagen ? row.imagen.trim() : null,
+                            row.activo === undefined ? 1 : Number(Boolean(row.activo))
+                        ]
+                    );
+
+                    const generatedId =
+                        insertResult?.insertId !== undefined
+                            ? Number(insertResult.insertId)
+                            : insertResult?.identifiers?.[0]?.id_producto;
+
+                    provisionalOutcomes.set(rowNumber, {
+                        success: true,
+                        id_producto: typeof generatedId === 'number' && generatedId > 0 ? generatedId : undefined,
+                        codigo: row.codigo,
+                        nombre: row.nombre
+                    });
+                } catch (rowError: any) {
+                    if (isDuplicateEntryError(rowError)) {
+                        provisionalOutcomes.set(rowNumber, {
+                            success: false,
+                            codigo: row.codigo,
+                            nombre: row.nombre,
+                            error: 'El SKU ya existe en el catálogo',
+                            isDuplicateConflict: true
+                        });
+                    } else {
+                        throw rowError;
+                    }
+                }
+            }
+        });
+
+        for (const [rowNum, outcome] of provisionalOutcomes.entries()) {
+            outcomes.set(rowNum, outcome);
+        }
+    } catch (_txOrCommitError: any) {
+        for (let idx = 0; idx < rows.length; idx++) {
+            const row = rows[idx];
+            const rowNumber = row.rowNumber ?? idx + 1;
+            const prev = provisionalOutcomes.get(rowNumber);
+            if (prev?.isDuplicateConflict) {
+                outcomes.set(rowNumber, prev);
+            } else {
+                uncertainRowNumbers.add(rowNumber);
+            }
+        }
+    }
+
+    return { outcomes, uncertainRowNumbers };
+};
+
+export const insertImportedProduct = async (
+    row: InsertProductRowInput
+): Promise<InsertProductRowResult> => {
     const skuKey = normalizeSkuForComparison(row.codigo);
+    const rawPrice = row.precio_base_usd !== undefined ? row.precio_base_usd : row.precio;
+    const exactPrice = resolveExactDecimalOrNull(rawPrice);
+    const exactDiscount = resolveExactDecimalOrNull(row.descuento_especial_pct);
 
     if (!dataSource.isInitialized) {
         if (mockInsertedProducts.has(skuKey)) {
@@ -188,12 +375,17 @@ export const insertImportedProduct = async (row: {
                 success: false,
                 codigo: row.codigo,
                 nombre: row.nombre,
-                error: `El código SKU "${row.codigo}" ya existe en la base de datos.`,
+                error: 'El SKU ya existe en el catálogo',
                 isDuplicateConflict: true
             };
         }
         const fakeId = mockInsertedProducts.size + 1;
-        mockInsertedProducts.set(skuKey, { ...row, id_producto: fakeId });
+        mockInsertedProducts.set(skuKey, {
+            ...row,
+            precio: exactPrice,
+            descuento_especial_pct: exactDiscount,
+            id_producto: fakeId
+        });
         return {
             success: true,
             id_producto: fakeId,
@@ -202,46 +394,24 @@ export const insertImportedProduct = async (row: {
         };
     }
 
-    try {
-        const insertResult = await inTransaction(async (manager) =>
-            manager.getRepository(ProductoSchema).insert({
-                codigo: row.codigo.trim(),
-                nombre: row.nombre.trim(),
-                descripcion: row.descripcion ? row.descripcion.trim() : null,
-                precio: String(row.precio),
-                stock: row.stock,
-                id_categoria: row.id_categoria,
-                imagen: row.imagen ? row.imagen.trim() : null,
-                activo: row.activo === undefined ? 1 : Number(row.activo)
-            })
-        );
-
-        const generatedId = insertResult.identifiers[0]?.id_producto;
-        return {
-            success: true,
-            id_producto: typeof generatedId === 'number' ? generatedId : undefined,
-            codigo: row.codigo,
-            nombre: row.nombre
-        };
-    } catch (error: any) {
-        if (error?.code === 'ER_DUP_ENTRY' || error?.message?.includes('ER_DUP_ENTRY')) {
-            return {
-                success: false,
-                codigo: row.codigo,
-                nombre: row.nombre,
-                error: `Conflicto concurrente: el código SKU "${row.codigo}" ya fue insertado por otra operación.`,
-                isDuplicateConflict: true
-            };
-        }
+    const batchInserter = exports.insertImportedProductsBatch || insertImportedProductsBatch;
+    const batchResult = await batchInserter([{ ...row, rowNumber: 1 }]);
+    if (batchResult.uncertainRowNumbers.has(1)) {
         return {
             success: false,
             codigo: row.codigo,
             nombre: row.nombre,
-            error: error?.message || 'Error al persistir fila de producto.'
+            error: 'Resultado de escritura por verificar en la base de datos.',
+            isUncertainCommit: true
         };
     }
-};
-
-export const clearMockInsertedProducts = (): void => {
-    mockInsertedProducts.clear();
+    return (
+        batchResult.outcomes.get(1) ?? {
+            success: false,
+            codigo: row.codigo,
+            nombre: row.nombre,
+            error: 'Resultado de escritura por verificar en la base de datos.',
+            isUncertainCommit: true
+        }
+    );
 };

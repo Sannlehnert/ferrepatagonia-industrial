@@ -1,211 +1,253 @@
 import {
-    ProductImportRowDto,
-    RawImportRow,
-    buildProductImportDto,
-    validateProductImportDto
-} from '../dtos/products/productImport.dto';
-import {
     findExistingCategoryIds,
     findExistingSkuRows,
-    insertImportedProduct
+    insertImportedProductsBatch,
+    normalizeSkuForComparison
 } from '../repositories/productImport.repository';
 import {
-    getConfirmationTokenRecord,
-    markConfirmationTokenCompleted,
-    markConfirmationTokenProcessing,
     releaseSkuLocks,
+    setConfirmationTokenStatus,
     tryAcquireSkuLocks
 } from '../utils/importConfirmationState.util';
 import { FileImportValidationError } from '../utils/import.utils';
+import {
+    ConfirmImportItemDetail,
+    ImportConfirmationReport,
+    buildReportFromRecord,
+    reconcileUncertainRowsWithDb,
+    verifyTokenAccessAndTtl
+} from './productImportReconcile.util.service';
 
-export interface ConfirmImportItemDetail {
-    row?: number;
-    codigo: string;
-    nombre: string;
-    estado: 'importado' | 'omitido' | 'rechazado';
-    motivo?: string;
-    id_producto?: number;
-}
-
-export interface ImportConfirmationReport {
-    success: boolean;
-    totalProcesados: number;
-    importados: number;
-    omitidos: number;
-    rechazados: number;
-    detalles: ConfirmImportItemDetail[];
-}
+export { ConfirmImportItemDetail, ImportConfirmationReport };
 
 export interface ConfirmImportPayload {
     previewToken?: string;
-    items?: ProductImportRowDto[];
-    filas?: ProductImportRowDto[];
-    productos?: ProductImportRowDto[];
-    validRows?: ProductImportRowDto[];
     politicaInvalidos?: 'omitir' | 'rechazar_todo';
+    [key: string]: unknown;
 }
 
-export const confirmProductImport = async (
-    payload: ConfirmImportPayload
+export const getImportConfirmationStatus = async (
+    previewToken: string,
+    adminId?: number | string | null
 ): Promise<ImportConfirmationReport> => {
-    if (!payload || typeof payload !== 'object') {
+    const cleanToken = typeof previewToken === 'string' ? previewToken.trim() : '';
+    if (!cleanToken) {
+        throw new FileImportValidationError('El parámetro previewToken es obligatorio.', 400);
+    }
+
+    const record = verifyTokenAccessAndTtl(cleanToken, adminId);
+    if (record.status === 'por_verificar') {
+        await reconcileUncertainRowsWithDb(record);
+    }
+
+    return buildReportFromRecord(record);
+};
+
+export const confirmProductImport = async (
+    payload: ConfirmImportPayload,
+    adminId?: number | string | null
+): Promise<ImportConfirmationReport> => {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new FileImportValidationError(
-            'El cuerpo de la solicitud debe contener un listado de productos válidos para confirmar.',
+            'El cuerpo de la solicitud debe ser un objeto JSON con { "previewToken": "string" }.',
             400
         );
     }
 
-    const rawItems = payload.items || payload.productos || payload.validRows || payload.filas;
-    if (!rawItems || !Array.isArray(rawItems) || rawItems.length === 0) {
-        throw new FileImportValidationError(
-            'El cuerpo de la solicitud debe contener un listado de productos válidos para confirmar.',
-            400
-        );
-    }
-
-    const token = payload.previewToken?.trim();
-    if (token) {
-        const tokenRecord = getConfirmationTokenRecord(token);
-        if (!tokenRecord) {
+    const forbiddenRowKeys = ['items', 'filas', 'productos', 'validRows', 'rows', 'data'];
+    for (const key of forbiddenRowKeys) {
+        if (key in payload && payload[key] !== undefined) {
             throw new FileImportValidationError(
-                'El token de previsualización no es válido o ha expirado. Genere una nueva previsualización.',
+                'No se permite enviar ni sustituir filas en el cuerpo de la confirmación. Envíe únicamente { "previewToken" }.',
                 400
             );
         }
-        if (tokenRecord.status === 'PROCESSING') {
-            throw new FileImportValidationError(
-                'El lote de importación ya se encuentra en procesamiento. Evite enviar solicitudes duplicadas.',
-                409
-            );
-        }
-        if (tokenRecord.status === 'COMPLETED') {
-            throw new FileImportValidationError(
-                'Este lote de importación ya fue confirmado previamente.',
-                409
-            );
-        }
-        markConfirmationTokenProcessing(token);
     }
 
-    const candidateSkus = rawItems
-        .map((item) => (typeof item?.codigo === 'string' ? item.codigo.trim() : ''))
-        .filter((sku) => sku.length > 0);
+    const allowedKeys = new Set(['previewToken', 'politicaInvalidos']);
+    for (const key of Object.keys(payload)) {
+        if (!allowedKeys.has(key)) {
+            throw new FileImportValidationError(
+                `Propiedad no permitida en el cuerpo de confirmación: "${key}". Envíe únicamente { "previewToken" }.`,
+                400
+            );
+        }
+    }
 
+    const token = typeof payload.previewToken === 'string' ? payload.previewToken.trim() : '';
+    if (!token) {
+        throw new FileImportValidationError(
+            'El campo "previewToken" es obligatorio para confirmar la importación.',
+            400
+        );
+    }
+
+    if (payload.politicaInvalidos !== undefined && payload.politicaInvalidos !== 'omitir') {
+        throw new FileImportValidationError(
+            `La política "${String(payload.politicaInvalidos)}" rechaza el lote o no está permitida en la confirmación.`,
+            400
+        );
+    }
+
+    const tokenRecord = verifyTokenAccessAndTtl(token, adminId);
+
+    if (tokenRecord.status === 'completado' || tokenRecord.status === 'procesando') {
+        return buildReportFromRecord(tokenRecord);
+    }
+
+    if (tokenRecord.status === 'por_verificar') {
+        const isCompleted = await reconcileUncertainRowsWithDb(tokenRecord);
+        if (isCompleted) {
+            return buildReportFromRecord(tokenRecord);
+        }
+    }
+
+    const eligibleEntries = tokenRecord.rows.filter((r) => r.estado === 'pendiente');
+    if (eligibleEntries.length === 0) {
+        throw new FileImportValidationError(
+            'El lote previsualizado no contiene filas elegibles para importar.',
+            400
+        );
+    }
+
+    const candidateSkus = eligibleEntries.map((e) => e.codigo);
     if (!tryAcquireSkuLocks(candidateSkus)) {
         throw new FileImportValidationError(
-            'Existen operaciones de importación o actualización concurrentes sobre los mismos productos. Reintente en unos instantes.',
+            'Conflicto transitorio: existen operaciones concurrentes sobre los mismos códigos SKU. Reintente en unos instantes.',
             409
         );
     }
 
+    setConfirmationTokenStatus(token, 'procesando');
+
     try {
-        const detalles: ConfirmImportItemDetail[] = [];
-        let importados = 0;
-        let omitidos = 0;
-        let rechazados = 0;
+        const skuChecks = eligibleEntries.map((e) => ({ rowNumber: e.row, codigo: e.codigo }));
+        const categoryIds = eligibleEntries.map((e) => e.dto.id_categoria);
 
-        const skuChecks: Array<{ rowNumber: number; codigo: string }> = [];
-        rawItems.forEach((item, idx) => {
-            if (typeof item?.codigo === 'string' && item.codigo.trim().length > 0) {
-                skuChecks.push({ rowNumber: idx + 1, codigo: item.codigo.trim() });
+        let existingSkuRows: Set<number>;
+        let existingCategories: Set<number>;
+
+        try {
+            [existingSkuRows, existingCategories] = await Promise.all([
+                findExistingSkuRows(skuChecks),
+                findExistingCategoryIds(categoryIds)
+            ]);
+        } catch {
+            for (const entry of eligibleEntries) {
+                entry.motivos = [
+                    {
+                        field: 'codigo',
+                        code: 'COMMIT_UNCERTAIN',
+                        message: 'Estado de escritura pendiente de verificación con la base de datos.'
+                    }
+                ];
             }
-        });
+            setConfirmationTokenStatus(token, 'por_verificar');
+            return buildReportFromRecord(tokenRecord);
+        }
 
-        const categoryIds = rawItems
-            .map((r) => Number(r?.id_categoria))
-            .filter((id) => Number.isInteger(id) && id > 0);
+        const rowsToInsert: Array<{ entry: (typeof eligibleEntries)[number] }> = [];
 
-        const [existingSkuRows, existingCategories] = await Promise.all([
-            findExistingSkuRows(skuChecks),
-            findExistingCategoryIds(categoryIds)
-        ]);
-
-        for (let i = 0; i < rawItems.length; i++) {
-            const rowNumber = i + 1;
-            const dto = buildProductImportDto(rawItems[i] as unknown as RawImportRow);
-            const dtoErrors = await validateProductImportDto(dto, rowNumber);
-
-            if (dtoErrors.length > 0) {
-                rechazados++;
-                detalles.push({
-                    row: rowNumber,
-                    codigo: dto.codigo || '',
-                    nombre: dto.nombre || '',
-                    estado: 'rechazado',
-                    motivo: dtoErrors.map((e) => e.message).join(' ')
-                });
+        for (const entry of eligibleEntries) {
+            if (existingSkuRows.has(entry.row)) {
+                entry.estado = 'omitido';
+                entry.motivos = [
+                    {
+                        field: 'codigo',
+                        code: 'SKU_EXISTS',
+                        message: 'El SKU ya existe en el catálogo'
+                    }
+                ];
                 continue;
             }
 
-            if (existingSkuRows.has(rowNumber)) {
-                omitidos++;
-                detalles.push({
-                    row: rowNumber,
-                    codigo: dto.codigo,
-                    nombre: dto.nombre,
-                    estado: 'omitido',
-                    motivo: `El código SKU "${dto.codigo}" ya existe en el catálogo.`
-                });
+            if (!existingCategories.has(entry.dto.id_categoria)) {
+                entry.estado = 'rechazado';
+                entry.motivos = [
+                    {
+                        field: 'id_categoria',
+                        code: 'CATEGORY_NOT_FOUND',
+                        message: `La categoría con ID ${entry.dto.id_categoria} no existe o no se encuentra activa.`
+                    }
+                ];
                 continue;
             }
 
-            if (!existingCategories.has(dto.id_categoria)) {
-                rechazados++;
-                detalles.push({
-                    row: rowNumber,
-                    codigo: dto.codigo,
-                    nombre: dto.nombre,
-                    estado: 'rechazado',
-                    motivo: `La categoría ${dto.id_categoria} no existe o no se encuentra activa.`
-                });
-                continue;
-            }
+            tokenRecord.attemptedSkus.add(normalizeSkuForComparison(entry.codigo));
+            rowsToInsert.push({ entry });
+        }
 
-            const outcome = await insertImportedProduct(dto);
-            if (outcome.success) {
-                importados++;
-                detalles.push({
-                    row: rowNumber,
-                    codigo: dto.codigo,
-                    nombre: dto.nombre,
-                    estado: 'importado',
-                    id_producto: outcome.id_producto
-                });
-            } else if (outcome.isDuplicateConflict) {
-                omitidos++;
-                detalles.push({
-                    row: rowNumber,
-                    codigo: dto.codigo,
-                    nombre: dto.nombre,
-                    estado: 'omitido',
-                    motivo: outcome.error
-                });
-            } else {
-                rechazados++;
-                detalles.push({
-                    row: rowNumber,
-                    codigo: dto.codigo,
-                    nombre: dto.nombre,
-                    estado: 'rechazado',
-                    motivo: outcome.error
-                });
+        if (rowsToInsert.length > 0) {
+            const batchInputs = rowsToInsert.map(({ entry }) => ({
+                rowNumber: entry.row,
+                codigo: entry.dto.codigo,
+                nombre: entry.dto.nombre,
+                descripcion: entry.dto.descripcion,
+                precio_base_usd: entry.dto.precio_base_usd,
+                descuento_especial_pct: entry.dto.descuento_especial_pct,
+                stock: entry.dto.stock,
+                id_categoria: entry.dto.id_categoria,
+                imagen: entry.dto.imagen,
+                activo: entry.dto.activo
+            }));
+
+            const { outcomes, uncertainRowNumbers } = await insertImportedProductsBatch(batchInputs);
+
+            for (const { entry } of rowsToInsert) {
+                if (uncertainRowNumbers.has(entry.row)) {
+                    entry.estado = 'pendiente';
+                    entry.motivos = [
+                        {
+                            field: 'codigo',
+                            code: 'COMMIT_UNCERTAIN',
+                            message: 'La confirmación del commit es incierta; pendiente de conciliación con MariaDB.'
+                        }
+                    ];
+                    continue;
+                }
+
+                const outcome = outcomes.get(entry.row);
+                if (!outcome) continue;
+
+                if (outcome.isUncertainCommit) {
+                    entry.estado = 'pendiente';
+                    entry.motivos = [
+                        {
+                            field: 'codigo',
+                            code: 'COMMIT_UNCERTAIN',
+                            message: 'La confirmación del commit es incierta; pendiente de conciliación con MariaDB.'
+                        }
+                    ];
+                } else if (outcome.success) {
+                    entry.estado = 'importado';
+                    entry.id_producto = outcome.id_producto;
+                    entry.motivos = [];
+                } else if (outcome.isDuplicateConflict) {
+                    entry.estado = 'omitido';
+                    entry.motivos = [
+                        {
+                            field: 'codigo',
+                            code: 'SKU_EXISTS',
+                            message: 'El SKU ya existe en el catálogo'
+                        }
+                    ];
+                } else {
+                    entry.estado = 'pendiente';
+                    entry.motivos = [
+                        {
+                            field: 'codigo',
+                            code: 'COMMIT_UNCERTAIN',
+                            message: outcome.error || 'Resultado de escritura por verificar.'
+                        }
+                    ];
+                }
             }
         }
 
-        const report: ImportConfirmationReport = {
-            success: importados > 0 || (omitidos > 0 && rechazados === 0),
-            totalProcesados: rawItems.length,
-            importados,
-            omitidos,
-            rechazados,
-            detalles
-        };
+        const hasPendingUncertain = tokenRecord.rows.some((r) => r.estado === 'pendiente');
+        setConfirmationTokenStatus(token, hasPendingUncertain ? 'por_verificar' : 'completado');
 
-        if (token) {
-            markConfirmationTokenCompleted(token, report);
-        }
-
-        return report;
+        return buildReportFromRecord(tokenRecord);
     } finally {
         releaseSkuLocks(candidateSkus);
     }
