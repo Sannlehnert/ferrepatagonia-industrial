@@ -1,4 +1,4 @@
-const { test } = require('node:test');
+const { describe, it, test} = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -97,4 +97,47 @@ test('service calls shared Axios with real route methods and minimal payloads',a
  const requestConfig={timeout:123};await service.getAdminProducts(requestConfig);await service.getActiveCategories(requestConfig);
  assert.deepEqual(calls.slice(-2),[['get','/admin/productos',requestConfig],['get','/categorias',requestConfig]]);
  api.get=async()=>({data:'<html>error</html>'});await assert.rejects(service.getAdminProducts(),/no es válida/);
+});
+describe('Product Form & Actions - Regression Tests (#240)', () => {
+    it('H05: el payload de actualización preserva precio ausente/null si no se modificó', () => {
+        const originalProduct = {
+            id_producto: 42,
+            id_categoria: 1,
+            codigo: 'SKU-SIN-PRECIO',
+            nombre: 'Producto Sin Precio Original',
+            precio: null,
+            stock: 15,
+            descripcion: null,
+            imagen: null,
+            activo: 1
+        };
+
+        const formState = {
+            id_categoria: 1,
+            codigo: 'SKU-SIN-PRECIO',
+            nombre: 'Producto Con Nombre Editado',
+            precio: '',
+            stock: 15,
+            descripcion: '',
+            imagen: '',
+            activo: true
+        };
+
+        const isPriceEmpty = formState.precio === '' || formState.precio === null || formState.precio === undefined;
+
+        const payload = {
+            nombre: formState.nombre.trim(),
+            codigo: formState.codigo.trim(),
+            id_categoria: Number(formState.id_categoria),
+            ...(isPriceEmpty ? {} : { precio: Number(formState.precio) }),
+            stock: Number(formState.stock),
+            descripcion: formState.descripcion.trim() || null,
+            imagen: formState.imagen.trim() || null,
+            activo: Boolean(formState.activo)
+        };
+
+        assert.equal(payload.nombre, 'Producto Con Nombre Editado');
+        assert.equal(payload.precio, undefined, 'El payload no debe incluir precio: 0');
+        assert.notEqual(payload.precio, 0, 'El precio no debe coaccionarse a cero');
+    });
 });

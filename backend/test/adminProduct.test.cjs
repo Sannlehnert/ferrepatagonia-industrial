@@ -451,6 +451,47 @@ describe('Admin Products Endpoints (#197)', () => {
         for (const key of ['nombre', 'codigo', 'precio', 'stock', 'id_categoria', 'activo']) assert.equal(result[key], body[key]);
     });
 
+    it('H05: preserva precio NULL al actualizar unicamente el nombre del producto (#240)', async () => {
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
+        const testSku = `${TEST_PREFIX}H05-NULL`;
+
+        const insertResult = await pool.query(
+            "INSERT INTO PRODUCTO (id_categoria, codigo, nombre, precio, stock, activo) VALUES (1, ?, 'Producto Original Sin Precio', NULL, 10, 1)",
+            [testSku]
+        );
+        const productId = Number(insertResult.insertId);
+        createdProductIds.push(productId);
+
+        const updateRes = await fetch(`${BASE_URL}/admin/productos/${productId}`, {
+            method: 'PUT',
+            headers: {
+                Cookie: adminCookie,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                id_categoria: 1,
+                codigo: testSku,
+                nombre: 'Producto Con Nombre Modificado',
+                stock: 10,
+                descripcion: null,
+                imagen: null,
+                activo: true
+            })
+        });
+
+        assert.equal(updateRes.status, 200, 'La actualizacion debio responder 200 OK');
+        const body = await updateRes.json();
+        assert.equal(body.nombre, 'Producto Con Nombre Modificado');
+        assert.equal(body.precio, null, 'El campo precio en la respuesta debe mantenerse en null');
+
+        const [persisted] = await pool.query(
+            'SELECT nombre, precio FROM PRODUCTO WHERE id_producto = ?',
+            [productId]
+        );
+        assert.equal(persisted.nombre, 'Producto Con Nombre Modificado');
+        assert.equal(persisted.precio, null, 'El precio en la base de datos debe ser NULL y no 0.00');
+    });
+
     // Limpiar la BD exclusivamente por los IDs creados y cerrar conexión siempre
     after(async () => {
         const { pool } = require('../dist/config/catalog-snapshot.config.js');
