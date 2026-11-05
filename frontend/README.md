@@ -42,6 +42,42 @@ Tailwind CSS v4. La Home definitiva corresponde a la tarea #220 de Bruno y se
 integra por separado; debe validarse visualmente junto con estas pantallas
 antes del release.
 
+### Importación administrativa de productos
+
+La pantalla `/admin/productos/importar` descarga una plantilla CSV y acepta
+archivos CSV delimitados por coma o punto y coma, y archivos XLSX (se procesa
+la primera hoja). Ambos formatos usan los encabezados `codigo`, `nombre`,
+`id_categoria`, `precio`, `stock`, `descripcion`, `imagen` y `activo`; los
+últimos tres son opcionales. En XLSX, los SKU deben guardarse como texto para
+preservar ceros iniciales. La categoría se identifica con su ID activo y el
+precio admite punto o coma decimal, con hasta dos decimales.
+
+La validación y previsualización se realizan antes de confirmar. La importación
+usa el endpoint administrativo existente para crear productos, una fila por
+solicitud; no es una operación atómica. Los rechazos se informan en el reporte
+CSV. Los SKU que ya aparecen en el catálogo o repetidos en el archivo se marcan
+en la previsualización sin distinguir mayúsculas; el índice único de MariaDB
+en el backend conserva la validación definitiva. Los archivos tienen un límite
+de 5 MB, 1000 filas y, para XLSX, 24 MB de contenido descomprimido. Las celdas
+con fórmulas se rechazan antes de leer sus valores almacenados. Se muestran
+como máximo 100 filas en la previsualización. Descripción, URL de imagen y
+estado activo/inactivo son visibles antes de confirmar.
+
+El estado y los resultados se guardan localmente en IndexedDB, separados por
+usuario administrativo y pestaña del navegador. Las altas secuenciales tienen
+un timeout de 30 segundos; ante timeout, cancelación o respuesta ambigua se
+marca la fila como incierta y se detiene el proceso para evitar reintentos
+automáticos. Al salir de la pantalla se cancela la solicitud activa y se
+conserva un estado recuperable. La pantalla permite reintentar solo rechazos
+confirmados y vuelve a cargar productos y categorías después de importar y
+antes de validar otra planilla. Las consultas de referencias tienen un timeout
+de 30 segundos y muestran una opción para reintentar; la confirmación queda
+bloqueada mientras se lee una nueva planilla. Al cambiar la sesión se aborta la
+solicitud activa y su resultado queda como incierto. La unicidad final,
+incluidas equivalencias según la collation, sigue siendo responsabilidad del
+servidor. La API bulk de FER-16 no forma parte de este flujo hasta que su contrato
+esté disponible.
+
 ### Compile and Hot-Reload for Development
 
 ```sh

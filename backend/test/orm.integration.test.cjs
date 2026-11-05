@@ -16,8 +16,14 @@ test('schema metadata mirrors every active column, CHECK, index and FK', async (
       const actual = columns.find(c => c.Field === column.databaseName);
       assert.equal(column.isNullable, actual.Null === 'YES', metadata.tableName + '.' + column.databaseName);
       const type = actual.Type.replace(/\(\d+\)/, '');
-      if (column.type === 'decimal') assert.equal(actual.Type, 'decimal(12,2)');
-      else assert.equal(type, column.type);
+            if (column.type === 'decimal') {
+                const expected = column.precision && column.scale
+                    ? `decimal(${column.precision},${column.scale})`
+                    : 'decimal(12,2)';
+                assert.equal(actual.Type, expected);
+            } else {
+                assert.equal(type, column.type);
+            }
       if (column.length) assert.equal(actual.Type, 'varchar(' + column.length + ')');
       if (column.collation) assert.equal(actual.Collation, column.collation);
       if (column.isPrimary) assert.equal(actual.Key, 'PRI');
