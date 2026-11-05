@@ -27,11 +27,14 @@ const { app } = require('../dist/app.js');
 
 let server;
 let baseUrl;
+let importBaseUrl;
 
 before(async () => {
     server = app.listen(0, '127.0.0.1');
     await once(server, 'listening');
-    baseUrl = `http://127.0.0.1:${server.address().port}/api/admin/productos/importar/validar`;
+    const port = server.address().port;
+    importBaseUrl = `http://127.0.0.1:${port}/api/admin/productos/importar`;
+    baseUrl = `${importBaseUrl}/validar`;
 });
 
 after(async () => {
@@ -129,8 +132,9 @@ function buildTestXlsxBuffer(rows, prefix = '') {
     return Buffer.concat([...localParts, centralDirBuffer, eocd]);
 }
 
-test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
+test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) => {
     t.beforeEach(() => {
+        repo.clearMockInsertedProducts();
         test.mock.method(repo, 'findExistingSkus', async () => new Set(['SKU-DB-1']));
         test.mock.method(repo, 'findExistingCategoryIds', async () => new Set([1, 2]));
     });
@@ -273,8 +277,8 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(body.totalRows, 1);
         assert.equal(body.validRowsCount, 1);
     });
+
     await t.test('Rechaza productos asignados a categorías inactivas o inexistentes', async () => {
-        // repo.findExistingCategoryIds devuelve Set([1, 2]) como activas; la categoría 3 está inactiva/inexistente
         const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nSKU-CAT-INACTIVA,Prod,3,100,5\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test.csv');
 
@@ -283,6 +287,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.ok(catError);
         assert.match(catError.message, /no existe o no se encuentra activa/);
     });
+
     await t.test('H01: detecta SKUs equivalentes con acentos (CAFE/café) en archivo', async () => {
         const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nCAFE,A,1,10,1\ncafé,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test.csv');
@@ -296,18 +301,16 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.strictEqual(report.valid, false);
         assert.ok(report.errors.some((e) => e.field === 'precio'));
     });
+
     await t.test('H03: XLSX con inlineStr y fragmentos <t> múltiples conserva el texto completo', async () => {
-        // Simula celda con inlineStr dividida en múltiples etiquetas <t>
         const sheetXml = '<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>' +
             '<row r="1"><c r="A1" t="inlineStr"><is><t>codigo</t></is></c><c r="B1" t="inlineStr"><is><t>nombre</t></is></c><c r="C1" t="inlineStr"><is><t>id_categoria</t></is></c><c r="D1" t="inlineStr"><is><t>precio</t></is></c><c r="E1" t="inlineStr"><is><t>stock</t></is></c></row>' +
             '<row r="2"><c r="A2" t="inlineStr"><is><t>SKU-</t><t>COMPLETO</t></is></c><c r="B2" t="inlineStr"><is><t>Prod</t></is></c><c r="C2" t="n"><v>1</v></c><c r="D2" t="n"><v>100</v></c><c r="E2" t="n"><v>5</v></c></row>' +
             '</sheetData></worksheet>';
 
-        const zip = require('node:zlib');
-        const deflate = (buf) => zip.deflateRawSync(buf);
         const fName = Buffer.from('xl/worksheets/sheet1.xml');
         const fData = Buffer.from(sheetXml, 'utf8');
-        const fComp = deflate(fData);
+        const fComp = zlib.deflateRawSync(fData);
 
         const lh = Buffer.alloc(30);
         lh.writeUInt32LE(0x04034b50, 0);
@@ -342,10 +345,8 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
     });
 
     await t.test('H04: rechaza archivo XLSX que excede el presupuesto de descompresión (Zip Bomb)', async () => {
-        // XML que infla a más de 10 MiB para disparar el guard de descompresión
         const hugePayload = Buffer.from('<worksheet>' + ' '.repeat(11 * 1024 * 1024) + '</worksheet>', 'utf8');
-        const zip = require('node:zlib');
-        const comp = zip.deflateRawSync(hugePayload);
+        const comp = zlib.deflateRawSync(hugePayload);
         const name = Buffer.from('xl/worksheets/sheet1.xml');
 
         const lh = Buffer.alloc(30);
@@ -380,6 +381,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
             (err) => err instanceof FileImportValidationError && (err.message.includes('límite') || err.message.includes('tamaño') || err.message.includes('descompresión') || err.message.includes('corrupto'))
         );
     });
+
     await t.test('H01: AE y Æ se detectan como distintos (no duplican) según reglas SQL', async () => {
         const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAE,A,1,10,1\nÆ,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test-ae.csv');
@@ -404,6 +406,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(report.valid, false);
         assert.equal(report.duplicateInFileCount, 1);
     });
+
     await t.test('H05: valida correctamente XLSX con etiquetas prefijadas con namespaces XML (x:row, x:c, x:v)', async () => {
         const buffer = buildTestXlsxBuffer([
             ['codigo', 'nombre', 'id_categoria', 'precio', 'stock', 'activo'],
@@ -420,5 +423,142 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(report.validRows[0].precio, 250.5);
         assert.equal(report.validRows[0].stock, 10);
         assert.equal(report.validRows[0].activo, true);
+    });
+
+    // --- Pruebas Task #236: Previsualización y Confirmación Segura ---
+
+    await t.test('#236: Endpoint /previsualizar devuelve token y conteos sin mutar base de datos', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1,
+            nombre_razon_social: null,
+            tipo_cliente: null
+        }));
+
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+        const form = new FormData();
+        const csvContent = 'codigo,nombre,precio,stock,id_categoria,activo\nPREV-001,Producto Previo,150.00,10,1,true';
+        form.append('file', new Blob([csvContent], { type: 'text/csv' }), 'catalogo.csv');
+
+        const res = await fetch(`${importBaseUrl}/previsualizar`, {
+            method: 'POST',
+            headers: { Cookie: `jwt_token=${adminToken}` },
+            body: form
+        });
+
+        assert.strictEqual(res.status, 200);
+        const body = await res.json();
+        assert.strictEqual(body.valid, true);
+        assert.strictEqual(body.validRowsCount, 1);
+        assert.strictEqual(typeof body.previewToken, 'string');
+    });
+
+    await t.test('#236: Endpoint /confirmar persiste filas válidas, omite duplicados y rechaza inválidos', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1,
+            nombre_razon_social: null,
+            tipo_cliente: null
+        }));
+
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+        const payload = {
+            items: [
+                {
+                    codigo: 'CONF-SKU-001',
+                    nombre: 'Taladro Percutor',
+                    precio: 45000.5,
+                    stock: 5,
+                    id_categoria: 1,
+                    activo: true
+                },
+                {
+                    codigo: 'SKU-DB-1',
+                    nombre: 'Duplicado en BD',
+                    precio: 100,
+                    stock: 2,
+                    id_categoria: 1,
+                    activo: true
+                },
+                {
+                    codigo: 'CONF-INVALID',
+                    nombre: 'Precio Negativo',
+                    precio: -10,
+                    stock: 1,
+                    id_categoria: 1,
+                    activo: true
+                }
+            ]
+        };
+
+        const res = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: `jwt_token=${adminToken}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        assert.strictEqual(res.status, 200);
+        const body = await res.json();
+        assert.strictEqual(body.totalProcesados, 3);
+        assert.strictEqual(body.importados, 1);
+        assert.strictEqual(body.omitidos, 1);
+        assert.strictEqual(body.rechazados, 1);
+    });
+
+    await t.test('#236: Rechaza confirmaciones duplicadas con el mismo token (409 Conflict)', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1,
+            nombre_razon_social: null,
+            tipo_cliente: null
+        }));
+
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+        const form = new FormData();
+        const csvContent = 'codigo,nombre,precio,stock,id_categoria,activo\nIDEMP-01,Martillo Forjado,12000,8,1,true';
+        form.append('file', new Blob([csvContent], { type: 'text/csv' }), 'test.csv');
+
+        const prevRes = await fetch(`${importBaseUrl}/preview`, {
+            method: 'POST',
+            headers: { Cookie: `jwt_token=${adminToken}` },
+            body: form
+        });
+
+        const prevBody = await prevRes.json();
+        const confirmPayload = {
+            previewToken: prevBody.previewToken,
+            items: prevBody.validRows
+        };
+
+        const firstConfirm = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: `jwt_token=${adminToken}`
+            },
+            body: JSON.stringify(confirmPayload)
+        });
+        assert.strictEqual(firstConfirm.status, 200);
+
+        const secondConfirm = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: `jwt_token=${adminToken}`
+            },
+            body: JSON.stringify(confirmPayload)
+        });
+        assert.strictEqual(secondConfirm.status, 409);
+        const secondBody = await secondConfirm.json();
+        assert.match(secondBody.message, /ya fue confirmado/);
     });
 });
