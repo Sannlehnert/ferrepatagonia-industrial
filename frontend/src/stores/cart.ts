@@ -5,8 +5,8 @@ import { cartErrorMessage, cartService } from '@/services/cartService'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
 import type { CartMutation, CartSnapshot, CartTransport } from '@/types/cart'
 
-function positiveInteger(value: number) {
-  return Number.isSafeInteger(value) && value > 0
+function validCartInteger(value: number) {
+  return Number.isInteger(value) && value >= 1 && value <= 2147483647
 }
 
 export function createCartStore(transport: CartTransport) {
@@ -18,9 +18,8 @@ export function createCartStore(transport: CartTransport) {
     const loadError = ref('')
     const operationError = ref('')
     const needsSync = ref(false)
-    // #245 no devuelve precios. Un GET exitoso únicamente revalida stock.
-    const pricesNeedValidation = computed(() => true)
     const stockNeedsValidation = computed(() => !cart.value || needsSync.value)
+    const pricesNeedValidation = computed(() => !cart.value || needsSync.value)
     const checksPending = ref(0)
     const items = computed(() => cart.value?.items ?? [])
     let active: AbortController | undefined
@@ -103,13 +102,9 @@ export function createCartStore(transport: CartTransport) {
     async function mutate(command: CartMutation) {
       const key = sessionKey.value
       if (!key || active || disposed) return false
-      if (!positiveInteger(command.productoId) ||
-          ('cantidad' in command && !positiveInteger(command.cantidad))) {
-        operationError.value = 'Ingresá un producto y una cantidad entera positiva.'
-        return false
-      }
-      if (!transport.mutate) {
-        operationError.value = 'Las operaciones del carrito todavía no están disponibles.'
+      if (!validCartInteger(command.productoId) ||
+          ('cantidad' in command && !validCartInteger(command.cantidad))) {
+        operationError.value = 'El producto y la cantidad deben ser enteros entre 1 y 2147483647.'
         return false
       }
       if (needsSync.value) {

@@ -8,6 +8,11 @@ const { createPinia, disposePinia } = require('pinia')
 
 const user = (id, rol = 'CLIENTE') => ({ id, rol })
 const tick = () => new Promise(resolve => setImmediate(resolve))
+const price = {
+  estadoPrecio: 'DEFINIDO', precioComprable: true, precioUnitarioUSD: '95.00',
+  subtotalUSD: '190.00', descuentoAplicado: '5.00', origenDescuento: 'ESPECIAL_PUBLICO',
+  datosSinteticos: false,
+}
 function deferred() {
   let resolve
   const promise = new Promise(done => { resolve = done })
@@ -18,13 +23,20 @@ function snapshot(id = 1, cantidad = 1, overrides = {}) {
     id_carrito: id,
     total_items: cantidad,
     tiene_incompatibles: !!overrides.motivo_no_disponible,
+    moneda: 'USD',
+    regla: 'FER17-v1',
+    ivaIncluido: true,
+    totalUSD: overrides.motivo_no_disponible ? null : cantidad ? '190.00' : '0.00',
+    estado_total: overrides.motivo_no_disponible ? 'ITEMS_INCOMPATIBLES' : 'DEFINIDO',
     items: cantidad ? [{
       id_item_carrito: id, id_producto: 7, codigo: 'SKU7', nombre: 'Producto',
-      imagen: null, cantidad, stock: 10, disponible: true, ...overrides,
+      imagen: null, cantidad, stock: 10, disponible: true, precio: price, error_precio: null,
+      ...overrides,
     }] : [],
   }
 }
-const httpError = status => new AxiosError('HTTP failure', undefined, undefined, undefined, { status })
+const httpError = (status, code) =>
+  new AxiosError('HTTP failure', undefined, undefined, undefined, { status, data: { code } })
 
 function runtime(t, { read = async () => snapshot(), mutate, api = {}, restore } = {}) {
   const pinia = createPinia()
@@ -55,10 +67,10 @@ function runtime(t, { read = async () => snapshot(), mutate, api = {}, restore }
       reads.push(signal)
       return read(signal)
     },
-    ...(mutate && { mutate(command, signal) {
+    mutate(command, signal) {
       writes.push(command)
       return mutate(command, signal)
-    } }),
+    },
   }
   const cart = (api.get && !mutate ? useCartStore : createCartStore(transport))(pinia)
   return { auth, cart, reads, writes, http }
@@ -80,7 +92,8 @@ test('starts empty and restores a confirmed session without exposing unconfirmed
   assert.deepEqual(cart.cart, snapshot(1, 0))
   assert.equal(cart.loading, false)
   assert.equal(cart.stockNeedsValidation, false)
-  assert.equal(cart.pricesNeedValidation, true)
+  assert.equal(cart.pricesNeedValidation, false)
+  assert.equal(cart.cart.totalUSD, '0.00')
 })
 
 test('loads existing session, retains data on GET failure and supports explicit retry', async t => {
@@ -102,23 +115,96 @@ test('loads existing session, retains data on GET failure and supports explicit 
   assert.equal(cart.loadError, '')
 })
 
-test('production GET uses the published unwrapped DTO and exposes unsupported writes', async t => {
+test('production adapter sends absolute quantities, accepts empty 204s and reconciles each write', async t => {
   const requests = []
-  const data = snapshot(1, 2, { stock: 1, motivo_no_disponible: 'SIN_STOCK' })
+  let data = snapshot(1, 2)
   const { cart } = runtime(t, { restore: user(1), api: {
     async get(url, config) {
-      requests.push({ url, config })
+      requests.push(['GET', url, config])
       return { data }
+    },
+    async post(url, body, config) {
+      requests.push(['POST', url, body, config])
+      data = snapshot(1, body.cantidad)
+      return { status: 204, data: '' }
+    },
+    async patch(url, body, config) {
+      requests.push(['PATCH', url, body, config])
+      data = snapshot(1, body.cantidad)
+      return { status: 204, data: '' }
+    },
+    async delete(url, config) {
+      requests.push(['DELETE', url, config])
+      data = snapshot(1, 0)
+      return { status: 204, data: '' }
     },
   } })
   await tick()
-  assert.equal(requests.length, 1)
-  assert.equal(requests[0].url, '/carrito')
-  assert.deepEqual(Object.keys(requests[0].config), ['signal'])
+  assert.equal(await cart.agregarProducto(7, 3), true)
+  assert.equal(cart.items[0].cantidad, 3)
+  assert.equal(await cart.actualizarCantidad(7, 4), true)
+  assert.equal(cart.items[0].cantidad, 4)
+  assert.equal(await cart.quitarProducto(7), true)
+  assert.equal(cart.cart.totalUSD, '0.00')
+  assert.deepEqual(requests.map(request => request.slice(0, -1)), [
+    ['GET', '/carrito'],
+    ['POST', '/carrito/items', { productoId: 7, cantidad: 3 }],
+    ['GET', '/carrito'],
+    ['PATCH', '/carrito/items/7', { cantidad: 4 }],
+    ['GET', '/carrito'],
+    ['DELETE', '/carrito/items/7'],
+    ['GET', '/carrito'],
+  ])
+  for (const request of requests) {
+    assert.deepEqual(Object.keys(request.at(-1)), ['signal'])
+    assert.ok(request.at(-1).signal instanceof AbortSignal)
+  }
+})
+
+test('preserves exact USD values, null totals, and separate stock and price states', async t => {
+  const data = {
+    ...snapshot(1, 2),
+    total_items: 6,
+    tiene_incompatibles: true,
+    totalUSD: null,
+    estado_total: 'ITEMS_INCOMPATIBLES',
+    items: [
+      snapshot(1, 2, { precio: { ...price, subtotalUSD: '99999999999.99' } }).items[0],
+      snapshot(2, 1, {
+        disponible: false, motivo_no_disponible: 'INACTIVO', precio: null,
+      }).items[0],
+      snapshot(3, 2, {
+        disponible: false, motivo_no_disponible: 'SIN_STOCK', stock: 1,
+      }).items[0],
+      snapshot(4, 1, { precio: null, error_precio: 'IMPORTE_FUERA_DE_RANGO' }).items[0],
+      snapshot(5, 1, { precio: {
+        ...price, estadoPrecio: 'BASE_NO_VERIFICADA', precioComprable: false,
+        precioUnitarioUSD: null, subtotalUSD: null,
+      } }).items[0],
+    ],
+  }
+  data.items.forEach((item, index) => { item.id_producto = 7 + index })
+  const { cart } = runtime(t, { restore: user(1), api: { get: async () => ({ data }) } })
+  await tick()
   assert.deepEqual(cart.cart, data)
-  assert.equal(await cart.agregarProducto(7, 1), false)
-  assert.match(cart.operationError, /todavía no están disponibles/)
-  assert.equal(requests.length, 1)
+  assert.equal(cart.pricesNeedValidation, false)
+  assert.equal(cart.stockNeedsValidation, false)
+})
+
+test('rejects a legacy snapshot and does not confirm an unexpected write response', async t => {
+  let data = { id_carrito: 1, items: [] }
+  const { cart } = runtime(t, { restore: user(1), api: {
+    get: async () => ({ data }),
+    post: async () => ({ status: 200, data: {} }),
+  } })
+  await tick()
+  assert.equal(cart.cart, null)
+  assert.equal(cart.needsSync, true)
+  data = snapshot()
+  assert.equal(await cart.cargarCarrito(), true)
+  assert.equal(await cart.agregarProducto(7, 3), false)
+  assert.ok(cart.operationError)
+  assert.equal(cart.items[0].cantidad, 1)
 })
 
 test('uses only product and quantity commands and syncs all three operations', async t => {
@@ -132,10 +218,11 @@ test('uses only product and quantity commands and syncs all three operations', a
     },
   })
   await tick()
-  for (const invalid of [0, -1, 1.25, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+  for (const invalid of [0, -1, 1.25, NaN, Infinity, 2147483648]) {
     assert.equal(await cart.agregarProducto(7, invalid), false)
   }
   assert.equal(await cart.quitarProducto(0), false)
+  assert.equal(await cart.actualizarCantidad(2147483648, 1), false)
   assert.equal(writes.length, 0)
   const add = cart.agregarProducto(7, 2)
   assert.equal(cart.operation, 'add')
@@ -161,28 +248,31 @@ test('uses only product and quantity commands and syncs all three operations', a
   ])
 })
 
-for (const [status, message, reason] of [
+for (const [status, message, code] of [
   [400, /no es válida/],
   [401, /Iniciá sesión/],
   [403, /no tiene acceso/],
-  [404, /no está disponible/],
-  [409, /disponibilidad cambiaron/, 'SIN_STOCK'],
-  [422, /no admite/, 'INACTIVO'],
+  [404, /no existe/, 'ITEM_INEXISTENTE'],
+  [409, /conflicto/, 'CONFLICTO_CARRITO'],
+  [422, /stock disponible es insuficiente/, 'STOCK_INSUFICIENTE'],
+  [422, /está inactivo/, 'PRODUCTO_INACTIVO'],
+  [422, /no está verificado/, 'BASE_NO_VERIFICADA'],
   [500, /servidor/],
+  [500, /No se pudo confirmar el resultado/, 'DATABASE_OUTCOME_UNKNOWN'],
 ]) {
-  test(`maps HTTP ${status} and reconciles with authoritative GET`, async t => {
-    let data = snapshot()
-    const { cart, writes } = runtime(t, { restore: user(1),
+  test(`maps HTTP ${status} ${code ?? ''} and reconciles with authoritative GET`, async t => {
+    const data = snapshot()
+    const { cart, writes, reads } = runtime(t, { restore: user(1),
       read: async () => data,
       async mutate() {
-        if (reason) data = snapshot(1, 1, { motivo_no_disponible: reason, disponible: false })
-        throw httpError(status)
+        throw httpError(status, code)
       },
     })
     await tick()
     assert.equal(await cart.actualizarCantidad(7, 2), false)
     assert.match(cart.operationError, message)
     assert.equal(writes.length, 1)
+    assert.equal(reads.length, 2)
     assert.equal(cart.needsSync, false)
     assert.deepEqual(cart.cart, data)
   })
@@ -208,12 +298,14 @@ test('network failure can follow a committed write; failed reconciliation preser
   assert.match(cart.loadError, /conexión/)
   assert.equal(cart.items[0].cantidad, 1)
   assert.equal(cart.stockNeedsValidation, true)
+  assert.equal(cart.pricesNeedValidation, true)
   assert.equal(await cart.agregarProducto(7, 2), false)
   assert.equal(writes.length, 1)
   failRead = false
   assert.equal(await cart.cargarCarrito(), true)
   assert.equal(cart.items[0].cantidad, 3)
   assert.equal(cart.needsSync, false)
+  assert.equal(cart.pricesNeedValidation, false)
 })
 
 test('ignores reads that complete after logout or a change of identity even if abort is ignored', async t => {
