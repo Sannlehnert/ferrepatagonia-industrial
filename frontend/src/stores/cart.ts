@@ -107,7 +107,7 @@ export function createCartStore(transport: CartTransport) {
         operationError.value = 'El producto y la cantidad deben ser enteros entre 1 y 2147483647.'
         return false
       }
-      if (needsSync.value) {
+      if (!cart.value || needsSync.value) {
         operationError.value = 'Volvé a consultar el carrito antes de modificarlo.'
         return false
       }

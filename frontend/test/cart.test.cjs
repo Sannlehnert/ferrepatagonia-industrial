@@ -336,14 +336,19 @@ test('ignores reads that complete after logout or a change of identity even if a
 test('ignores late mutation and does not reconcile into a new identity', async t => {
   const pending = deferred()
   let id = 1
+  let signal
   const { auth, cart, reads, writes } = runtime(t, { restore: user(1),
     read: async () => snapshot(id),
-    mutate: () => pending.promise,
+    mutate: (_command, activeSignal) => {
+      signal = activeSignal
+      return pending.promise
+    },
   })
   await tick()
   const mutation = cart.quitarProducto(7)
   id = 2
   auth.user = user(id)
+  assert.equal(signal.aborted, true)
   assert.equal(cart.operation, null)
   await tick()
   pending.resolve()
@@ -416,4 +421,17 @@ test('manual clearing cancels queued recovery and active reconciliation', async 
   result.resolve(snapshot())
   assert.equal(await load, false)
   assert.equal(cart.cart, null)
+})
+
+test('requires a confirmed snapshot before the first write and after clearing state', async t => {
+  const { cart, writes } = runtime(t, { restore: user(1), mutate: async () => {} })
+  assert.equal(await cart.agregarProducto(7, 1), false)
+  await tick()
+  assert.equal(writes.length, 0)
+  assert.ok(cart.cart)
+  cart.limpiarEstado()
+  assert.equal(await cart.agregarProducto(7, 1), false)
+  assert.equal(writes.length, 0)
+  assert.equal(await cart.cargarCarrito(), true)
+  assert.equal(await cart.agregarProducto(7, 1), true)
 })
