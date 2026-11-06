@@ -200,6 +200,21 @@ test('especial mayor gana; lista mayor gana; cambios se ven en la siguiente cons
   await dataSource.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=30 WHERE id_lista_precio=401');
   assert.equal((await service.resolve(request,'CLIENTE',auth)).totalUSD,'70.00');
 });
+test('asignar y cambiar lista actualiza solo el precio del cliente asignado',async()=>{
+  assert.equal((await http('/precios/mios',903)).body.data.totalUSD,'95.00');
+
+  await dataSource.query('UPDATE CLIENTE SET id_lista_precio=401 WHERE id_cliente=303');
+  assert.equal((await http('/precios/mios',903)).body.data.totalUSD,'90.00');
+  assert.equal((await http('/precios/mios',901)).body.data.totalUSD,'90.00');
+
+  await dataSource.query('UPDATE CLIENTE SET id_lista_precio=402 WHERE id_cliente=303');
+  assert.equal((await http('/precios/mios',903)).body.data.totalUSD,'80.00');
+  assert.equal((await http('/precios/mios',901)).body.data.totalUSD,'90.00');
+
+  await dataSource.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=30 WHERE id_lista_precio=402');
+  assert.equal((await http('/precios/mios',903)).body.data.totalUSD,'70.00');
+  assert.equal((await http('/precios/mios',901)).body.data.totalUSD,'90.00');
+});
 test('HTTP con JWT y lookup reales aísla clientes, público y caché',async()=>{
   for(const [id,amount] of [[901,'90.00'],[902,'80.00'],[903,'95.00'],[901,'90.00']]){
     const r=await http('/precios/mios',id); assert.equal(r.status,200); assert.equal(r.body.data.totalUSD,amount);
