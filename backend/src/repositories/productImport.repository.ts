@@ -241,6 +241,7 @@ export interface InsertProductRowResult {
     nombre: string;
     error?: string;
     isDuplicateConflict?: boolean;
+    isCategoryInactive?: boolean;
     isUncertainCommit?: boolean;
 }
 
@@ -262,12 +263,13 @@ export const insertImportedProductsBatch = async (
 ): Promise<{
     outcomes: Map<number, InsertProductRowResult>;
     uncertainRowNumbers: Set<number>;
+    rolledBackWithoutInsert?: boolean;
 }> => {
     const outcomes = new Map<number, InsertProductRowResult>();
     const uncertainRowNumbers = new Set<number>();
 
     if (rows.length === 0) {
-        return { outcomes, uncertainRowNumbers };
+        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: false };
     }
 
     if (!dataSource.isInitialized) {
@@ -282,16 +284,38 @@ export const insertImportedProductsBatch = async (
                 outcomes.set(rowNumber, singleOutcome);
             }
         }
-        return { outcomes, uncertainRowNumbers };
+        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: false };
     }
 
     const provisionalOutcomes = new Map<number, InsertProductRowResult>();
 
     try {
         await dataSource.transaction(async (manager) => {
+            // H05: Revalidar categorías activas con bloqueo compartido FOR SHARE / LOCK IN SHARE MODE
+            const uniqueCategoryIds = Array.from(new Set(rows.map((r) => r.id_categoria)));
+            const activeCategoryRows = await manager.query(
+                `SELECT id_categoria FROM CATEGORIA WHERE id_categoria IN (${uniqueCategoryIds.map(() => '?').join(',')}) AND activo = 1 LOCK IN SHARE MODE`,
+                uniqueCategoryIds
+            );
+            const activeCategoryIds = new Set<number>(
+                activeCategoryRows.map((r: any) => Number(r.id_categoria))
+            );
+
             for (let idx = 0; idx < rows.length; idx++) {
                 const row = rows[idx];
                 const rowNumber = row.rowNumber ?? idx + 1;
+
+                if (!activeCategoryIds.has(row.id_categoria)) {
+                    provisionalOutcomes.set(rowNumber, {
+                        success: false,
+                        codigo: row.codigo,
+                        nombre: row.nombre,
+                        error: `La categoría con ID ${row.id_categoria} no existe o no se encuentra activa.`,
+                        isCategoryInactive: true
+                    });
+                    continue;
+                }
+
                 const rawPrice = row.precio_base_usd !== undefined ? row.precio_base_usd : row.precio;
                 const exactPrice = resolveExactDecimalOrNull(rawPrice);
                 const exactDiscount = resolveExactDecimalOrNull(row.descuento_especial_pct);
@@ -345,20 +369,22 @@ export const insertImportedProductsBatch = async (
         for (const [rowNum, outcome] of provisionalOutcomes.entries()) {
             outcomes.set(rowNum, outcome);
         }
+        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: false };
     } catch (_txOrCommitError: any) {
+        // En caso de rollback en MariaDB, las filas que no fueron conflicto quedan marcadas
+        // sin apropiarse de ningún producto insertado posteriormente.
         for (let idx = 0; idx < rows.length; idx++) {
             const row = rows[idx];
             const rowNumber = row.rowNumber ?? idx + 1;
             const prev = provisionalOutcomes.get(rowNumber);
-            if (prev?.isDuplicateConflict) {
+            if (prev?.isDuplicateConflict || prev?.isCategoryInactive) {
                 outcomes.set(rowNumber, prev);
             } else {
                 uncertainRowNumbers.add(rowNumber);
             }
         }
+        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: true };
     }
-
-    return { outcomes, uncertainRowNumbers };
 };
 
 export const insertImportedProduct = async (

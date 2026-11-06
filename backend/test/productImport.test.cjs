@@ -585,4 +585,88 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         const statusReport = await statusRes.json();
         assert.equal(statusReport.previewToken, prev.previewToken);
     });
+    await t.test('Auditoría H04 (Rollback + SKU ajeno): la consulta del lote no se apropia de SKUs ajenos tras rollback', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-ROLLBACK,Producto Rollback,1,100,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'rollback.csv', 1);
+
+        // Simular que el lote tuvo un rollback en MariaDB
+        test.mock.method(repo, 'insertImportedProductsBatch', async () => ({
+            outcomes: new Map(),
+            uncertainRowNumbers: new Set([2]),
+            rolledBackWithoutInsert: true
+        }));
+
+        await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+
+        // Otra operación da de alta el mismo SKU externamente con id_producto = 9999
+        test.mock.method(repo, 'findExistingProductsBySkus', async () => {
+            const m = new Map();
+            m.set('SKU-ROLLBACK', 9999);
+            return m;
+        });
+
+        // La consulta del lote no debe contar importados: 1 ni id_producto: 9999
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.importados, 0);
+        const row = statusReport.detalles.find((d) => d.codigo === 'SKU-ROLLBACK');
+        assert.notEqual(row?.id_producto, 9999);
+        assert.notEqual(row?.estado, 'importado');
+    });
+
+    await t.test('Auditoría H05 (Categoría desactivada antes de escritura): rechaza la fila y no confirma el alta', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-CAT-RACE,Prod Race,1,100,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'race.csv', 1);
+
+        // Simular que entre validación y escritura la categoría se desactivó dentro de la transacción
+        test.mock.method(repo, 'insertImportedProductsBatch', async () => {
+            const outcomes = new Map();
+            outcomes.set(2, {
+                success: false,
+                codigo: 'SKU-CAT-RACE',
+                nombre: 'Prod Race',
+                isCategoryInactive: true,
+                error: 'La categoría con ID 1 no existe o no se encuentra activa.'
+            });
+            return { outcomes, uncertainRowNumbers: new Set(), rolledBackWithoutInsert: false };
+        });
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+
+        assert.equal(confirmRes.status, 200);
+        const report = await confirmRes.json();
+        assert.equal(report.importados, 0);
+        assert.equal(report.rechazados, 1);
+        const row = report.detalles.find((d) => d.codigo === 'SKU-CAT-RACE');
+        assert.equal(row?.estado, 'rechazado');
+        assert.equal(row?.motivos[0]?.field, 'id_categoria');
+    });
 });

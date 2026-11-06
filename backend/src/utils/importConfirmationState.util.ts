@@ -1,7 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 import { ProductImportRowDto, RowFieldIssue } from '../dtos/products/productImport.dto';
 
 export type ImportBatchGlobalState = 'pendiente' | 'procesando' | 'por_verificar' | 'completado';
-export type ImportBatchRowState = 'importado' | 'omitido' | 'rechazado' | 'pendiente';
+export type ImportBatchRowState = 'pendiente' | 'importado' | 'omitido' | 'rechazado';
 
 export interface PreviewBatchRowEntry {
     row: number;
@@ -14,76 +17,178 @@ export interface PreviewBatchRowEntry {
 
 export interface ConfirmationTokenRecord {
     token: string;
-    adminId: string | null;
     createdAtMs: number;
     expiresAtMs: number;
+    adminId: string | number | null;
     status: ImportBatchGlobalState;
     rows: PreviewBatchRowEntry[];
     attemptedSkus: Set<string>;
+    importedProductIds: Set<number>;
+}
+
+interface SerializableConfirmationTokenRecord {
+    token: string;
+    createdAtMs: number;
+    expiresAtMs: number;
+    adminId: string | number | null;
+    status: ImportBatchGlobalState;
+    rows: PreviewBatchRowEntry[];
+    attemptedSkus: string[];
+    importedProductIds: number[];
 }
 
 const confirmationTokens = new Map<string, ConfirmationTokenRecord>();
 const activeImportSkuLocks = new Set<string>();
-export const TOKEN_TTL_MS = 30 * 60 * 1000; // 30 minutos
+export const TOKEN_TTL_MS = 30 * 60 * 1000;
+
+// Directorio de almacenamiento persistente local
+const getStorageDir = (): string => {
+    const dir = process.env.IMPORT_STORAGE_DIR || path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
+    try {
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
+        }
+        return dir;
+    } catch {
+        return os.tmpdir();
+    }
+};
+
+const getRecordFilePath = (token: string): string => {
+    const safeToken = token.replace(/[^a-zA-Z0-9_-]/g, '');
+    return path.join(getStorageDir(), `${safeToken}.json`);
+};
+
+const persistRecordToDisk = (record: ConfirmationTokenRecord): void => {
+    try {
+        const serializable: SerializableConfirmationTokenRecord = {
+            token: record.token,
+            createdAtMs: record.createdAtMs,
+            expiresAtMs: record.expiresAtMs,
+            adminId: record.adminId,
+            status: record.status,
+            rows: record.rows,
+            attemptedSkus: Array.from(record.attemptedSkus),
+            importedProductIds: Array.from(record.importedProductIds)
+        };
+        fs.writeFileSync(getRecordFilePath(record.token), JSON.stringify(serializable), 'utf8');
+    } catch {
+        // Fallback no bloqueante si el sistema de archivos es de solo lectura
+    }
+};
+
+const loadRecordFromDisk = (token: string): ConfirmationTokenRecord | undefined => {
+    try {
+        const filePath = getRecordFilePath(token);
+        if (!fs.existsSync(filePath)) return undefined;
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const data: SerializableConfirmationTokenRecord = JSON.parse(raw);
+        const record: ConfirmationTokenRecord = {
+            token: data.token,
+            createdAtMs: data.createdAtMs,
+            expiresAtMs: data.expiresAtMs,
+            adminId: data.adminId,
+            status: data.status,
+            rows: data.rows,
+            attemptedSkus: new Set(data.attemptedSkus || []),
+            importedProductIds: new Set(data.importedProductIds || [])
+        };
+        confirmationTokens.set(token, record);
+        return record;
+    } catch {
+        return undefined;
+    }
+};
 
 export const normalizeSkuKey = (sku: string): string => {
     return sku
         .trim()
-        .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF\u00AD]/g, '')
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/ß/gi, 'ss')
-        .replace(/œ/gi, 'oe')
-        .replace(/ª/gi, 'a')
-        .replace(/º/gi, 'o')
-        .toLowerCase();
+        .replace(/ß/gi, 'SS')
+        .toUpperCase();
+};
+
+export const cleanExpiredConfirmationTokens = (): void => {
+    const now = Date.now();
+    for (const [token, record] of confirmationTokens.entries()) {
+        if (now > record.expiresAtMs) {
+            confirmationTokens.delete(token);
+            try {
+                const p = getRecordFilePath(token);
+                if (fs.existsSync(p)) fs.unlinkSync(p);
+            } catch {
+                // Ignore cleanup errors
+            }
+        }
+    }
 };
 
 export const registerConfirmationToken = (
     token: string,
-    rows: PreviewBatchRowEntry[] = [],
-    adminId?: number | string | null,
-    ttlMs: number = TOKEN_TTL_MS
+    rows: PreviewBatchRowEntry[],
+    adminId?: number | string | null
 ): ConfirmationTokenRecord => {
+    cleanExpiredConfirmationTokens();
     const now = Date.now();
     const record: ConfirmationTokenRecord = {
         token,
-        adminId: adminId !== undefined && adminId !== null ? String(adminId) : null,
         createdAtMs: now,
-        expiresAtMs: now + ttlMs,
+        expiresAtMs: now + TOKEN_TTL_MS,
+        adminId: adminId !== undefined && adminId !== null ? adminId : null,
         status: 'pendiente',
-        rows: rows.map((r) => ({
-            ...r,
-            motivos: [...r.motivos]
-        })),
-        attemptedSkus: new Set<string>()
+        rows,
+        attemptedSkus: new Set<string>(),
+        importedProductIds: new Set<number>()
     };
     confirmationTokens.set(token, record);
+    persistRecordToDisk(record);
     return record;
 };
 
 export const getConfirmationTokenRecordRaw = (token: string): ConfirmationTokenRecord | undefined => {
-    return confirmationTokens.get(token);
+    cleanExpiredConfirmationTokens();
+    let record = confirmationTokens.get(token);
+    if (!record) {
+        record = loadRecordFromDisk(token);
+    }
+    return record;
 };
 
 export const isConfirmationTokenExpired = (record: ConfirmationTokenRecord): boolean => {
-    return record.status === 'pendiente' && Date.now() > record.expiresAtMs;
+    return Date.now() > record.expiresAtMs;
 };
 
 export const setConfirmationTokenStatus = (
     token: string,
     status: ImportBatchGlobalState
 ): void => {
-    const record = confirmationTokens.get(token);
+    const record = getConfirmationTokenRecordRaw(token);
     if (record) {
         record.status = status;
+        persistRecordToDisk(record);
     }
 };
 
+export const recordImportedProductLink = (
+    token: string,
+    idProducto: number
+): void => {
+    const record = getConfirmationTokenRecordRaw(token);
+    if (record && idProducto > 0) {
+        record.importedProductIds.add(idProducto);
+        persistRecordToDisk(record);
+    }
+};
+
+export const saveConfirmationRecord = (record: ConfirmationTokenRecord): void => {
+    confirmationTokens.set(record.token, record);
+    persistRecordToDisk(record);
+};
+
 export const tryAcquireSkuLocks = (skus: string[]): boolean => {
-    const normalized = Array.from(
-        new Set(skus.map((s) => normalizeSkuKey(s)).filter((s) => s.length > 0))
-    );
+    const normalized = skus.map((s) => normalizeSkuKey(s));
     for (const sku of normalized) {
         if (activeImportSkuLocks.has(sku)) {
             return false;
@@ -96,25 +201,8 @@ export const tryAcquireSkuLocks = (skus: string[]): boolean => {
 };
 
 export const releaseSkuLocks = (skus: string[]): void => {
-    const normalized = Array.from(
-        new Set(skus.map((s) => normalizeSkuKey(s)).filter((s) => s.length > 0))
-    );
+    const normalized = skus.map((s) => normalizeSkuKey(s));
     for (const sku of normalized) {
         activeImportSkuLocks.delete(sku);
     }
-};
-
-export const clearConfirmationTokensForTesting = (): void => {
-    confirmationTokens.clear();
-    activeImportSkuLocks.clear();
-};
-
-export const getConfirmationTokenRecord = getConfirmationTokenRecordRaw;
-
-export const markConfirmationTokenProcessing = (token: string): void => {
-    setConfirmationTokenStatus(token, 'procesando');
-};
-
-export const markConfirmationTokenCompleted = (token: string, _result?: unknown): void => {
-    setConfirmationTokenStatus(token, 'completado');
 };
