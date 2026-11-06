@@ -1,8 +1,8 @@
-import { dataSource, inTransaction } from '../config/database.config';
-import { 
-    CarritoSchema, 
-    ItemCarritoSchema, 
-    UsuarioSchema 
+import { dataSource } from '../config/database.config';
+import {
+    CarritoSchema,
+    ItemCarritoSchema,
+    UsuarioSchema
 } from '../entities/active.schemas';
 
 export interface CartItemRecord {
@@ -27,7 +27,8 @@ export const findClienteIdByUsuarioId = async (idUsuario: number): Promise<numbe
 
 export const getOrCreateCartIdByClientId = async (idCliente: number): Promise<number> => {
     const carritoRepo = dataSource.getRepository(CarritoSchema);
-    
+
+    // 1. Verificación inicial de existencia
     const existing = await carritoRepo.findOne({
         where: { id_cliente: idCliente },
         select: ['id_carrito']
@@ -37,32 +38,47 @@ export const getOrCreateCartIdByClientId = async (idCliente: number): Promise<nu
         return existing.id_carrito;
     }
 
-    return await inTransaction(async (manager) => {
-        const transactionalRepo = manager.getRepository(CarritoSchema);
-        const doubleCheck = await transactionalRepo.findOne({
-            where: { id_cliente: idCliente },
-            select: ['id_carrito']
-        });
-        
-        if (doubleCheck) {
-            return doubleCheck.id_carrito;
+    // 2. Inserción atómica controlando colisión concurrente (H01)
+    try {
+        const insertResult = await carritoRepo.insert({ id_cliente: idCliente });
+        const generatedId = insertResult.identifiers?.[0]?.id_carrito;
+        if (generatedId) {
+            return Number(generatedId);
         }
+    } catch (error: any) {
+        const isDuplicate =
+            error?.code === 'ER_DUP_ENTRY' ||
+            error?.driverError?.code === 'ER_DUP_ENTRY' ||
+            error?.errno === 1062 ||
+            error?.driverError?.errno === 1062 ||
+            (typeof error?.message === 'string' && error.message.includes('ER_DUP_ENTRY'));
 
-        try {
-            const insertResult = await transactionalRepo.insert({ id_cliente: idCliente });
-            return Number(insertResult.identifiers[0].id_carrito);
-        } catch (error: any) {
-            // Protección idempotente ante inserts concurrentes simultáneos
-            if (error?.code === 'ER_DUP_ENTRY') {
-                const found = await transactionalRepo.findOne({
-                    where: { id_cliente: idCliente },
-                    select: ['id_carrito']
-                });
-                if (found) return found.id_carrito;
-            }
+        if (!isDuplicate) {
             throw error;
         }
+    }
+
+    // 3. Recuperar el carrito creado concurrentemente por la solicitud hermana
+    const found = await carritoRepo.findOne({
+        where: { id_cliente: idCliente },
+        select: ['id_carrito']
     });
+
+    if (found) {
+        return found.id_carrito;
+    }
+
+    // Respaldo de lectura directa en caso de desfase en la metadata
+    const rows = await dataSource.query(
+        'SELECT id_carrito FROM CARRITO WHERE id_cliente = ? LIMIT 1',
+        [idCliente]
+    );
+
+    if (rows && rows.length > 0 && rows[0].id_carrito) {
+        return Number(rows[0].id_carrito);
+    }
+
+    throw new Error('No se pudo inicializar o recuperar el carrito del cliente.');
 };
 
 export const findCartItems = async (idCarrito: number): Promise<CartItemRecord[]> => {

@@ -1,7 +1,7 @@
-import { 
-    getOrCreateCartIdByClientId, 
-    findCartItems, 
-    findClienteIdByUsuarioId 
+import {
+    getOrCreateCartIdByClientId,
+    findCartItems,
+    findClienteIdByUsuarioId
 } from '../repositories/cart.repository';
 
 export interface CartItemDTO {
@@ -37,8 +37,12 @@ export const getAuthenticatedClientCart = async (idUsuario: number): Promise<Car
 
     const items: CartItemDTO[] = rawItems.map((raw) => {
         const esActivo = Boolean(Number(raw.producto_activo) && Number(raw.categoria_activa));
-        const tieneStock = Number(raw.stock) >= Number(raw.cantidad);
-        const disponible = esActivo && Number(raw.stock) > 0;
+        const cantidadPedida = Number(raw.cantidad);
+        const stockActual = Number(raw.stock);
+
+        // H02: Solo disponible si el producto y categoría están activos Y el stock cubre la cantidad pedida
+        const tieneStock = stockActual >= cantidadPedida;
+        const disponible = esActivo && tieneStock;
 
         let motivo: 'INACTIVO' | 'SIN_STOCK' | undefined;
         if (!esActivo) {
@@ -50,17 +54,17 @@ export const getAuthenticatedClientCart = async (idUsuario: number): Promise<Car
         }
 
         if (esActivo) {
-            totalItems += Number(raw.cantidad);
+            totalItems += cantidadPedida;
         }
 
         return {
-            id_item_carrito: raw.id_item_carrito,
-            id_producto: raw.id_producto,
+            id_item_carrito: Number(raw.id_item_carrito),
+            id_producto: Number(raw.id_producto),
             codigo: raw.codigo,
             nombre: raw.nombre,
             imagen: raw.imagen,
-            cantidad: raw.cantidad,
-            stock: raw.stock,
+            cantidad: cantidadPedida,
+            stock: stockActual,
             disponible,
             motivo_no_disponible: motivo
         };

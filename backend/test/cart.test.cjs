@@ -1,5 +1,3 @@
-const path = require('node:path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
@@ -7,42 +5,135 @@ const { app } = require('../dist/app');
 const { dataSource } = require('../dist/config/database.config');
 const { signToken } = require('../dist/services/token.service');
 
-describe('Task #245 — Persistencia y Modelo del Carrito', () => {
+describe('Task #245 — Persistencia y Modelo del Carrito (H01, H02, H03)', () => {
     let server;
     let url;
     let client1Cookie;
     let client2Cookie;
     let adminCookie;
 
+    let idCategoriaTest;
+    let idProductoStockSuficiente;
+    let idProductoStockBajo;
+    let idProductoInactivo;
+    let idCliente1;
+    let idCliente2;
+    let idUsuario1;
+    let idUsuario2;
+    let idUsuarioAdmin;
+
+    const PREFIX = `TEST_CART_${Date.now()}_`;
+
     before(async () => {
-        // Inicializar DataSource si no estuviera abierto
         if (dataSource && !dataSource.isInitialized) {
             await dataSource.initialize();
         }
 
-        // Levantar servidor Express en puerto dinámico efímero
+        // H03: Candado defensivo. Solo se ejecuta sobre bases descartables efímeras
+        const [dbInfo] = await dataSource.query('SELECT DATABASE() AS db_name');
+        const dbName = dbInfo?.db_name || '';
+        assert.ok(
+            dbName.startsWith('test_') || dbName.includes('test') || dbName.startsWith('cart_test_'),
+            `Ejecución abortada: '${dbName}' no es una base de datos descartable de prueba.`
+        );
+
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');
         url = `http://127.0.0.1:${server.address().port}`;
 
-        // Generar tokens JWT para fixture según esquema del proyecto
-        const token1 = signToken({ id: 1, rol: 'CLIENTE', exp: Math.floor(Date.now() / 1000) + 7200 });
-        client1Cookie = `jwt_token=${token1}`;
+        // Fixture: Categoría de prueba
+        const catRes = await dataSource.query(
+            'INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 1)',
+            [`${PREFIX}CAT`]
+        );
+        idCategoriaTest = catRes.insertId;
 
-        const token2 = signToken({ id: 2, rol: 'CLIENTE', exp: Math.floor(Date.now() / 1000) + 7200 });
-        client2Cookie = `jwt_token=${token2}`;
+        // Fixtures: Productos aislados
+        const p1 = await dataSource.query(
+            'INSERT INTO PRODUCTO (codigo, nombre, id_categoria, precio, stock, activo) VALUES (?, ?, ?, 150.00, 10, 1)',
+            [`${PREFIX}SKU1`, 'Prod Stock Suficiente', idCategoriaTest]
+        );
+        idProductoStockSuficiente = p1.insertId;
 
-        const tokenAdmin = signToken({ id: 4, rol: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 7200 });
-        adminCookie = `jwt_token=${tokenAdmin}`;
+        const p2 = await dataSource.query(
+            'INSERT INTO PRODUCTO (codigo, nombre, id_categoria, precio, stock, activo) VALUES (?, ?, ?, 250.00, 1, 1)',
+            [`${PREFIX}SKU2`, 'Prod Stock Insuficiente', idCategoriaTest]
+        );
+        idProductoStockBajo = p2.insertId;
+
+        const p3 = await dataSource.query(
+            'INSERT INTO PRODUCTO (codigo, nombre, id_categoria, precio, stock, activo) VALUES (?, ?, ?, 350.00, 5, 0)',
+            [`${PREFIX}SKU3`, 'Prod Inactivo', idCategoriaTest]
+        );
+        idProductoInactivo = p3.insertId;
+
+        // Fixtures: Clientes aislados
+        const c1 = await dataSource.query(
+            'INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, es_fiel, activo) VALUES ("PARTICULAR", ?, 0, 1)',
+            [`${PREFIX}Cliente1`]
+        );
+        idCliente1 = c1.insertId;
+
+        const c2 = await dataSource.query(
+            'INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, es_fiel, activo) VALUES ("PARTICULAR", ?, 0, 1)',
+            [`${PREFIX}Cliente2`]
+        );
+        idCliente2 = c2.insertId;
+
+        // Fixtures: Usuarios clientes
+        const u1 = await dataSource.query(
+            'INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo) VALUES (?, ?, "hash_test", "CLIENTE", 1)',
+            [idCliente1, `${PREFIX}u1@test.com`]
+        );
+        idUsuario1 = u1.insertId;
+
+        const u2 = await dataSource.query(
+            'INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo) VALUES (?, ?, "hash_test", "CLIENTE", 1)',
+            [idCliente2, `${PREFIX}u2@test.com`]
+        );
+        idUsuario2 = u2.insertId;
+
+        // Fixture: Usuario ADMIN real persistido para validar el 403
+        const uAdmin = await dataSource.query(
+            'INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo) VALUES (NULL, ?, "hash_test", "ADMIN", 1)',
+            [`${PREFIX}admin@test.com`]
+        );
+        idUsuarioAdmin = uAdmin.insertId;
+
+        // Credenciales JWT vinculadas a usuarios existentes en la base efímera
+        client1Cookie = `jwt_token=${signToken({ id: idUsuario1, rol: 'CLIENTE', exp: Math.floor(Date.now() / 1000) + 7200 })}`;
+        client2Cookie = `jwt_token=${signToken({ id: idUsuario2, rol: 'CLIENTE', exp: Math.floor(Date.now() / 1000) + 7200 })}`;
+        adminCookie = `jwt_token=${signToken({ id: idUsuarioAdmin, rol: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 7200 })}`;
     });
 
     after(async () => {
-        // Cerrar servidor HTTP
+        try {
+            if (dataSource && dataSource.isInitialized) {
+                await dataSource.query('DELETE FROM ITEM_CARRITO WHERE id_producto IN (?, ?, ?)', [
+                    idProductoStockSuficiente,
+                    idProductoStockBajo,
+                    idProductoInactivo
+                ]);
+                await dataSource.query('DELETE FROM CARRITO WHERE id_cliente IN (?, ?)', [idCliente1, idCliente2]);
+                await dataSource.query('DELETE FROM USUARIO WHERE id_usuario IN (?, ?, ?)', [
+                    idUsuario1,
+                    idUsuario2,
+                    idUsuarioAdmin
+                ]);
+                await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente IN (?, ?)', [idCliente1, idCliente2]);
+                await dataSource.query('DELETE FROM PRODUCTO WHERE id_producto IN (?, ?, ?)', [
+                    idProductoStockSuficiente,
+                    idProductoStockBajo,
+                    idProductoInactivo
+                ]);
+                await dataSource.query('DELETE FROM CATEGORIA WHERE id_categoria = ?', [idCategoriaTest]);
+            }
+        } catch {}
+
         if (server) {
             await new Promise((resolve) => server.close(resolve));
         }
 
-        // Liberar conexiones de base de datos para no dejar el event loop bloqueado
         const db = require('../dist/config/database.config');
         if (typeof db.destroyDatabase === 'function') {
             await db.destroyDatabase();
@@ -63,83 +154,84 @@ describe('Task #245 — Persistencia y Modelo del Carrito', () => {
         assert.equal(res.status, 403);
     });
 
-    test('Cliente recupera su carrito inicial vacío de forma aislada', async () => {
-        // Asegurar que el carrito del cliente 1 comience limpio para la aserción
-        const [u1] = await dataSource.query('SELECT id_cliente FROM USUARIO WHERE id_usuario = 1');
-        if (u1?.id_cliente) {
-            const [c1] = await dataSource.query('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [u1.id_cliente]);
-            if (c1) {
-                await dataSource.query('DELETE FROM ITEM_CARRITO WHERE id_carrito = ?', [c1.id_carrito]);
-            }
-        }
+    test('Auditoría H01: dos primeras consultas simultáneas del mismo cliente devuelven 200 con idéntico ID', async () => {
+        const [resA, resB] = await Promise.all([
+            fetch(`${url}/api/carrito`, { headers: { Cookie: client2Cookie } }),
+            fetch(`${url}/api/carrito`, { headers: { Cookie: client2Cookie } })
+        ]);
 
-        const res1 = await fetch(`${url}/api/carrito`, {
-            headers: { Cookie: client1Cookie }
-        });
+        assert.equal(resA.status, 200, 'La primera solicitud concurrente debe responder 200');
+        assert.equal(resB.status, 200, 'La segunda solicitud concurrente debe responder 200');
 
-        assert.equal(res1.status, 200);
-        const data1 = await res1.json();
-        assert.equal(data1.total_items, 0);
-        assert.deepEqual(data1.items, []);
+        const dataA = await resA.json();
+        const dataB = await resB.json();
 
-        // El cliente 2 debe acceder a su propio carrito
-        const res2 = await fetch(`${url}/api/carrito`, {
-            headers: { Cookie: client2Cookie }
-        });
-
-        assert.equal(res2.status, 200);
-        const data2 = await res2.json();
-        assert.notEqual(data1.id_carrito, data2.id_carrito);
+        assert.equal(dataA.id_carrito, dataB.id_carrito, 'Ambas consultas deben recibir el mismo carrito');
+        assert.equal(dataA.total_items, 0);
+        assert.deepEqual(dataA.items, []);
     });
 
-    test('Persistencia entre sesiones y detección de producto inactivo', async () => {
-        const [usuario1] = await dataSource.query('SELECT id_cliente FROM USUARIO WHERE id_usuario = 1');
-        const idCliente = usuario1.id_cliente;
-
-        let [cartRow] = await dataSource.query('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [idCliente]);
-        if (!cartRow) {
-            await dataSource.query('INSERT INTO CARRITO (id_cliente) VALUES (?)', [idCliente]);
-            [cartRow] = await dataSource.query('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [idCliente]);
+    test('Auditoría H02: cantidad 3 con stock 1 responde disponible: false y SIN_STOCK', async () => {
+        const cartRows = await dataSource.query('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [idCliente1]);
+        let cartId = cartRows[0]?.id_carrito;
+        if (!cartId) {
+            const created = await dataSource.query('INSERT INTO CARRITO (id_cliente) VALUES (?)', [idCliente1]);
+            cartId = created.insertId;
         }
-        const cartId = cartRow.id_carrito;
 
-        // Limpiar items previos
         await dataSource.query('DELETE FROM ITEM_CARRITO WHERE id_carrito = ?', [cartId]);
 
-        // 1. Insertar item con producto 1
+        // 1. Ítem con stock suficiente (cantidad 2, stock 10)
         await dataSource.query(
-            'INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, 1, 2)',
-            [cartId]
+            'INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, ?, 2)',
+            [cartId, idProductoStockSuficiente]
         );
 
-        // 2. Desactivar producto 2 temporalmente y agregarlo al carrito
-        await dataSource.query('UPDATE PRODUCTO SET activo = 0 WHERE id_producto = 2');
+        // 2. H02: Ítem con stock insuficiente (cantidad 3, stock 1)
         await dataSource.query(
-            'INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, 2, 1)',
-            [cartId]
+            'INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, ?, 3)',
+            [cartId, idProductoStockBajo]
         );
 
-        // 3. Simular consulta HTTP tras reconexión
+        // 3. Ítem con producto inactivo
+        await dataSource.query(
+            'INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, ?, 1)',
+            [cartId, idProductoInactivo]
+        );
+
         const res = await fetch(`${url}/api/carrito`, {
             headers: { Cookie: client1Cookie }
         });
 
         assert.equal(res.status, 200);
         const data = await res.json();
-        assert.equal(data.items.length, 2);
+        assert.equal(data.items.length, 3);
 
-        const itemActivo = data.items.find((i) => i.id_producto === 1);
-        const itemInactivo = data.items.find((i) => i.id_producto === 2);
+        const itemOk = data.items.find((i) => i.id_producto === idProductoStockSuficiente);
+        const itemSinStock = data.items.find((i) => i.id_producto === idProductoStockBajo);
+        const itemInactivo = data.items.find((i) => i.id_producto === idProductoInactivo);
 
-        assert.ok(itemActivo);
+        assert.ok(itemOk);
+        assert.equal(itemOk.disponible, true);
+        assert.equal(itemOk.motivo_no_disponible, undefined);
+
+        assert.ok(itemSinStock);
+        assert.equal(itemSinStock.disponible, false, 'disponible debe ser false si stock < cantidad');
+        assert.equal(itemSinStock.motivo_no_disponible, 'SIN_STOCK');
+
         assert.ok(itemInactivo);
-        assert.equal(itemActivo.disponible, true);
         assert.equal(itemInactivo.disponible, false);
         assert.equal(itemInactivo.motivo_no_disponible, 'INACTIVO');
-        assert.equal(data.tiene_incompatibles, true);
 
-        // Limpieza de datos temporales
-        await dataSource.query('UPDATE PRODUCTO SET activo = 1 WHERE id_producto = 2');
-        await dataSource.query('DELETE FROM ITEM_CARRITO WHERE id_carrito = ?', [cartId]);
+        assert.equal(data.tiene_incompatibles, true);
+    });
+
+    test('Persistencia entre sesiones: recupera items tras nueva conexión', async () => {
+        const res = await fetch(`${url}/api/carrito`, {
+            headers: { Cookie: client1Cookie }
+        });
+        assert.equal(res.status, 200);
+        const data = await res.json();
+        assert.equal(data.items.length, 3);
     });
 });
