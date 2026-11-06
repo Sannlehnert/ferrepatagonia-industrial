@@ -6,6 +6,7 @@ import { adminRouter } from './routes/admin.routes';
 import { authPassport } from './config/passport.config';
 import { catalogRouter } from './routes/catalog.routes';
 import { categoryRouter } from './routes/category.routes';
+import { cartRouter } from './routes/cart.routes';
 import { env } from './config/env.config';
 import { httpSecurity } from './middlewares/http-security.middleware';
 import { MariaDbPricingSource } from './repositories/pricing.source';
@@ -27,13 +28,13 @@ app.use('/api', catalogRouter);
 app.use('/api', categoryRouter);
 app.use('/api', createPricingRouter(new PricingService(new MariaDbPricingSource())));
 app.use('/api/admin', adminRouter);
+app.use('/api/carrito', cartRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
 const handleError: ErrorRequestHandler = (error, _req, res, _next) => {
-  // Conservamos errores HTTP del lector JSON sin exponer detalles internos.
   const status = Number(error.status);
   if (Number.isInteger(status) && status >= 400 && status < 500) {
     res.status(status).json({ error: 'Solicitud inválida' });
