@@ -1,6 +1,6 @@
 # FER-18 / #246 — Operaciones del carrito
 
-La implementación usa las tablas y restricciones de [#245 / PR #66](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/66) y la [API de precios FER-17](precios.md). El PR de #246 se apila sobre `feature/FER-18-245-cart-persistence` mientras #245 siga abierta. Desplegar ambos cambios con el esquema de carrito y la evidencia de precios FER-17.
+La implementación usa las tablas y restricciones de [#245 / PR #66](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/66), integradas en `develop`, y la [API de precios FER-17](precios.md). El despliegue requiere el esquema del carrito y la evidencia de precios FER-17.
 
 ## HTTP
 

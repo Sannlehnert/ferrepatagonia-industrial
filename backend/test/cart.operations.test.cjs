@@ -143,8 +143,18 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
       return { cookie };
     };
     const first = await login();
+    const initial = await get(first);
+    assert.deepEqual(initial.items, []);
     await success(add(p, 2, first));
+    await success(add(q, 1, first));
+    const added = await get(first);
+    assert.equal(added.id_carrito, initial.id_carrito);
+    assert.equal(added.items.find(item => item.id_producto === q).cantidad, 1);
+    await success(patch(q, 3, first));
+    assert.equal((await get(first)).items.find(item => item.id_producto === q).cantidad, 3);
+    await success(remove(q, first));
     const before = await get(first);
+    assert.deepEqual(before.items.map(({ id_producto, cantidad }) => [id_producto, cantidad]), [[p, 2]]);
     const logout = await request('POST', '/auth/logout', first);
     assert.equal(logout.status, 200);
     assert.match(logout.headers.get('set-cookie'), /jwt_token=;/);
@@ -439,6 +449,52 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
     } while (performance.now() < deadline);
     assert.fail('No se observaron ' + count + ' esperas reales de catálogo');
   }
+
+  test('un deadlock real de InnoDB revierte el primer intento y confirma una sola línea', async t => {
+    const actor = await client('deadlock-246@example.test');
+    const cart = await get(actor);
+    const products = [q];
+    for (let i = 0; i < 8; i++) products.push(await product('deadlock-246-' + i));
+
+    const original = dataSource.createQueryRunner.bind(dataSource);
+    let deadlocks = 0;
+    const probe = t.mock.method(dataSource, 'createQueryRunner', (...args) => {
+      const runner = original(...args);
+      const query = runner.query.bind(runner);
+      runner.query = async (...params) => {
+        try { return await query(...params); }
+        catch (error) {
+          if (error.driverError?.errno === 1213) deadlocks++;
+          throw error;
+        }
+      };
+      return runner;
+    });
+
+    let pending;
+    try {
+      await withLockedProduct(q, async writer => {
+        // Give the competing transaction more weight so InnoDB rolls back
+        // the cart request, which is still taking locks and has made no writes.
+        const placeholders = products.map(() => '?').join(', ');
+        await writer.query(`UPDATE PRODUCTO SET stock = stock - 1 WHERE id_producto IN (${placeholders})`, products);
+        pending = add(q, 2, actor);
+        await waitForCatalogLocks(writer);
+        // The cart holds the user and waits on q. Asking for the user while
+        // holding q completes the cycle. The helper then rolls back the writer.
+        await writer.query('SELECT id_usuario FROM USUARIO WHERE id_usuario = ? FOR UPDATE', [actor.id]);
+      });
+      await success(pending);
+      assert.equal(deadlocks, 1);
+      const snapshot = await get(actor);
+      assert.equal(snapshot.id_carrito, cart.id_carrito);
+      assert.deepEqual(snapshot.items.map(({ id_producto, cantidad }) => [id_producto, cantidad]), [[q, 2]]);
+      await assertStock(q, 10);
+    } finally {
+      if (pending) await pending;
+      probe.mock.restore();
+    }
+  });
 
   // Pause after taking a real TypeORM connection and before running A's session
   // SELECT. Passport and MariaDB still handle identity and resources normally.

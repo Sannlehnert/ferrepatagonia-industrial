@@ -12,17 +12,27 @@ export class FileImportValidationError extends Error {
 export const MAX_IMPORT_ROWS = 1000;
 export const MAX_IMPORT_COLUMNS = 20;
 
-const REQUIRED_HEADERS = ['codigo', 'nombre', 'id_categoria', 'precio', 'stock'] as const;
+const REQUIRED_HEADERS = [
+    'codigo',
+    'nombre',
+    'id_categoria',
+    'precio_base_usd',
+    'stock'
+] as const;
+
 const ALLOWED_HEADERS = new Set([
     'codigo',
     'nombre',
     'id_categoria',
-    'precio',
+    'precio_base_usd',
     'stock',
     'descripcion',
     'imagen',
-    'activo'
+    'activo',
+    'descuento_especial_pct'
 ]);
+
+const LEGACY_HEADERS = new Set(['precio', 'descuento', 'descuento_pct']);
 
 export interface ParsedSheetRow {
     rowNumber: number;
@@ -57,8 +67,15 @@ export const validateHeaders = (rawHeaders: string[]): string[] => {
         if (seenHeaders.has(header)) {
             throw new FileImportValidationError(`El encabezado "${header}" está duplicado en la plantilla.`);
         }
+        if (LEGACY_HEADERS.has(header)) {
+            throw new FileImportValidationError(
+                `El encabezado "${header}" corresponde a una versión anterior. Utilice la nueva plantilla FER16-v2 (precio_base_usd, descuento_especial_pct).`
+            );
+        }
         if (!ALLOWED_HEADERS.has(header)) {
-            throw new FileImportValidationError(`Columna no reconocida en la plantilla: "${header}".`);
+            throw new FileImportValidationError(
+                `Columna no reconocida en la plantilla: "${header}". Utilice la plantilla vigente FER16-v2.`
+            );
         }
         seenHeaders.add(header);
     }
@@ -66,7 +83,7 @@ export const validateHeaders = (rawHeaders: string[]): string[] => {
     for (const required of REQUIRED_HEADERS) {
         if (!seenHeaders.has(required)) {
             throw new FileImportValidationError(
-                `Falta la columna obligatoria "${required}" en el encabezado del archivo.`
+                `Falta la columna obligatoria "${required}" en el encabezado del archivo (plantilla FER16-v2).`
             );
         }
     }

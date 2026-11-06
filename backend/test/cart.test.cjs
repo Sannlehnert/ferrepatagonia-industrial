@@ -23,19 +23,38 @@ describe('Task #245 — Persistencia y Modelo del Carrito (H01, H02, H03)', () =
     let idUsuarioAdmin;
 
     const PREFIX = `TEST_CART_${Date.now()}_`;
+    const VALID_DB_PATTERN = /^cart_test_[0-9a-f]{32}$/i;
 
     before(async () => {
-        assert.match(process.env.CART_TEST_DATABASE ?? '', /^cart_test_[a-f0-9]{32}$/);
-        assert.equal(process.env.DB_NAME, process.env.CART_TEST_DATABASE);
+        // H03: Candado estricto. Aborta antes de conectar si falta CART_TEST_DATABASE o si su formato no es efímero
+        const runnerDb = process.env.CART_TEST_DATABASE;
+        assert.ok(
+            runnerDb && VALID_DB_PATTERN.test(runnerDb),
+            `Ejecución abortada: CART_TEST_DATABASE no está configurada o no tiene el formato efímero esperado (cart_test_<32hex>). Valor recibido: '${runnerDb}'`
+        );
         assert.equal(process.env.DB_HOST, '127.0.0.1');
+        assert.equal(process.env.DB_NAME, runnerDb);
+
         if (dataSource && !dataSource.isInitialized) {
             await dataSource.initialize();
         }
 
-        // H03: Candado defensivo. Solo se ejecuta sobre bases descartables efímeras
         const [dbInfo] = await dataSource.query('SELECT DATABASE() AS db_name');
-        assert.equal(dbInfo?.db_name, process.env.CART_TEST_DATABASE);
+        const dbName = dbInfo?.db_name || '';
 
+        // Comprueba que la base conectada sea exactamente la efímera generada por el runner
+        assert.ok(
+            VALID_DB_PATTERN.test(dbName),
+            `Ejecución abortada: la base conectada '${dbName}' no cumple con el patrón estricto de base descartable (cart_test_<32hex>).`
+        );
+
+        assert.equal(
+            dbName,
+            runnerDb,
+            `Ejecución abortada: la base conectada ('${dbName}') no coincide con CART_TEST_DATABASE ('${runnerDb}').`
+        );
+
+        // A partir de este punto la base efímera está garantizada: se inicia servidor y fixtures
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');
         url = `http://127.0.0.1:${server.address().port}`;
@@ -108,24 +127,36 @@ describe('Task #245 — Persistencia y Modelo del Carrito (H01, H02, H03)', () =
     after(async () => {
         try {
             if (dataSource && dataSource.isInitialized) {
-                await dataSource.query('DELETE FROM ITEM_CARRITO WHERE id_producto IN (?, ?, ?)', [
-                    idProductoStockSuficiente,
-                    idProductoStockBajo,
-                    idProductoInactivo
-                ]);
-                await dataSource.query('DELETE FROM CARRITO WHERE id_cliente IN (?, ?)', [idCliente1, idCliente2]);
-                await dataSource.query('DELETE FROM USUARIO WHERE id_usuario IN (?, ?, ?)', [
-                    idUsuario1,
-                    idUsuario2,
-                    idUsuarioAdmin
-                ]);
-                await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente IN (?, ?)', [idCliente1, idCliente2]);
-                await dataSource.query('DELETE FROM PRODUCTO WHERE id_producto IN (?, ?, ?)', [
-                    idProductoStockSuficiente,
-                    idProductoStockBajo,
-                    idProductoInactivo
-                ]);
-                await dataSource.query('DELETE FROM CATEGORIA WHERE id_categoria = ?', [idCategoriaTest]);
+                if (idProductoStockSuficiente) {
+                    await dataSource.query('DELETE FROM ITEM_CARRITO WHERE id_producto IN (?, ?, ?)', [
+                        idProductoStockSuficiente,
+                        idProductoStockBajo,
+                        idProductoInactivo
+                    ]);
+                }
+                if (idCliente1 && idCliente2) {
+                    await dataSource.query('DELETE FROM CARRITO WHERE id_cliente IN (?, ?)', [idCliente1, idCliente2]);
+                }
+                if (idUsuario1 && idUsuario2 && idUsuarioAdmin) {
+                    await dataSource.query('DELETE FROM USUARIO WHERE id_usuario IN (?, ?, ?)', [
+                        idUsuario1,
+                        idUsuario2,
+                        idUsuarioAdmin
+                    ]);
+                }
+                if (idCliente1 && idCliente2) {
+                    await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente IN (?, ?)', [idCliente1, idCliente2]);
+                }
+                if (idProductoStockSuficiente) {
+                    await dataSource.query('DELETE FROM PRODUCTO WHERE id_producto IN (?, ?, ?)', [
+                        idProductoStockSuficiente,
+                        idProductoStockBajo,
+                        idProductoInactivo
+                    ]);
+                }
+                if (idCategoriaTest) {
+                    await dataSource.query('DELETE FROM CATEGORIA WHERE id_categoria = ?', [idCategoriaTest]);
+                }
             }
         } catch {}
 
