@@ -332,7 +332,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         ch.writeUInt16LE(20, 6);
         ch.writeUInt16LE(8, 10);
         ch.writeUInt32LE(fComp.length, 20);
-        ch.writeUInt32LE(fData.length, 24);
+        ch.writeUInt32LE(bigDataLength = fData.length, 24);
         ch.writeUInt16LE(fName.length, 28);
 
         const zipBuffer = Buffer.concat([
@@ -608,7 +608,6 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         });
         assert.equal(confirmRes.status, 202);
 
-        // Otra operación externa inserta el SKU con un ID ajeno (9999)
         test.mock.method(repo, 'findExistingProductsBySkus', async () => {
             const m = new Map();
             m.set('SKU-ROLLBACK', 9999);
@@ -658,7 +657,6 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         });
         assert.equal(confirmRes.status, 202);
 
-        // MariaDB guardó el producto con id 777
         test.mock.method(repo, 'findExistingProductsBySkus', async () => {
             const m = new Map();
             m.set('SKU-COMMIT-OK', 777);
@@ -676,6 +674,69 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         const row = statusReport.detalles.find((d) => d.codigo === 'SKU-COMMIT-OK');
         assert.equal(row?.estado, 'importado');
         assert.equal(row?.id_producto, 777);
+    });
+
+    await t.test('Auditoría H04 (Caída de proceso tras COMMIT): nuevo proceso concilia lote interrumpido en GET y POST', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-CRASH-COMMIT,Prod Crash,1,200,4';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'crash.csv', 1);
+
+        const {
+            recordBatchProvisionalProductLink,
+            getConfirmationTokenRecordRaw,
+            clearTokenActiveExecution,
+            persistRecordToDisk
+        } = require('../dist/utils/importConfirmationState.util.js');
+
+        recordBatchProvisionalProductLink(prev.previewToken, 'SKU-CRASH-COMMIT', 888);
+        const record = getConfirmationTokenRecordRaw(prev.previewToken);
+        assert.ok(record);
+        record.status = 'procesando';
+        persistRecordToDisk(record);
+
+        // Simular que el proceso terminó (sin ejecuciones activas en memoria)
+        clearTokenActiveExecution(prev.previewToken);
+
+        test.mock.method(repo, 'findExistingProductsBySkus', async () => {
+            const m = new Map();
+            m.set('SKU-CRASH-COMMIT', 888);
+            return m;
+        });
+
+        // 1. GET /confirmaciones/:previewToken en proceso nuevo recupera completado e ID real
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.estado, 'completado');
+        assert.equal(statusReport.importados, 1);
+        assert.equal(statusReport.pendientes, 0);
+        const row = statusReport.detalles.find((d) => d.codigo === 'SKU-CRASH-COMMIT');
+        assert.equal(row?.estado, 'importado');
+        assert.equal(row?.id_producto, 888);
+
+        // 2. Reintento POST /confirmar devuelve 200 con el mismo resultado sin duplicar
+        const retryRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(retryRes.status, 200);
+        const retryReport = await retryRes.json();
+        assert.equal(retryReport.estado, 'completado');
+        assert.equal(retryReport.importados, 1);
+        const retryRow = retryReport.detalles.find((d) => d.codigo === 'SKU-CRASH-COMMIT');
+        assert.equal(retryRow?.estado, 'importado');
+        assert.equal(retryRow?.id_producto, 888);
     });
 
     await t.test('Auditoría H04 (Retención de reporte completado): GET /confirmaciones devuelve 200 tras superar 30 min', async () => {

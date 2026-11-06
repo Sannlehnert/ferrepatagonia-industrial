@@ -41,11 +41,22 @@ interface SerializableConfirmationTokenRecord {
 
 const confirmationTokens = new Map<string, ConfirmationTokenRecord>();
 const activeImportSkuLocks = new Set<string>();
+const activeExecutionTokens = new Set<string>();
 
-// TTL de 30 minutos exclusivo para iniciar la confirmación de la previsualización
 export const PREVIEW_TTL_MS = 30 * 60 * 1000;
-// Retención de 24 horas para reportes iniciados o completados
 export const REPORT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
+export const markTokenActiveExecution = (token: string): void => {
+    activeExecutionTokens.add(token);
+};
+
+export const clearTokenActiveExecution = (token: string): void => {
+    activeExecutionTokens.delete(token);
+};
+
+export const isTokenActivelyExecuting = (token: string): boolean => {
+    return activeExecutionTokens.has(token);
+};
 
 const getStorageDir = (): string => {
     const dir = process.env.IMPORT_STORAGE_DIR || path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
@@ -195,6 +206,12 @@ export const recordBatchProvisionalProductLink = (
         const norm = normalizeSkuKey(sku);
         record.batchLinkedProducts.set(norm, idProducto);
         record.importedProductIds.add(idProducto);
+        const matchingRow = record.rows.find(
+            (r) => normalizeSkuKey(r.codigo) === norm && r.estado === 'pendiente'
+        );
+        if (matchingRow) {
+            matchingRow.id_producto = idProducto;
+        }
         persistRecordToDisk(record);
     }
 };

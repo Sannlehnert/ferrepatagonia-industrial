@@ -8,6 +8,9 @@ import {
 import {
     ConfirmationTokenRecord,
     PreviewBatchRowEntry,
+    clearTokenActiveExecution,
+    isTokenActivelyExecuting,
+    markTokenActiveExecution,
     recordImportedProductLink,
     releaseSkuLocks,
     saveConfirmationRecord,
@@ -33,7 +36,7 @@ export interface ConfirmImportPayload {
 export const reconcileUncertainRowsWithDb = async (
     record: ConfirmationTokenRecord
 ): Promise<boolean> => {
-    if (record.status !== 'por_verificar') {
+    if (record.status !== 'por_verificar' && record.status !== 'procesando') {
         return (record.status as string) === 'completado';
     }
 
@@ -108,7 +111,9 @@ export const getImportConfirmationStatus = async (
     }
 
     const record = verifyTokenAccessAndTtl(cleanToken, adminId);
-    if (record.status === 'por_verificar') {
+    const isInterrupted = record.status === 'procesando' && !isTokenActivelyExecuting(cleanToken);
+
+    if (record.status === 'por_verificar' || isInterrupted) {
         await reconcileUncertainRowsWithDb(record);
     }
 
@@ -162,16 +167,26 @@ export const confirmProductImport = async (
     }
 
     const tokenRecord = verifyTokenAccessAndTtl(token, adminId);
+    const isInterrupted = tokenRecord.status === 'procesando' && !isTokenActivelyExecuting(token);
 
-    if (tokenRecord.status === 'completado' || tokenRecord.status === 'procesando') {
+    if (tokenRecord.status === 'completado') {
         return buildReportFromRecord(tokenRecord);
     }
 
-    if (tokenRecord.status === 'por_verificar') {
+    if (tokenRecord.status === 'por_verificar' || isInterrupted) {
         const isCompleted = await reconcileUncertainRowsWithDb(tokenRecord);
         if (isCompleted) {
             return buildReportFromRecord(tokenRecord);
         }
+        if (isInterrupted && !isCompleted) {
+            tokenRecord.status = 'por_verificar';
+            saveConfirmationRecord(tokenRecord);
+            return buildReportFromRecord(tokenRecord);
+        }
+    }
+
+    if (tokenRecord.status === 'procesando') {
+        return buildReportFromRecord(tokenRecord);
     }
 
     const eligibleEntries: PreviewBatchRowEntry[] = tokenRecord.rows.filter(
@@ -195,6 +210,7 @@ export const confirmProductImport = async (
     }
 
     setConfirmationTokenStatus(token, 'procesando');
+    markTokenActiveExecution(token);
 
     try {
         const skuChecks = eligibleEntries.map((e: PreviewBatchRowEntry) => ({
@@ -329,7 +345,7 @@ export const confirmProductImport = async (
             }
         }
 
-        const hasPendingUncertain: boolean = tokenRecord.rows.some(
+        const hasPendingUncertain = tokenRecord.rows.some(
             (r: PreviewBatchRowEntry): boolean => r.estado === 'pendiente'
         );
         setConfirmationTokenStatus(token, hasPendingUncertain ? 'por_verificar' : 'completado');
@@ -337,6 +353,7 @@ export const confirmProductImport = async (
 
         return buildReportFromRecord(tokenRecord);
     } finally {
+        clearTokenActiveExecution(token);
         releaseSkuLocks(candidateSkus);
     }
 };

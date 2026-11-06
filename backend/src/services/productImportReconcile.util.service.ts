@@ -1,10 +1,15 @@
 import { RowFieldIssue } from '../dtos/products/productImport.dto';
 import {
+    findExistingProductsBySkus,
+    normalizeSkuForComparison
+} from '../repositories/productImport.repository';
+import {
     ConfirmationTokenRecord,
     ImportBatchGlobalState,
     ImportBatchRowState,
     getConfirmationTokenRecordRaw,
-    isConfirmationTokenExpired
+    isConfirmationTokenExpired,
+    saveConfirmationRecord
 } from '../utils/importConfirmationState.util';
 import { FileImportValidationError } from '../utils/import.utils';
 
@@ -93,8 +98,6 @@ export const verifyTokenAccessAndTtl = (
         );
     }
 
-    // El vencimiento de 30 min aplica a la previsualización no confirmada.
-    // Los lotes ya iniciados o completados quedan protegidos bajo retención de reportes.
     if (record.status === 'pendiente' && isConfirmationTokenExpired(record)) {
         throw new FileImportValidationError(
             'El token de previsualización ha vencido (TTL de 30 minutos superado). Genere una nueva previsualización.',
@@ -103,4 +106,72 @@ export const verifyTokenAccessAndTtl = (
     }
 
     return record;
+};
+
+export const reconcileUncertainRowsWithDb = async (
+    record: ConfirmationTokenRecord
+): Promise<boolean> => {
+    if (record.status !== 'por_verificar' && record.status !== 'procesando') {
+        return (record.status as string) === 'completado';
+    }
+
+    const pendingEntries = record.rows.filter((r) => r.estado === 'pendiente');
+    if (pendingEntries.length === 0) {
+        record.status = 'completado';
+        saveConfirmationRecord(record);
+        return true;
+    }
+
+    try {
+        const skusToVerify = pendingEntries.map((r) => r.codigo);
+        const foundProductsMap = await findExistingProductsBySkus(skusToVerify);
+
+        for (const entry of pendingEntries) {
+            const normSku = normalizeSkuForComparison(entry.codigo);
+            const foundId = foundProductsMap.get(normSku);
+
+            if (foundId !== undefined) {
+                const linkedId = record.batchLinkedProducts.get(normSku);
+                const wasInsertedByThisBatch =
+                    (linkedId !== undefined && linkedId === foundId) ||
+                    record.importedProductIds.has(foundId);
+
+                if (wasInsertedByThisBatch) {
+                    entry.estado = 'importado';
+                    entry.id_producto = foundId;
+                    entry.motivos = [];
+                    record.importedProductIds.add(foundId);
+                } else {
+                    entry.estado = 'omitido';
+                    entry.motivos = [
+                        {
+                            field: 'codigo',
+                            code: 'SKU_EXISTS',
+                            message: 'El SKU ya existe en el catálogo'
+                        }
+                    ];
+                }
+            } else {
+                entry.estado = 'omitido';
+                entry.motivos = [
+                    {
+                        field: 'codigo',
+                        code: 'COMMIT_FAILED',
+                        message: 'La transacción fue revertida en MariaDB y no persistió este producto.'
+                    }
+                ];
+            }
+        }
+
+        const stillPending = record.rows.some((r) => r.estado === 'pendiente');
+        if (!stillPending) {
+            record.status = 'completado';
+            saveConfirmationRecord(record);
+            return true;
+        }
+    } catch {
+        // En caso de caída transitoria de red se mantiene por_verificar
+    }
+
+    return false;
 };
