@@ -3,8 +3,10 @@ const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
 const bcrypt = require('bcrypt');
+const mariadb = require('mariadb');
 const { app } = require('../dist/app');
 const { dataSource, destroyDatabase } = require('../dist/config/database.config');
+const { cartAdmission } = require('../dist/services/cart.admission');
 const { signToken } = require('../dist/services/token.service');
 const { fetchFromBrowser } = require('./helpers/browser-request.cjs');
 
@@ -405,6 +407,262 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
     const cat = await insert("INSERT INTO CATEGORIA (nombre, activo) VALUES ('Cart 246 lock', 1)");
     const id = await product('cart-246-active-race', { categoryId: cat });
     await changeWhileAdding(fresh, id, 'UPDATE CATEGORIA SET activo = 0 WHERE id_categoria = ?', [cat], 'PRODUCTO_INACTIVO');
+  });
+
+  // The observer also owns the row lock, outside the five-connection application pool.
+  async function withLockedProduct(id, work) {
+    const writer = await mariadb.createConnection({
+      host: process.env.DB_HOST, port: Number(process.env.DB_PORT), database: process.env.CART_TEST_DATABASE,
+      user: process.env.DB_USER, password: process.env.DB_PASSWORD,
+    });
+    try {
+      await writer.beginTransaction();
+      await writer.query('SELECT id_producto FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id]);
+      await work(writer);
+    } finally {
+      try { await writer.rollback(); }
+      finally { await writer.end(); }
+    }
+  }
+
+  const lockQueries = async writer => (await writer.query('SHOW FULL PROCESSLIST'))
+    .filter(row => row.Info?.includes('LOCK IN SHARE MODE'));
+
+  async function waitForCatalogLocks(writer, count = 1) {
+    const deadline = performance.now() + 1500;
+    do {
+      if ((await lockQueries(writer)).length === count) return;
+      await delay(10);
+    } while (performance.now() < deadline);
+    assert.fail('No se observaron ' + count + ' esperas reales de catálogo');
+  }
+
+  test('P1: un POST bloqueado y cuatro GET de A dejan libre la autenticación y el carrito de B', async t => {
+    assert.equal(dataSource.options.extra.connectionLimit, 5);
+    const actor = await client('admission-p1-246@example.test');
+    const otherBefore = await get(b);
+    let post;
+    try {
+      await withLockedProduct(q, async writer => {
+        post = add(q, 2, actor);
+        await waitForCatalogLocks(writer);
+        const allArrived = new EventTarget();
+        const arrived = once(allArrived, 'ready', { signal: AbortSignal.timeout(1000) });
+        const original = cartAdmission.run.bind(cartAdmission);
+        let seen = 0;
+        let completed = 0;
+        const mock = t.mock.method(cartAdmission, 'run', (id, signal, work) => {
+          const result = original(id, signal, work);
+          if (id === actor.id && ++seen === 4) allArrived.dispatchEvent(new Event('ready'));
+          return result;
+        });
+        const reads = Array.from({ length: 4 }, () => request('GET', '/carrito', actor).then(res => {
+          completed++;
+          return res;
+        }));
+        try {
+          await arrived;
+          const auth = await request('GET', '/auth/me', b);
+          assert.equal(auth.status, 200, await auth.clone().text());
+          assert.equal((await auth.json()).user.id, b.id);
+          assert.ok(completed < 4, 'B se autentica mientras A aún tiene GET pendientes');
+          assert.deepEqual(await get(b), otherBefore);
+          await Promise.all(reads.map(read => fails(read, 409, 'CONFLICTO_CARRITO')));
+          assert.equal((await lockQueries(writer)).length, 1, 'el POST sigue esperando');
+        } finally {
+          mock.mock.restore();
+          await Promise.allSettled(reads);
+        }
+      });
+      await success(post);
+    } finally {
+      if (post) await post;
+    }
+    const snapshot = await get(actor);
+    assert.deepEqual(snapshot.items.map(item => [item.id_producto, item.cantidad]), [[q, 2]]);
+    await success(patch(q, 3, actor));
+    assert.equal((await get(actor)).items[0].cantidad, 3);
+    await success(remove(q, actor));
+    assert.deepEqual((await get(actor)).items, []);
+    assert.deepEqual(await get(b), otherBefore);
+    await assertStock(q, 10);
+  });
+
+  test('P1: el cuarto cliente excede la espera de admisión con tres transacciones activas', async () => {
+    const actors = [];
+    for (let i = 0; i < 4; i++) actors.push(await client('admission-global-' + i + '-246@example.test'));
+    for (const actor of actors.slice(0, 3)) await success(add(q, 1, actor));
+    const posts = [];
+    try {
+      await withLockedProduct(q, async writer => {
+        for (const actor of actors.slice(0, 3)) {
+          posts.push(add(q, 2, actor));
+          await waitForCatalogLocks(writer, posts.length);
+        }
+        await fails(request('GET', '/carrito', actors[3]), 409, 'CONFLICTO_CARRITO');
+        assert.equal((await lockQueries(writer)).length, 3);
+        const auth = await request('GET', '/auth/me', actors[3]);
+        assert.equal(auth.status, 200, await auth.clone().text());
+        assert.deepEqual(await sql('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [actors[3].clientId]), []);
+      });
+      await Promise.all(posts.map(success));
+    } finally {
+      await Promise.allSettled(posts);
+    }
+    assert.deepEqual((await get(actors[3])).items, []);
+    for (const actor of actors.slice(0, 3)) assert.equal((await get(actor)).items[0].cantidad, 2);
+  });
+
+  test('P1: desconectar un GET en cola cancela su espera antes de ejecutar SQL', async t => {
+    const actor = await client('admission-cancel-246@example.test');
+    const controller = new AbortController();
+    const waiting = Promise.withResolvers();
+    const original = cartAdmission.run.bind(cartAdmission);
+    let executed = false;
+    let post;
+    try {
+      await withLockedProduct(q, async writer => {
+        post = add(q, 2, actor);
+        await waitForCatalogLocks(writer);
+        const mock = t.mock.method(cartAdmission, 'run', (id, signal, work) => {
+          const result = original(id, signal, async () => {
+            executed = true;
+            return work();
+          });
+          waiting.resolve(signal);
+          return result;
+        });
+        try {
+          const response = assert.rejects(fetch(base + '/carrito', {
+            signal: controller.signal, headers: { Cookie: actor.cookie },
+          }), { name: 'AbortError' });
+          const serverSignal = await Promise.race([
+            waiting.promise, response.then(() => assert.fail('el GET terminó antes de entrar en admisión')),
+          ]);
+          const closed = once(serverSignal, 'abort', { signal: AbortSignal.timeout(1000) });
+          controller.abort();
+          await Promise.all([response, closed]);
+        } finally {
+          mock.mock.restore();
+        }
+      });
+      await success(post);
+    } finally {
+      controller.abort();
+      if (post) await post;
+    }
+    assert.equal(executed, false);
+    assert.equal((await get(actor)).items[0].cantidad, 2);
+  });
+
+  test('P2: esperar el timeout real del producto devuelve 409, revierte y libera la admisión', async () => {
+    const actor = await client('lock-timeout-246@example.test');
+    await withLockedProduct(q, async writer => {
+      const post = add(q, 2, actor);
+      try {
+        await waitForCatalogLocks(writer);
+        // Keep the independent lock until MariaDB ends the application's wait.
+        await fails(post, 409, 'CONFLICTO_CARRITO');
+        assert.deepEqual(await sql('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [actor.clientId]), []);
+        await assertStock(q, 10);
+      } finally {
+        await post;
+      }
+    });
+    const empty = await get(actor);
+    assert.deepEqual(empty.items, []);
+    assert.equal(empty.totalUSD, '0.00');
+    await success(add(q, 2, actor));
+    assert.equal((await get(actor)).items[0].cantidad, 2);
+    await assertStock(q, 10);
+  });
+
+  for (const [scope, status, code] of [
+    ['LOCK IN SHARE MODE', 409, 'CONFLICTO_CARRITO'],
+    ['PRECIO_USD_EVIDENCIA', 500, 'ERROR_INTERNO'],
+  ]) {
+    test('P2: clasifica errno 1969 anidado según el contexto ' + scope, async t => {
+      const actor = await client('statement-' + status + '-246@example.test');
+      const original = dataSource.createQueryRunner.bind(dataSource);
+      let injected = 0;
+      const mock = t.mock.method(dataSource, 'createQueryRunner', (...args) => {
+        const runner = original(...args);
+        const query = runner.query.bind(runner);
+        runner.query = async (statement, ...params) => {
+          if (statement.includes(scope)) {
+            injected++;
+            throw new Error('test secret', { cause: { driverError: { errno: 1969 } } });
+          }
+          return query(statement, ...params);
+        };
+        return runner;
+      });
+      try {
+        await fails(add(q, 2, actor), status, code);
+        assert.equal(injected, 1);
+        assert.deepEqual(await sql('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [actor.clientId]), []);
+      } finally {
+        mock.mock.restore();
+      }
+      assert.deepEqual((await get(actor)).items, []);
+    });
+  }
+
+  test('P2: pérdida del acuse de COMMIT conserva resultado incierto aunque la causa parezca un lock', async t => {
+    const actor = await client('unknown-commit-246@example.test');
+    const original = dataSource.createQueryRunner.bind(dataSource);
+    let commits = 0;
+    const mock = t.mock.method(dataSource, 'createQueryRunner', (...args) => {
+      const runner = original(...args);
+      const commit = runner.commitTransaction.bind(runner);
+      runner.commitTransaction = async () => {
+        await commit();
+        commits++;
+        throw new Error('test secret', { cause: { driverError: { code: 'ER_LOCK_WAIT_TIMEOUT' } } });
+      };
+      return runner;
+    });
+    try {
+      await fails(add(q, 2, actor), 500, 'DATABASE_OUTCOME_UNKNOWN');
+      assert.equal(commits, 1);
+    } finally {
+      mock.mock.restore();
+    }
+    const snapshot = await get(actor);
+    assert.deepEqual(snapshot.items.map(item => [item.id_producto, item.cantidad]), [[q, 2]]);
+    await assertStock(q, 10);
+  });
+
+  test('P2: un rollback sin confirmación prevalece sobre el código de contención original', async t => {
+    const actor = await client('unknown-rollback-246@example.test');
+    const original = dataSource.createQueryRunner.bind(dataSource);
+    let rollbacks = 0;
+    const mock = t.mock.method(dataSource, 'createQueryRunner', (...args) => {
+      const runner = original(...args);
+      if (args[1] === undefined) return runner;
+      const query = runner.query.bind(runner);
+      runner.query = async (statement, ...params) => {
+        if (statement.includes('INSERT INTO ITEM_CARRITO')) {
+          throw new Error('test secret', { cause: { driverError: { errno: 1205 } } });
+        }
+        return query(statement, ...params);
+      };
+      runner.rollbackTransaction = async () => {
+        rollbacks++;
+        throw new Error('test secret');
+      };
+      return runner;
+    });
+    try {
+      await fails(add(q, 2, actor), 500, 'DATABASE_OUTCOME_UNKNOWN');
+      assert.equal(rollbacks, 1);
+    } finally {
+      mock.mock.restore();
+    }
+    assert.deepEqual(await sql('SELECT id_carrito FROM CARRITO WHERE id_cliente = ?', [actor.clientId]), []);
+    assert.deepEqual((await get(actor)).items, []);
+    await success(add(q, 2, actor));
+    assert.equal((await get(actor)).items[0].cantidad, 2);
   });
 
   for (const [sqlstate, errno, status, code] of [

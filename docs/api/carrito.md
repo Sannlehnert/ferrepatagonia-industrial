@@ -37,7 +37,7 @@ HTTP, Passport y el parser JSON conservan el formato de error compartido de la a
 | 401 | Sesión ausente, inválida, expirada o usuario desactivado al restaurarla. |
 | 403 | Origen rechazado, rol sin acceso o `NO_AUTORIZADO` si el cliente no está habilitado o falla la revalidación transaccional. |
 | 404 | `PRODUCTO_INEXISTENTE` en POST para un producto inexistente, o `ITEM_INEXISTENTE` en PATCH para una línea ausente. |
-| 409 | `CONFLICTO_CARRITO` cuando la contención o colisión no se puede resolver en el servidor. Consultar GET antes de decidir si reintentar. |
+| 409 | `CONFLICTO_CARRITO` cuando se llena o vence la admisión, o cuando la contención o colisión no se puede resolver con rollback confirmado. Consultar GET antes de decidir si reintentar. |
 | 422 | `CANTIDAD_INVALIDA`, `STOCK_INSUFICIENTE`, `PRODUCTO_INACTIVO` para producto o categoría, o estado FER-17 como `PRECIO_AUSENTE`, `BASE_CERO`, `BASE_NO_VERIFICADA`, `FINAL_CERO`, `IMPORTE_FUERA_DE_RANGO` o `DATOS_COMERCIALES_INVALIDOS`. |
 | 500 | Error operativo sanitizado. `DATABASE_OUTCOME_UNKNOWN` indica que hace falta reconciliar por GET. |
 
@@ -94,6 +94,18 @@ evidencia vigentes en cada consulta.
 
 ## Transacciones y adaptación a #247
 
+Después de autenticar y antes de pedir una conexión para la transacción, el
+carrito admite hasta tres operaciones activas por proceso, una por usuario
+autenticado. En el pool compartido de cinco quedan dos conexiones fuera del cupo
+de transacciones de carrito. La cola admite hasta doce solicitudes en total y
+dos por usuario, con una espera máxima de 750 ms. Se atiende la primera solicitud
+elegible, de modo que un usuario ocupado no detiene a los demás. Si la cola está
+llena o vence la espera, la petición recibe `409 CONFLICTO_CARRITO` antes de abrir
+una transacción. Una desconexión quita la espera de la cola. Si la operación ya
+está activa, conserva el cupo hasta que la transacción y la conexión se liberen.
+La admisión es local a cada proceso. MariaDB serializa las operaciones del mismo
+cliente entre procesos mediante los bloqueos y las restricciones.
+
 La operación usa un QueryRunner de MariaDB en `REPEATABLE READ`. Revalida y
 bloquea usuario, cliente y carrito por identidad de sesión. POST y PATCH leen
 la línea bajo bloqueo y adquieren bloqueos compartidos sobre producto y categoría
@@ -102,7 +114,12 @@ al terminar la transacción. Lista, descuentos y evidencia se leen desde ese mis
 QueryRunner. La auditoría FER-17 de listas inactivas participa en el mismo commit
 que el carrito. GET lee líneas, stock y precios en un snapshot común, incluso si
 necesita varios lotes de FER-17. La unicidad de MariaDB respalda la serialización.
-Se puede reintentar una vez un deadlock o duplicado con rollback confirmado.
+En el carrito, las sentencias esperan hasta dos segundos por un bloqueo InnoDB
+dentro del límite general de cinco segundos por sentencia. Se puede reintentar una
+vez un deadlock o duplicado con rollback confirmado. Un vencimiento de bloqueo
+confirmado devuelve `409`. El código de timeout de sentencia se interpreta como
+contención sólo en las lecturas puntuales con bloqueo. Un COMMIT o rollback cuyo
+resultado no se confirma devuelve `500 DATABASE_OUTCOME_UNKNOWN`.
 
 POST, PATCH y DELETE sólo devuelven `204` una vez confirmado el commit. Las
 operaciones no reservan ni cambian stock. Cada GET posterior obtiene su propio

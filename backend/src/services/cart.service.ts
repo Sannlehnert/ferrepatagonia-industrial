@@ -8,12 +8,8 @@ import type { AuthContext } from '../types/auth';
 import { PricingError } from './pricing/money';
 import { PricingService, sumAmounts } from './pricing/pricing.service';
 import type { PriceLine } from './pricing/pricing.types';
-
-export class CartError extends Error {
-    constructor(readonly code: string, readonly status: number, message: string) {
-        super(message);
-    }
-}
+import { cartAdmission } from './cart.admission';
+import { CartError, CartLockStatementTimeout, cartConflict, hasDatabaseError } from './cart.errors';
 
 export type CartMutation =
     | { type: 'add' | 'update'; productoId: number; cantidad: number }
@@ -26,28 +22,45 @@ function pricing(manager: EntityManager) {
     return new PricingService(new MariaDbPricingSource(undefined, manager));
 }
 
-async function withClientCart<T>(auth: AuthContext,
+function withClientCart<T>(auth: AuthContext, signal: AbortSignal,
     work: (manager: EntityManager, clientId: number, cartId: number | null) => Promise<T>): Promise<T> {
-    for (let attempt = 0; ; attempt++) {
-        try {
-            return await inTransaction(async manager => {
-                const clientId = await lockCartClient(manager, auth.id);
-                if (clientId === null) throw new CartError('NO_AUTORIZADO', 403, 'Cuenta de cliente no habilitada.');
-                return work(manager, clientId, await findCartId(manager, clientId));
-            }, 'REPEATABLE READ');
-        } catch (error) {
-            // inTransaction surfaces an uncertain outcome separately. Only retry a confirmed rollback.
-            const code = (error as { code?: string })?.code;
-            if (code !== 'ER_DUP_ENTRY' && code !== 'ER_LOCK_DEADLOCK' && code !== 'ER_LOCK_WAIT_TIMEOUT') throw error;
-            if (attempt === 1 || code === 'ER_LOCK_WAIT_TIMEOUT') {
-                throw new CartError('CONFLICTO_CARRITO', 409, 'Consultá el carrito y volvé a intentar.');
+    return cartAdmission.run(auth.id, signal, async () => {
+        for (let attempt = 0; ; attempt++) {
+            signal.throwIfAborted();
+            let workFailure: { error: unknown } | undefined;
+            try {
+                return await inTransaction(async manager => {
+                    try {
+                        const clientId = await lockCartClient(manager, auth.id);
+                        if (clientId === null) throw new CartError('NO_AUTORIZADO', 403, 'Cuenta de cliente no habilitada.');
+                        const cartId = await findCartId(manager, clientId);
+                        signal.throwIfAborted();
+                        const result = await work(manager, clientId, cartId);
+                        signal.throwIfAborted();
+                        return result;
+                    } catch (error) {
+                        workFailure = { error };
+                        throw error;
+                    }
+                }, { isolation: 'REPEATABLE READ', lockWaitSeconds: 2 });
+            } catch (error) {
+                // Classify only failures returned from transaction work after rollback.
+                // START/COMMIT/uncertain rollback and connection release errors are separate.
+                if (!workFailure || error !== workFailure.error) throw error;
+                if (error instanceof CartLockStatementTimeout || hasDatabaseError(error, 'ER_LOCK_WAIT_TIMEOUT', 1205)) {
+                    throw cartConflict();
+                }
+                if (!hasDatabaseError(error, 'ER_DUP_ENTRY', 1062) && !hasDatabaseError(error, 'ER_LOCK_DEADLOCK', 1213)) {
+                    throw error;
+                }
+                if (attempt === 1) throw cartConflict();
             }
         }
-    }
+    });
 }
 
-export function getAuthenticatedClientCart(auth: AuthContext) {
-    return withClientCart(auth, async (manager, clientId, existingId) => {
+export function getAuthenticatedClientCart(auth: AuthContext, signal: AbortSignal) {
+    return withClientCart(auth, signal, async (manager, clientId, existingId) => {
         const idCarrito = existingId ?? await createCart(manager, clientId);
         const rawItems = await findCartItems(manager, idCarrito);
         const items = rawItems.map(({ producto_activo, categoria_activa, ...item }) => {
@@ -103,8 +116,8 @@ export function getAuthenticatedClientCart(auth: AuthContext) {
     });
 }
 
-export function mutateAuthenticatedClientCart(auth: AuthContext, command: CartMutation): Promise<void> {
-    return withClientCart(auth, async (manager, clientId, cartId) => {
+export function mutateAuthenticatedClientCart(auth: AuthContext, command: CartMutation, signal: AbortSignal): Promise<void> {
+    return withClientCart(auth, signal, async (manager, clientId, cartId) => {
         const { productoId } = command;
         if (command.type === 'remove') {
             if (cartId !== null) await removeCartItem(manager, cartId, productoId);

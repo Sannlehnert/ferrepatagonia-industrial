@@ -1,7 +1,8 @@
 import type { Request, RequestHandler } from 'express';
 import { DatabaseOutcomeUnknownError } from '../config/database-policy';
-import { CartError, getAuthenticatedClientCart, mutateAuthenticatedClientCart } from '../services/cart.service';
+import { getAuthenticatedClientCart, mutateAuthenticatedClientCart } from '../services/cart.service';
 import type { CartMutation } from '../services/cart.service';
+import { CartError } from '../services/cart.errors';
 import { PricingError } from '../services/pricing/money';
 
 const MAX_INT = 2147483647;
@@ -41,17 +42,24 @@ function parseCommand(req: Request, type: CartMutation['type']): CartMutation {
 
 export function handleCart(type?: CartMutation['type']): RequestHandler {
     return async (req, res) => {
+        const cancellation = new AbortController();
+        const onClose = () => cancellation.abort();
+        res.once('close', onClose);
+        if (res.destroyed) onClose();
+        const { signal } = cancellation;
         try {
             if (Object.keys(req.query).length) invalidRequest();
             const auth = req.auth!;
             if (type) {
-                await mutateAuthenticatedClientCart(auth, parseCommand(req, type));
-                res.status(204).end();
+                await mutateAuthenticatedClientCart(auth, parseCommand(req, type), signal);
+                if (!signal.aborted) res.status(204).end();
             } else {
                 if (hasBody(req)) invalidRequest();
-                res.json(await getAuthenticatedClientCart(auth));
+                const cart = await getAuthenticatedClientCart(auth, signal);
+                if (!signal.aborted) res.json(cart);
             }
         } catch (error) {
+            if (signal.aborted) return;
             if (error instanceof CartError) {
                 res.status(error.status).json({ code: error.code, message: error.message });
             } else if (error instanceof PricingError && error.status < 500) {
@@ -62,6 +70,8 @@ export function handleCart(type?: CartMutation['type']): RequestHandler {
                 console.error('Error interno al procesar el carrito.');
                 res.status(500).json({ code: 'ERROR_INTERNO', message: 'Error interno del servidor.' });
             }
+        } finally {
+            res.removeListener('close', onClose);
         }
     };
 }

@@ -28,13 +28,14 @@ export async function checkDatabase(): Promise<void> {
 }
 
 // Keep one EntityManager and discard a connection whose rollback cannot be confirmed.
-export async function inTransaction<T>(work: (manager: EntityManager) => Promise<T>, isolation?: IsolationLevel): Promise<T> {
-  const runner = dataSource.createQueryRunner();
+export async function inTransaction<T>(work: (manager: EntityManager) => Promise<T>,
+  options: { isolation?: IsolationLevel; lockWaitSeconds?: number } = {}): Promise<T> {
+  const runner = dataSource.createQueryRunner('master', options.lockWaitSeconds);
   let connection: { destroy(): void } | undefined;
   let committing = false;
   try {
     connection = await runner.connect();
-    await runner.startTransaction(isolation);
+    await runner.startTransaction(options.isolation);
     const result = await work(runner.manager);
     committing = true;
     await runner.commitTransaction();
