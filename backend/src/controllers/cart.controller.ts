@@ -1,5 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import { DatabaseOutcomeUnknownError } from '../config/database-policy';
+import { authenticateRequest, authorizeRequest } from '../middlewares/auth.middleware';
+import { cartAdmission } from '../services/cart.admission';
 import { getAuthenticatedClientCart, mutateAuthenticatedClientCart } from '../services/cart.service';
 import type { CartMutation } from '../services/cart.service';
 import { CartError } from '../services/cart.errors';
@@ -48,16 +50,19 @@ export function handleCart(type?: CartMutation['type']): RequestHandler {
         if (res.destroyed) onClose();
         const { signal } = cancellation;
         try {
-            if (Object.keys(req.query).length) invalidRequest();
-            const auth = req.auth!;
-            if (type) {
-                await mutateAuthenticatedClientCart(auth, parseCommand(req, type), signal);
-                if (!signal.aborted) res.status(204).end();
-            } else {
-                if (hasBody(req)) invalidRequest();
-                const cart = await getAuthenticatedClientCart(auth, signal);
-                if (!signal.aborted) res.json(cart);
-            }
+            await cartAdmission.run(signal, async () => {
+                if (await authenticateRequest(req, res) && authorizeRequest(req, res, ['CLIENTE'])) return req.auth;
+            }, async auth => {
+                if (Object.keys(req.query).length) invalidRequest();
+                if (type) {
+                    await mutateAuthenticatedClientCart(auth, parseCommand(req, type), signal);
+                    if (!signal.aborted) res.status(204).end();
+                } else {
+                    if (hasBody(req)) invalidRequest();
+                    const cart = await getAuthenticatedClientCart(auth, signal);
+                    if (!signal.aborted) res.json(cart);
+                }
+            });
         } catch (error) {
             if (signal.aborted) return;
             if (error instanceof CartError) {

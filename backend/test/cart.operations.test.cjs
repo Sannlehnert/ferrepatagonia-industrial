@@ -2,11 +2,14 @@ const { describe, test, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
 const { setTimeout: delay } = require('node:timers/promises');
+const { randomUUID } = require('node:crypto');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const mariadb = require('mariadb');
 const { app } = require('../dist/app');
 const { dataSource, destroyDatabase } = require('../dist/config/database.config');
 const { cartAdmission } = require('../dist/services/cart.admission');
+const users = require('../dist/repositories/usuario.repository');
 const { signToken } = require('../dist/services/token.service');
 const { fetchFromBrowser } = require('./helpers/browser-request.cjs');
 
@@ -437,6 +440,139 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
     assert.fail('No se observaron ' + count + ' esperas reales de catálogo');
   }
 
+  // Pause after taking a real TypeORM connection and before running A's session
+  // SELECT. Passport and MariaDB still handle identity and resources normally.
+  function pausePassport(t, actor) {
+    const reached = new EventTarget();
+    const unblock = Promise.withResolvers();
+    const original = dataSource.createQueryRunner.bind(dataSource);
+    let connected = 0;
+    const mock = t.mock.method(dataSource, 'createQueryRunner', (...args) => {
+      const runner = original(...args);
+      const query = runner.query.bind(runner);
+      runner.query = async (sql, params, ...rest) => {
+        if (sql.includes('FROM `USUARIO`') && sql.includes('LEFT JOIN `CLIENTE`')
+            && params?.length === 1 && params[0] === actor.id) {
+          await runner.connect();
+          if (++connected === 3) reached.dispatchEvent(new Event('full'));
+          await unblock.promise;
+        }
+        return query(sql, params, ...rest);
+      };
+      return runner;
+    });
+    return { reached, connected: () => connected, release: unblock.resolve, restore: () => mock.mock.restore() };
+  }
+
+  test('P1: 12 ráfagas de 24 JWT distintos mantienen disponible Passport para otro cliente', async t => {
+    assert.equal(dataSource.options.extra.connectionLimit, 5);
+    const actor = await client('passport-burst-246@example.test');
+    await success(add(q, 2, actor));
+    const expected = await get(actor);
+    const other = await get(b);
+    assert.notEqual(expected.id_carrito, other.id_carrito);
+    for (let round = 1; round <= 12; round++) {
+      const probe = pausePassport(t, actor);
+      const full = once(probe.reached, 'full', { signal: AbortSignal.timeout(1500) });
+      const rejected = new EventTarget();
+      const overflow = once(rejected, 'full', { signal: AbortSignal.timeout(1500) });
+      let finished = 0;
+      const tokens = Array.from({ length: 24 }, () => jwt.sign({ id: actor.id, rol: 'CLIENTE' },
+        process.env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '2h', jwtid: randomUUID() }));
+      assert.equal(new Set(tokens).size, 24);
+      const requests = tokens.map(token => request('GET', '/carrito', { cookie: 'jwt_token=' + token }).then(res => {
+        if (++finished === 21) rejected.dispatchEvent(new Event('full'));
+        return res;
+      }));
+      try {
+        await Promise.all([full, overflow]);
+        const auth = await request('GET', '/auth/me', b);
+        assert.equal(auth.status, 200, await auth.clone().text());
+        assert.equal((await auth.json()).user.id, b.id);
+        assert.equal(probe.connected(), 3, 'tres conexiones reales en Passport');
+        assert.equal(finished, 21, 'los tres GET admitidos siguen restaurando su sesión');
+        probe.release();
+        let ok = 0, conflicts = 0;
+        for (const response of await Promise.all(requests)) {
+          if (response.status === 200) {
+            ok++;
+            assert.deepEqual(await response.json(), expected);
+          } else {
+            conflicts++;
+            await fails(response, 409, 'CONFLICTO_CARRITO');
+          }
+        }
+        assert.equal(ok, 3);
+        assert.equal(conflicts, 21);
+        t.diagnostic(`Ronda ${round}: A 200=${ok}, 409=${conflicts}, 500=0; B=200`);
+      } finally {
+        probe.release();
+        await Promise.allSettled(requests);
+        probe.restore();
+      }
+      assert.deepEqual(await get(actor), expected);
+      assert.deepEqual(await get(b), other);
+      const runners = Array.from({ length: 5 }, () => dataSource.createQueryRunner());
+      try {
+        const connections = await Promise.allSettled(runners.map(runner => runner.connect()));
+        assert.deepEqual(connections.map(connection => connection.status), Array(5).fill('fulfilled'));
+      } finally {
+        await Promise.all(runners.map(runner => runner.release()));
+      }
+    }
+  });
+
+  test('P1: una desconexión en Passport conserva la conexión y el cupo hasta que termine la consulta', async t => {
+    const actor = await client('passport-abort-246@example.test');
+    const probe = pausePassport(t, actor);
+    const full = once(probe.reached, 'full', { signal: AbortSignal.timeout(1500) });
+    const cancellation = new AbortController();
+    const signalReady = Promise.withResolvers();
+    const original = cartAdmission.run.bind(cartAdmission);
+    const mock = t.mock.method(cartAdmission, 'run', (signal, identify, work) => {
+      signalReady.resolve(signal);
+      return original(signal, identify, work);
+    });
+    const first = assert.rejects(fetch(base + '/carrito', {
+      signal: cancellation.signal, headers: { Cookie: actor.cookie },
+    }), { name: 'AbortError' });
+    const serverSignal = await signalReady.promise;
+    const others = [request('GET', '/carrito', actor), request('GET', '/carrito', actor)];
+    try {
+      await full;
+      const closed = once(serverSignal, 'abort', { signal: AbortSignal.timeout(1000) });
+      cancellation.abort();
+      await Promise.all([first, closed]);
+      await fails(request('GET', '/carrito', actor), 409, 'CONFLICTO_CARRITO');
+      assert.equal(probe.connected(), 3);
+      assert.equal((await request('GET', '/auth/me', b)).status, 200);
+      probe.release();
+      for (const response of await Promise.all(others)) assert.equal(response.status, 200);
+    } finally {
+      cancellation.abort();
+      probe.release();
+      await Promise.allSettled([first, ...others]);
+      mock.mock.restore();
+      probe.restore();
+    }
+    assert.deepEqual((await get(actor)).items, []);
+  });
+
+  test('P1: los errores de Passport liberan el cupo y conservan el error HTTP de autenticación', async t => {
+    const original = users.findUsuarioById;
+    const mock = t.mock.method(users, 'findUsuarioById', async id => {
+      if (id === a.id) throw new Error('test secret');
+      return original(id);
+    });
+    try {
+      for (let i = 0; i < 4; i++) await fails(request('GET', '/carrito', a), 500);
+      assert.equal((await request('GET', '/auth/me', b)).status, 200);
+    } finally {
+      mock.mock.restore();
+    }
+    assert.equal((await request('GET', '/carrito', a)).status, 200);
+  });
+
   test('P1: un POST bloqueado y cuatro GET de A dejan libre la autenticación y el carrito de B', async t => {
     assert.equal(dataSource.options.extra.connectionLimit, 5);
     const actor = await client('admission-p1-246@example.test');
@@ -448,12 +584,18 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
         await waitForCatalogLocks(writer);
         const allArrived = new EventTarget();
         const arrived = once(allArrived, 'ready', { signal: AbortSignal.timeout(1000) });
+        const authenticated = once(allArrived, 'authenticated', { signal: AbortSignal.timeout(1000) });
         const original = cartAdmission.run.bind(cartAdmission);
         let seen = 0;
+        let verified = 0;
         let completed = 0;
-        const mock = t.mock.method(cartAdmission, 'run', (id, signal, work) => {
-          const result = original(id, signal, work);
-          if (id === actor.id && ++seen === 4) allArrived.dispatchEvent(new Event('ready'));
+        const mock = t.mock.method(cartAdmission, 'run', (signal, identify, work) => {
+          const result = original(signal, async () => {
+            const identity = await identify();
+            if (identity?.id === actor.id && ++verified === 2) allArrived.dispatchEvent(new Event('authenticated'));
+            return identity;
+          }, work);
+          if (++seen === 4) allArrived.dispatchEvent(new Event('ready'));
           return result;
         });
         const reads = Array.from({ length: 4 }, () => request('GET', '/carrito', actor).then(res => {
@@ -461,7 +603,7 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
           return res;
         }));
         try {
-          await arrived;
+          await Promise.all([arrived, authenticated]);
           const auth = await request('GET', '/auth/me', b);
           assert.equal(auth.status, 200, await auth.clone().text());
           assert.equal((await auth.json()).user.id, b.id);
@@ -488,7 +630,7 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
     await assertStock(q, 10);
   });
 
-  test('P1: el cuarto cliente excede la espera de admisión con tres transacciones activas', async () => {
+  test('P1: el cuarto cliente recibe 409 antes de Passport con tres transacciones activas', async () => {
     const actors = [];
     for (let i = 0; i < 4; i++) actors.push(await client('admission-global-' + i + '-246@example.test'));
     for (const actor of actors.slice(0, 3)) await success(add(q, 1, actor));
@@ -524,13 +666,15 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
       await withLockedProduct(q, async writer => {
         post = add(q, 2, actor);
         await waitForCatalogLocks(writer);
-        const mock = t.mock.method(cartAdmission, 'run', (id, signal, work) => {
-          const result = original(id, signal, async () => {
+        const mock = t.mock.method(cartAdmission, 'run', (signal, identify, work) => {
+          return original(signal, async () => {
+            const identity = await identify();
+            waiting.resolve(signal);
+            return identity;
+          }, async identity => {
             executed = true;
-            return work();
+            return work(identity);
           });
-          waiting.resolve(signal);
-          return result;
         });
         try {
           const response = assert.rejects(fetch(base + '/carrito', {

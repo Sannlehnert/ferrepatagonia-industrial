@@ -37,7 +37,7 @@ HTTP, Passport y el parser JSON conservan el formato de error compartido de la a
 | 401 | Sesión ausente, inválida, expirada o usuario desactivado al restaurarla. |
 | 403 | Origen rechazado, rol sin acceso o `NO_AUTORIZADO` si el cliente no está habilitado o falla la revalidación transaccional. |
 | 404 | `PRODUCTO_INEXISTENTE` en POST para un producto inexistente, o `ITEM_INEXISTENTE` en PATCH para una línea ausente. |
-| 409 | `CONFLICTO_CARRITO` cuando se llena o vence la admisión, o cuando la contención o colisión no se puede resolver con rollback confirmado. Consultar GET antes de decidir si reintentar. |
+| 409 | `CONFLICTO_CARRITO` cuando se llena el cupo previo a Passport, se llena o vence la cola del usuario, o se confirma el rollback por contención o colisión. Consultar GET antes de decidir si reintentar. |
 | 422 | `CANTIDAD_INVALIDA`, `STOCK_INSUFICIENTE`, `PRODUCTO_INACTIVO` para producto o categoría, o estado FER-17 como `PRECIO_AUSENTE`, `BASE_CERO`, `BASE_NO_VERIFICADA`, `FINAL_CERO`, `IMPORTE_FUERA_DE_RANGO` o `DATOS_COMERCIALES_INVALIDOS`. |
 | 500 | Error operativo sanitizado. `DATABASE_OUTCOME_UNKNOWN` indica que hace falta reconciliar por GET. |
 
@@ -94,17 +94,21 @@ evidencia vigentes en cada consulta.
 
 ## Transacciones y adaptación a #247
 
-Después de autenticar y antes de pedir una conexión para la transacción, el
-carrito admite hasta tres operaciones activas por proceso, una por usuario
-autenticado. En el pool compartido de cinco quedan dos conexiones fuera del cupo
-de transacciones de carrito. La cola admite hasta doce solicitudes en total y
-dos por usuario, con una espera máxima de 750 ms. Se atiende la primera solicitud
-elegible, de modo que un usuario ocupado no detiene a los demás. Si la cola está
-llena o vence la espera, la petición recibe `409 CONFLICTO_CARRITO` antes de abrir
-una transacción. Una desconexión quita la espera de la cola. Si la operación ya
-está activa, conserva el cupo hasta que la transacción y la conexión se liberen.
+Antes de invocar Passport, el carrito reserva uno de tres cupos por proceso. Es
+el mismo cupo para restaurar la sesión y para ejecutar la transacción. En el
+pool compartido de cinco quedan dos conexiones fuera del cupo del carrito. Si
+los tres lugares están ocupados, la petición recibe `409 CONFLICTO_CARRITO` antes
+de consultar la sesión.
+
+Después de autenticar y autorizar, el ID verificado permite una transacción
+activa por usuario. Una solicitud que deba esperar a ese usuario devuelve su
+cupo a la admisión y lo recupera antes de abrir la transacción. La cola admite
+hasta doce solicitudes en total, dos por usuario y 750 ms de espera. Se atiende
+la primera solicitud elegible. Una cola llena o vencida devuelve `409`.
+Una desconexión quita la espera de la cola. Durante Passport o la transacción,
+el cupo se libera cuando el trabajo iniciado termina y devuelve la conexión.
 La admisión es local a cada proceso. MariaDB serializa las operaciones del mismo
-cliente entre procesos mediante los bloqueos y las restricciones.
+cliente entre procesos mediante bloqueos y restricciones.
 
 La operación usa un QueryRunner de MariaDB en `REPEATABLE READ`. Revalida y
 bloquea usuario, cliente y carrito por identidad de sesión. POST y PATCH leen

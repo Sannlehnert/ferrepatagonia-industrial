@@ -3,35 +3,52 @@ import { cartConflict } from './cart.errors';
 type Pending = { userId: number; grant: () => void };
 
 export class CartAdmission {
-    private readonly active = new Set<number>();
+    private occupied = 0;
+    private readonly activeUsers = new Set<number>();
     private readonly pending: Pending[] = [];
 
     constructor(private readonly limits: {
         active: number; pending: number; pendingPerUser: number; waitMs: number;
     }) {}
 
-    async run<T>(userId: number, signal: AbortSignal, work: () => Promise<T>): Promise<T> {
-        await this.acquire(userId, signal);
+    async run<A extends { id: number }, T>(signal: AbortSignal, identify: () => Promise<A | undefined>,
+        work: (identity: A) => Promise<T>): Promise<T | undefined> {
+        signal.throwIfAborted();
+        if (this.occupied >= this.limits.active) throw cartConflict();
+        this.occupied++;
+        let ownsSlot = true;
         try {
+            const identity = await identify();
             signal.throwIfAborted();
-            return await work();
+            if (!identity) return;
+            const userId = identity.id;
+            if (this.activeUsers.has(userId)) {
+                // Passport has finished with its connection. Park without a SQL slot.
+                const waiting = this.enqueue(userId, signal);
+                ownsSlot = false;
+                this.release();
+                await waiting;
+                ownsSlot = true;
+            } else {
+                this.activeUsers.add(userId);
+            }
+            try {
+                signal.throwIfAborted();
+                return await work(identity);
+            } finally {
+                this.activeUsers.delete(userId);
+            }
         } finally {
-            // An active operation retains its permit through rollback/commit and connection release,
+            // Keep the slot through Passport or transaction settlement and connection release,
             // even if the HTTP client disconnects.
-            this.active.delete(userId);
-            this.drain();
+            if (ownsSlot) this.release();
         }
     }
 
-    private acquire(userId: number, signal: AbortSignal): Promise<void> {
-        signal.throwIfAborted();
-        if (this.active.size < this.limits.active && !this.active.has(userId)) {
-            this.active.add(userId);
-            return Promise.resolve();
-        }
+    private enqueue(userId: number, signal: AbortSignal): Promise<void> {
         if (this.pending.length >= this.limits.pending
             || this.pending.filter(entry => entry.userId === userId).length >= this.limits.pendingPerUser) {
-            return Promise.reject(cartConflict());
+            throw cartConflict();
         }
         return new Promise<void>((resolve, reject) => {
             const deadline = performance.now() + this.limits.waitMs;
@@ -51,7 +68,8 @@ export class CartAdmission {
                     return;
                 }
                 cleanup();
-                this.active.add(userId);
+                this.occupied++;
+                this.activeUsers.add(userId);
                 resolve();
             } };
             const timer = setTimeout(() => cancel(cartConflict()), this.limits.waitMs);
@@ -60,15 +78,16 @@ export class CartAdmission {
         });
     }
 
-    private drain(): void {
-        while (this.active.size < this.limits.active) {
-            const next = this.pending.find(entry => !this.active.has(entry.userId));
+    private release(): void {
+        this.occupied--;
+        while (this.occupied < this.limits.active) {
+            const next = this.pending.find(entry => !this.activeUsers.has(entry.userId));
             if (!next) return;
             next.grant();
         }
     }
 }
 
-// Each process has its own five-connection TypeORM pool. Leave two connections
-// outside cart transactions for Passport and other endpoints.
+// Passport and transactions of the cart share three slots in the five-connection
+// pool. The remaining two connections are outside the cart's allocation.
 export const cartAdmission = new CartAdmission({ active: 3, pending: 12, pendingPerUser: 2, waitMs: 750 });
