@@ -111,11 +111,12 @@ test('valida stock y refleja los cambios en el catálogo público', async ({
         exact: true,
       });
 
-      if (quantity === 0) {
-        await expect(add).toBeDisabled();
-      } else {
-        await expect(add).toBeEnabled();
-      }
+      // #243: stock remains independent from price and the pending FER-18 cart.
+      await expect(add).toBeDisabled();
+      await expect(add).toHaveAccessibleDescription('Carrito aún no disponible.');
+      await expect(product.getByText('Precio pendiente de verificación', {
+        exact: true,
+      })).toBeVisible();
     }
   } finally {
     try {
