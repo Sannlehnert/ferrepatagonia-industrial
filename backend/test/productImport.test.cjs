@@ -739,6 +739,51 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         assert.equal(retryRow?.id_producto, 888);
     });
 
+    await t.test('H07: un token alterado no accede al lote ni interrumpe una confirmación activa', async (t) => {
+        t.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const findExisting = t.mock.method(repo, 'findExistingProductsBySkus', async () => new Map());
+        const cookie = `jwt_token=${signToken({ id: 1, rol: 'ADMIN' })}`;
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-H07,Prod H07,1,100,5';
+        const { previewToken } = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'h07.csv', 1);
+        const {
+            markTokenActiveExecution,
+            clearTokenActiveExecution,
+            setConfirmationTokenStatus
+        } = require('../dist/utils/importConfirmationState.util.js');
+
+        setConfirmationTokenStatus(previewToken, 'procesando');
+        markTokenActiveExecution(previewToken);
+        try {
+            const alteredToken = previewToken + '!';
+            const status = await fetch(`${importBaseUrl}/confirmaciones/${encodeURIComponent(alteredToken)}`, {
+                headers: { Cookie: cookie }
+            });
+            assert.equal(status.status, 404);
+            const confirm = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({ previewToken: alteredToken })
+            });
+            assert.equal(confirm.status, 404);
+
+            const active = await fetch(`${importBaseUrl}/confirmaciones/${previewToken}`, {
+                headers: { Cookie: cookie }
+            });
+            assert.equal(active.status, 200);
+            const report = await active.json();
+            assert.equal(report.estado, 'procesando');
+            assert.equal(report.pendientes, 1);
+            assert.equal(findExisting.mock.callCount(), 0);
+        } finally {
+            clearTokenActiveExecution(previewToken);
+        }
+    });
+
     await t.test('Auditoría H04 (Retención de reporte completado): GET /confirmaciones devuelve 200 tras superar 30 min', async () => {
         test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
             id_usuario: 1,

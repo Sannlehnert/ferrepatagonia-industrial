@@ -42,6 +42,7 @@ interface SerializableConfirmationTokenRecord {
 const confirmationTokens = new Map<string, ConfirmationTokenRecord>();
 const activeImportSkuLocks = new Set<string>();
 const activeExecutionTokens = new Set<string>();
+const PREVIEW_TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export const PREVIEW_TTL_MS = 30 * 60 * 1000;
 export const REPORT_RETENTION_MS = 24 * 60 * 60 * 1000;
@@ -100,6 +101,7 @@ const loadRecordFromDisk = (token: string): ConfirmationTokenRecord | undefined 
         if (!fs.existsSync(filePath)) return undefined;
         const raw = fs.readFileSync(filePath, 'utf8');
         const data: SerializableConfirmationTokenRecord = JSON.parse(raw);
+        if (data.token !== token) return undefined;
         const record: ConfirmationTokenRecord = {
             token: data.token,
             createdAtMs: data.createdAtMs,
@@ -170,6 +172,8 @@ export const registerConfirmationToken = (
 };
 
 export const getConfirmationTokenRecordRaw = (token: string): ConfirmationTokenRecord | undefined => {
+    if (!PREVIEW_TOKEN_PATTERN.test(token)) return undefined;
+
     cleanExpiredConfirmationTokens();
     let record = confirmationTokens.get(token);
     if (!record) {
