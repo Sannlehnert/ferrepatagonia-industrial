@@ -24,6 +24,7 @@ export interface ConfirmationTokenRecord {
     rows: PreviewBatchRowEntry[];
     attemptedSkus: Set<string>;
     importedProductIds: Set<number>;
+    batchLinkedProducts: Map<string, number>;
 }
 
 interface SerializableConfirmationTokenRecord {
@@ -35,13 +36,17 @@ interface SerializableConfirmationTokenRecord {
     rows: PreviewBatchRowEntry[];
     attemptedSkus: string[];
     importedProductIds: number[];
+    batchLinkedProducts: Array<[string, number]>;
 }
 
 const confirmationTokens = new Map<string, ConfirmationTokenRecord>();
 const activeImportSkuLocks = new Set<string>();
-export const TOKEN_TTL_MS = 30 * 60 * 1000;
 
-// Directorio de almacenamiento persistente local
+// TTL de 30 minutos exclusivo para iniciar la confirmación de la previsualización
+export const PREVIEW_TTL_MS = 30 * 60 * 1000;
+// Retención de 24 horas para reportes iniciados o completados
+export const REPORT_RETENTION_MS = 24 * 60 * 60 * 1000;
+
 const getStorageDir = (): string => {
     const dir = process.env.IMPORT_STORAGE_DIR || path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
     try {
@@ -59,7 +64,7 @@ const getRecordFilePath = (token: string): string => {
     return path.join(getStorageDir(), `${safeToken}.json`);
 };
 
-const persistRecordToDisk = (record: ConfirmationTokenRecord): void => {
+export const persistRecordToDisk = (record: ConfirmationTokenRecord): void => {
     try {
         const serializable: SerializableConfirmationTokenRecord = {
             token: record.token,
@@ -69,11 +74,12 @@ const persistRecordToDisk = (record: ConfirmationTokenRecord): void => {
             status: record.status,
             rows: record.rows,
             attemptedSkus: Array.from(record.attemptedSkus),
-            importedProductIds: Array.from(record.importedProductIds)
+            importedProductIds: Array.from(record.importedProductIds),
+            batchLinkedProducts: Array.from(record.batchLinkedProducts.entries())
         };
         fs.writeFileSync(getRecordFilePath(record.token), JSON.stringify(serializable), 'utf8');
     } catch {
-        // Fallback no bloqueante si el sistema de archivos es de solo lectura
+        // Fallback en entornos de solo lectura
     }
 };
 
@@ -91,7 +97,8 @@ const loadRecordFromDisk = (token: string): ConfirmationTokenRecord | undefined 
             status: data.status,
             rows: data.rows,
             attemptedSkus: new Set(data.attemptedSkus || []),
-            importedProductIds: new Set(data.importedProductIds || [])
+            importedProductIds: new Set(data.importedProductIds || []),
+            batchLinkedProducts: new Map(data.batchLinkedProducts || [])
         };
         confirmationTokens.set(token, record);
         return record;
@@ -113,7 +120,10 @@ export const normalizeSkuKey = (sku: string): string => {
 export const cleanExpiredConfirmationTokens = (): void => {
     const now = Date.now();
     for (const [token, record] of confirmationTokens.entries()) {
-        if (now > record.expiresAtMs) {
+        const isPendingExpired = record.status === 'pendiente' && now > record.expiresAtMs;
+        const isRetentionExpired = now > record.createdAtMs + REPORT_RETENTION_MS;
+
+        if (isPendingExpired || isRetentionExpired) {
             confirmationTokens.delete(token);
             try {
                 const p = getRecordFilePath(token);
@@ -135,12 +145,13 @@ export const registerConfirmationToken = (
     const record: ConfirmationTokenRecord = {
         token,
         createdAtMs: now,
-        expiresAtMs: now + TOKEN_TTL_MS,
+        expiresAtMs: now + PREVIEW_TTL_MS,
         adminId: adminId !== undefined && adminId !== null ? adminId : null,
         status: 'pendiente',
         rows,
         attemptedSkus: new Set<string>(),
-        importedProductIds: new Set<number>()
+        importedProductIds: new Set<number>(),
+        batchLinkedProducts: new Map<string, number>()
     };
     confirmationTokens.set(token, record);
     persistRecordToDisk(record);
@@ -157,6 +168,9 @@ export const getConfirmationTokenRecordRaw = (token: string): ConfirmationTokenR
 };
 
 export const isConfirmationTokenExpired = (record: ConfirmationTokenRecord): boolean => {
+    if (record.status !== 'pendiente') {
+        return Date.now() > record.createdAtMs + REPORT_RETENTION_MS;
+    }
     return Date.now() > record.expiresAtMs;
 };
 
@@ -167,6 +181,20 @@ export const setConfirmationTokenStatus = (
     const record = getConfirmationTokenRecordRaw(token);
     if (record) {
         record.status = status;
+        persistRecordToDisk(record);
+    }
+};
+
+export const recordBatchProvisionalProductLink = (
+    token: string,
+    sku: string,
+    idProducto: number
+): void => {
+    const record = getConfirmationTokenRecordRaw(token);
+    if (record && idProducto > 0) {
+        const norm = normalizeSkuKey(sku);
+        record.batchLinkedProducts.set(norm, idProducto);
+        record.importedProductIds.add(idProducto);
         persistRecordToDisk(record);
     }
 };

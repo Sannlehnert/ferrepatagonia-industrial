@@ -53,22 +53,35 @@ export const reconcileUncertainRowsWithDb = async (
             const foundId = foundProductsMap.get(normSku);
 
             if (foundId !== undefined) {
-                // H04: Solo se cuenta como importado si ese id_producto fue originado por ESTE lote
-                if (record.importedProductIds.has(foundId)) {
+                const linkedId = record.batchLinkedProducts.get(normSku);
+                const wasInsertedByThisBatch =
+                    (linkedId !== undefined && linkedId === foundId) ||
+                    record.importedProductIds.has(foundId);
+
+                if (wasInsertedByThisBatch) {
                     entry.estado = 'importado';
                     entry.id_producto = foundId;
                     entry.motivos = [];
+                    record.importedProductIds.add(foundId);
                 } else {
-                    // El SKU existe en MariaDB pero pertenece a otra operación/rollback previo
                     entry.estado = 'omitido';
                     entry.motivos = [
                         {
                             field: 'codigo',
                             code: 'SKU_EXISTS',
-                            message: 'El SKU ya existe en el catálogo (creado por otra operación)'
+                            message: 'El SKU ya existe en el catálogo'
                         }
                     ];
                 }
+            } else {
+                entry.estado = 'omitido';
+                entry.motivos = [
+                    {
+                        field: 'codigo',
+                        code: 'COMMIT_FAILED',
+                        message: 'La transacción fue revertida en MariaDB y no persistió este producto.'
+                    }
+                ];
             }
         }
 
@@ -79,7 +92,7 @@ export const reconcileUncertainRowsWithDb = async (
             return true;
         }
     } catch {
-        // En caso de caída de red se mantiene por_verificar
+        // En caso de caída transitoria de red se mantiene por_verificar
     }
 
     return false;
@@ -259,30 +272,21 @@ export const confirmProductImport = async (
                 activo: entry.dto.activo
             }));
 
-            const { outcomes, uncertainRowNumbers, rolledBackWithoutInsert } =
-                await insertImportedProductsBatch(batchInputs);
+            const { outcomes, uncertainRowNumbers } = await insertImportedProductsBatch(
+                batchInputs,
+                token
+            );
 
             for (const { entry } of rowsToInsert) {
                 if (uncertainRowNumbers.has(entry.row)) {
-                    if (rolledBackWithoutInsert) {
-                        entry.estado = 'omitido';
-                        entry.motivos = [
-                            {
-                                field: 'codigo',
-                                code: 'SKU_EXISTS',
-                                message: 'La transacción fue revertida y no se persistió el producto en este lote.'
-                            }
-                        ];
-                    } else {
-                        entry.estado = 'pendiente';
-                        entry.motivos = [
-                            {
-                                field: 'codigo',
-                                code: 'COMMIT_UNCERTAIN',
-                                message: 'La confirmación del commit es incierta; pendiente de conciliación con MariaDB.'
-                            }
-                        ];
-                    }
+                    entry.estado = 'pendiente';
+                    entry.motivos = [
+                        {
+                            field: 'codigo',
+                            code: 'COMMIT_UNCERTAIN',
+                            message: 'La confirmación del commit es incierta; pendiente de conciliación con MariaDB.'
+                        }
+                    ];
                     continue;
                 }
 
@@ -325,7 +329,7 @@ export const confirmProductImport = async (
             }
         }
 
-        const hasPendingUncertain = tokenRecord.rows.some(
+        const hasPendingUncertain: boolean = tokenRecord.rows.some(
             (r: PreviewBatchRowEntry): boolean => r.estado === 'pendiente'
         );
         setConfirmationTokenStatus(token, hasPendingUncertain ? 'por_verificar' : 'completado');

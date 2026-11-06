@@ -2,7 +2,10 @@ declare const exports: any;
 
 import { dataSource } from '../config/database.config';
 import { CategoriaSchema, ProductoSchema } from '../entities/active.schemas';
-import { normalizeSkuKey } from '../utils/importConfirmationState.util';
+import {
+    normalizeSkuKey,
+    recordBatchProvisionalProductLink
+} from '../utils/importConfirmationState.util';
 
 export interface DuplicateSkuResult {
     rowNumber: number;
@@ -259,17 +262,17 @@ const isDuplicateEntryError = (error: any): boolean =>
     );
 
 export const insertImportedProductsBatch = async (
-    rows: InsertProductRowInput[]
+    rows: InsertProductRowInput[],
+    previewToken?: string
 ): Promise<{
     outcomes: Map<number, InsertProductRowResult>;
     uncertainRowNumbers: Set<number>;
-    rolledBackWithoutInsert?: boolean;
 }> => {
     const outcomes = new Map<number, InsertProductRowResult>();
     const uncertainRowNumbers = new Set<number>();
 
     if (rows.length === 0) {
-        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: false };
+        return { outcomes, uncertainRowNumbers };
     }
 
     if (!dataSource.isInitialized) {
@@ -284,14 +287,14 @@ export const insertImportedProductsBatch = async (
                 outcomes.set(rowNumber, singleOutcome);
             }
         }
-        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: false };
+        return { outcomes, uncertainRowNumbers };
     }
 
     const provisionalOutcomes = new Map<number, InsertProductRowResult>();
 
     try {
         await dataSource.transaction(async (manager) => {
-            // H05: Revalidar categorías activas con bloqueo compartido FOR SHARE / LOCK IN SHARE MODE
+            // H05: Revalidación protegida de categorías con LOCK IN SHARE MODE
             const uniqueCategoryIds = Array.from(new Set(rows.map((r) => r.id_categoria)));
             const activeCategoryRows = await manager.query(
                 `SELECT id_categoria FROM CATEGORIA WHERE id_categoria IN (${uniqueCategoryIds.map(() => '?').join(',')}) AND activo = 1 LOCK IN SHARE MODE`,
@@ -344,9 +347,17 @@ export const insertImportedProductsBatch = async (
                             ? Number(insertResult.insertId)
                             : insertResult?.identifiers?.[0]?.id_producto;
 
+                    const validId =
+                        typeof generatedId === 'number' && generatedId > 0 ? generatedId : undefined;
+
+                    // H04: Vincular el alta al lote dentro de la misma transacción
+                    if (previewToken && validId) {
+                        recordBatchProvisionalProductLink(previewToken, row.codigo, validId);
+                    }
+
                     provisionalOutcomes.set(rowNumber, {
                         success: true,
-                        id_producto: typeof generatedId === 'number' && generatedId > 0 ? generatedId : undefined,
+                        id_producto: validId,
                         codigo: row.codigo,
                         nombre: row.nombre
                     });
@@ -369,10 +380,9 @@ export const insertImportedProductsBatch = async (
         for (const [rowNum, outcome] of provisionalOutcomes.entries()) {
             outcomes.set(rowNum, outcome);
         }
-        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: false };
     } catch (_txOrCommitError: any) {
-        // En caso de rollback en MariaDB, las filas que no fueron conflicto quedan marcadas
-        // sin apropiarse de ningún producto insertado posteriormente.
+        // H04: Si falla la confirmación del commit o se pierde la conexión,
+        // no afirmar reversión prematura: marcar como resultado incierto por verificar.
         for (let idx = 0; idx < rows.length; idx++) {
             const row = rows[idx];
             const rowNumber = row.rowNumber ?? idx + 1;
@@ -383,8 +393,9 @@ export const insertImportedProductsBatch = async (
                 uncertainRowNumbers.add(rowNumber);
             }
         }
-        return { outcomes, uncertainRowNumbers, rolledBackWithoutInsert: true };
     }
+
+    return { outcomes, uncertainRowNumbers };
 };
 
 export const insertImportedProduct = async (

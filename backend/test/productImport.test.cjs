@@ -401,7 +401,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         assert.strictEqual(report.duplicateInFileCount, 0);
     });
 
-    await t.test('H01: AB y A\\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
+    await t.test('H01: AB y A\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
         const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nAB,A,1,10,1\nA\u200DB,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test-zwj.csv');
         assert.equal(report.valid, false);
@@ -431,8 +431,6 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         assert.equal(report.validRows[0].producto.stock, 10);
         assert.equal(report.validRows[0].producto.activo, true);
     });
-
-    // --- Regresiones Auditoría Task #236 (H01 - H04) ---
 
     await t.test('Auditoría H01: Rechaza confirmar sin token válido, token ajeno o filas sustituidas en body', async () => {
         test.mock.method(usuarioRepo, 'findUsuarioById', async (id) => ({
@@ -585,6 +583,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         const statusReport = await statusRes.json();
         assert.equal(statusReport.previewToken, prev.previewToken);
     });
+
     await t.test('Auditoría H04 (Rollback + SKU ajeno): la consulta del lote no se apropia de SKUs ajenos tras rollback', async () => {
         test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
             id_usuario: 1,
@@ -597,27 +596,25 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-ROLLBACK,Producto Rollback,1,100,5';
         const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'rollback.csv', 1);
 
-        // Simular que el lote tuvo un rollback en MariaDB
         test.mock.method(repo, 'insertImportedProductsBatch', async () => ({
             outcomes: new Map(),
-            uncertainRowNumbers: new Set([2]),
-            rolledBackWithoutInsert: true
+            uncertainRowNumbers: new Set([2])
         }));
 
-        await fetch(`${importBaseUrl}/confirmar`, {
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
             body: JSON.stringify({ previewToken: prev.previewToken })
         });
+        assert.equal(confirmRes.status, 202);
 
-        // Otra operación da de alta el mismo SKU externamente con id_producto = 9999
+        // Otra operación externa inserta el SKU con un ID ajeno (9999)
         test.mock.method(repo, 'findExistingProductsBySkus', async () => {
             const m = new Map();
             m.set('SKU-ROLLBACK', 9999);
             return m;
         });
 
-        // La consulta del lote no debe contar importados: 1 ni id_producto: 9999
         const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
             method: 'GET',
             headers: { Cookie: `jwt_token=${adminToken}` }
@@ -625,9 +622,94 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         assert.equal(statusRes.status, 200);
         const statusReport = await statusRes.json();
         assert.equal(statusReport.importados, 0);
+        assert.equal(statusReport.omitidos, 1);
         const row = statusReport.detalles.find((d) => d.codigo === 'SKU-ROLLBACK');
         assert.notEqual(row?.id_producto, 9999);
-        assert.notEqual(row?.estado, 'importado');
+        assert.equal(row?.estado, 'omitido');
+    });
+
+    await t.test('Auditoría H04 (Commit con acuse perdido): la consulta concilia el alta exitosa con su ID', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-COMMIT-OK,Prod Commit,1,150,3';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'commit-ok.csv', 1);
+
+        const { recordBatchProvisionalProductLink } = require('../dist/utils/importConfirmationState.util.js');
+        test.mock.method(repo, 'insertImportedProductsBatch', async (_rows, token) => {
+            if (token) {
+                recordBatchProvisionalProductLink(token, 'SKU-COMMIT-OK', 777);
+            }
+            return {
+                outcomes: new Map(),
+                uncertainRowNumbers: new Set([2])
+            };
+        });
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(confirmRes.status, 202);
+
+        // MariaDB guardó el producto con id 777
+        test.mock.method(repo, 'findExistingProductsBySkus', async () => {
+            const m = new Map();
+            m.set('SKU-COMMIT-OK', 777);
+            return m;
+        });
+
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.importados, 1);
+        assert.equal(statusReport.pendientes, 0);
+        const row = statusReport.detalles.find((d) => d.codigo === 'SKU-COMMIT-OK');
+        assert.equal(row?.estado, 'importado');
+        assert.equal(row?.id_producto, 777);
+    });
+
+    await t.test('Auditoría H04 (Retención de reporte completado): GET /confirmaciones devuelve 200 tras superar 30 min', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-TTL,Prod TTL,1,100,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'ttl.csv', 1);
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(confirmRes.status, 200);
+
+        const { getConfirmationTokenRecordRaw } = require('../dist/utils/importConfirmationState.util.js');
+        const record = getConfirmationTokenRecordRaw(prev.previewToken);
+        assert.ok(record);
+        record.expiresAtMs = Date.now() - 5000;
+
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const report = await statusRes.json();
+        assert.equal(report.previewToken, prev.previewToken);
+        assert.equal(report.estado, 'completado');
     });
 
     await t.test('Auditoría H05 (Categoría desactivada antes de escritura): rechaza la fila y no confirma el alta', async () => {
@@ -642,7 +724,6 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-CAT-RACE,Prod Race,1,100,5';
         const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'race.csv', 1);
 
-        // Simular que entre validación y escritura la categoría se desactivó dentro de la transacción
         test.mock.method(repo, 'insertImportedProductsBatch', async () => {
             const outcomes = new Map();
             outcomes.set(2, {
@@ -652,7 +733,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
                 isCategoryInactive: true,
                 error: 'La categoría con ID 1 no existe o no se encuentra activa.'
             });
-            return { outcomes, uncertainRowNumbers: new Set(), rolledBackWithoutInsert: false };
+            return { outcomes, uncertainRowNumbers: new Set() };
         });
 
         const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
