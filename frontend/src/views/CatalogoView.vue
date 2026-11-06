@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ProductPrices from '@/components/ProductPrices.vue'
+import ProductPrice from '@/components/ProductPrice.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
@@ -130,6 +132,7 @@ async function cargar() {
   controlador?.abort()
   controlador = null
   cargando.value = true
+  productos.value = []
   error.value = null
 
   const paginaNormalizada = normalizarQueryPagina(route.query)
@@ -238,6 +241,7 @@ onBeforeUnmount(() => {
       </aside>
 
       <section>
+        <ProductPrices :products="productos" :catalog-loading="cargando" v-slot="pricing">
         <p v-if="cargando">Cargando productos...</p>
 
         <p v-else-if="error" class="m-0" role="alert">
@@ -271,15 +275,16 @@ onBeforeUnmount(() => {
 
             <p class="m-0 min-w-0 max-w-full break-all text-[.7rem] text-slate-500">COD. {{ p.codigo }}</p>
             <h3 class="my-1 break-all text-sm font-semibold text-slate-900">{{ p.nombre }}</h3>
-            <p class="m-0 mb-2 text-[.95rem]">Precio a confirmar</p>
+            <ProductPrice :line="pricing.prices[p.id]" :loading="pricing.loading" :error="pricing.error" :personalized="pricing.personalized" />
 
             <div class="mt-auto flex items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
-              <span class="text-sm text-green-600" :class="{ 'text-red-700': !p.disponible }">
+              <span aria-label="Disponibilidad de stock" class="text-sm text-green-600" :class="{ 'text-red-700': !p.disponible }">
                 {{ p.disponible ? 'Disponible' : 'No disponible' }}
               </span>
-              <!-- Conectar al carrito cuando exista -->
-              <button type="button" class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] disabled:cursor-not-allowed disabled:bg-slate-400 [@media(max-width:560px)]:w-full" :disabled="!p.disponible">Agregar</button>
+              <!-- FER-18 aún no dispone de una integración real. -->
+              <button type="button" class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] disabled:cursor-not-allowed disabled:bg-slate-400 [@media(max-width:560px)]:w-full" disabled :aria-describedby="`cart-pending-${p.id}`">Agregar</button>
             </div>
+            <p :id="`cart-pending-${p.id}`" class="mb-0 mt-2 text-xs text-slate-500">Carrito aún no disponible.</p>
           </li>
         </ul>
 
@@ -306,6 +311,7 @@ onBeforeUnmount(() => {
             Siguiente
           </button>
         </nav>
+        </ProductPrices>
       </section>
     </div>
   </main>
