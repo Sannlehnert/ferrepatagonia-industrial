@@ -1,9 +1,5 @@
-import { dataSource } from '../config/database.config';
-import {
-    CarritoSchema,
-    ItemCarritoSchema,
-    UsuarioSchema
-} from '../entities/active.schemas';
+import type { EntityManager } from 'typeorm';
+import { ItemCarritoSchema } from '../entities/active.schemas';
 
 export interface CartItemRecord {
     id_item_carrito: number;
@@ -17,72 +13,62 @@ export interface CartItemRecord {
     categoria_activa: number;
 }
 
-export const findClienteIdByUsuarioId = async (idUsuario: number): Promise<number | null> => {
-    const usuario = await dataSource.getRepository(UsuarioSchema).findOne({
-        where: { id_usuario: idUsuario },
-        select: ['id_usuario', 'id_cliente']
-    });
-    return usuario?.id_cliente ?? null;
-};
+// Lock the authoritative identity and the shared client row before touching the cart.
+export async function lockCartClient(manager: EntityManager, userId: number): Promise<number | null> {
+    const [row] = await manager.query(`
+        SELECT c.id_cliente FROM USUARIO u
+        INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente
+        WHERE u.id_usuario = ? AND u.rol = 'CLIENTE' AND u.activo = 1 AND c.activo = 1
+        FOR UPDATE`, [userId]);
+    return row?.id_cliente ?? null;
+}
 
-export const getOrCreateCartIdByClientId = async (idCliente: number): Promise<number> => {
-    const carritoRepo = dataSource.getRepository(CarritoSchema);
+export async function findCartId(manager: EntityManager, clientId: number): Promise<number | null> {
+    const [row] = await manager.query(
+        'SELECT id_carrito FROM CARRITO WHERE id_cliente = ? FOR UPDATE', [clientId]);
+    return row?.id_carrito ?? null;
+}
 
-    // 1. Verificación inicial de existencia
-    const existing = await carritoRepo.findOne({
-        where: { id_cliente: idCliente },
-        select: ['id_carrito']
-    });
+export async function createCart(manager: EntityManager, clientId: number): Promise<number> {
+    const result = await manager.query('INSERT INTO CARRITO (id_cliente) VALUES (?)', [clientId]);
+    return result.insertId;
+}
 
-    if (existing) {
-        return existing.id_carrito;
+export async function lockCartProduct(manager: EntityManager, productId: number): Promise<{
+    stock: number; producto_activo: number; categoria_activa: number;
+} | undefined> {
+    const [product] = await manager.query(`
+        SELECT p.stock, p.activo AS producto_activo, c.activo AS categoria_activa
+        FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
+        WHERE p.id_producto = ? LOCK IN SHARE MODE`, [productId]);
+    return product;
+}
+
+export async function findCartItem(manager: EntityManager, cartId: number, productId: number):
+    Promise<{ id_item_carrito: number; cantidad: number } | undefined> {
+    const [item] = await manager.query(
+        'SELECT id_item_carrito, cantidad FROM ITEM_CARRITO WHERE id_carrito = ? AND id_producto = ? FOR UPDATE',
+        [cartId, productId]);
+    return item;
+}
+
+export async function saveCartItem(manager: EntityManager, cartId: number, productId: number,
+    quantity: number, existing?: { id_item_carrito: number; cantidad: number }): Promise<void> {
+    if (!existing) {
+        await manager.query('INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, ?, ?)',
+            [cartId, productId, quantity]);
+    } else if (existing.cantidad !== quantity) {
+        await manager.query('UPDATE ITEM_CARRITO SET cantidad = ? WHERE id_carrito = ? AND id_item_carrito = ?',
+            [quantity, cartId, existing.id_item_carrito]);
     }
+}
 
-    // 2. Inserción atómica controlando colisión concurrente (H01)
-    try {
-        const insertResult = await carritoRepo.insert({ id_cliente: idCliente });
-        const generatedId = insertResult.identifiers?.[0]?.id_carrito;
-        if (generatedId) {
-            return Number(generatedId);
-        }
-    } catch (error: any) {
-        const isDuplicate =
-            error?.code === 'ER_DUP_ENTRY' ||
-            error?.driverError?.code === 'ER_DUP_ENTRY' ||
-            error?.errno === 1062 ||
-            error?.driverError?.errno === 1062 ||
-            (typeof error?.message === 'string' && error.message.includes('ER_DUP_ENTRY'));
+export async function removeCartItem(manager: EntityManager, cartId: number, productId: number): Promise<void> {
+    await manager.query('DELETE FROM ITEM_CARRITO WHERE id_carrito = ? AND id_producto = ?', [cartId, productId]);
+}
 
-        if (!isDuplicate) {
-            throw error;
-        }
-    }
-
-    // 3. Recuperar el carrito creado concurrentemente por la solicitud hermana
-    const found = await carritoRepo.findOne({
-        where: { id_cliente: idCliente },
-        select: ['id_carrito']
-    });
-
-    if (found) {
-        return found.id_carrito;
-    }
-
-    // Respaldo de lectura directa en caso de desfase en la metadata
-    const rows = await dataSource.query(
-        'SELECT id_carrito FROM CARRITO WHERE id_cliente = ? LIMIT 1',
-        [idCliente]
-    );
-
-    if (rows && rows.length > 0 && rows[0].id_carrito) {
-        return Number(rows[0].id_carrito);
-    }
-
-    throw new Error('No se pudo inicializar o recuperar el carrito del cliente.');
-};
-
-export const findCartItems = async (idCarrito: number): Promise<CartItemRecord[]> => {
-    return await dataSource.getRepository(ItemCarritoSchema)
+export const findCartItems = async (manager: EntityManager, idCarrito: number): Promise<CartItemRecord[]> => {
+    return await manager.getRepository(ItemCarritoSchema)
         .createQueryBuilder('ic')
         .innerJoin('ic.producto', 'p')
         .innerJoin('p.categoria', 'c')

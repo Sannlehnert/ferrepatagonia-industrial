@@ -25,17 +25,16 @@ describe('Task #245 — Persistencia y Modelo del Carrito (H01, H02, H03)', () =
     const PREFIX = `TEST_CART_${Date.now()}_`;
 
     before(async () => {
+        assert.match(process.env.CART_TEST_DATABASE ?? '', /^cart_test_[a-f0-9]{32}$/);
+        assert.equal(process.env.DB_NAME, process.env.CART_TEST_DATABASE);
+        assert.equal(process.env.DB_HOST, '127.0.0.1');
         if (dataSource && !dataSource.isInitialized) {
             await dataSource.initialize();
         }
 
         // H03: Candado defensivo. Solo se ejecuta sobre bases descartables efímeras
         const [dbInfo] = await dataSource.query('SELECT DATABASE() AS db_name');
-        const dbName = dbInfo?.db_name || '';
-        assert.ok(
-            dbName.startsWith('test_') || dbName.includes('test') || dbName.startsWith('cart_test_'),
-            `Ejecución abortada: '${dbName}' no es una base de datos descartable de prueba.`
-        );
+        assert.equal(dbInfo?.db_name, process.env.CART_TEST_DATABASE);
 
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');

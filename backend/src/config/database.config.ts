@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { EntityManager } from 'typeorm';
+import type { IsolationLevel } from 'typeorm/driver/types/IsolationLevel';
 import { env } from './env.config';
 import { SchemaNamingStrategy } from '../entities/schema-naming.strategy';
 import { activeSchemas } from '../entities/active.schemas';
@@ -27,13 +28,13 @@ export async function checkDatabase(): Promise<void> {
 }
 
 // Keep one EntityManager and discard a connection whose rollback cannot be confirmed.
-export async function inTransaction<T>(work: (manager: EntityManager) => Promise<T>): Promise<T> {
+export async function inTransaction<T>(work: (manager: EntityManager) => Promise<T>, isolation?: IsolationLevel): Promise<T> {
   const runner = dataSource.createQueryRunner();
   let connection: { destroy(): void } | undefined;
   let committing = false;
   try {
     connection = await runner.connect();
-    await runner.startTransaction();
+    await runner.startTransaction(isolation);
     const result = await work(runner.manager);
     committing = true;
     await runner.commitTransaction();

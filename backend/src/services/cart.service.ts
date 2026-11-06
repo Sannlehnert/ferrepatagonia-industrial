@@ -1,79 +1,137 @@
+import type { EntityManager } from 'typeorm';
+import { inTransaction } from '../config/database.config';
 import {
-    getOrCreateCartIdByClientId,
-    findCartItems,
-    findClienteIdByUsuarioId
+    createCart, findCartId, findCartItem, findCartItems, lockCartClient, lockCartProduct, removeCartItem, saveCartItem
 } from '../repositories/cart.repository';
+import { MariaDbPricingSource } from '../repositories/pricing.source';
+import type { AuthContext } from '../types/auth';
+import { PricingError } from './pricing/money';
+import { PricingService, sumAmounts } from './pricing/pricing.service';
+import type { PriceLine } from './pricing/pricing.types';
 
-export interface CartItemDTO {
-    id_item_carrito: number;
-    id_producto: number;
-    codigo: string;
-    nombre: string;
-    imagen: string | null;
-    cantidad: number;
-    stock: number;
-    disponible: boolean;
-    motivo_no_disponible?: 'INACTIVO' | 'SIN_STOCK';
-}
-
-export interface CartResponseDTO {
-    id_carrito: number;
-    items: CartItemDTO[];
-    total_items: number;
-    tiene_incompatibles: boolean;
-}
-
-export const getAuthenticatedClientCart = async (idUsuario: number): Promise<CartResponseDTO | null> => {
-    const idCliente = await findClienteIdByUsuarioId(idUsuario);
-    if (!idCliente) {
-        return null;
+export class CartError extends Error {
+    constructor(readonly code: string, readonly status: number, message: string) {
+        super(message);
     }
+}
 
-    const idCarrito = await getOrCreateCartIdByClientId(idCliente);
-    const rawItems = await findCartItems(idCarrito);
+export type CartMutation =
+    | { type: 'add' | 'update'; productoId: number; cantidad: number }
+    | { type: 'remove'; productoId: number };
 
-    let totalItems = 0;
-    let tieneIncompatibles = false;
+type CartPrice = Pick<PriceLine, 'estadoPrecio' | 'precioComprable' | 'precioUnitarioUSD' | 'subtotalUSD'
+    | 'descuentoAplicado' | 'origenDescuento'> & { datosSinteticos: boolean };
 
-    const items: CartItemDTO[] = rawItems.map((raw) => {
-        const esActivo = Boolean(Number(raw.producto_activo) && Number(raw.categoria_activa));
-        const cantidadPedida = Number(raw.cantidad);
-        const stockActual = Number(raw.stock);
+function pricing(manager: EntityManager) {
+    return new PricingService(new MariaDbPricingSource(undefined, manager));
+}
 
-        // H02: Solo disponible si el producto y categoría están activos Y el stock cubre la cantidad pedida
-        const tieneStock = stockActual >= cantidadPedida;
-        const disponible = esActivo && tieneStock;
+async function withClientCart<T>(auth: AuthContext,
+    work: (manager: EntityManager, clientId: number, cartId: number | null) => Promise<T>): Promise<T> {
+    for (let attempt = 0; ; attempt++) {
+        try {
+            return await inTransaction(async manager => {
+                const clientId = await lockCartClient(manager, auth.id);
+                if (clientId === null) throw new CartError('NO_AUTORIZADO', 403, 'Cuenta de cliente no habilitada.');
+                return work(manager, clientId, await findCartId(manager, clientId));
+            }, 'REPEATABLE READ');
+        } catch (error) {
+            // inTransaction surfaces an uncertain outcome separately. Only retry a confirmed rollback.
+            const code = (error as { code?: string })?.code;
+            if (code !== 'ER_DUP_ENTRY' && code !== 'ER_LOCK_DEADLOCK' && code !== 'ER_LOCK_WAIT_TIMEOUT') throw error;
+            if (attempt === 1 || code === 'ER_LOCK_WAIT_TIMEOUT') {
+                throw new CartError('CONFLICTO_CARRITO', 409, 'Consultá el carrito y volvé a intentar.');
+            }
+        }
+    }
+}
 
-        let motivo: 'INACTIVO' | 'SIN_STOCK' | undefined;
-        if (!esActivo) {
-            motivo = 'INACTIVO';
-            tieneIncompatibles = true;
-        } else if (!tieneStock) {
-            motivo = 'SIN_STOCK';
-            tieneIncompatibles = true;
+export function getAuthenticatedClientCart(auth: AuthContext) {
+    return withClientCart(auth, async (manager, clientId, existingId) => {
+        const idCarrito = existingId ?? await createCart(manager, clientId);
+        const rawItems = await findCartItems(manager, idCarrito);
+        const items = rawItems.map(({ producto_activo, categoria_activa, ...item }) => {
+            const active = producto_activo === 1 && categoria_activa === 1;
+            const reason = !active ? 'INACTIVO' as const : item.stock < item.cantidad ? 'SIN_STOCK' as const : undefined;
+            return { ...item, disponible: reason === undefined, motivo_no_disponible: reason,
+                precio: null as CartPrice | null, error_precio: null as string | null };
+        });
+
+        const activeItems = items.filter(item => item.motivo_no_disponible !== 'INACTIVO');
+        const at = new Date();
+        const service = pricing(manager);
+        // Keep carts already persisted with more than 100 lines readable on one snapshot.
+        for (let start = 0; start < activeItems.length; start += 100) {
+            const batch = activeItems.slice(start, start + 100);
+            try {
+                const lines = await service.quoteCartLines(
+                    batch.map(item => ({ productoId: item.id_producto, cantidad: item.cantidad })), auth, at);
+                for (const item of batch) {
+                    const line = lines.get(item.id_producto)!;
+                    if (typeof line === 'string') item.error_precio = line;
+                    else item.precio = {
+                        estadoPrecio: line.estadoPrecio, precioComprable: line.precioComprable,
+                        precioUnitarioUSD: line.precioUnitarioUSD, subtotalUSD: line.subtotalUSD,
+                        descuentoAplicado: line.descuentoAplicado, origenDescuento: line.origenDescuento,
+                        datosSinteticos: line.evidenciaBaseUSD?.synthetic ?? false,
+                    };
+                }
+            } catch (error) {
+                if (!(error instanceof PricingError) || error.status !== 422) throw error;
+                for (const item of batch) item.error_precio = error.code;
+            }
         }
 
-        if (esActivo) {
-            totalItems += cantidadPedida;
+        let totalUSD: string | null = null;
+        let estadoTotal: 'DEFINIDO' | 'ITEMS_INCOMPATIBLES' | 'IMPORTE_FUERA_DE_RANGO' = 'ITEMS_INCOMPATIBLES';
+        if (items.every(item => item.disponible && item.precio?.precioComprable)) {
+            try {
+                totalUSD = sumAmounts(items.map(item => item.precio!.subtotalUSD!));
+                estadoTotal = 'DEFINIDO';
+            } catch (error) {
+                if (!(error instanceof PricingError) || error.code !== 'IMPORTE_FUERA_DE_RANGO') throw error;
+                estadoTotal = 'IMPORTE_FUERA_DE_RANGO';
+            }
         }
 
         return {
-            id_item_carrito: Number(raw.id_item_carrito),
-            id_producto: Number(raw.id_producto),
-            codigo: raw.codigo,
-            nombre: raw.nombre,
-            imagen: raw.imagen,
-            cantidad: cantidadPedida,
-            stock: stockActual,
-            disponible,
-            motivo_no_disponible: motivo
+            id_carrito: idCarrito, items,
+            total_items: activeItems.reduce((total, item) => total + item.cantidad, 0),
+            tiene_incompatibles: items.some(item => !item.disponible),
+            moneda: 'USD', regla: 'FER17-v1', ivaIncluido: true, totalUSD, estado_total: estadoTotal,
         };
     });
+}
 
-    return {
-        id_carrito: idCarrito,
-        items,
-        total_items: totalItems,
-        tiene_incompatibles: tieneIncompatibles
-    };
-};
+export function mutateAuthenticatedClientCart(auth: AuthContext, command: CartMutation): Promise<void> {
+    return withClientCart(auth, async (manager, clientId, cartId) => {
+        const { productoId } = command;
+        if (command.type === 'remove') {
+            if (cartId !== null) await removeCartItem(manager, cartId, productoId);
+            return;
+        }
+
+        const existing = cartId === null ? undefined : await findCartItem(manager, cartId, productoId);
+        if (command.type === 'update' && !existing) {
+            throw new CartError('ITEM_INEXISTENTE', 404, 'El producto no está en el carrito.');
+        }
+
+        // These are current locking reads. Establish the pricing snapshot only after acquiring them.
+        const product = await lockCartProduct(manager, productoId);
+        if (!product) throw new CartError('PRODUCTO_INEXISTENTE', 404, 'El producto no existe.');
+        if (product.producto_activo !== 1 || product.categoria_activa !== 1) {
+            throw new CartError('PRODUCTO_INACTIVO', 422, 'El producto no está disponible.');
+        }
+        const { cantidad } = command;
+        if (cantidad > product.stock) {
+            throw new CartError('STOCK_INSUFICIENTE', 422, 'La cantidad supera el stock disponible.');
+        }
+
+        const quote = await pricing(manager).resolve({ moneda: 'USD', productos: [{ productoId, cantidad }] }, 'CLIENTE', auth);
+        const line = quote.productos[0];
+        if (!line.precioComprable) throw new CartError(line.estadoPrecio, 422, 'El producto no tiene un precio comprable.');
+
+        const idCarrito = cartId ?? await createCart(manager, clientId);
+        await saveCartItem(manager, idCarrito, productoId, cantidad, existing);
+    });
+}
