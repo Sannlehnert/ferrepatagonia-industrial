@@ -68,8 +68,8 @@ async function main() {
         // Ejecución de la suite inyectando variables efímeras sin tocar backend/.env
         const result = spawnSync(process.execPath, [
             '--require', './test/helpers/test-env.cjs',
-            '--test',
-            'test/cart.test.cjs'
+            '--test', '--test-concurrency=1',
+            'test/cart.test.cjs', 'test/cart.operations.test.cjs'
         ], {
             cwd: backend,
             stdio: 'inherit',
