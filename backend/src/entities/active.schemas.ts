@@ -231,6 +231,123 @@ export const ItemCarritoSchema = new EntitySchema<ItemCarrito>({
     }
 });
 
+export interface CuentaCorriente {
+    id_cuenta_corriente: number;
+    id_cliente: number;
+    limite_credito: string;
+    habilitada: number;
+    fecha_alta: Date;
+    observaciones: string | null;
+    cliente?: Cliente;
+    movimientos?: MovimientoCuentaCorriente[];
+}
+
+export interface MovimientoCuentaCorriente {
+    id_movimiento_cuenta: number;
+    id_cuenta_corriente: number;
+    tipo_movimiento: 'CARGO' | 'ABONO';
+    origen: string;
+    id_pedido: number | null;
+    id_pago: number | null;
+    monto: string;
+    moneda: string;
+    fecha_efectiva: Date;
+    fecha_incorporacion: Date;
+    fecha_vencimiento: Date | null;
+    estado: 'ACREDITADO' | 'ANULADO';
+    motivo_invalidacion: string | null;
+    autorizado_por: string | null;
+    observaciones: string | null;
+    cuenta_corriente?: CuentaCorriente;
+}
+
+export const CuentaCorrienteSchema = new EntitySchema<CuentaCorriente>({
+    name: 'CuentaCorriente',
+    tableName: 'CUENTA_CORRIENTE',
+    columns: {
+        id_cuenta_corriente: id,
+        id_cliente: { type: 'int' },
+        limite_credito: { type: 'decimal', precision: 12, scale: 2 },
+        habilitada: flag,
+        fecha_alta: created,
+        observaciones: { type: 'text', nullable: true }
+    },
+    checks: [
+        { name: 'chk_cuenta_limite', expression: 'limite_credito >= 0' },
+        { name: 'chk_cuenta_habilitada', expression: 'habilitada IN (0, 1)' }
+    ],
+    relations: {
+        cliente: {
+            type: 'one-to-one',
+            target: 'Cliente',
+            joinColumn: {
+                name: 'id_cliente',
+                referencedColumnName: 'id_cliente',
+                foreignKeyConstraintName: 'fk_cuenta_cliente'
+            },
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT'
+        },
+        movimientos: {
+            type: 'one-to-many',
+            target: 'MovimientoCuentaCorriente',
+            inverseSide: 'cuenta_corriente'
+        }
+    }
+});
+
+export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuentaCorriente>({
+    name: 'MovimientoCuentaCorriente',
+    tableName: 'MOVIMIENTO_CUENTA_CORRIENTE',
+    columns: {
+        id_movimiento_cuenta: id,
+        id_cuenta_corriente: { type: 'int' },
+        tipo_movimiento: binary(),
+        origen: text(50),
+        id_pedido: { type: 'int', nullable: true },
+        id_pago: { type: 'int', nullable: true },
+        monto: { type: 'decimal', precision: 12, scale: 2 },
+        moneda: text(3),
+        fecha_efectiva: created,
+        fecha_incorporacion: created,
+        fecha_vencimiento: { type: 'datetime', nullable: true },
+        estado: { ...text(30), collation: 'utf8mb4_bin' },
+        motivo_invalidacion: { type: 'text', nullable: true },
+        autorizado_por: text(200, true),
+        observaciones: { type: 'text', nullable: true }
+    },
+    indices: [
+        { name: 'uq_movimiento_pedido', columns: ['id_pedido'], unique: true },
+        { name: 'uq_movimiento_pago', columns: ['id_pago'], unique: true },
+        { name: 'idx_movimiento_cuenta', columns: ['id_cuenta_corriente'] },
+        { name: 'idx_movimiento_cuenta_estado', columns: ['id_cuenta_corriente', 'estado'] }
+    ],
+    checks: [
+        { name: 'chk_movimiento_tipo', expression: "tipo_movimiento IN ('CARGO', 'ABONO')" },
+        { name: 'chk_movimiento_monto', expression: 'monto > 0' },
+        { name: 'chk_movimiento_moneda', expression: "moneda IN ('USD', 'ARS')" },
+        { name: 'chk_movimiento_estado', expression: "estado IN ('ACREDITADO', 'ANULADO')" },
+        {
+            name: 'chk_movimiento_referencia',
+            expression: "(tipo_movimiento = 'CARGO' AND id_pedido IS NOT NULL AND id_pago IS NULL) OR (tipo_movimiento = 'ABONO' AND id_pedido IS NULL)"
+        }
+    ],
+    relations: {
+        cuenta_corriente: {
+            type: 'many-to-one',
+            target: 'CuentaCorriente',
+            inverseSide: 'movimientos',
+            joinColumn: {
+                name: 'id_cuenta_corriente',
+                referencedColumnName: 'id_cuenta_corriente',
+                foreignKeyConstraintName: 'fk_movimiento_cuenta'
+            },
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT'
+        }
+    }
+});
+
 export const activeSchemas = [
     CategoriaSchema,
     ProductoSchema,
@@ -239,5 +356,7 @@ export const activeSchemas = [
     ListaPrecioSchema,
     CotizacionSchema,
     CarritoSchema,
-    ItemCarritoSchema
+    ItemCarritoSchema,
+    CuentaCorrienteSchema,
+    MovimientoCuentaCorrienteSchema
 ];
