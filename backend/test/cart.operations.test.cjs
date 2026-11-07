@@ -238,6 +238,31 @@ describe('#246 — operaciones HTTP con Passport, TypeORM y MariaDB', () => {
     assert.deepEqual(await get(), first);
   });
 
+  test('POST y PATCH rechazan precios y totales del cliente y conservan la cotización del servidor', async () => {
+    const actor = await client('tampered-total-246@example.test', list);
+    const priceFields = ['total', 'totalUSD', 'precio', 'precioUnitarioUSD', 'subtotal',
+      'subtotalUSD', 'descuentoAplicado', 'moneda', 'ivaIncluido'];
+
+    for (const field of priceFields) {
+      await fails(request('POST', '/carrito/items', actor, {
+        productoId: p, cantidad: 2, [field]: '0.01',
+      }), 400, 'SOLICITUD_INVALIDA');
+    }
+    assert.deepEqual((await get(actor)).items, []);
+
+    await success(add(p, 2, actor));
+    for (const field of priceFields) {
+      await fails(request('PATCH', '/carrito/items/' + p, actor, {
+        cantidad: 3, [field]: '0.01',
+      }), 400, 'SOLICITUD_INVALIDA');
+    }
+
+    const snapshot = await get(actor);
+    assert.deepEqual(snapshot.items.map(({ id_producto, cantidad }) => [id_producto, cantidad]), [[p, 2]]);
+    assert.equal(snapshot.items[0].precio.subtotalUSD, '16.02');
+    assert.equal(snapshot.totalUSD, '16.02');
+  });
+
   test('protección de origen productiva rechaza mutación cross-origin', async () => {
     await fails(fetch(base + '/carrito/items/' + p, {
       method: 'DELETE', headers: { Origin: 'https://untrusted.example', Cookie: a.cookie },
