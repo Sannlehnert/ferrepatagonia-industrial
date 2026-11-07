@@ -26,6 +26,25 @@ export interface Usuario {
     id_usuario: number; id_cliente: number | null; email: string; password_hash: string;
     rol: 'CLIENTE' | 'ADMIN'; activo: number; fecha_creacion: Date; ultimo_acceso: Date | null; cliente?: Cliente | null;
 }
+export interface Carrito {
+    id_carrito: number;
+    id_cliente: number;
+    fecha_creacion: Date;
+    fecha_actualizacion: Date;
+    cliente?: Cliente;
+    items?: ItemCarrito[];
+}
+
+export interface ItemCarrito {
+    id_item_carrito: number;
+    id_carrito: number;
+    id_producto: number;
+    cantidad: number;
+    fecha_agregado: Date;
+    fecha_actualizacion: Date;
+    carrito?: Carrito;
+    producto?: Producto;
+}
 
 export const ListaPrecioSchema = new EntitySchema<ListaPrecio>({
     name: 'ListaPrecio',
@@ -137,5 +156,88 @@ export const UsuarioSchema = new EntitySchema<Usuario>({
         joinColumn: { name: 'id_cliente', referencedColumnName: 'id_cliente', foreignKeyConstraintName: 'fk_usuario_cliente' },
         onDelete: 'RESTRICT', onUpdate: 'RESTRICT', cascade: false } },
 });
+export const CarritoSchema = new EntitySchema<Carrito>({
+    name: 'Carrito',
+    tableName: 'CARRITO',
+    columns: {
+        id_carrito: id,
+        id_cliente: { type: 'int' },
+        fecha_creacion: created,
+        fecha_actualizacion: { ...created, onUpdate: 'CURRENT_TIMESTAMP' }
+    },
+    relations: {
+        cliente: {
+            type: 'one-to-one',
+            target: 'Cliente',
+            joinColumn: {
+                name: 'id_cliente',
+                referencedColumnName: 'id_cliente',
+                foreignKeyConstraintName: 'fk_carrito_cliente'
+            },
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT'
+        },
+        items: {
+            type: 'one-to-many',
+            target: 'ItemCarrito',
+            inverseSide: 'carrito'
+        }
+    }
+});
 
-export const activeSchemas = [CategoriaSchema, ProductoSchema, ClienteSchema, UsuarioSchema, ListaPrecioSchema, CotizacionSchema];
+export const ItemCarritoSchema = new EntitySchema<ItemCarrito>({
+    name: 'ItemCarrito',
+    tableName: 'ITEM_CARRITO',
+    columns: {
+        id_item_carrito: id,
+        id_carrito: { type: 'int' },
+        id_producto: { type: 'int' },
+        cantidad: { type: 'int' },
+        fecha_agregado: created,
+        fecha_actualizacion: { ...created, onUpdate: 'CURRENT_TIMESTAMP' }
+    },
+    indices: [
+        { name: 'uq_item_carrito_producto', columns: ['id_carrito', 'id_producto'], unique: true },
+        { name: 'idx_item_carrito_carrito', columns: ['id_carrito'] },
+        { name: 'idx_item_carrito_producto', columns: ['id_producto'] }
+    ],
+    checks: [
+        { name: 'chk_item_carrito_cantidad', expression: 'cantidad > 0' }
+    ],
+    relations: {
+        carrito: {
+            type: 'many-to-one',
+            target: 'Carrito',
+            inverseSide: 'items',
+            joinColumn: {
+                name: 'id_carrito',
+                referencedColumnName: 'id_carrito',
+                foreignKeyConstraintName: 'fk_item_carrito_carrito'
+            },
+            onDelete: 'CASCADE',
+            onUpdate: 'RESTRICT'
+        },
+        producto: {
+            type: 'many-to-one',
+            target: 'Producto',
+            joinColumn: {
+                name: 'id_producto',
+                referencedColumnName: 'id_producto',
+                foreignKeyConstraintName: 'fk_item_carrito_producto'
+            },
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT'
+        }
+    }
+});
+
+export const activeSchemas = [
+    CategoriaSchema,
+    ProductoSchema,
+    ClienteSchema,
+    UsuarioSchema,
+    ListaPrecioSchema,
+    CotizacionSchema,
+    CarritoSchema,
+    ItemCarritoSchema
+];
