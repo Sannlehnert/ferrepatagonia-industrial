@@ -272,9 +272,6 @@ export const CuentaCorrienteSchema = new EntitySchema<CuentaCorriente>({
         fecha_alta: created,
         observaciones: { type: 'text', nullable: true }
     },
-    indices: [
-        { name: 'uq_cuenta_cliente', columns: ['id_cliente'], unique: true }
-    ],
     checks: [
         { name: 'chk_cuenta_limite', expression: 'limite_credito >= 0' },
         { name: 'chk_cuenta_habilitada', expression: 'habilitada IN (0, 1)' }
