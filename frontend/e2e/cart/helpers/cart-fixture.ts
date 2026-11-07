@@ -5,6 +5,9 @@ export async function mockCart(page: Page) {
   const state = {
     quantity: 1,
     removed: false,
+    readFailures: 0,
+    readGate: null as Promise<void> | null,
+    transform: null as ((value: CartSnapshot) => CartSnapshot) | null,
     writes: [] as Array<{ method: string; quantity?: number }>,
   }
 
@@ -15,7 +18,7 @@ export async function mockCart(page: Page) {
   }
 
   function snapshot(): CartSnapshot {
-    return {
+    const value: CartSnapshot = {
       id_carrito: 1,
       items: state.removed ? [] : [{
         id_item_carrito: 1,
@@ -45,6 +48,12 @@ export async function mockCart(page: Page) {
       totalUSD: state.removed ? '0.00' : amounts[state.quantity]!,
       estado_total: 'DEFINIDO',
     }
+
+    if (state.transform && value.items.length > 0) {
+      return state.transform(value)
+    }
+
+    return value
   }
 
   // Datos exclusivos de pruebas HTTP interceptadas.
@@ -69,6 +78,18 @@ export async function mockCart(page: Page) {
     }
 
     if (path === '/api/carrito' && method === 'GET') {
+      if (state.readGate) {
+        await state.readGate
+      }
+
+      if (state.readFailures > 0) {
+        state.readFailures--
+        return route.fulfill({
+          status: 500,
+          json: { message: 'Error de prueba.' },
+        })
+      }
+
       return route.fulfill({ json: snapshot() })
     }
 

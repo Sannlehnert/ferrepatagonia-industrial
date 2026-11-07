@@ -44,6 +44,36 @@ function closeOnBackdrop(event: MouseEvent) {
 
   if (outside) panel.close()
 }
+
+function handleDialogKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Tab' || !dialog.value) return
+
+  const controls = Array.from(
+    dialog.value.querySelectorAll<HTMLElement>(
+      'a[href], button, input, select, textarea, [tabindex]',
+    ),
+  ).filter(element =>
+    element.tabIndex >= 0 &&
+    !element.matches(':disabled') &&
+    element.getClientRects().length > 0 &&
+    !element.closest('[inert]'),
+  )
+
+  const first = controls[0]
+  const last = controls[controls.length - 1]
+
+  if (!first || !last) return
+
+  const active = dialog.value.ownerDocument.activeElement
+
+  if (event.shiftKey && active === first) {
+    event.preventDefault()
+    last.focus()
+  } else if (!event.shiftKey && active === last) {
+    event.preventDefault()
+    first.focus()
+  }
+}
 </script>
 
 <template>
@@ -59,6 +89,7 @@ function closeOnBackdrop(event: MouseEvent) {
       @cancel.prevent="panel.close()"
       @close="panel.close()"
       @click="closeOnBackdrop"
+      @keydown="handleDialogKeydown"
     >
       <header
         class="box-border flex min-h-[72px] items-center
