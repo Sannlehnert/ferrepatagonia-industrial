@@ -235,7 +235,12 @@ test('asignar y cambiar lista actualiza solo el precio del cliente asignado',asy
   assert.equal(otherClientAfterReassignment.productos[0].descuentoAplicado,'10.00');
   assert.equal(otherClientAfterReassignment.productos[0].origenDescuento,'LISTA');
 
+  const sharedClientBeforeDiscountChange=(await http('/precios/mios',902)).body.data;
+  assert.equal(sharedClientBeforeDiscountChange.totalUSD,'80.00');
+
   await dataSource.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=30 WHERE id_lista_precio=402');
+  const sharedClientAfterDiscountChange=(await http('/precios/mios',902)).body.data;
+  assert.equal(sharedClientAfterDiscountChange.totalUSD,'70.00');
   clientResult=(await http('/precios/mios',903)).body.data;
   assert.equal(clientResult.totalUSD,'70.00');
   assert.equal(clientResult.productos[0].descuentoAplicado,'30.00');
