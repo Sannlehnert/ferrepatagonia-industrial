@@ -194,11 +194,61 @@ test('lista inactiva conserva promoción y persiste observación diaria deduplic
   assert.equal(Number(count.n),1);
 });
 test('especial mayor gana; lista mayor gana; cambios se ven en la siguiente consulta',async()=>{
-  assert.equal((await service.resolve(request,'CLIENTE',auth)).totalUSD,'90.00');
+  let result=await service.resolve(request,'CLIENTE',auth);
+  assert.equal(result.totalUSD,'90.00');
+  assert.equal(result.productos[0].descuentoAplicado,'10.00');
+  assert.equal(result.productos[0].origenDescuento,'LISTA');
   await dataSource.query('UPDATE PRODUCTO SET descuento_especial_pct=15 WHERE id_producto=701');
-  assert.equal((await service.resolve(request,'CLIENTE',auth)).totalUSD,'85.00');
+  result=await service.resolve(request,'CLIENTE',auth);
+  assert.equal(result.totalUSD,'85.00');
+  assert.equal(result.productos[0].descuentoAplicado,'15.00');
+  assert.equal(result.productos[0].origenDescuento,'ESPECIAL_PUBLICO');
   await dataSource.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=30 WHERE id_lista_precio=401');
-  assert.equal((await service.resolve(request,'CLIENTE',auth)).totalUSD,'70.00');
+  result=await service.resolve(request,'CLIENTE',auth);
+  assert.equal(result.totalUSD,'70.00');
+  assert.equal(result.productos[0].descuentoAplicado,'30.00');
+  assert.equal(result.productos[0].origenDescuento,'LISTA');
+});
+test('asignar y cambiar lista actualiza solo el precio del cliente asignado',async()=>{
+  let clientResult=(await http('/precios/mios',903)).body.data;
+  assert.equal(clientResult.totalUSD,'95.00');
+  assert.equal(clientResult.productos[0].descuentoAplicado,'5.00');
+  assert.equal(clientResult.productos[0].origenDescuento,'ESPECIAL_PUBLICO');
+
+  await dataSource.query('UPDATE CLIENTE SET id_lista_precio=401 WHERE id_cliente=303');
+  clientResult=(await http('/precios/mios',903)).body.data;
+  assert.equal(clientResult.totalUSD,'90.00');
+  assert.equal(clientResult.productos[0].descuentoAplicado,'10.00');
+  assert.equal(clientResult.productos[0].origenDescuento,'LISTA');
+  const otherClientResult=(await http('/precios/mios',901)).body.data;
+  assert.equal(otherClientResult.totalUSD,'90.00');
+  assert.equal(otherClientResult.productos[0].descuentoAplicado,'10.00');
+  assert.equal(otherClientResult.productos[0].origenDescuento,'LISTA');
+
+  await dataSource.query('UPDATE CLIENTE SET id_lista_precio=402 WHERE id_cliente=303');
+  clientResult=(await http('/precios/mios',903)).body.data;
+  assert.equal(clientResult.totalUSD,'80.00');
+  assert.equal(clientResult.productos[0].descuentoAplicado,'20.00');
+  assert.equal(clientResult.productos[0].origenDescuento,'LISTA');
+  const otherClientAfterReassignment=(await http('/precios/mios',901)).body.data;
+  assert.equal(otherClientAfterReassignment.totalUSD,'90.00');
+  assert.equal(otherClientAfterReassignment.productos[0].descuentoAplicado,'10.00');
+  assert.equal(otherClientAfterReassignment.productos[0].origenDescuento,'LISTA');
+
+  const sharedClientBeforeDiscountChange=(await http('/precios/mios',902)).body.data;
+  assert.equal(sharedClientBeforeDiscountChange.totalUSD,'80.00');
+
+  await dataSource.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=30 WHERE id_lista_precio=402');
+  const sharedClientAfterDiscountChange=(await http('/precios/mios',902)).body.data;
+  assert.equal(sharedClientAfterDiscountChange.totalUSD,'70.00');
+  clientResult=(await http('/precios/mios',903)).body.data;
+  assert.equal(clientResult.totalUSD,'70.00');
+  assert.equal(clientResult.productos[0].descuentoAplicado,'30.00');
+  assert.equal(clientResult.productos[0].origenDescuento,'LISTA');
+  const otherClientAfterDiscountChange=(await http('/precios/mios',901)).body.data;
+  assert.equal(otherClientAfterDiscountChange.totalUSD,'90.00');
+  assert.equal(otherClientAfterDiscountChange.productos[0].descuentoAplicado,'10.00');
+  assert.equal(otherClientAfterDiscountChange.productos[0].origenDescuento,'LISTA');
 });
 test('HTTP con JWT y lookup reales aísla clientes, público y caché',async()=>{
   for(const [id,amount] of [[901,'90.00'],[902,'80.00'],[903,'95.00'],[901,'90.00']]){
