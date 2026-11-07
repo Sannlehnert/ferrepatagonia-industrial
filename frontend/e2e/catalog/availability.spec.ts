@@ -36,8 +36,11 @@ test('mantiene visible el producto sin stock y deshabilita Agregar', async ({
     exact: true,
   })).toBeDisabled();
 
-  // #243: FER-18 has no real cart integration yet, even stock-positive items stay disabled.
-  await expect(withStock.getByText('Carrito aún no disponible.')).toBeVisible();
+  // El visitante necesita iniciar sesión para agregar productos.
+  await expect(withStock.getByText(
+    'Iniciá sesión para agregar productos.',
+    { exact: true },
+  )).toBeVisible();
   await page.reload();
 
   await expect(withoutStock.getByRole('button', {
