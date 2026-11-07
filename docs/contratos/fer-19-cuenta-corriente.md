@@ -58,6 +58,8 @@ DTO en cadenas canónicas de escala 2, sin exponentes ni cero negativo. Importes
 | Empresa activa con cuenta inhabilitada | Consulta propia permitida | 403 | Denegada |
 | ADMIN activo | 403 | Lectura explícita, incluye cuentas inhabilitadas e historial de clientes inactivos | Fuera del flujo CLIENTE |
 
+**Decisión técnica sobre SIN_CUENTA y 403:** La consulta (`GET /api/cuenta-corriente`) devuelve `200 OK` con `{ data: { estado: 'SIN_CUENTA' } }` para clientes particulares o empresas sin cuenta asignada, evitando que los interceptores de Vue Router disparen vistas de error genéricas al navegar el perfil. El rechazo con `403 Forbidden` (`CUENTA_NO_HABILITADA`) se reserva de forma estricta para el intento de operar o confirmar compras a crédito (#261).
+
 **Acceso histórico.** El titular empresarial con usuario y cliente activos conserva la consulta propia de historial y deuda acreditada aunque se inhabilite la cuenta o cambie su aprobación comercial. La habilitación y la aprobación controlan la compra a crédito.
 
 Usar [Passport JWT](../../backend/src/config/passport.config.ts) y [middlewares vigentes](../../backend/src/middlewares/auth.middleware.ts), con cookie de sesión. Resolver `USUARIO → CLIENTE` desde el ID de usuario autenticado, revalidar rol y actividad en servidor y aplicar el predicado de propiedad a cuenta y registros. El cliente no envía su ID, ni acepta filtro de cuenta o cliente en rutas propias. En rutas ADMIN, validar rol antes de resolver el ID de destino. No devolver comprobantes, observaciones internas ni referencias sensibles. Aislar caché y estado de pantalla por sesión, limpiar al salir y descartar respuestas en vuelo de una sesión anterior.
@@ -103,6 +105,10 @@ type Resumen = {
   limite: Decimal | null
   utilizado: Decimal | null
   disponible: Decimal | null
+  deudaVencidaTotal: Decimal | null
+  deudaVencida30Dias: Decimal | null
+  deudaVencida60Dias: Decimal | null
+  deudaPorVencerTotal: Decimal | null
   cobertura: Cobertura
   estadoCredito: 'BLOQUEADO' | 'DISPONIBLE' | 'NO_DETERMINABLE'
 }
@@ -112,6 +118,7 @@ type Movimiento = {
   fechaOperacion: InstanteUTC
   concepto: string
   importe: Decimal // magnitud positiva; tipo determina el signo contable
+  saldoResultante: Decimal | null // Saldo acumulado proyectado por backend en orden cronológico
   moneda: Moneda
   estado: 'VIGENTE' | 'ANULADO'
   venceEl: FechaCivil | null
