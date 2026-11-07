@@ -47,8 +47,16 @@ El backend obtiene el cliente y su carrito desde la sesión.
 No acepta IDs de otros clientes, precios, descuentos, totales,
 límites ni saldos enviados por el frontend.
 
-La ruta y el mecanismo de idempotencia quedan sujetos a revisión
-del equipo antes de implementar la interfaz.
+Decisiones confirmadas por Santi en el grupo:
+
+- POST /api/pedidos/cuenta-corriente para confirmar.
+- Idempotency-Key obligatorio, vinculado al cliente autenticado
+  y persistido en MariaDB.
+- Consulta GET por la misma clave para recuperar el resultado.
+
+Queda por definir la ruta exacta del GET y el formato de su respuesta.
+La consulta debe verificar la pertenencia al cliente autenticado,
+sin revelar operaciones de otros clientes.
 
 ## Resultado
 
@@ -94,35 +102,49 @@ El orden de bloqueos debe ser consistente entre escritores.
 La implementación debe demostrar que dos confirmaciones simultáneas
 no superan el límite ni venden más stock del disponible.
 
-## Reintentos
+## Reintentos y recuperación
 
-La clave se vincula al cliente autenticado y a una única operación.
+La clave es obligatoria y se vincula al cliente autenticado
+y a una única operación. Se persiste en MariaDB.
 
-Una repetición completada devuelve el pedido original, sin consumir
-otra vez crédito ni stock, aunque el carrito ya haya quedado vacío.
+Una repetición completada devuelve el pedido y cargo originales,
+sin consumir nuevamente crédito ni stock, aunque el carrito ya
+haya quedado vacío.
 
-Una operación todavía en curso devuelve un conflicto controlado.
-No se ejecuta nuevamente en paralelo.
+Si la operación continúa en curso o su resultado es incierto,
+se responde 202 Accepted. El frontend conserva la misma clave
+y consulta el estado mediante GET, sin iniciar otra compra.
 
 Si se pierde la confirmación del COMMIT, no se afirma que hubo rollback.
-La recuperación consulta el resultado persistido mediante la misma clave.
-El frontend conserva esa clave hasta resolver el resultado del intento.
+La recuperación debe conciliar el resultado con los registros persistidos
+antes de informar éxito o fracaso definitivo.
 
-La duración de retención de claves y resultados debe acordarse
-y documentarse antes de implementar.
+Los resultados exitosos se conservan junto con el pedido.
+Los pendientes no se descartan hasta conciliarlos.
 
-## Errores propuestos
+La recuperación debe funcionar después de reiniciar el proceso,
+sin depender exclusivamente de memoria local.
 
+## Respuestas y errores
+
+- 201: primera confirmación exitosa.
+- 200: recuperación o repetición de una operación completada.
+- 202: operación en curso o resultado incierto pendiente de conciliación.
 - 400: formato de solicitud o clave inválidos.
 - 401: sesión ausente o inválida.
 - 403: rol o condiciones comerciales no habilitados.
-- 409: operación en curso, stock o crédito insuficientes,
-  o cambios que requieren revisar el carrito.
+- 409: stock o crédito insuficientes, o cambios que requieren
+  revisar el carrito.
 - 422: carrito vacío, productos incompatibles o precios no comprables.
-- 503: dependencia indisponible o resultado pendiente de conciliación.
+- 503: dependencia temporalmente indisponible, cuando no corresponda
+  informar un resultado incierto mediante 202.
 
-Las respuestas incluyen message y un code estable.
-Los códigos concretos deben acordarse con #262.
+202 no representa un rechazo definitivo ni autoriza otro intento
+con una clave diferente.
+
+Los errores incluyen message y un code estable.
+Quedan por definir los códigos concretos y las respuestas del GET,
+incluido el caso de una clave sin operación visible para ese cliente.
 
 Todas las respuestas son privadas y no almacenables en caché.
 
@@ -150,6 +172,20 @@ Todas las respuestas son privadas y no almacenables en caché.
 - #262: consumo de la operación y tratamiento de sus resultados.
 - #263: pruebas funcionales y de concurrencia.
 
-El equipo debe revisar la ruta, la idempotencia, su retención,
-el tratamiento del carrito y los códigos de error propuestos.
-La implementación se ajustará a las interfaces aprobadas de #260.
+## Acuerdo y próximos pasos
+
+Santi confirmó en el grupo la ruta POST, la idempotencia obligatoria
+persistida por cliente, la recuperación mediante GET y el uso de 202
+para operaciones en curso o con resultado incierto.
+
+También confirmó que el stock se descuenta únicamente al confirmar.
+Pedido, cargo, descuento de stock, imputaciones y limpieza de las líneas
+confirmadas del carrito se realizan dentro de una sola transacción.
+Un fallo anterior al COMMIT revierte todas esas escrituras.
+
+Antes de implementar, revisar con #260 las diferencias respecto de #250
+en precisión monetaria, saldos a favor y vencimientos.
+La lógica financiera debe reutilizarse, sin duplicarla en #261.
+
+Queda por acordar la ruta exacta del GET, sus respuestas y los códigos
+de error concretos para la integración con #262.
