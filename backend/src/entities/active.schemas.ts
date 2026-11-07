@@ -314,7 +314,7 @@ export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuenta
         fecha_efectiva: created,
         fecha_incorporacion: created,
         fecha_vencimiento: { type: 'datetime', nullable: true },
-        estado: binary(),
+        estado: { ...text(30), collation: 'utf8mb4_bin' },
         motivo_invalidacion: { type: 'text', nullable: true },
         autorizado_por: text(200, true),
         observaciones: { type: 'text', nullable: true }

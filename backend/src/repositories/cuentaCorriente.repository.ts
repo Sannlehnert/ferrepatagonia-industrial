@@ -70,17 +70,31 @@ export const registrarCargoPorPedido = async (
     externalManager?: EntityManager
 ): Promise<number> => {
     const execute = async (manager: EntityManager): Promise<number> => {
+        // H-02: Validación temprana de tipo y número finito mayor a cero
+        const montoNum = Number(dto.monto);
+        if (!Number.isFinite(montoNum) || montoNum <= 0) {
+            throw new Error('El importe del cargo debe ser un número finito mayor a cero.');
+        }
+
+        // H-01: Bloqueo pesimista de escritura (FOR UPDATE) sobre CUENTA_CORRIENTE
+        // Serializa pedidos simultáneos de la misma empresa para evitar sobregiro concurrente
+        const cuentaBloqueada = await manager
+            .getRepository(CuentaCorrienteSchema)
+            .createQueryBuilder('c')
+            .setLock('pessimistic_write')
+            .where('c.id_cuenta_corriente = :id', { id: dto.id_cuenta_corriente })
+            .getOne();
+
+        if (!cuentaBloqueada) {
+            throw new Error('Cuenta corriente no encontrada.');
+        }
+
         const estado = await calcularEstadoCuenta(dto.id_cuenta_corriente, manager);
         if (!estado) {
             throw new Error('Cuenta corriente no encontrada.');
         }
         if (!estado.habilitada) {
             throw new Error('La cuenta corriente no se encuentra habilitada.');
-        }
-
-        const montoNum = Number(dto.monto);
-        if (montoNum <= 0) {
-            throw new Error('El importe del cargo debe ser mayor a cero.');
         }
 
         const disponibleNum = Number(estado.credito_disponible);

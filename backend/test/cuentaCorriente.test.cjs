@@ -16,6 +16,8 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
     let idPedidoTest1;
     let idPedidoTest2;
     let idPedidoTest3;
+    let idPedidoTest4;
+    let idPedidoTest5;
     let idClienteInhabilitado;
     let idCuentaInhabilitada;
 
@@ -63,6 +65,20 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             [idClienteTest]
         );
         idPedidoTest3 = ped3.insertId;
+
+        const ped4 = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
+             VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 450.00, 0.00, 450.00)`,
+            [idClienteTest]
+        );
+        idPedidoTest4 = ped4.insertId;
+
+        const ped5 = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
+             VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 450.00, 0.00, 450.00)`,
+            [idClienteTest]
+        );
+        idPedidoTest5 = ped5.insertId;
 
         // 3. Cliente con Cuenta Corriente Inhabilitada
         const cliInh = await dataSource.query(
@@ -152,7 +168,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
 
     test('3. Imputación de abono: reduce la deuda vigente y libera crédito disponible', async () => {
         await dataSource.query(
-            `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE 
+            `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
              (id_cuenta_corriente, tipo_movimiento, origen, id_pedido, id_pago, monto, moneda, estado, observaciones)
              VALUES (?, 'ABONO', 'PAGO', NULL, NULL, 150.00, 'USD', 'ACREDITADO', 'Abono recibido')`,
             [idCuentaTest]
@@ -168,7 +184,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
 
     test('4. Movimientos anulados: conservan trazabilidad sin alterar balance', async () => {
         await dataSource.query(
-            `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE 
+            `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
              (id_cuenta_corriente, tipo_movimiento, origen, id_pedido, id_pago, monto, moneda, estado, motivo_invalidacion)
              VALUES (?, 'CARGO', 'PEDIDO', ?, NULL, 200.00, 'USD', 'ANULADO', 'Pedido cancelado por admin')`,
             [idCuentaTest, idPedidoTest2]
@@ -176,7 +192,6 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
 
         const estado = await calcularEstadoCuenta(idCuentaTest);
         assert.ok(estado);
-        // Sigue calculando sobre 350 - 150 = 200, el cargo anulado se ignora en la suma
         assert.equal(estado.deuda_vigente, '200.00');
         assert.equal(estado.credito_disponible, '800.00');
     });
@@ -199,7 +214,6 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
     });
 
     test('6. Control de crédito: rechaza cargo si el importe supera el disponible', async () => {
-        // Disponible actual: 800.00. Intento de consumo: 850.00
         await assert.rejects(
             registrarCargoPorPedido({
                 id_cuenta_corriente: idCuentaTest,
@@ -211,7 +225,6 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
     });
 
     test('7. Garantía antiduplicidad: imposibilita registrar dos cargos para el mismo pedido', async () => {
-        // idPedidoTest1 ya fue registrado en el test #2
         await assert.rejects(
             registrarCargoPorPedido({
                 id_cuenta_corriente: idCuentaTest,
@@ -240,13 +253,11 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
                     manager
                 );
 
-                // Simulamos fallo posterior de confirmación de pedido
                 throw new Error('SIMULATED_ORDER_CONFIRMATION_FAILURE');
             }),
             /SIMULATED_ORDER_CONFIRMATION_FAILURE/
         );
 
-        // El movimiento se revirtió por completo
         const [movsAfter] = await dataSource.query(
             `SELECT COUNT(*) AS total FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pedido = ?`,
             [idPedidoTest3]
@@ -254,11 +265,55 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         assert.equal(Number(movsAfter.total), 0);
     });
 
-    test('9. Integridad DDL MariaDB: rechaza violaciones de restricciones CHECK', async () => {
-        // chk_movimiento_monto (monto > 0)
+    test('9. H-01 (Auditoría): Serialización pesimista ante pedidos concurrentes que superan el disponible', async () => {
+        // Disponible actual: 800.00. Disparamos Pedido 4 ($450) y Pedido 5 ($450) simultáneamente en paralelo
+        const p1 = registrarCargoPorPedido({
+            id_cuenta_corriente: idCuentaTest,
+            id_pedido: idPedidoTest4,
+            monto: '450.00'
+        });
+        const p2 = registrarCargoPorPedido({
+            id_cuenta_corriente: idCuentaTest,
+            id_pedido: idPedidoTest5,
+            monto: '450.00'
+        });
+
+        const results = await Promise.allSettled([p1, p2]);
+        const fulfilled = results.filter(r => r.status === 'fulfilled');
+        const rejected = results.filter(r => r.status === 'rejected');
+
+        assert.equal(fulfilled.length, 1, 'Exactamente un pedido debe aprobarse');
+        assert.equal(rejected.length, 1, 'El segundo pedido debe ser rechazado por sobregiro');
+        assert.match(rejected[0].reason.message, /excede el crédito disponible/);
+
+        const estadoFinal = await calcularEstadoCuenta(idCuentaTest);
+        assert.ok(Number(estadoFinal.deuda_vigente) <= 1000.00, 'La deuda jamás puede sobregirar el límite');
+    });
+
+    test('10. H-02 (Auditoría): Validación estricta de valores no finitos (NaN, cadenas vacías)', async () => {
+        await assert.rejects(
+            registrarCargoPorPedido({
+                id_cuenta_corriente: idCuentaTest,
+                id_pedido: idPedidoTest3,
+                monto: 'invalido'
+            }),
+            /El importe del cargo debe ser un número finito mayor a cero/
+        );
+
+        await assert.rejects(
+            registrarCargoPorPedido({
+                id_cuenta_corriente: idCuentaTest,
+                id_pedido: idPedidoTest3,
+                monto: NaN
+            }),
+            /El importe del cargo debe ser un número finito mayor a cero/
+        );
+    });
+
+    test('11. Integridad DDL MariaDB: rechaza violaciones de restricciones CHECK', async () => {
         await assert.rejects(
             dataSource.query(
-                `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE 
+                `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
                  (id_cuenta_corriente, tipo_movimiento, origen, monto)
                  VALUES (?, 'ABONO', 'PAGO', 0.00)`,
                 [idCuentaTest]
@@ -266,10 +321,9 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             /chk_movimiento_monto/
         );
 
-        // chk_movimiento_tipo (CARGO | ABONO)
         await assert.rejects(
             dataSource.query(
-                `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE 
+                `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
                  (id_cuenta_corriente, tipo_movimiento, origen, monto)
                  VALUES (?, 'INVALIDO', 'PAGO', 10.00)`,
                 [idCuentaTest]
@@ -277,10 +331,9 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             /chk_movimiento_tipo/
         );
 
-        // chk_movimiento_referencia (CARGO exige id_pedido NOT NULL y id_pago NULL)
         await assert.rejects(
             dataSource.query(
-                `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE 
+                `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
                  (id_cuenta_corriente, tipo_movimiento, origen, id_pedido, monto)
                  VALUES (?, 'CARGO', 'PEDIDO', NULL, 10.00)`,
                 [idCuentaTest]
