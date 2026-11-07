@@ -32,6 +32,8 @@ describe('Task #245 — Persistencia y Modelo del Carrito (H01, H02, H03)', () =
             runnerDb && VALID_DB_PATTERN.test(runnerDb),
             `Ejecución abortada: CART_TEST_DATABASE no está configurada o no tiene el formato efímero esperado (cart_test_<32hex>). Valor recibido: '${runnerDb}'`
         );
+        assert.equal(process.env.DB_HOST, '127.0.0.1');
+        assert.equal(process.env.DB_NAME, runnerDb);
 
         if (dataSource && !dataSource.isInitialized) {
             await dataSource.initialize();

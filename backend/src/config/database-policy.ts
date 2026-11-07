@@ -13,14 +13,14 @@ export class SafeDatabaseLogger implements Logger {
 }
 
 export class ControlledDataSource extends DataSource {
-  override createQueryRunner(mode: 'master' | 'slave' = 'master'): QueryRunner {
+  override createQueryRunner(mode: 'master' | 'slave' = 'master', lockWaitSeconds = 5): QueryRunner {
     const runner = super.createQueryRunner(mode);
     const query = runner.query.bind(runner);
     runner.query = (sql: string, parameters?: unknown[], structured?: boolean) => {
       // Fixed MariaDB statement-scoped limits: no session leakage and no client
       // timer that abandons a still-running mutation. Transaction control is not wrapped.
       const bounded = /^\s*(SELECT|INSERT|UPDATE|DELETE)\b/i.test(sql)
-        ? 'SET STATEMENT max_statement_time=5, innodb_lock_wait_timeout=5 FOR ' + sql : sql;
+        ? `SET STATEMENT max_statement_time=5, innodb_lock_wait_timeout=${lockWaitSeconds} FOR ` + sql : sql;
       return structured ? query(bounded, parameters, true) : query(bounded, parameters);
     };
     return runner;
