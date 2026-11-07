@@ -28,6 +28,20 @@ function line(base, list = '0', special = null, quantity = 1, rate = null) {
 }
 const rejectsCode = (promise, code) => assert.rejects(promise, error => error.code === code);
 
+test('la cotización de carrito conserva líneas válidas ante un importe fuera de rango', async () => {
+  const oversized = { ...product, id: 8, baseUSD: '9999999999.99' };
+  const unverified = { ...product, id: 9, baseVerified: false };
+  const f = fixture({ products: [product, oversized, unverified] });
+  const items = [7, 8, 9].map(productoId => ({ productoId, cantidad: 2 }));
+  const lines = await f.service.quoteCartLines(items, auth, now);
+  assert.deepEqual(f.calls, [[11, [7, 8, 9], now, 'USD']]);
+  assert.equal(lines.get(7).subtotalUSD, '180.00');
+  assert.equal(lines.get(8), 'IMPORTE_FUERA_DE_RANGO');
+  assert.equal(lines.get(9).estadoPrecio, 'BASE_NO_VERIFICADA');
+  assert.equal(lines.get(9).subtotalUSD, null);
+  await rejectsCode(f.service.resolve({ moneda: 'USD', productos: items }, 'CLIENTE', auth), 'IMPORTE_FUERA_DE_RANGO');
+});
+
 for (const [label, base, list, special, quantity, unit, subtotal, origin] of [
   ['sin descuentos / IVA incluido', '100', '0', null, 1, '100.00', '100.00', 'NINGUNO'],
   ['lista mayor', '100', '10', '5', 2, '90.00', '180.00', 'LISTA'],

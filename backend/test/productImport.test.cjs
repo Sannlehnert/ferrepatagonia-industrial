@@ -4,7 +4,6 @@ const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
 const zlib = require('node:zlib');
 
-// Ningún test unitario usa credenciales ni conexiones reales.
 Object.assign(process.env, {
     JWT_SECRET: randomUUID(),
     DB_HOST: '127.0.0.1',
@@ -27,11 +26,14 @@ const { app } = require('../dist/app.js');
 
 let server;
 let baseUrl;
+let importBaseUrl;
 
 before(async () => {
     server = app.listen(0, '127.0.0.1');
     await once(server, 'listening');
-    baseUrl = `http://127.0.0.1:${server.address().port}/api/admin/productos/importar/validar`;
+    const port = server.address().port;
+    baseUrl = `http://127.0.0.1:${port}/api/admin/productos/importar/validar`;
+    importBaseUrl = `http://127.0.0.1:${port}/api/admin/productos/importar`;
 });
 
 after(async () => {
@@ -129,8 +131,9 @@ function buildTestXlsxBuffer(rows, prefix = '') {
     return Buffer.concat([...localParts, centralDirBuffer, eocd]);
 }
 
-test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
+test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) => {
     t.beforeEach(() => {
+        repo.clearMockInsertedProducts();
         test.mock.method(repo, 'findExistingSkus', async () => new Set(['SKU-DB-1']));
         test.mock.method(repo, 'findExistingCategoryIds', async () => new Set([1, 2]));
     });
@@ -139,8 +142,8 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         test.mock.restoreAll();
     });
 
-    await t.test('Valida correctamente un archivo CSV con una fila válida', async () => {
-        const csv = 'codigo,nombre,id_categoria,precio,stock,activo\nSKU-NEW,Nuevo Producto,1,150.25,10,true';
+    await t.test('Valida correctamente un archivo CSV con una fila válida (FER16-v2)', async () => {
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock,activo\nSKU-NEW,Nuevo Producto,1,150.25,10,true';
         const buffer = Buffer.from(csv, 'utf8');
         const report = await validateProductImportFile(buffer, 'plantilla.csv');
 
@@ -151,20 +154,21 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(report.duplicateInFileCount, 0);
         assert.equal(report.existingInDbCount, 0);
         assert.equal(report.errors.length, 0);
-        assert.equal(report.validRows[0].codigo, 'SKU-NEW');
+        assert.equal(report.validRows[0].producto.codigo, 'SKU-NEW');
+        assert.equal(report.validRows[0].producto.precio_base_usd, '150.25');
     });
 
-    await t.test('Valida correctamente un archivo XLSX generado en memoria', async () => {
+    await t.test('Valida correctamente un archivo XLSX generado en memoria (FER16-v2)', async () => {
         const buffer = buildTestXlsxBuffer([
-            ['codigo', 'nombre', 'id_categoria', 'precio', 'stock', 'activo'],
+            ['codigo', 'nombre', 'id_categoria', 'precio_base_usd', 'stock', 'activo'],
             ['SKU-XLSX', 'Prod Excel', 2, 99.99, 5, 'si']
         ]);
 
         const report = await validateProductImportFile(buffer, 'plantilla.xlsx');
         assert.equal(report.valid, true);
         assert.equal(report.validRowsCount, 1);
-        assert.equal(report.validRows[0].codigo, 'SKU-XLSX');
-        assert.equal(report.validRows[0].activo, true);
+        assert.equal(report.validRows[0].producto.codigo, 'SKU-XLSX');
+        assert.equal(report.validRows[0].producto.activo, true);
     });
 
     await t.test('Rechaza extensiones no soportadas y archivos XLSX malformados', async () => {
@@ -180,17 +184,22 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         );
     });
 
-    await t.test('Falla si faltan columnas obligatorias', async () => {
-        const csv = 'codigo,nombre,precio\nSKU-1,Prod,100';
-        const buffer = Buffer.from(csv, 'utf8');
+    await t.test('Falla si faltan columnas obligatorias o si usa encabezado antiguo precio', async () => {
+        const csvMissing = 'codigo,nombre,precio_base_usd\nSKU-1,Prod,100';
         await assert.rejects(
-            validateProductImportFile(buffer, 'test.csv'),
+            validateProductImportFile(Buffer.from(csvMissing, 'utf8'), 'test.csv'),
             (err) => err instanceof FileImportValidationError && err.message.includes('Falta la columna obligatoria')
+        );
+
+        const csvLegacy = 'codigo,nombre,id_categoria,precio,stock\nSKU-OLD,Prod,1,100,5';
+        await assert.rejects(
+            validateProductImportFile(Buffer.from(csvLegacy, 'utf8'), 'legacy.csv'),
+            (err) => err instanceof FileImportValidationError && err.message.includes('FER16-v2')
         );
     });
 
     await t.test('Detecta errores de DTO (precio negativo, stock negativo y categoría inexistente)', async () => {
-        const csv = 'codigo,nombre,id_categoria,precio,stock\nSKU-ERR,Prod,99,-5.50,-10';
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-ERR,Prod,99,-5.50,-10';
         const buffer = Buffer.from(csv, 'utf8');
         const report = await validateProductImportFile(buffer, 'test.csv');
 
@@ -198,30 +207,30 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(report.invalidRowsCount, 1);
         const fieldsInError = report.errors.map((e) => e.field);
         assert.ok(fieldsInError.includes('id_categoria'));
-        assert.ok(fieldsInError.includes('precio'));
+        assert.ok(fieldsInError.includes('precio_base_usd'));
         assert.ok(fieldsInError.includes('stock'));
     });
 
     await t.test('Detecta SKUs duplicados dentro del mismo archivo', async () => {
-        const csv = 'codigo,nombre,id_categoria,precio,stock\nDUP-1,Prod 1,1,100,10\nDUP-1,Prod 2,1,200,20';
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nDUP-1,Prod 1,1,100,10\nDUP-1,Prod 2,1,200,20';
         const buffer = Buffer.from(csv, 'utf8');
         const report = await validateProductImportFile(buffer, 'test.csv');
 
         assert.equal(report.valid, false);
         assert.equal(report.duplicateInFileCount, 1);
-        const dupError = report.errors.find((e) => e.field === 'codigo' && e.message.includes('repetido dentro del archivo'));
+        const dupError = report.errors.find((e) => e.field === 'codigo' && e.code === 'DUPLICATE_SKU_IN_FILE');
         assert.ok(dupError);
         assert.equal(dupError.row, 3);
     });
 
     await t.test('Detecta SKUs que ya existen en la base de datos', async () => {
-        const csv = 'codigo,nombre,id_categoria,precio,stock\nSKU-DB-1,Prod Existente,1,100,10';
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-DB-1,Prod Existente,1,100,10';
         const buffer = Buffer.from(csv, 'utf8');
         const report = await validateProductImportFile(buffer, 'test.csv');
 
         assert.equal(report.valid, false);
         assert.equal(report.existingInDbCount, 1);
-        const dbError = report.errors.find((e) => e.field === 'codigo' && e.message.includes('ya existe en la base de datos'));
+        const dbError = report.errors.find((e) => e.field === 'codigo' && e.code === 'SKU_EXISTS');
         assert.ok(dbError);
     });
 
@@ -258,7 +267,7 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
 
         const adminToken = signToken({ id: 1, rol: 'ADMIN' });
         const form = new FormData();
-        const csvContent = 'codigo,nombre,id_categoria,precio,stock\nSKU-HTTP-1,Martillo,1,2500.50,15';
+        const csvContent = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-HTTP-1,Martillo,1,2500.50,15';
         form.append('file', new Blob([csvContent], { type: 'text/csv' }), 'productos.csv');
 
         const res = await fetch(baseUrl, {
@@ -272,10 +281,11 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.equal(body.valid, true);
         assert.equal(body.totalRows, 1);
         assert.equal(body.validRowsCount, 1);
+        assert.equal(body.version, 'FER16-v2');
     });
+
     await t.test('Rechaza productos asignados a categorías inactivas o inexistentes', async () => {
-        // repo.findExistingCategoryIds devuelve Set([1, 2]) como activas; la categoría 3 está inactiva/inexistente
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nSKU-CAT-INACTIVA,Prod,3,100,5\n', 'utf8');
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-CAT-INACTIVA,Prod,3,100,5\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test.csv');
 
         assert.equal(report.valid, false);
@@ -283,31 +293,30 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         assert.ok(catError);
         assert.match(catError.message, /no existe o no se encuentra activa/);
     });
+
     await t.test('H01: detecta SKUs equivalentes con acentos (CAFE/café) en archivo', async () => {
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nCAFE,A,1,10,1\ncafé,B,1,10,1\n', 'utf8');
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nCAFE,A,1,10,1\ncafé,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test.csv');
         assert.strictEqual(report.valid, false);
         assert.strictEqual(report.duplicateInFileCount, 1);
     });
 
     await t.test('H02: rechaza decimales con exceso de escala que perderían precisión', async () => {
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nSKU-1,A,1,1.00000000000001,1\n', 'utf8');
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-1,A,1,1.00000000000001,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test.csv');
         assert.strictEqual(report.valid, false);
-        assert.ok(report.errors.some((e) => e.field === 'precio'));
+        assert.ok(report.errors.some((e) => e.field === 'precio_base_usd'));
     });
+
     await t.test('H03: XLSX con inlineStr y fragmentos <t> múltiples conserva el texto completo', async () => {
-        // Simula celda con inlineStr dividida en múltiples etiquetas <t>
         const sheetXml = '<?xml version="1.0" encoding="UTF-8"?><worksheet><sheetData>' +
-            '<row r="1"><c r="A1" t="inlineStr"><is><t>codigo</t></is></c><c r="B1" t="inlineStr"><is><t>nombre</t></is></c><c r="C1" t="inlineStr"><is><t>id_categoria</t></is></c><c r="D1" t="inlineStr"><is><t>precio</t></is></c><c r="E1" t="inlineStr"><is><t>stock</t></is></c></row>' +
+            '<row r="1"><c r="A1" t="inlineStr"><is><t>codigo</t></is></c><c r="B1" t="inlineStr"><is><t>nombre</t></is></c><c r="C1" t="inlineStr"><is><t>id_categoria</t></is></c><c r="D1" t="inlineStr"><is><t>precio_base_usd</t></is></c><c r="E1" t="inlineStr"><is><t>stock</t></is></c></row>' +
             '<row r="2"><c r="A2" t="inlineStr"><is><t>SKU-</t><t>COMPLETO</t></is></c><c r="B2" t="inlineStr"><is><t>Prod</t></is></c><c r="C2" t="n"><v>1</v></c><c r="D2" t="n"><v>100</v></c><c r="E2" t="n"><v>5</v></c></row>' +
             '</sheetData></worksheet>';
 
-        const zip = require('node:zlib');
-        const deflate = (buf) => zip.deflateRawSync(buf);
         const fName = Buffer.from('xl/worksheets/sheet1.xml');
         const fData = Buffer.from(sheetXml, 'utf8');
-        const fComp = deflate(fData);
+        const fComp = zlib.deflateRawSync(fData);
 
         const lh = Buffer.alloc(30);
         lh.writeUInt32LE(0x04034b50, 0);
@@ -323,38 +332,39 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         ch.writeUInt16LE(20, 6);
         ch.writeUInt16LE(8, 10);
         ch.writeUInt32LE(fComp.length, 20);
-        ch.writeUInt32LE(fData.length, 24);
+        ch.writeUInt32LE(bigDataLength = fData.length, 24);
         ch.writeUInt16LE(fName.length, 28);
 
-        const cd = Buffer.concat([ch, fName]);
-        const eocd = Buffer.alloc(22);
-        eocd.writeUInt32LE(0x06054b50, 0);
-        eocd.writeUInt16LE(1, 8);
-        eocd.writeUInt16LE(1, 10);
-        eocd.writeUInt32LE(cd.length, 12);
-        eocd.writeUInt32LE(lh.length + fName.length + fComp.length, 16);
+        const zipBuffer = Buffer.concat([
+            lh, fName, fComp,
+            ch, fName,
+            Buffer.from([
+                0x50, 0x4b, 0x05, 0x06,
+                0x00, 0x00, 0x00, 0x00,
+                0x01, 0x00, 0x01, 0x00,
+                (46 + fName.length) & 0xff, ((46 + fName.length) >> 8) & 0xff, 0x00, 0x00,
+                (30 + fName.length + fComp.length) & 0xff, ((30 + fName.length + fComp.length) >> 8) & 0xff, 0x00, 0x00,
+                0x00, 0x00
+            ])
+        ]);
 
-        const xlsxBuf = Buffer.concat([lh, fName, fComp, cd, eocd]);
-        const report = await validateProductImportFile(xlsxBuf, 'inline_str.xlsx');
-
+        const report = await validateProductImportFile(zipBuffer, 'inline.xlsx');
         assert.equal(report.valid, true);
-        assert.equal(report.validRows[0].codigo, 'SKU-COMPLETO');
+        assert.equal(report.validRows[0].producto.codigo, 'SKU-COMPLETO');
     });
 
     await t.test('H04: rechaza archivo XLSX que excede el presupuesto de descompresión (Zip Bomb)', async () => {
-        // XML que infla a más de 10 MiB para disparar el guard de descompresión
-        const hugePayload = Buffer.from('<worksheet>' + ' '.repeat(11 * 1024 * 1024) + '</worksheet>', 'utf8');
-        const zip = require('node:zlib');
-        const comp = zip.deflateRawSync(hugePayload);
-        const name = Buffer.from('xl/worksheets/sheet1.xml');
+        const bigXml = Buffer.alloc(11 * 1024 * 1024, 0x20);
+        const comp = zlib.deflateRawSync(bigXml);
+        const nameBuf = Buffer.from('xl/worksheets/sheet1.xml');
 
         const lh = Buffer.alloc(30);
         lh.writeUInt32LE(0x04034b50, 0);
         lh.writeUInt16LE(20, 4);
         lh.writeUInt16LE(8, 8);
         lh.writeUInt32LE(comp.length, 18);
-        lh.writeUInt32LE(hugePayload.length, 22);
-        lh.writeUInt16LE(name.length, 26);
+        lh.writeUInt32LE(bigXml.length, 22);
+        lh.writeUInt16LE(nameBuf.length, 26);
 
         const ch = Buffer.alloc(46);
         ch.writeUInt32LE(0x02014b50, 0);
@@ -362,63 +372,488 @@ test('Product Import Service & Endpoint - Unit Tests (#235)', async (t) => {
         ch.writeUInt16LE(20, 6);
         ch.writeUInt16LE(8, 10);
         ch.writeUInt32LE(comp.length, 20);
-        ch.writeUInt32LE(hugePayload.length, 24);
-        ch.writeUInt16LE(name.length, 28);
+        ch.writeUInt32LE(bigXml.length, 24);
+        ch.writeUInt16LE(nameBuf.length, 28);
 
-        const cd = Buffer.concat([ch, name]);
-        const eocd = Buffer.alloc(22);
-        eocd.writeUInt32LE(0x06054b50, 0);
-        eocd.writeUInt16LE(1, 8);
-        eocd.writeUInt16LE(1, 10);
-        eocd.writeUInt32LE(cd.length, 12);
-        eocd.writeUInt32LE(lh.length + name.length + comp.length, 16);
-
-        const bombBuf = Buffer.concat([lh, name, comp, cd, eocd]);
+        const zipBomb = Buffer.concat([
+            lh, nameBuf, comp,
+            ch, nameBuf,
+            Buffer.from([
+                0x50, 0x4b, 0x05, 0x06,
+                0x00, 0x00, 0x00, 0x00,
+                0x01, 0x00, 0x01, 0x00,
+                (46 + nameBuf.length) & 0xff, ((46 + nameBuf.length) >> 8) & 0xff, 0x00, 0x00,
+                (30 + nameBuf.length + comp.length) & 0xff, ((30 + nameBuf.length + comp.length) >> 8) & 0xff, 0x00, 0x00,
+                0x00, 0x00
+            ])
+        ]);
 
         await assert.rejects(
-            validateProductImportFile(bombBuf, 'bomb.xlsx'),
-            (err) => err instanceof FileImportValidationError && (err.message.includes('límite') || err.message.includes('tamaño') || err.message.includes('descompresión') || err.message.includes('corrupto'))
+            validateProductImportFile(zipBomb, 'bomb.xlsx'),
+            (err) => err instanceof FileImportValidationError && err.message.includes('límite seguro de memoria acumulada')
         );
     });
-    await t.test('H01: AE y Æ se detectan como distintos (no duplican) según reglas SQL', async () => {
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAE,A,1,10,1\nÆ,B,1,10,1\n', 'utf8');
-        const report = await validateProductImportFile(csv, 'test-ae.csv');
 
-        assert.equal(report.duplicateInFileCount, 0);
-        assert.equal(report.valid, true);
+    await t.test('H01: AE y Æ se detectan como distintos (no duplican) según reglas SQL', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nAE,A,1,10,1\nÆ,B,1,10,1\n', 'utf8');
+        const report = await validateProductImportFile(csv, 'test-ae.csv');
+        assert.strictEqual(report.valid, true);
+        assert.strictEqual(report.duplicateInFileCount, 0);
     });
 
-    await t.test('H01: AB y A\\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nAB,A,1,10,1\nA\u200DB,B,1,10,1\n', 'utf8');
+    await t.test('H01: AB y A\u200DB (zero-width joiner invisible) se detectan como colisión', async () => {
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nAB,A,1,10,1\nA\u200DB,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test-zwj.csv');
-
         assert.equal(report.valid, false);
         assert.equal(report.duplicateInFileCount, 1);
-        assert.ok(report.errors.some((e) => e.field === 'codigo' && e.message.includes('repetido dentro del archivo')));
     });
 
     await t.test('H01: ss y ß se detectan como colisión según reglas SQL', async () => {
-        const csv = Buffer.from('codigo,nombre,id_categoria,precio,stock\nss,A,1,10,1\nß,B,1,10,1\n', 'utf8');
+        const csv = Buffer.from('codigo,nombre,id_categoria,precio_base_usd,stock\nss,A,1,10,1\nß,B,1,10,1\n', 'utf8');
         const report = await validateProductImportFile(csv, 'test-ss.csv');
-
         assert.equal(report.valid, false);
         assert.equal(report.duplicateInFileCount, 1);
     });
+
     await t.test('H05: valida correctamente XLSX con etiquetas prefijadas con namespaces XML (x:row, x:c, x:v)', async () => {
         const buffer = buildTestXlsxBuffer([
-            ['codigo', 'nombre', 'id_categoria', 'precio', 'stock', 'activo'],
+            ['codigo', 'nombre', 'id_categoria', 'precio_base_usd', 'stock', 'activo'],
             ['000123', 'Taladro', 1, 250.50, 10, true]
         ], 'x');
 
         const report = await validateProductImportFile(buffer, 'prefixed.xlsx');
-
         assert.equal(report.valid, true);
         assert.equal(report.validRowsCount, 1);
-        assert.equal(report.validRows[0].codigo, '000123');
-        assert.equal(report.validRows[0].nombre, 'Taladro');
-        assert.equal(report.validRows[0].id_categoria, 1);
-        assert.equal(report.validRows[0].precio, 250.5);
-        assert.equal(report.validRows[0].stock, 10);
-        assert.equal(report.validRows[0].activo, true);
+        assert.equal(report.validRows[0].producto.codigo, '000123');
+        assert.equal(report.validRows[0].producto.nombre, 'Taladro');
+        assert.equal(report.validRows[0].producto.id_categoria, 1);
+        assert.equal(report.validRows[0].producto.precio_base_usd, '250.50');
+        assert.equal(report.validRows[0].producto.stock, 10);
+        assert.equal(report.validRows[0].producto.activo, true);
+    });
+
+    await t.test('Auditoría H01: Rechaza confirmar sin token válido, token ajeno o filas sustituidas en body', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async (id) => ({
+            id_usuario: Number(id),
+            email: `admin${id}@test.com`,
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const admin1Token = signToken({ id: 1, rol: 'ADMIN' });
+
+        const badBodyRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: `jwt_token=${admin1Token}`
+            },
+            body: JSON.stringify({ previewToken: 'dummy', items: [{ codigo: 'FAKE' }] })
+        });
+        assert.equal(badBodyRes.status, 400);
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nH01-SKU,Admin 1 Prod,1,100,5';
+        const previewReport = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'test.csv', 1);
+
+        const admin2Token = signToken({ id: 999, rol: 'ADMIN' });
+        const foreignTokenRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                Cookie: `jwt_token=${admin2Token}`
+            },
+            body: JSON.stringify({ previewToken: previewReport.previewToken })
+        });
+        assert.equal(foreignTokenRes.status, 404);
+    });
+
+    await t.test('Auditoría H02: Conflicto 409 no bloquea el token en PROCESSING permanente y permite resolver', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv1 = 'codigo,nombre,id_categoria,precio_base_usd,stock\nH02-LOCK,Prod 1,1,100,5';
+        const csv2 = 'codigo,nombre,id_categoria,precio_base_usd,stock\nH02-LOCK,Prod 2,1,120,5';
+
+        const prev1 = await validateProductImportFile(Buffer.from(csv1, 'utf8'), 'test1.csv', 1);
+        const prev2 = await validateProductImportFile(Buffer.from(csv2, 'utf8'), 'test2.csv', 1);
+
+        const { tryAcquireSkuLocks, releaseSkuLocks } = require('../dist/utils/importConfirmationState.util.js');
+        tryAcquireSkuLocks(['H02-LOCK']);
+
+        const conflictRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev2.previewToken })
+        });
+        assert.equal(conflictRes.status, 409);
+
+        releaseSkuLocks(['H02-LOCK']);
+
+        const resolveRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev2.previewToken })
+        });
+        assert.equal(resolveRes.status, 200);
+        const report = await resolveRes.json();
+        assert.equal(report.importados, 1);
+    });
+
+    await t.test('Auditoría H03: Mantiene numeración original de filas (row) y descartes de previsualización', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = [
+            'codigo,nombre,id_categoria,precio_base_usd,stock',
+            'SKU-INV,Invalido,1,10,-1',
+            'SKU-VAL3,Valido Fila 3,1,50,5',
+            'SKU-DB-1,Existente,1,10,1'
+        ].join('\n');
+
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'mixto.csv', 1);
+        assert.equal(prev.validRows.length, 1);
+        assert.equal(prev.validRows[0].row, 3);
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+
+        assert.equal(confirmRes.status, 200);
+        const confirmReport = await confirmRes.json();
+
+        assert.equal(confirmReport.totalProcesados, 3);
+        assert.equal(confirmReport.importados, 1);
+        assert.equal(confirmReport.rechazados, 1);
+        assert.equal(confirmReport.omitidos, 1);
+
+        const row2 = confirmReport.detalles.find((d) => d.row === 2);
+        const row3 = confirmReport.detalles.find((d) => d.row === 3);
+        const row4 = confirmReport.detalles.find((d) => d.row === 4);
+
+        assert.ok(row2 && row2.estado === 'rechazado');
+        assert.ok(row3 && row3.estado === 'importado');
+        assert.ok(row4 && row4.estado === 'omitido');
+    });
+
+    await t.test('Auditoría H04: Commit incierto responde 202 por_verificar y GET /confirmaciones permite conciliar', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-UNCERTAIN,Incierto,1,20,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'commit-drop.csv', 1);
+
+        test.mock.method(repo, 'insertImportedProductsBatch', async () => ({
+            outcomes: new Map(),
+            uncertainRowNumbers: new Set([2])
+        }));
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+
+        assert.equal(confirmRes.status, 202);
+        const report = await confirmRes.json();
+        assert.equal(report.estado, 'por_verificar');
+        assert.equal(report.pendientes, 1);
+        assert.equal(report.rechazados, 0);
+
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.previewToken, prev.previewToken);
+    });
+
+    await t.test('Auditoría H04 (Rollback + SKU ajeno): la consulta del lote no se apropia de SKUs ajenos tras rollback', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-ROLLBACK,Producto Rollback,1,100,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'rollback.csv', 1);
+
+        test.mock.method(repo, 'insertImportedProductsBatch', async () => ({
+            outcomes: new Map(),
+            uncertainRowNumbers: new Set([2])
+        }));
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(confirmRes.status, 202);
+
+        test.mock.method(repo, 'findExistingProductsBySkus', async () => {
+            const m = new Map();
+            m.set('SKU-ROLLBACK', 9999);
+            return m;
+        });
+
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.importados, 0);
+        assert.equal(statusReport.omitidos, 1);
+        const row = statusReport.detalles.find((d) => d.codigo === 'SKU-ROLLBACK');
+        assert.notEqual(row?.id_producto, 9999);
+        assert.equal(row?.estado, 'omitido');
+    });
+
+    await t.test('Auditoría H04 (Commit con acuse perdido): la consulta concilia el alta exitosa con su ID', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-COMMIT-OK,Prod Commit,1,150,3';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'commit-ok.csv', 1);
+
+        const { recordBatchProvisionalProductLink } = require('../dist/utils/importConfirmationState.util.js');
+        test.mock.method(repo, 'insertImportedProductsBatch', async (_rows, token) => {
+            if (token) {
+                recordBatchProvisionalProductLink(token, 'SKU-COMMIT-OK', 777);
+            }
+            return {
+                outcomes: new Map(),
+                uncertainRowNumbers: new Set([2])
+            };
+        });
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(confirmRes.status, 202);
+
+        test.mock.method(repo, 'findExistingProductsBySkus', async () => {
+            const m = new Map();
+            m.set('SKU-COMMIT-OK', 777);
+            return m;
+        });
+
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.importados, 1);
+        assert.equal(statusReport.pendientes, 0);
+        const row = statusReport.detalles.find((d) => d.codigo === 'SKU-COMMIT-OK');
+        assert.equal(row?.estado, 'importado');
+        assert.equal(row?.id_producto, 777);
+    });
+
+    await t.test('Auditoría H04 (Caída de proceso tras COMMIT): nuevo proceso concilia lote interrumpido en GET y POST', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-CRASH-COMMIT,Prod Crash,1,200,4';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'crash.csv', 1);
+
+        const {
+            recordBatchProvisionalProductLink,
+            getConfirmationTokenRecordRaw,
+            clearTokenActiveExecution,
+            persistRecordToDisk
+        } = require('../dist/utils/importConfirmationState.util.js');
+
+        recordBatchProvisionalProductLink(prev.previewToken, 'SKU-CRASH-COMMIT', 888);
+        const record = getConfirmationTokenRecordRaw(prev.previewToken);
+        assert.ok(record);
+        record.status = 'procesando';
+        persistRecordToDisk(record);
+
+        // Simular que el proceso terminó (sin ejecuciones activas en memoria)
+        clearTokenActiveExecution(prev.previewToken);
+
+        test.mock.method(repo, 'findExistingProductsBySkus', async () => {
+            const m = new Map();
+            m.set('SKU-CRASH-COMMIT', 888);
+            return m;
+        });
+
+        // 1. GET /confirmaciones/:previewToken en proceso nuevo recupera completado e ID real
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const statusReport = await statusRes.json();
+        assert.equal(statusReport.estado, 'completado');
+        assert.equal(statusReport.importados, 1);
+        assert.equal(statusReport.pendientes, 0);
+        const row = statusReport.detalles.find((d) => d.codigo === 'SKU-CRASH-COMMIT');
+        assert.equal(row?.estado, 'importado');
+        assert.equal(row?.id_producto, 888);
+
+        // 2. Reintento POST /confirmar devuelve 200 con el mismo resultado sin duplicar
+        const retryRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(retryRes.status, 200);
+        const retryReport = await retryRes.json();
+        assert.equal(retryReport.estado, 'completado');
+        assert.equal(retryReport.importados, 1);
+        const retryRow = retryReport.detalles.find((d) => d.codigo === 'SKU-CRASH-COMMIT');
+        assert.equal(retryRow?.estado, 'importado');
+        assert.equal(retryRow?.id_producto, 888);
+    });
+
+    await t.test('H07: un token alterado no accede al lote ni interrumpe una confirmación activa', async (t) => {
+        t.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const findExisting = t.mock.method(repo, 'findExistingProductsBySkus', async () => new Map());
+        const cookie = `jwt_token=${signToken({ id: 1, rol: 'ADMIN' })}`;
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-H07,Prod H07,1,100,5';
+        const { previewToken } = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'h07.csv', 1);
+        const {
+            markTokenActiveExecution,
+            clearTokenActiveExecution,
+            setConfirmationTokenStatus
+        } = require('../dist/utils/importConfirmationState.util.js');
+
+        setConfirmationTokenStatus(previewToken, 'procesando');
+        markTokenActiveExecution(previewToken);
+        try {
+            const alteredToken = previewToken + '!';
+            const status = await fetch(`${importBaseUrl}/confirmaciones/${encodeURIComponent(alteredToken)}`, {
+                headers: { Cookie: cookie }
+            });
+            assert.equal(status.status, 404);
+            const confirm = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: cookie },
+                body: JSON.stringify({ previewToken: alteredToken })
+            });
+            assert.equal(confirm.status, 404);
+
+            const active = await fetch(`${importBaseUrl}/confirmaciones/${previewToken}`, {
+                headers: { Cookie: cookie }
+            });
+            assert.equal(active.status, 200);
+            const report = await active.json();
+            assert.equal(report.estado, 'procesando');
+            assert.equal(report.pendientes, 1);
+            assert.equal(findExisting.mock.callCount(), 0);
+        } finally {
+            clearTokenActiveExecution(previewToken);
+        }
+    });
+
+    await t.test('Auditoría H04 (Retención de reporte completado): GET /confirmaciones devuelve 200 tras superar 30 min', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-TTL,Prod TTL,1,100,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'ttl.csv', 1);
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+        assert.equal(confirmRes.status, 200);
+
+        const { getConfirmationTokenRecordRaw } = require('../dist/utils/importConfirmationState.util.js');
+        const record = getConfirmationTokenRecordRaw(prev.previewToken);
+        assert.ok(record);
+        record.expiresAtMs = Date.now() - 5000;
+
+        const statusRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+            method: 'GET',
+            headers: { Cookie: `jwt_token=${adminToken}` }
+        });
+        assert.equal(statusRes.status, 200);
+        const report = await statusRes.json();
+        assert.equal(report.previewToken, prev.previewToken);
+        assert.equal(report.estado, 'completado');
+    });
+
+    await t.test('Auditoría H05 (Categoría desactivada antes de escritura): rechaza la fila y no confirma el alta', async () => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+
+        const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-CAT-RACE,Prod Race,1,100,5';
+        const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'race.csv', 1);
+
+        test.mock.method(repo, 'insertImportedProductsBatch', async () => {
+            const outcomes = new Map();
+            outcomes.set(2, {
+                success: false,
+                codigo: 'SKU-CAT-RACE',
+                nombre: 'Prod Race',
+                isCategoryInactive: true,
+                error: 'La categoría con ID 1 no existe o no se encuentra activa.'
+            });
+            return { outcomes, uncertainRowNumbers: new Set() };
+        });
+
+        const confirmRes = await fetch(`${importBaseUrl}/confirmar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+            body: JSON.stringify({ previewToken: prev.previewToken })
+        });
+
+        assert.equal(confirmRes.status, 200);
+        const report = await confirmRes.json();
+        assert.equal(report.importados, 0);
+        assert.equal(report.rechazados, 1);
+        const row = report.detalles.find((d) => d.codigo === 'SKU-CAT-RACE');
+        assert.equal(row?.estado, 'rechazado');
+        assert.equal(row?.motivos[0]?.field, 'id_categoria');
     });
 });

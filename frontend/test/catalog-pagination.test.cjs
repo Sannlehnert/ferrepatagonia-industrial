@@ -43,7 +43,7 @@ async function mount(t, page, handler = query => response(query.page)) {
   const module = { exports: {} }
   new Function('require', 'module', 'exports', code)(name => {
     if (name === '@/services/catalogService') return service
-    if (name === '@/components/CatalogFilters.vue') return { default: {} }
+    if (['@/components/CatalogFilters.vue', '@/components/ProductPrices.vue', '@/components/ProductPrice.vue'].includes(name)) return { default: {} }
     if (name === '@/utils/catalogPagination') return require('../src/utils/catalogPagination.ts')
     return require(name)
   }, module, module.exports)
