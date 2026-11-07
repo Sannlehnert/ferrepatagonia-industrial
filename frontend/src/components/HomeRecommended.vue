@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import ProductPrices from '@/components/ProductPrices.vue'
+import ProductPrice from '@/components/ProductPrice.vue'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import axios from 'axios'
@@ -51,6 +53,7 @@ onBeforeUnmount(() => {
         Productos
       </h2>
 
+      <ProductPrices :products="products" :catalog-loading="loading" v-slot="pricing">
       <p v-if="loading" class="m-0 text-center" role="status">
         Cargando productos...
       </p>
@@ -93,11 +96,10 @@ onBeforeUnmount(() => {
               {{ product.nombre }}
             </h3>
 
-            <p class="m-0 text-sm text-slate-600">
-              Precio a confirmar
-            </p>
+            <ProductPrice :line="pricing.prices[product.id]" :loading="pricing.loading" :error="pricing.error" :personalized="pricing.personalized" />
 
             <p
+              aria-label="Disponibilidad de stock"
               class="mt-auto mb-3 pt-4 text-sm"
               :class="product.disponible ? 'text-green-700' : 'text-red-700'"
             >
@@ -116,6 +118,7 @@ onBeforeUnmount(() => {
           </article>
         </li>
       </ul>
+      </ProductPrices>
     </div>
   </section>
 </template>

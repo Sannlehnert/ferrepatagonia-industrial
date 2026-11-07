@@ -34,8 +34,10 @@ test('mantiene visible el producto sin stock y deshabilita Agregar', async ({
   await expect(withStock.getByRole('button', {
     name: 'Agregar',
     exact: true,
-  })).toBeEnabled();
+  })).toBeDisabled();
 
+  // #243: FER-18 has no real cart integration yet, even stock-positive items stay disabled.
+  await expect(withStock.getByText('Carrito aún no disponible.')).toBeVisible();
   await page.reload();
 
   await expect(withoutStock.getByRole('button', {
@@ -45,7 +47,7 @@ test('mantiene visible el producto sin stock y deshabilita Agregar', async ({
   await expect(withStock.getByRole('button', {
     name: 'Agregar',
     exact: true,
-  })).toBeEnabled();
+  })).toBeDisabled();
 });
 
 for (const scenario of [
