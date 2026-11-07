@@ -65,6 +65,18 @@ jobs:
             - name: Run E2E cleanup resilience tests
               run: node --test backend/test/e2e-cleanup.test.cjs
 
+            - name: Run account seed safety and cleanup tests
+              working-directory: backend
+              run: |
+                  npm run test:account:safety
+                  npm run test:account:cleanup
+
+            # Deliberately fails closed until #260 is integrated. A green build of
+            # unrelated suites must not imply account persistence was exercised.
+            - name: Run account seed integration (requires task 260)
+              working-directory: backend
+              run: npm run test:account:isolated
+
             - name: Verify MariaDB container and volume cleanup
               if: always()
               shell: bash

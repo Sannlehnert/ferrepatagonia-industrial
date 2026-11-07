@@ -13,7 +13,12 @@
     "test:dto-source": "node --require ./test/helpers/test-env.cjs --import tsx --test test/dto-source.test.cjs test/auth.passport-source.test.cjs",
     "type-check": "tsc --noEmit",
     "test:pricing:mariadb": "node test/helpers/run-pricing-mariadb.cjs",
-    "test:cart:isolated": "node test/helpers/run-cart-mariadb.cjs"
+    "test:cart:isolated": "node test/helpers/run-cart-mariadb.cjs",
+    "test:account:safety": "node --test test/account.safety.test.cjs",
+    "test:account:cleanup": "node --test test/account.cleanup.test.cjs",
+    "test:account:isolated": "node test/helpers/run-account-mariadb.cjs",
+    "test:account:contract": "node test/helpers/run-account-mariadb.cjs contract",
+    "test:account:client": "node test/helpers/run-account-mariadb.cjs client"
   },
   "engines": {
     "node": ">=22"
