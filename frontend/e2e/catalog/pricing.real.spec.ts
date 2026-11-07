@@ -4,7 +4,14 @@ type PriceResponse = {
   data: {
     totalUSD: string | null
     datosSinteticos: boolean
-    productos: Array<{ evidenciaBaseUSD?: { synthetic: boolean } }>
+    productos: Array<{
+      productoId: number
+      descuentoAplicado: string
+      origenDescuento: string
+      precioUnitarioUSD: string | null
+      estadoPrecio: string
+      evidenciaBaseUSD?: { synthetic: boolean }
+    }>
   }
 }
 
@@ -62,7 +69,13 @@ test('backend real: visitante, cliente nuevo y listas propias al cambiar de sesi
   expect(publicPrice.status).toBe(200)
   expect(publicPrice.body.data.totalUSD).toBe('125.00')
   expect(publicPrice.body.data.datosSinteticos).toBe(true)
-  expect(publicPrice.body.data.productos[0].evidenciaBaseUSD?.synthetic).toBe(true)
+  expect(publicPrice.body.data.productos[0]).toMatchObject({
+    productoId: 25,
+    descuentoAplicado: '0.00',
+    origenDescuento: 'NINGUNO',
+    precioUnitarioUSD: '125.00',
+    evidenciaBaseUSD: { synthetic: true },
+  })
 
   const signIn=async(email:string)=>{
     await page.goto('/login')
@@ -77,19 +90,85 @@ test('backend real: visitante, cliente nuevo y listas propias al cambiar de sesi
     await logout
   }
 
-  for(const [email,total] of [
-    ['cliente@e2e.test','112.50'],
-    ['segundo-cliente@e2e.test','100.00'],
-    ['cliente-nuevo@e2e.test','125.00'],
-    ['cliente@e2e.test','112.50'],
+  for(const [email,total,discount,origin] of [
+    ['cliente@e2e.test','112.50','10.00','LISTA'],
+    ['segundo-cliente@e2e.test','100.00','20.00','LISTA'],
+    ['cliente-nuevo@e2e.test','125.00','0.00','NINGUNO'],
+    ['cliente@e2e.test','112.50','10.00','LISTA'],
   ]){
     await signIn(email)
     const result=await quote('/api/precios/mios')
     expect(result.status).toBe(200)
     expect(result.body.data.totalUSD).toBe(total)
+    expect(result.body.data.productos[0]).toMatchObject({
+      descuentoAplicado: discount,
+      origenDescuento: origin,
+      precioUnitarioUSD: total,
+    })
     expect(result.cache).toContain('private, no-store')
     expect(result.vary).toContain('Cookie')
     expect(JSON.stringify(result.body)).not.toMatch(/clienteId|listaId/)
+
+    // The public channel must not inherit the currently authenticated client's list price.
+    const publicResult=await quote('/api/precios')
+    expect(publicResult.status).toBe(200)
+    expect(publicResult.body.data.productos[0]).toMatchObject({
+      descuentoAplicado: '0.00',
+      origenDescuento: 'NINGUNO',
+      precioUnitarioUSD: '125.00',
+    })
     await signOut()
   }
+})
+
+test('cambio de sesión invalida precios previos y la UI bloquea precios sintéticos privados',async({page})=>{
+  const signIn=async(email:string)=>{
+    await page.goto('/login')
+    await page.getByLabel('Email',{exact:true}).fill(email)
+    await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
+    await page.getByRole('button',{name:'Ingresar',exact:true}).click()
+    await expect(page).toHaveURL(/\/mi-cuenta\/datos/)
+  }
+  const openCatalog=async()=>{
+    const pricing=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/precios/mios' && r.request().method()==='POST')
+    await page.goto('/catalogo?page=3')
+    const response=await pricing
+    expect(response.status()).toBe(200)
+    return (await response.json()).data as PriceResponse['data']
+  }
+  const card=()=>page.locator('li').filter({hasText:'E2E-25'})
+
+  await signIn('cliente@e2e.test')
+  let result=await openCatalog()
+  expect(result.datosSinteticos).toBe(true)
+  expect(result.productos.find(line=>line.productoId===25)).toMatchObject({
+    descuentoAplicado:'10.00',
+    origenDescuento:'LISTA',
+    precioUnitarioUSD:'112.50',
+    estadoPrecio:'DEFINIDO',
+    evidenciaBaseUSD:{synthetic:true},
+  })
+  await expect(card()).toHaveCount(1)
+  await expect(card()).toContainText('Precio no disponible')
+  await expect(card()).not.toContainText('USD 112.50')
+  await expect(card()).not.toContainText('USD 125.00')
+
+  await page.goto('/mi-cuenta/datos')
+  const logout=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/auth/logout'&&r.request().method()==='POST')
+  await page.getByRole('button',{name:'Cerrar sesión',exact:true}).click()
+  await logout
+  await expect(page).toHaveURL(/\/login/)
+
+  await signIn('segundo-cliente@e2e.test')
+  result=await openCatalog()
+  expect(result.productos.find(line=>line.productoId===25)).toMatchObject({
+    descuentoAplicado:'20.00',
+    origenDescuento:'LISTA',
+    precioUnitarioUSD:'100.00',
+    estadoPrecio:'DEFINIDO',
+    evidenciaBaseUSD:{synthetic:true},
+  })
+  await expect(card()).toContainText('Precio no disponible')
+  await expect(card()).not.toContainText('USD 112.50')
+  await expect(card()).not.toContainText('USD 100.00')
 })
