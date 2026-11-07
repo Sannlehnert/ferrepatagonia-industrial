@@ -1,12 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import axios from 'axios'
-import { getAdminClients } from '@/services/adminClientService'
-import type { AdminClient } from '@/types/adminClient'
+import AdminPriceListsPanel from './AdminPriceListsPanel.vue'
+import { getAdminClients, getAdminClientPriceLists, saveAdminClientPriceList } from '@/services/adminClientService'
+import type { AdminClient, AdminClientPriceList, AdminPriceListOption } from '@/types/adminClient'
 
 const clients = ref<AdminClient[]>([])
 const isLoading = ref(true)
 const errorMessage = ref<string | null>(null)
+const priceLists = ref<AdminPriceListOption[]>([])
+const assignments = ref<Record<number, AdminClientPriceList | null>>({})
+const selections = ref<Record<number, number | ''>>({})
+const feedback = ref<Record<number, { text: string; error: boolean }>>({})
+const priceListsLoading = ref(true)
+const priceListsError = ref<string | null>(null)
+const savingClientId = ref<number | null>(null)
+const managingPriceLists = ref(false)
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
     dateStyle: 'short',
@@ -18,6 +27,58 @@ function formatDate(value: string): string {
     return Number.isNaN(date.getTime())
         ? 'Fecha no disponible'
         : dateFormatter.format(date)
+}
+
+async function loadPriceLists() {
+    priceListsLoading.value = true
+    try {
+        const data = await getAdminClientPriceLists()
+        priceLists.value = data.listas
+        assignments.value = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item]))
+        selections.value = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item.idListaPrecio]))
+        feedback.value = {}
+        priceListsError.value = null
+    } catch {
+        priceListsError.value = 'No pudimos consultar las listas y asignaciones. Volvé a cargar para continuar.'
+    } finally {
+        priceListsLoading.value = false
+    }
+}
+
+function hasAvailableList(id: number) {
+    return priceLists.value.some(list => list.id === id)
+}
+
+function selectedList(id: number) {
+    return selections.value[id] || null
+}
+
+function canSavePriceList(id: number) {
+    const selected = selectedList(id)
+    return savingClientId.value === null && !managingPriceLists.value && !priceListsLoading.value && !priceListsError.value &&
+        selected !== (assignments.value[id]?.idListaPrecio ?? null) &&
+        (selected === null || hasAvailableList(selected))
+}
+
+async function savePriceList(id: number) {
+    if (!canSavePriceList(id)) return
+    savingClientId.value = id
+    delete feedback.value[id]
+    try {
+        const list = await saveAdminClientPriceList(id, selectedList(id))
+        assignments.value[id] = list
+        selections.value[id] = list?.idListaPrecio ?? ''
+        feedback.value[id] = { text: list ? 'Lista asignada.' : 'Asignación retirada.', error: false }
+    } catch (error: unknown) {
+        const response = axios.isAxiosError<{ message?: string }>(error) ? error.response : undefined
+        if (!response || response.status >= 500) {
+            priceListsError.value = 'No pudimos confirmar el cambio. Volvé a cargar las asignaciones para ver el resultado.'
+        } else {
+            feedback.value[id] = { text: response.data?.message ?? 'No se pudo guardar la asignación.', error: true }
+        }
+    } finally {
+        savingClientId.value = null
+    }
 }
 
 async function loadClients(): Promise<void> {
@@ -43,6 +104,7 @@ async function loadClients(): Promise<void> {
 
 onMounted(() => {
     void loadClients()
+    void loadPriceLists()
 })
 </script>
 
@@ -52,6 +114,8 @@ onMounted(() => {
             <h1 id="clients-title" class="m-0 mb-3 text-[28px] font-semibold">Clientes</h1>
             <p class="m-0 leading-6 text-slate-600">Listado de clientes particulares y empresas registrados.</p>
         </header>
+
+        <AdminPriceListsPanel :disabled="savingClientId !== null" @changed="loadPriceLists" @busy="managingPriceLists = $event" />
 
         <p v-if="isLoading" role="status" class="text-slate-600">Cargando clientes…</p>
 
@@ -73,7 +137,14 @@ onMounted(() => {
             aria-label="Listado de clientes; desplazamiento horizontal disponible"
             tabindex="0"
         >
-            <table class="w-full min-w-[600px] border-collapse text-left">
+            <p v-if="priceListsLoading" role="status" class="px-4 text-slate-600">Cargando listas de precios…</p>
+            <div v-else-if="priceListsError" class="p-4">
+                <p role="alert" class="mb-2">{{ priceListsError }}</p>
+                <button type="button" class="min-h-11 rounded-md border border-slate-300 px-3" @click="loadPriceLists">
+                    Recargar listas y asignaciones
+                </button>
+            </div>
+            <table class="w-full min-w-[800px] border-collapse text-left">
                 <caption class="p-4 text-left font-bold">
                     Clientes registrados: {{ clients.length }}
                 </caption>
@@ -82,6 +153,7 @@ onMounted(() => {
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Nombre o razón social</th>
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Email</th>
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Fecha de registro</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Lista de precios</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -89,6 +161,47 @@ onMounted(() => {
                         <td class="break-words border-b border-slate-200 p-4 align-top leading-6">{{ client.nombreRazonSocial }}</td>
                         <td class="break-words border-b border-slate-200 p-4 align-top leading-6">{{ client.email }}</td>
                         <td class="break-words border-b border-slate-200 p-4 align-top leading-6">{{ formatDate(client.fechaRegistro) }}</td>
+                        <td class="min-w-64 border-b border-slate-200 p-4 align-top">
+                            <div v-if="!priceListsLoading && !priceListsError">
+                                <p class="mb-2 text-sm text-slate-600">
+                                    {{ assignments[client.id]?.nombre ?? 'Sin lista asignada' }}
+                                    <span v-if="assignments[client.id]?.activa === false">(inactiva)</span>
+                                </p>
+                                <div class="flex flex-wrap gap-2">
+                                    <select
+                                        :value="selections[client.id] ?? ''"
+                                        :aria-label="`Lista de precios de ${client.nombreRazonSocial}`"
+                                        :disabled="savingClientId !== null || managingPriceLists"
+                                        class="min-h-11 min-w-0 rounded-md border border-slate-300 px-2"
+                                        @change="selections[client.id] = Number(($event.target as HTMLSelectElement).value) || ''"
+                                    >
+                                        <option value="">Sin lista</option>
+                                        <option v-for="list in priceLists" :key="list.id" :value="list.id">
+                                            {{ list.nombre }} ({{ list.porcentajeDescuento }} %)
+                                        </option>
+                                        <option
+                                            v-if="assignments[client.id] && !hasAvailableList(assignments[client.id]!.idListaPrecio)"
+                                            :value="assignments[client.id]!.idListaPrecio"
+                                            disabled
+                                        >
+                                            {{ assignments[client.id]!.nombre }} (no disponible)
+                                        </option>
+                                    </select>
+                                    <button
+                                        type="button"
+                                        :disabled="!canSavePriceList(client.id)"
+                                        class="min-h-11 rounded-md border-0 bg-[#145a8d] px-3 font-bold text-white disabled:opacity-50"
+                                        @click="savePriceList(client.id)"
+                                    >
+                                        {{ savingClientId === client.id ? 'Guardando…' : 'Guardar lista' }}
+                                    </button>
+                                </div>
+                                <p v-if="feedback[client.id]" class="mt-2 text-sm" :role="feedback[client.id]!.error ? 'alert' : 'status'">
+                                    {{ feedback[client.id]!.text }}
+                                </p>
+                            </div>
+                            <span v-else class="text-slate-600">—</span>
+                        </td>
                     </tr>
                 </tbody>
             </table>

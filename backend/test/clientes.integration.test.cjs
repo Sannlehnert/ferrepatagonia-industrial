@@ -91,6 +91,99 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
         try { await connection.rollbackTransaction(); } finally { await connection.release(); }
       }
     });
+    await t.test('#242: ADMIN mantiene listas y asignaciones con persistencia y permisos', async () => {
+      const client = await createAuthUser(pool, 'CLIENTE');
+      const listIds = [];
+      try {
+        const listsUrl = `${url.slice(0, -'/clientes'.length)}/listas-precio`;
+        const saveList = (input, { cookie = adminCookie, id } = {}) => fetch(id === undefined ? listsUrl : `${listsUrl}/${id}`, {
+          method: id === undefined ? 'POST' : 'PUT',
+          headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+          body: JSON.stringify(input),
+        });
+        const draft = { nombre: `Fixture ${randomUUID()}`, porcentajeDescuento: '12.5', activa: true };
+        assert.equal((await fetch(listsUrl)).status, 401);
+        assert.equal((await fetch(listsUrl, { headers: { Cookie: client.cookie } })).status, 403);
+        assert.equal((await saveList(draft, { cookie: null })).status, 401);
+        assert.equal((await saveList(draft, { cookie: client.cookie })).status, 403);
+        for (const invalid of ['100', '-1', '1.001', '1e1', 12.5]) {
+          assert.equal((await saveList({ ...draft, porcentajeDescuento: invalid })).status, 400);
+        }
+        assert.equal((await saveList({ ...draft, nombre: '   ' })).status, 400);
+        assert.equal((await saveList({ ...draft, activa: 'false' })).status, 400);
+        assert.equal((await saveList(draft, { id: 2147483647 })).status, 404);
+        const createList = async (active) => {
+          const response = await saveList({ ...draft, nombre: `${draft.nombre} ${active ? 'A' : 'B'}`, activa: active,
+            porcentajeDescuento: active ? '12.5' : '0' });
+          assert.equal(response.status, 201, await response.clone().text());
+          const { lista } = (await response.json()).data;
+          listIds.push(lista.id);
+          assert.equal(lista.porcentajeDescuento, active ? '12.50' : '0.00');
+          return lista.id;
+        };
+        const active = await createList(true);
+        const inactive = await createList(false);
+        assert.equal((await saveList(draft, { id: active, cookie: client.cookie })).status, 403);
+        const assignmentUrl = `${url}/${client.clientId}/lista-precio`;
+        const save = (body, cookie = adminCookie, target = assignmentUrl) => fetch(target, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}) },
+          body: JSON.stringify(body),
+        });
+        const read = (cookie = adminCookie) => fetch(`${url}/listas-precio`, {
+          headers: cookie ? { Cookie: cookie } : {},
+        });
+        const storedList = async () => (await pool.query('SELECT id_lista_precio FROM CLIENTE WHERE id_cliente = ?', [client.clientId]))[0].id_lista_precio;
+
+        assert.equal((await read(null)).status, 401);
+        assert.equal((await read(client.cookie)).status, 403);
+        assert.equal((await save({ idListaPrecio: active }, null)).status, 401);
+        assert.equal((await save({ idListaPrecio: active }, client.cookie)).status, 403);
+        assert.equal(await storedList(), null);
+
+        for (const body of [{}, { idListaPrecio: String(active) }, { idListaPrecio: active, precio: 99 }]) {
+          assert.equal((await save(body)).status, 400);
+        }
+        assert.equal((await save({ idListaPrecio: active }, adminCookie, `${url}/0/lista-precio`)).status, 400);
+        assert.equal((await save({ idListaPrecio: active }, adminCookie, `${url}/2147483647/lista-precio`)).status, 404);
+
+        const response = await save({ idListaPrecio: active });
+        assert.equal(response.status, 200, await response.clone().text());
+        assert.equal((await response.json()).data.lista.idListaPrecio, active);
+        assert.equal((await save({ idListaPrecio: active })).status, 200);
+        assert.equal((await save({ idListaPrecio: inactive })).status, 409);
+        assert.equal((await save({ idListaPrecio: 2147483647 })).status, 404);
+        assert.equal(await storedList(), active);
+
+        const readResponse = await read();
+        assert.equal(readResponse.status, 200);
+        const { data } = await readResponse.json();
+        assert.equal(data.listas.find(list => list.id === active).porcentajeDescuento, '12.50');
+        assert.ok(!data.listas.some(list => list.id === inactive));
+        assert.equal(data.asignaciones.find(row => row.idCliente === client.clientId).idListaPrecio, active);
+
+        const edited = { nombre: 'Lista actualizada', porcentajeDescuento: '99.99', activa: false };
+        const deactivated = await saveList(edited, { id: active });
+        assert.equal(deactivated.status, 200);
+        assert.deepEqual((await deactivated.json()).data.lista, { id: active, ...edited });
+        const managedLists = (await (await fetch(listsUrl, { headers: { Cookie: adminCookie } })).json()).data.listas;
+        assert.deepEqual(managedLists.find(list => list.id === active), { id: active, ...edited });
+        assert.equal(await storedList(), active);
+        const afterDeactivate = (await (await read()).json()).data;
+        assert.equal(afterDeactivate.asignaciones.find(row => row.idCliente === client.clientId).activa, false);
+        assert.ok(!afterDeactivate.listas.some(list => list.id === active));
+        assert.equal((await save({ idListaPrecio: active })).status, 409);
+        assert.equal((await saveList({ ...edited, activa: true }, { id: active })).status, 200);
+        assert.ok((await (await read()).json()).data.listas.some(list => list.id === active));
+        const removed = await save({ idListaPrecio: null });
+        assert.equal(removed.status, 200);
+        assert.equal((await removed.json()).data.lista, null);
+        assert.equal(await storedList(), null);
+      } finally {
+        await client.destroy();
+        for (const id of listIds) await pool.query('DELETE FROM LISTA_PRECIO WHERE id_lista_precio = ?', [id]);
+      }
+    });
   } finally {
     await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
     try { await admin.destroy(); } finally { await pool.end(); }
