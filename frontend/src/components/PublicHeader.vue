@@ -5,8 +5,10 @@ import NavigationMenu from '@/components/NavigationMenu.vue'
 import { publicMenu } from '@/config/menu'
 import { getPermissionsForUser } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
+import { useCartPanelStore } from '@/stores/cartPanel'
 
 const auth = useAuthStore()
+const cartPanel = useCartPanelStore()
 const router = useRouter()
 const route = useRoute()
 const search = ref('')
@@ -118,6 +120,21 @@ async function submitSearch() {
           >
             {{ accountLabel }}
           </RouterLink>
+
+          <button
+            v-if="auth.rol === 'CLIENTE'"
+            type="button"
+            aria-haspopup="dialog"
+            :aria-expanded="cartPanel.visible"
+            class="inline-flex min-h-11 cursor-pointer items-center
+              rounded border-0 bg-transparent font-[inherit]
+              text-xs font-bold text-[#103a5c] hover:underline
+              focus-visible:outline-2 focus-visible:outline-offset-2
+              focus-visible:outline-[#2b7bbb]"
+            @click="cartPanel.open()"
+          >
+            Carrito
+          </button>
 
           <RouterLink
             v-if="!auth.isAuthenticated"

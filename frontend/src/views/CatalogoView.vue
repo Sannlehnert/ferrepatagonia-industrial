@@ -16,6 +16,7 @@ import type {
   CatalogFiltersValue,
   CatalogCategory,
 } from '@/types/catalog'
+import CatalogCartButton from '@/components/CatalogCartButton.vue'
 
 const LIMITE = 12
 const route = useRoute()
@@ -281,10 +282,13 @@ onBeforeUnmount(() => {
               <span aria-label="Disponibilidad de stock" class="text-sm text-green-600" :class="{ 'text-red-700': !p.disponible }">
                 {{ p.disponible ? 'Disponible' : 'No disponible' }}
               </span>
-              <!-- FER-18 aún no dispone de una integración real. -->
-              <button type="button" class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] disabled:cursor-not-allowed disabled:bg-slate-400 [@media(max-width:560px)]:w-full" disabled :aria-describedby="`cart-pending-${p.id}`">Agregar</button>
+              <CatalogCartButton
+                :product="p"
+                :line="pricing.prices[p.id]"
+                :loading="pricing.loading"
+                :error="pricing.error"
+              />
             </div>
-            <p :id="`cart-pending-${p.id}`" class="mb-0 mt-2 text-xs text-slate-500">Carrito aún no disponible.</p>
           </li>
         </ul>
 
