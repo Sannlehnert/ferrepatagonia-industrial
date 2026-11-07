@@ -1,0 +1,30 @@
+import { test, expect } from '@playwright/test'
+
+// Real login, Passport, MariaDB and financial routes, with no route interception.
+// Only proves authorization and explicit unavailability while #260 is blocked.
+test('ADMIN abre consultas, reintenta 503 y CLIENTE no accede después de logout', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByLabel('Email', { exact: true }).fill('admin@e2e.test')
+  await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+  await expect(page).toHaveURL(/\/admin\/dashboard$/)
+  await page.getByRole('link', { name: 'Cuentas corrientes', exact: true }).click()
+  await expect(page.getByRole('heading', { name: 'Cuentas corrientes', exact: true })).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('no está disponible')
+  const retry = page.waitForResponse(r => r.url().includes('/api/admin/cuentas-corrientes'))
+  await page.getByRole('button', { name: 'Reintentar desde la primera página' }).click()
+  expect((await retry).status()).toBe(503)
+  await page.getByLabel('ID de cliente', { exact: true }).fill('2147483647')
+  await page.getByRole('button', { name: 'Consultar cliente por ID' }).click()
+  await expect(page.getByText('El cliente no existe.', { exact: true })).toBeVisible()
+  await page.getByRole('button', { name: /Cerrar sesión/ }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')
+  await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+  await expect(page).not.toHaveURL(/\/login/)
+  await page.goto('/admin/cuentas-corrientes')
+  await expect(page).toHaveURL(/\/acceso-denegado$/)
+  expect((await page.request.get('/api/admin/cuentas-corrientes')).status()).toBe(403)
+  await expect(page.getByRole('table')).toHaveCount(0)
+})

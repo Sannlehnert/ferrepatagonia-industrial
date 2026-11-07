@@ -12,9 +12,12 @@ import { httpSecurity } from './middlewares/http-security.middleware';
 import { MariaDbPricingSource } from './repositories/pricing.source';
 import { PricingService } from './services/pricing/pricing.service';
 import { createPricingRouter } from './routes/pricing.routes';
+import { adminAccountPrivacy } from './middlewares/adminAccountPrivacy.middleware';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
+// Includes security, parsing, authentication and authorization errors.
+app.use(adminAccountPrivacy);
 app.use('/api', httpSecurity(env.httpSecurity));
 
 app.use(cookieParser());
