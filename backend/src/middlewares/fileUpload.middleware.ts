@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import multer, { MulterError } from 'multer';
 import path from 'node:path';
 
-export const MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+export const MAX_UPLOAD_FILE_SIZE_BYTES = 5 * 1024 * 1024; // 5 MiB
 
 const ALLOWED_EXTENSIONS = new Set(['.csv', '.xlsx']);
 
@@ -77,8 +77,8 @@ export const uploadCatalogFile = (req: Request, res: Response, next: NextFunctio
     upload(req, res, (err: unknown) => {
         if (err instanceof MulterError) {
             if (err.code === 'LIMIT_FILE_SIZE') {
-                res.status(400).json({
-                    message: 'El archivo supera el tamaño máximo permitido de 5 MB.'
+                res.status(413).json({
+                    message: 'El archivo supera el tamaño máximo permitido de 5 MiB.'
                 });
                 return;
             }
