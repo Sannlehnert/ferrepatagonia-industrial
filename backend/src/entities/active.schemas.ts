@@ -21,6 +21,7 @@ export interface Cliente {
     nombre_razon_social: string; doc_cliente: string | null; cuit: string | null; email: string | null;
     telefono: string | null; direccion: string | null; estado_aprobacion_empresa: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | null;
     es_fiel: number; activo: number; fecha_alta: Date; usuario?: Usuario; lista_precio?: ListaPrecio | null;
+    cuenta_corriente?: CuentaCorriente;
 }
 export interface Usuario {
     id_usuario: number; id_cliente: number | null; email: string; password_hash: string;
@@ -44,6 +45,16 @@ export interface ItemCarrito {
     fecha_actualizacion: Date;
     carrito?: Carrito;
     producto?: Producto;
+}
+
+export interface CuentaCorriente {
+    id_cuenta_corriente: number;
+    id_cliente: number;
+    limite_credito: string;
+    habilitada: number;
+    fecha_alta: Date;
+    observaciones: string | null;
+    cliente?: Cliente;
 }
 
 export const ListaPrecioSchema = new EntitySchema<ListaPrecio>({
@@ -135,7 +146,8 @@ export const ClienteSchema = new EntitySchema<Cliente>({
         usuario: { type: 'one-to-one', target: 'Usuario', inverseSide: 'cliente' },
         lista_precio: { type: 'many-to-one', target: 'ListaPrecio', inverseSide: 'clientes', nullable: true,
             joinColumn: { name: 'id_lista_precio', referencedColumnName: 'id_lista_precio', foreignKeyConstraintName: 'fk_cliente_lista_precio' },
-            onDelete: 'RESTRICT', onUpdate: 'RESTRICT', cascade: false }
+            onDelete: 'RESTRICT', onUpdate: 'RESTRICT', cascade: false },
+        cuenta_corriente: { type: 'one-to-one', target: 'CuentaCorriente', inverseSide: 'cliente' }
     },
 });
 
@@ -156,6 +168,7 @@ export const UsuarioSchema = new EntitySchema<Usuario>({
         joinColumn: { name: 'id_cliente', referencedColumnName: 'id_cliente', foreignKeyConstraintName: 'fk_usuario_cliente' },
         onDelete: 'RESTRICT', onUpdate: 'RESTRICT', cascade: false } },
 });
+
 export const CarritoSchema = new EntitySchema<Carrito>({
     name: 'Carrito',
     tableName: 'CARRITO',
@@ -165,6 +178,9 @@ export const CarritoSchema = new EntitySchema<Carrito>({
         fecha_creacion: created,
         fecha_actualizacion: { ...created, onUpdate: 'CURRENT_TIMESTAMP' }
     },
+    indices: [
+        { name: 'uq_carrito_cliente', columns: ['id_cliente'], unique: true }
+    ],
     relations: {
         cliente: {
             type: 'one-to-one',
@@ -231,6 +247,39 @@ export const ItemCarritoSchema = new EntitySchema<ItemCarrito>({
     }
 });
 
+export const CuentaCorrienteSchema = new EntitySchema<CuentaCorriente>({
+    name: 'CuentaCorriente',
+    tableName: 'CUENTA_CORRIENTE',
+    columns: {
+        id_cuenta_corriente: id,
+        id_cliente: { type: 'int' },
+        limite_credito: { type: 'decimal', precision: 12, scale: 2 },
+        habilitada: flag,
+        fecha_alta: created,
+        observaciones: { type: 'text', nullable: true }
+    },
+    indices: [
+        { name: 'uq_cuenta_cliente', columns: ['id_cliente'], unique: true }
+    ],
+    checks: [
+        { name: 'chk_cuenta_limite', expression: 'limite_credito >= 0' },
+        { name: 'chk_cuenta_habilitada', expression: 'habilitada IN (0, 1)' }
+    ],
+    relations: {
+        cliente: {
+            type: 'one-to-one',
+            target: 'Cliente',
+            joinColumn: {
+                name: 'id_cliente',
+                referencedColumnName: 'id_cliente',
+                foreignKeyConstraintName: 'fk_cuenta_cliente'
+            },
+            onDelete: 'RESTRICT',
+            onUpdate: 'RESTRICT'
+        }
+    }
+});
+
 export const activeSchemas = [
     CategoriaSchema,
     ProductoSchema,
@@ -239,5 +288,6 @@ export const activeSchemas = [
     ListaPrecioSchema,
     CotizacionSchema,
     CarritoSchema,
-    ItemCarritoSchema
+    ItemCarritoSchema,
+    CuentaCorrienteSchema
 ];
