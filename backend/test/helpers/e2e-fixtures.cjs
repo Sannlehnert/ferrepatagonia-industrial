@@ -37,6 +37,14 @@ async function seedFixtures(connection) {
         (4, 'Oculta E2E', 0)
     `);
 
+    await connection.query(`
+      INSERT INTO LISTA_PRECIO
+        (id_lista_precio, nombre, porcentaje_descuento, activa)
+      VALUES
+        (1, 'SINTETICO E2E lista 10%', 10, 1),
+        (2, 'SINTETICO E2E lista 20%', 20, 1)
+    `);
+
     for (let id = 1; id <= 25; id++) {
       const number = String(id).padStart(2, "0");
 
@@ -71,11 +79,20 @@ async function seedFixtures(connection) {
       `
       INSERT INTO CLIENTE
         (id_cliente, tipo_cliente, nombre_razon_social, email,
-        estado_aprobacion_empresa, es_fiel, activo)
-      VALUES (1, 'PARTICULAR', 'Cliente E2E', ?, NULL, 0, 1)
+        estado_aprobacion_empresa, es_fiel, activo, id_lista_precio)
+      VALUES (1, 'PARTICULAR', 'Cliente E2E', ?, NULL, 0, 1, 1)
     `,
       [credentials.client.email],
     );
+
+    await connection.query(`
+      INSERT INTO CLIENTE
+        (id_cliente, tipo_cliente, nombre_razon_social, email,
+        estado_aprobacion_empresa, es_fiel, activo, id_lista_precio)
+      VALUES
+        (2, 'PARTICULAR', 'Segundo cliente E2E', 'segundo-cliente@e2e.test', NULL, 0, 1, 2),
+        (3, 'PARTICULAR', 'Cliente nuevo E2E', 'cliente-nuevo@e2e.test', NULL, 1, 1, NULL)
+    `);
 
     const hash = await bcrypt.hash(credentials.admin.password, 10);
 
@@ -85,10 +102,21 @@ async function seedFixtures(connection) {
         (id_usuario, id_cliente, email, password_hash, rol, activo)
       VALUES
         (1, NULL, ?, ?, 'ADMIN', 1),
-        (2, 1, ?, ?, 'CLIENTE', 1)
+        (2, 1, ?, ?, 'CLIENTE', 1),
+        (3, 2, 'segundo-cliente@e2e.test', ?, 'CLIENTE', 1),
+        (4, 3, 'cliente-nuevo@e2e.test', ?, 'CLIENTE', 1)
     `,
-      [credentials.admin.email, hash, credentials.client.email, hash],
+      [credentials.admin.email, hash, credentials.client.email, hash, hash, hash],
     );
+
+    await connection.query(`
+      INSERT INTO PRECIO_USD_EVIDENCIA
+        (id_producto, precio_verificado, evidencia, id_admin,
+        verificado_utc, valida, sintetica)
+      VALUES
+        (25, 125.00, 'SINTETICO E2E precio USD explícito', 1,
+        '2020-01-01 12:00:00', 1, 1)
+    `);
 
     await connection.commit();
   } catch (error) {
