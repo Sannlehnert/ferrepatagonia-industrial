@@ -22,9 +22,9 @@ test('schema metadata mirrors every active column, CHECK, index and FK', async (
                     : 'decimal(12,2)';
                 assert.equal(actual.Type, expected);
             } else {
-                assert.equal(type, column.type);
+                assert.equal(type, column.unsigned ? column.type + ' unsigned' : column.type);
             }
-      if (column.length) assert.equal(actual.Type, 'varchar(' + column.length + ')');
+      if (column.length) assert.equal(actual.Type, column.type + '(' + column.length + ')');
       if (column.collation) assert.equal(actual.Collation, column.collation);
       if (column.isPrimary) assert.equal(actual.Key, 'PRI');
       if (column.isGenerated) assert.match(actual.Extra, /auto_increment/);

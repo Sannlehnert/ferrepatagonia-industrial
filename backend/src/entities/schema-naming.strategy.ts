@@ -7,6 +7,7 @@ export class SchemaNamingStrategy extends DefaultNamingStrategy {
     const name = typeof table === 'string' ? table : table.name;
     if (name === 'USUARIO' && columns.length === 1 && columns[0] === 'id_cliente') return 'uq_usuario_cliente';
     if (name === 'CARRITO' && columns.length === 1 && columns[0] === 'id_cliente') return 'uq_carrito_cliente';
+    if (name === 'CUENTA_CORRIENTE' && columns.length === 1 && columns[0] === 'id_cliente') return 'uq_cuenta_cliente';
     return super.relationConstraintName(table, columns, where);
   }
 }
