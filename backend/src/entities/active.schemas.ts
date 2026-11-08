@@ -239,11 +239,18 @@ export interface CuentaCorriente {
     limite_credito: string;
     habilitada: number;
     cobertura: 'COMPLETA' | 'PARCIAL' | 'NO_ACREDITADA';
-    plazo_dias: 30 | 60;
+    plazo_dias: 30 | 60 | null;
     fecha_alta: Date;
     observaciones: string | null;
     cliente?: Cliente;
     movimientos?: MovimientoCuentaCorriente[];
+    moneda_limite: string | null;
+    evidencia_limite: string | null;
+    evidencia_plazo: string | null;
+    evidencia_cobertura: string | null;
+    cobertura_desde_utc: Date | null;
+    origen_datos: 'REAL' | 'DEMO';
+    revision: string;
 }
 
 export interface MovimientoCuentaCorriente {
@@ -263,6 +270,17 @@ export interface MovimientoCuentaCorriente {
     autorizado_por: string | null;
     observaciones: string | null;
     cuenta_corriente?: CuentaCorriente;
+    fecha_base_civil: string | null;
+    plazo_aplicado: 30 | 60 | null;
+    vence_el: string | null;
+    huella_registro: string | null;
+    evidencia_origen: string | null;
+    monto_original: string | null;
+    moneda_original: string | null;
+    id_cotizacion: number | null;
+    tasa_historica: string | null;
+    evento_invalidacion: string | null;
+    invalidado_utc: Date | null;
 }
 
 export interface ImputacionMovimientoCuenta {
@@ -273,26 +291,39 @@ export interface ImputacionMovimientoCuenta {
     monto_imputado: string;
     fecha_imputacion: Date;
     estado: 'VIGENTE' | 'ANULADA';
+    revision: string | null;
+    evento: string | null;
+    evento_sustitucion: string | null;
+    invalidada_utc: Date | null;
 }
 
 export const CuentaCorrienteSchema = new EntitySchema<CuentaCorriente>({
     name: 'CuentaCorriente',
     tableName: 'CUENTA_CORRIENTE',
     columns: {
+        moneda_limite: { type: 'varchar', length: 3, nullable: true },
+        evidencia_limite: { type: 'varchar', length: 1000, nullable: true },
+        evidencia_plazo: { type: 'varchar', length: 1000, nullable: true },
+        evidencia_cobertura: { type: 'varchar', length: 1000, nullable: true },
+        cobertura_desde_utc: { type: 'datetime', nullable: true, precision: 3 },
+        origen_datos: { type: 'varchar', length: 10, collation: 'utf8mb4_bin' },
+        revision: { type: 'bigint', unsigned: true },
         id_cuenta_corriente: id,
         id_cliente: { type: 'int' },
         limite_credito: { type: 'decimal', precision: 12, scale: 2 },
         habilitada: flag,
         cobertura: text(20),
-        plazo_dias: { type: 'int' },
+        plazo_dias: { type: 'int', nullable: true },
         fecha_alta: created,
         observaciones: { type: 'text', nullable: true }
     },
     checks: [
+        { name: 'chk_cuenta_origen', expression: "origen_datos IN ('REAL', 'DEMO')" },
+        { name: 'chk_cuenta_moneda_limite', expression: "moneda_limite IS NULL OR moneda_limite = 'USD'" },
         { name: 'chk_cuenta_cobertura', expression: "cobertura IN ('COMPLETA', 'PARCIAL', 'NO_ACREDITADA')" },
         { name: 'chk_cuenta_habilitada', expression: 'habilitada IN (0, 1)' },
         { name: 'chk_cuenta_limite', expression: 'limite_credito >= 0' },
-        { name: 'chk_cuenta_plazo', expression: 'plazo_dias IN (30, 60)' }
+        { name: 'chk_cuenta_plazo', expression: "plazo_dias IS NULL OR plazo_dias IN (30, 60)" }
     ],
     relations: {
         cliente: {
@@ -318,6 +349,17 @@ export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuenta
     name: 'MovimientoCuentaCorriente',
     tableName: 'MOVIMIENTO_CUENTA_CORRIENTE',
     columns: {
+        fecha_base_civil: { type: 'date', nullable: true },
+        plazo_aplicado: { type: 'int', nullable: true },
+        vence_el: { type: 'date', nullable: true },
+        huella_registro: { type: 'char', length: 64, nullable: true },
+        evidencia_origen: { type: 'longtext', nullable: true },
+        monto_original: { type: 'decimal', nullable: true, precision: 12, scale: 2 },
+        moneda_original: { type: 'varchar', length: 3, nullable: true },
+        id_cotizacion: { type: 'int', nullable: true },
+        tasa_historica: { type: 'decimal', nullable: true, precision: 20, scale: 8 },
+        evento_invalidacion: { type: 'varchar', length: 100, nullable: true, collation: 'utf8mb4_bin' },
+        invalidado_utc: { type: 'datetime', nullable: true, precision: 3 },
         id_movimiento_cuenta: id,
         id_cuenta_corriente: { type: 'int' },
         tipo_movimiento: { ...text(20), collation: 'utf8mb4_bin' },
@@ -335,14 +377,17 @@ export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuenta
         observaciones: { type: 'text', nullable: true }
     },
     indices: [
+        { name: 'uq_movimiento_invalidacion', columns: ["evento_invalidacion"], unique: true },
         { name: 'uq_movimiento_pedido', columns: ['id_pedido'], unique: true },
         { name: 'uq_movimiento_pago', columns: ['id_pago'], unique: true },
         { name: 'idx_movimiento_cuenta', columns: ['id_cuenta_corriente'] },
         { name: 'idx_movimiento_cuenta_estado', columns: ['id_cuenta_corriente', 'estado'] }
     ],
     checks: [
+        { name: 'chk_movimiento_original', expression: "(monto_original IS NULL AND moneda_original IS NULL AND evidencia_origen IS NULL) OR (monto_original IS NOT NULL AND monto_original > 0 AND moneda_original IS NOT NULL AND moneda_original IN ('USD','ARS') AND evidencia_origen IS NOT NULL AND JSON_VALID(evidencia_origen) AND (moneda_original = 'USD' OR (id_cotizacion IS NOT NULL AND tasa_historica IS NOT NULL AND tasa_historica > 0)))" },
+        { name: 'chk_movimiento_fecha', expression: "(fecha_base_civil IS NULL AND plazo_aplicado IS NULL AND vence_el IS NULL) OR (tipo_movimiento = 'CARGO' AND fecha_base_civil IS NOT NULL AND plazo_aplicado IS NOT NULL AND plazo_aplicado IN (30,60) AND vence_el IS NOT NULL AND vence_el = DATE_ADD(fecha_base_civil, INTERVAL plazo_aplicado DAY))" },
         { name: 'chk_movimiento_estado', expression: "estado IN ('ACREDITADO', 'ANULADO')" },
-        { name: 'chk_movimiento_moneda', expression: "moneda = 'USD'" },
+        { name: 'chk_movimiento_moneda', expression: "BINARY moneda = BINARY 'USD'" },
         { name: 'chk_movimiento_monto', expression: 'monto > 0' },
         {
             name: 'chk_movimiento_referencia',
@@ -369,6 +414,10 @@ export const ImputacionMovimientoCuentaSchema = new EntitySchema<ImputacionMovim
     name: 'ImputacionMovimientoCuenta',
     tableName: 'IMPUTACION_MOVIMIENTO_CUENTA',
     columns: {
+        revision: { type: 'bigint', nullable: true, unsigned: true },
+        evento: { type: 'varchar', length: 100, nullable: true, collation: 'utf8mb4_bin' },
+        evento_sustitucion: { type: 'varchar', length: 100, nullable: true, collation: 'utf8mb4_bin' },
+        invalidada_utc: { type: 'datetime', nullable: true, precision: 3 },
         id_imputacion: id,
         id_cuenta_corriente: { type: 'int' },
         id_cargo: { type: 'int' },
@@ -378,6 +427,7 @@ export const ImputacionMovimientoCuentaSchema = new EntitySchema<ImputacionMovim
         estado: { ...text(20), collation: 'utf8mb4_bin' }
     },
     indices: [
+        { name: 'uq_imputacion_revision', columns: ["id_cargo","id_abono","revision"], unique: true },
         { name: 'idx_imputacion_cargo', columns: ['id_cargo'] },
         { name: 'idx_imputacion_abono', columns: ['id_abono'] }
     ],
