@@ -231,11 +231,15 @@ export const ItemCarritoSchema = new EntitySchema<ItemCarrito>({
     }
 });
 
+// backend/src/entities/active.schemas.ts
+
 export interface CuentaCorriente {
     id_cuenta_corriente: number;
     id_cliente: number;
     limite_credito: string;
     habilitada: number;
+    cobertura: 'COMPLETA' | 'PARCIAL' | 'NO_ACREDITADA';
+    plazo_dias: 30 | 60;
     fecha_alta: Date;
     observaciones: string | null;
     cliente?: Cliente;
@@ -250,7 +254,7 @@ export interface MovimientoCuentaCorriente {
     id_pedido: number | null;
     id_pago: number | null;
     monto: string;
-    moneda: string;
+    moneda: 'USD';
     fecha_efectiva: Date;
     fecha_incorporacion: Date;
     fecha_vencimiento: Date | null;
@@ -261,6 +265,16 @@ export interface MovimientoCuentaCorriente {
     cuenta_corriente?: CuentaCorriente;
 }
 
+export interface ImputacionMovimientoCuenta {
+    id_imputacion: number;
+    id_cuenta_corriente: number;
+    id_cargo: number;
+    id_abono: number;
+    monto_imputado: string;
+    fecha_imputacion: Date;
+    estado: 'VIGENTE' | 'ANULADA';
+}
+
 export const CuentaCorrienteSchema = new EntitySchema<CuentaCorriente>({
     name: 'CuentaCorriente',
     tableName: 'CUENTA_CORRIENTE',
@@ -269,12 +283,16 @@ export const CuentaCorrienteSchema = new EntitySchema<CuentaCorriente>({
         id_cliente: { type: 'int' },
         limite_credito: { type: 'decimal', precision: 12, scale: 2 },
         habilitada: flag,
+        cobertura: text(20),
+        plazo_dias: { type: 'int' },
         fecha_alta: created,
         observaciones: { type: 'text', nullable: true }
     },
     checks: [
+        { name: 'chk_cuenta_cobertura', expression: "cobertura IN ('COMPLETA', 'PARCIAL', 'NO_ACREDITADA')" },
+        { name: 'chk_cuenta_habilitada', expression: 'habilitada IN (0, 1)' },
         { name: 'chk_cuenta_limite', expression: 'limite_credito >= 0' },
-        { name: 'chk_cuenta_habilitada', expression: 'habilitada IN (0, 1)' }
+        { name: 'chk_cuenta_plazo', expression: 'plazo_dias IN (30, 60)' }
     ],
     relations: {
         cliente: {
@@ -302,7 +320,7 @@ export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuenta
     columns: {
         id_movimiento_cuenta: id,
         id_cuenta_corriente: { type: 'int' },
-        tipo_movimiento: binary(),
+        tipo_movimiento: { ...text(20), collation: 'utf8mb4_bin' },
         origen: text(50),
         id_pedido: { type: 'int', nullable: true },
         id_pago: { type: 'int', nullable: true },
@@ -323,20 +341,19 @@ export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuenta
         { name: 'idx_movimiento_cuenta_estado', columns: ['id_cuenta_corriente', 'estado'] }
     ],
     checks: [
-        { name: 'chk_movimiento_tipo', expression: "tipo_movimiento IN ('CARGO', 'ABONO')" },
-        { name: 'chk_movimiento_monto', expression: 'monto > 0' },
-        { name: 'chk_movimiento_moneda', expression: "moneda IN ('USD', 'ARS')" },
         { name: 'chk_movimiento_estado', expression: "estado IN ('ACREDITADO', 'ANULADO')" },
+        { name: 'chk_movimiento_moneda', expression: "moneda = 'USD'" },
+        { name: 'chk_movimiento_monto', expression: 'monto > 0' },
         {
             name: 'chk_movimiento_referencia',
-            expression: "(tipo_movimiento = 'CARGO' AND id_pedido IS NOT NULL AND id_pago IS NULL) OR (tipo_movimiento = 'ABONO' AND id_pedido IS NULL)"
-        }
+            expression: "(tipo_movimiento = 'CARGO' AND id_pedido IS NOT NULL AND id_pago IS NULL) OR (tipo_movimiento = 'ABONO' AND id_pago IS NOT NULL AND id_pedido IS NULL)"
+        },
+        { name: 'chk_movimiento_tipo', expression: "tipo_movimiento IN ('CARGO', 'ABONO')" }
     ],
     relations: {
         cuenta_corriente: {
             type: 'many-to-one',
             target: 'CuentaCorriente',
-            inverseSide: 'movimientos',
             joinColumn: {
                 name: 'id_cuenta_corriente',
                 referencedColumnName: 'id_cuenta_corriente',
@@ -346,6 +363,28 @@ export const MovimientoCuentaCorrienteSchema = new EntitySchema<MovimientoCuenta
             onUpdate: 'RESTRICT'
         }
     }
+});
+
+export const ImputacionMovimientoCuentaSchema = new EntitySchema<ImputacionMovimientoCuenta>({
+    name: 'ImputacionMovimientoCuenta',
+    tableName: 'IMPUTACION_MOVIMIENTO_CUENTA',
+    columns: {
+        id_imputacion: id,
+        id_cuenta_corriente: { type: 'int' },
+        id_cargo: { type: 'int' },
+        id_abono: { type: 'int' },
+        monto_imputado: { type: 'decimal', precision: 12, scale: 2 },
+        fecha_imputacion: created,
+        estado: { ...text(20), collation: 'utf8mb4_bin' }
+    },
+    indices: [
+        { name: 'idx_imputacion_cargo', columns: ['id_cargo'] },
+        { name: 'idx_imputacion_abono', columns: ['id_abono'] }
+    ],
+    checks: [
+        { name: 'chk_imp_monto', expression: 'monto_imputado > 0' },
+        { name: 'chk_imp_estado', expression: "estado IN ('VIGENTE', 'ANULADA')" }
+    ]
 });
 
 export const activeSchemas = [
@@ -358,5 +397,6 @@ export const activeSchemas = [
     CarritoSchema,
     ItemCarritoSchema,
     CuentaCorrienteSchema,
-    MovimientoCuentaCorrienteSchema
+    MovimientoCuentaCorrienteSchema,
+    ImputacionMovimientoCuentaSchema
 ];
