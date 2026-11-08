@@ -101,3 +101,50 @@ test('denegaciones de autenticación y excepciones liberan el cupo previo a Pass
   await assert.rejects(gate.run(signal, async () => { throw fault; }, work), reason => reason === fault);
   assert.equal(await run(gate, 2, async () => 2), 2);
 });
+
+test('consultar un resultado no espera al trabajo activo del mismo usuario', async () => {
+  const gate = new CartAdmission({
+    active: 2,
+    pending: 1,
+    pendingPerUser: 1,
+    waitMs: 1000,
+  });
+
+  const entered = Promise.withResolvers();
+  const hold = Promise.withResolvers();
+
+  const purchase = run(gate, 1, async () => {
+    entered.resolve();
+    await hold.promise;
+  });
+
+  await entered.promise;
+
+  try {
+    const result = await gate.run(
+      signal,
+      async () => ({ id: 1 }),
+      async () => {
+        await assert.rejects(
+          gate.run(
+            signal,
+            async () => assert.fail('identificó sin cupo disponible'),
+            async () => assert.fail('ejecutó sin cupo disponible'),
+            { serializePerUser: false },
+          ),
+          conflict,
+        );
+
+        return 'PENDIENTE';
+      },
+      { serializePerUser: false },
+    );
+
+    assert.equal(result, 'PENDIENTE');
+  } finally {
+    hold.resolve();
+    await purchase;
+  }
+
+  assert.equal(await run(gate, 1, async () => 'liberado'), 'liberado');
+});
