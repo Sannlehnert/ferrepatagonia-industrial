@@ -111,9 +111,11 @@ test('valida stock y refleja los cambios en el catálogo público', async ({
         exact: true,
       });
 
-      // #243: stock remains independent from price and the pending FER-18 cart.
+      // El visitante consulta stock, pero necesita sesión para agregar.
       await expect(add).toBeDisabled();
-      await expect(add).toHaveAccessibleDescription('Carrito aún no disponible.');
+      await expect(add).toHaveAccessibleDescription(
+        'Iniciá sesión para agregar productos.',
+      );
       await expect(product.getByText('Precio pendiente de verificación', {
         exact: true,
       })).toBeVisible();
