@@ -1,70 +1,64 @@
 # #261 — Confirmación de pedidos a cuenta corriente
 
-Estado: propuesta técnica para revisión del equipo.
+Estado: implementación y regresión local aprobadas;
+pendiente de CI y revisión independiente del PR #77.
 
-## Objetivo
+## Objetivo y alcance
 
-Confirmar un pedido del cliente autenticado y registrar su cargo
-en cuenta corriente dentro de una misma transacción.
+Confirmar pedidos del cliente autenticado a cuenta corriente,
+sin duplicar compras ni dejar escrituras comerciales parciales.
 
-Referencia comercial aprobada:
-[Contrato de cuenta corriente #250](../contratos/fer-19-cuenta-corriente.md).
+Se reutiliza la persistencia financiera de #260 y el contrato de
+[cuenta corriente #250](../contratos/fer-19-cuenta-corriente.md).
+Los precios se resuelven mediante FER-17.
 
-Esta propuesta define la operación de #261 y su integración con
-la interfaz de #262. No modifica las condiciones comerciales de #250.
+La interfaz que consume estos endpoints corresponde a #262.
 
-## Condiciones de confirmación
+## Condiciones de compra
 
-El backend debe verificar:
+El backend verifica:
 
 - Sesión válida con rol CLIENTE.
-- Usuario y cliente activos, vinculados entre sí.
-- Cliente de tipo empresa con aprobación comercial.
-- Cuenta corriente habilitada.
-- Saldo y límite acreditados en USD.
-- Plazo de 30 o 60 días configurado.
-- Carrito no vacío, con productos y categorías activos.
-- Cantidades válidas y stock suficiente.
-- Precios vigentes y comprables, resueltos por el backend.
-- Crédito disponible suficiente para el total del pedido.
+- Usuario y cliente activos y vinculados.
+- Cliente EMPRESA con aprobación comercial.
+- Cuenta corriente habilitada, con cobertura y crédito acreditados.
+- Moneda USD y plazo comercial configurado.
+- Carrito no vacío con cantidades válidas.
+- Productos y categorías activos.
+- Stock suficiente.
+- Precios verificados, no sintéticos y comprables.
+- Crédito disponible suficiente para el total calculado.
 
-Ante información insuficiente se rechaza la confirmación.
-Nunca se interpreta un saldo desconocido como cero.
+Los precios ausentes, cero o sin evidencia válida no permiten comprar.
+Un saldo desconocido nunca se interpreta como cero.
 
-## Operación HTTP propuesta
+## Confirmación HTTP
 
+```http
 POST /api/pedidos/cuenta-corriente
+Content-Type: application/json
+Idempotency-Key: <UUID v4>
 
-Autenticación mediante la cookie de sesión existente.
+{}
+```
 
-Cabecera propuesta:
+La autenticación utiliza la cookie de sesión existente.
 
-Idempotency-Key: <UUID generado para este intento de compra>
+La clave es obligatoria y se normaliza a minúsculas.
+Identifica un intento dentro del cliente autenticado.
 
-El cuerpo es un objeto vacío: {}.
+El cuerpo debe ser un objeto vacío.
+No se admiten parámetros de consulta ni campos con identidad,
+precios, descuentos, totales, límites o saldos.
 
 El backend obtiene el cliente y su carrito desde la sesión.
-No acepta IDs de otros clientes, precios, descuentos, totales,
-límites ni saldos enviados por el frontend.
 
-Decisiones confirmadas por Santi en el grupo:
+### Resultado confirmado
 
-- POST /api/pedidos/cuenta-corriente para confirmar.
-- Idempotency-Key obligatorio, vinculado al cliente autenticado
-  y persistido en MariaDB.
-- Consulta GET por la misma clave para recuperar el resultado.
+La primera confirmación exitosa devuelve 201.
+Una repetición completada devuelve 200 con el resultado original.
 
-Queda por definir la ruta exacta del GET y el formato de su respuesta.
-La consulta debe verificar la pertenencia al cliente autenticado,
-sin revelar operaciones de otros clientes.
-
-## Resultado
-
-Primera confirmación exitosa: 201 Created.
-Repetición de una confirmación completada: 200 OK.
-
-Respuesta propuesta:
-
+```json
 {
   "data": {
     "pedidoId": 123,
@@ -76,116 +70,200 @@ Respuesta propuesta:
     "venceEl": "2026-12-07"
   }
 }
+```
 
-Los valores son ilustrativos.
-Los importes monetarios se devuelven como cadenas decimales.
+Los valores del ejemplo son ilustrativos.
+Los importes se devuelven como cadenas decimales.
 
-## Atomicidad y concurrencia
+El resultado histórico no cambia si posteriormente se modifica
+el catálogo, la lista de precios o la habilitación de la cuenta.
+La consulta continúa requiriendo una sesión de cliente válida.
 
-La misma transacción debe:
+## Recuperación HTTP
 
-1. Revalidar identidad, condiciones comerciales y cuenta.
-2. Serializar las operaciones que consumen crédito de esa cuenta.
-3. Revalidar el carrito, los productos, el stock y los precios.
-4. Obtener saldo y crédito actuales, evitando lecturas antiguas.
-5. Crear el pedido y sus detalles con los precios históricos aplicados.
-6. Registrar el cargo, el vencimiento y las imputaciones que correspondan.
-7. Actualizar el stock y retirar del carrito las líneas confirmadas.
-8. Persistir el resultado idempotente.
+```http
+GET /api/pedidos/cuenta-corriente/:clave
+```
 
-Se comparte el mismo contexto transaccional con la persistencia de #260.
+La clave se envía en la ruta. La consulta no admite cuerpo ni
+parámetros de consulta y no inicia una compra.
 
-Si falla una operación antes de confirmar la transacción,
-no queda ninguna de estas escrituras aplicada parcialmente.
+- Confirmación completada: 200 con el resultado histórico.
+- Intento pendiente: 202 con el estado pendiente.
+- Rechazo persistido: mismo estado HTTP y error del rechazo.
+- Clave inexistente o perteneciente a otro cliente: 404,
+  sin revelar operaciones ajenas.
 
-El orden de bloqueos debe ser consistente entre escritores.
-La implementación debe demostrar que dos confirmaciones simultáneas
-no superan el límite ni venden más stock del disponible.
+### Resultado pendiente
 
-## Reintentos y recuperación
+```json
+{
+  "data": {
+    "estado": "PENDIENTE",
+    "code": "CONFIRMACION_PENDIENTE",
+    "message": "No hay un resultado definitivo. Conservá la misma clave para consultar o reintentar."
+  }
+}
+```
 
-La clave es obligatoria y se vincula al cliente autenticado
-y a una única operación. Se persiste en MariaDB.
+Las respuestas 202 incluyen `Retry-After: 1`.
 
-Una repetición completada devuelve el pedido y cargo originales,
-sin consumir nuevamente crédito ni stock, aunque el carrito ya
-haya quedado vacío.
+Un 202 no significa rechazo y no autoriza generar otra clave
+para repetir la compra. El frontend debe conservar la clave y consultar
+el resultado; cualquier reintento del mismo intento utiliza esa clave.
 
-Si la operación continúa en curso o su resultado es incierto,
-se responde 202 Accepted. El frontend conserva la misma clave
-y consulta el estado mediante GET, sin iniciar otra compra.
+## Idempotencia y persistencia
 
-Si se pierde la confirmación del COMMIT, no se afirma que hubo rollback.
-La recuperación debe conciliar el resultado con los registros persistidos
-antes de informar éxito o fracaso definitivo.
+`CONFIRMACION_PEDIDO_CC` conserva los intentos por cliente y clave:
 
-Los resultados exitosos se conservan junto con el pedido.
-Los pendientes no se descartan hasta conciliarlos.
+- PENDIENTE: todavía no hay un resultado definitivo persistido.
+- CONFIRMADO: contiene el pedido, cargo y respuesta originales.
+- RECHAZADO: conserva el rechazo definitivo del intento.
 
-La recuperación debe funcionar después de reiniciar el proceso,
-sin depender exclusivamente de memoria local.
+La reserva del intento no representa una compra confirmada.
 
-## Respuestas y errores
+Los resultados exitosos se conservan junto con sus referencias.
+Los pendientes no tienen una caducidad que permita descartarlos
+sin resolver su resultado.
 
-- 201: primera confirmación exitosa.
-- 200: recuperación o repetición de una operación completada.
-- 202: operación en curso o resultado incierto pendiente de conciliación.
-- 400: formato de solicitud o clave inválidos.
-- 401: sesión ausente o inválida.
-- 403: rol o condiciones comerciales no habilitados.
-- 409: stock o crédito insuficientes, o cambios que requieren
-  revisar el carrito.
-- 422: carrito vacío, productos incompatibles o precios no comprables.
-- 503: dependencia temporalmente indisponible, cuando no corresponda
-  informar un resultado incierto mediante 202.
+Un rechazo persistido no se transforma en una compra al repetir
+la misma clave, aunque después cambien las condiciones comerciales.
 
-202 no representa un rechazo definitivo ni autoriza otro intento
-con una clave diferente.
+## Atomicidad
 
-Los errores incluyen message y un code estable.
-Quedan por definir los códigos concretos y las respuestas del GET,
-incluido el caso de una clave sin operación visible para ese cliente.
+La transacción comercial utiliza READ COMMITTED y realiza:
 
-Todas las respuestas son privadas y no almacenables en caché.
+1. Validación y bloqueo de las condiciones de la cuenta.
+2. Validación del carrito, productos, categorías y stock.
+3. Resolución de precios vigentes del cliente.
+4. Verificación del crédito disponible.
+5. Creación del pedido y sus detalles.
+6. Conservación de la evidencia histórica de precios.
+7. Registro del cargo y las imputaciones financieras.
+8. Descuento del stock.
+9. Eliminación de las líneas confirmadas del carrito.
+10. Persistencia del resultado confirmado.
 
-## Validaciones previstas
+Si la transacción se revierte, ninguna de esas escrituras queda aplicada.
 
-- Confirmación válida con pedido, cargo y vencimiento persistidos.
-- Visitante y ADMIN sin acceso al flujo CLIENTE.
-- Cliente sin condiciones comerciales o cuenta habilitada.
-- Saldo, límite o plazo sin acreditar.
-- Crédito exacto al límite y crédito insuficiente.
-- Carrito vacío, producto inactivo y precio ausente o cero.
-- Stock insuficiente y modificación concurrente del stock.
-- Dos pedidos simultáneos que compiten por el mismo crédito.
-- Fallo intermedio con rollback completo.
-- Reintento sin pedido, cargo ni descuento de stock duplicados.
-- Respuesta perdida después de COMMIT y recuperación tras reiniciar.
-- Vencimiento a 30/60 días según fecha civil de Buenos Aires.
-- Cambios posteriores de precios que no alteran el pedido confirmado.
+`DETALLE_PEDIDO_CC_PRECIO` conserva la evidencia histórica
+de los precios utilizados en cada detalle.
 
-## Dependencias y puntos a revisar
+La lógica de saldo, crédito, vencimientos e imputaciones
+se reutiliza desde #260.
 
-- #260: persistencia, cobertura, precisión monetaria y serialización.
-- FER-17: resolución de precios y evidencia histórica.
-- FER-18: carrito persistente y operaciones de stock.
-- #262: consumo de la operación y tratamiento de sus resultados.
-- #263: pruebas funcionales y de concurrencia.
+## Concurrencia y fallos
 
-## Acuerdo y próximos pasos
+Los bloqueos y restricciones impiden duplicar el mismo intento.
+Las operaciones que compiten por stock o crédito deben respetar
+las restricciones comerciales dentro de la transacción.
 
-Santi confirmó en el grupo la ruta POST, la idempotencia obligatoria
-persistida por cliente, la recuperación mediante GET y el uso de 202
-para operaciones en curso o con resultado incierto.
+Las solicitudes tienen admisión limitada. La consulta del resultado
+puede ejecutarse mientras una confirmación del mismo usuario está
+en curso, conservando el límite global de conexiones.
 
-También confirmó que el stock se descuenta únicamente al confirmar.
-Pedido, cargo, descuento de stock, imputaciones y limpieza de las líneas
-confirmadas del carrito se realizan dentro de una sola transacción.
-Un fallo anterior al COMMIT revierte todas esas escrituras.
+Una desconexión HTTP no libera anticipadamente el cupo
+de una transacción que todavía no terminó.
 
-Antes de implementar, revisar con #260 las diferencias respecto de #250
-en precisión monetaria, saldos a favor y vencimientos.
-La lógica financiera debe reutilizarse, sin duplicarla en #261.
+Si se pierde el acuse del COMMIT, no se informa un rollback ficticio:
+se consulta el resultado persistido o se devuelve un estado pendiente.
 
-Queda por acordar la ruta exacta del GET, sus respuestas y los códigos
-de error concretos para la integración con #262.
+La recuperación funciona desde otro proceso después de una caída
+anterior o posterior al COMMIT.
+
+## Estados HTTP y errores
+
+| Estado | Significado |
+| --- | --- |
+| 201 | Primera confirmación exitosa |
+| 200 | Consulta o repetición de una confirmación completada |
+| 202 | Intento pendiente o resultado incierto |
+| 400 | Solicitud o UUID inválidos |
+| 401 | Sesión ausente o inválida |
+| 403 | Rol o condiciones comerciales no habilitados |
+| 404 | Intento no visible para el cliente autenticado |
+| 409 | Crédito, stock o conflicto de confirmación |
+| 422 | Carrito o precios no comprables |
+| 503 | Operación o dependencia temporalmente indisponible |
+
+Los errores tienen la forma:
+
+```json
+{
+  "code": "CREDITO_INSUFICIENTE",
+  "message": "Mensaje que describe el rechazo."
+}
+```
+
+Entre los códigos del flujo están:
+
+- CLAVE_IDEMPOTENCIA_INVALIDA
+- SOLICITUD_INVALIDA
+- INTENTO_NO_ENCONTRADO
+- CREDITO_INSUFICIENTE
+- CONFLICTO_CONFIRMACION
+- CONFIRMACION_OCUPADA
+- CONFIRMACION_NO_DISPONIBLE
+
+Los errores de productos, stock, precios y condiciones comerciales
+conservan sus códigos específicos.
+
+Un error de transporte o un 503 no debe interpretarse como autorización
+para generar otra compra con una clave distinta.
+
+Todas las respuestas de estas rutas incluyen:
+
+```http
+Cache-Control: private, no-store
+Vary: Cookie
+```
+
+Esto también se aplica a errores de autenticación, origen y JSON inválido.
+
+## Base de datos
+
+Para una base nueva se utiliza `database/schema.sql`.
+
+Para una base existente, la migración de #260 debe estar aplicada antes de:
+
+`database/migrate-fer-20-order-confirmation.sql`
+
+Las pruebas verifican la equivalencia de las tablas nuevas entre
+schema y migración, su aplicación repetida y las restricciones
+de integridad.
+
+Las pruebas no aplican migraciones sobre la base local de desarrollo.
+
+## Pruebas
+
+Validación de solicitudes y admisión:
+
+```bash
+npm run build --prefix backend
+node.exe --test backend/test/account-order-request.test.cjs backend/test/cart-admission.test.cjs
+```
+
+Suite de pedidos con MariaDB descartable:
+
+```bash
+npm run test:orders:isolated --prefix backend
+```
+
+Regresión general del backend:
+
+```bash
+npm test --prefix backend
+```
+
+La suite específica cubre persistencia, permisos HTTP, aislamiento
+entre clientes, precios, stock, crédito, rollback, concurrencia,
+idempotencia y recuperación.
+
+También termina procesos hijos deliberadamente antes y después
+del COMMIT y comprueba la recuperación desde otro proceso.
+
+La ejecución local específica aprobó 51 pruebas de MariaDB,
+además de 10 pruebas de solicitudes y admisión.
+La limpieza del contenedor y sus datos quedó confirmada.
+
+Estos resultados no sustituyen el CI ni la revisión independiente.

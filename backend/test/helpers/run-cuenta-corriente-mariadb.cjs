@@ -7,7 +7,10 @@ const { docker, newProfile, connectOwned, validateProfile } = require('./cc260-d
 const backend = path.resolve(__dirname, '../..');
 
 async function run(mode = process.argv[2] || 'all') {
-  assert.ok(['all', 'baseline', 'cleanup-success', 'cleanup-failure', 'migration'].includes(mode));
+  assert.ok([
+    'all', 'baseline', 'cleanup-success',
+    'cleanup-failure', 'migration', 'orders',
+  ].includes(mode));
   const p = newProfile();
   let session, child, interrupted = false;
   const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
@@ -34,10 +37,36 @@ async function run(mode = process.argv[2] || 'all') {
     };
     apply(path.join(backend, '../database/schema.sql'));
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+      if (mode === 'orders') {
+        apply(path.join(
+          backend,
+          '../database/migrate-fer-20-order-confirmation.sql',
+        ));
+      }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
-    const files = mode === 'baseline' ? ['test/cc260.regression.test.cjs'] : mode === 'migration'
-      ? ['test/cc260.migration.test.cjs'] : ['test/cuentaCorriente.test.cjs', 'test/cc260.regression.test.cjs', 'test/cc260.migration.test.cjs'];
+    const files = mode === 'orders'
+      ? [
+          'test/account-order.persistence.test.cjs',
+          'test/account-order-attempt.test.cjs',
+          'test/account-order-result.test.cjs',
+          'test/account-order-cart.test.cjs',
+          'test/account-order-pricing.test.cjs',
+          'test/account-order-storage.test.cjs',
+          'test/account-order-transaction.test.cjs',
+          'test/account-order-service.test.cjs',
+          'test/account-order-http.test.cjs',
+          'test/account-order-process.test.cjs',
+        ]
+      : mode === 'baseline'
+        ? ['test/cc260.regression.test.cjs']
+        : mode === 'migration'
+          ? ['test/cc260.migration.test.cjs']
+          : [
+              'test/cuentaCorriente.test.cjs',
+              'test/cc260.regression.test.cjs',
+              'test/cc260.migration.test.cjs',
+            ];
     const code = await new Promise((resolve, reject) => {
       child = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', ...files],
         { cwd: backend, stdio: 'inherit', windowsHide: true, env: { ...process.env, NODE_ENV: 'test', TZ: 'UTC',
