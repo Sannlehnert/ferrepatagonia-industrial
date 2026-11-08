@@ -1,7 +1,10 @@
 // backend/test/cuentaCorriente.test.cjs
 const { test, describe, before, after } = require('node:test');
+const { childProfile, connectOwned } = require('./helpers/cc260-disposable.cjs');
+let ownedSession;
 const assert = require('node:assert/strict');
 
+childProfile();
 const { dataSource, destroyDatabase, inTransaction } = require('../dist/config/database.config.js');
 const {
     findCuentaByClienteId,
@@ -25,14 +28,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
     const fixtureEmailInh = `cc-test-inh-${Date.now()}@example.com`;
 
     before(async () => {
-        // H07: Guardia de seguridad que exige base de datos descartable
-        const isSafe = /^audit_cc_[a-f0-9]+$/.test(process.env.CUENTA_CORRIENTE_TEST_DATABASE || '') ||
-                      process.env.ALLOW_DEV_DB === 'true';
-        assert.ok(
-            isSafe,
-            `Guardia H07: se requiere base descartable (CUENTA_CORRIENTE_TEST_DATABASE="${process.env.CUENTA_CORRIENTE_TEST_DATABASE}"). Ejecute mediante run-cuenta-corriente-mariadb.cjs.`
-        );
-
+        ownedSession = await connectOwned(childProfile());
         if (!dataSource.isInitialized) {
             await dataSource.initialize();
         }
@@ -52,6 +48,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         );
         idCuentaTest = cuentaRes.insertId;
 
+        await proveAccount(idCuentaTest, idClienteTest);
         // 2. Pedidos asociados al cliente para consumos
         const ped1 = await dataSource.query(
             `INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
@@ -88,6 +85,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         );
         idPedidoTest5 = ped5.insertId;
 
+        await dataSource.query("UPDATE PEDIDO SET moneda_total='USD',evidencia_total_usd='DEMO FER17-v1' WHERE id_cliente=?", [idClienteTest]);
         // 3. Cliente con Cuenta Corriente Inhabilitada
         const cliInh = await dataSource.query(
             `INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, email, estado_aprobacion_empresa, es_fiel, activo)
@@ -102,6 +100,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             [idClienteInhabilitado]
         );
         idCuentaInhabilitada = ctaInh.insertId;
+        await proveAccount(idCuentaInhabilitada, idClienteInhabilitado);
     });
 
     after(async () => {
@@ -128,12 +127,13 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
                     [idCuentaTest, idCuentaInhabilitada]
                 );
                 await dataSource.query(
-                    `DELETE FROM CLIENTE WHERE id_cliente IN (?, ?)`,
+                    `DELETE FROM USUARIO WHERE id_cliente IN (?, ?)`,
                     [idClienteTest, idClienteInhabilitado]
                 );
             }
         } finally {
             await destroyDatabase();
+            await ownedSession?.connection.end();
         }
     });
 
@@ -190,6 +190,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             [idCuentaTest]
         );
         const idPago = pagoRes.insertId;
+        await dataSource.query("UPDATE PAGO SET moneda='USD',fecha_acreditacion_utc=UTC_TIMESTAMP(3),evidencia_acreditacion='DEMO transferencia' WHERE id_pago=?", [idPago]);
 
         const idAbono = await registrarAbonoPorPago({
             id_cuenta_corriente: idCuentaTest,
@@ -282,7 +283,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
                     {
                         id_cuenta_corriente: idCuentaTest,
                         id_pedido: idPedidoTest3,
-                        monto: '200.00'
+                        monto: '500.00'
                     },
                     manager
                 );
@@ -392,6 +393,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
              VALUES (?, 100.00, 'PENDIENTE', 'CUENTA_CORRIENTE', 100.00, 0.00)`,
             [cliNoCob.insertId]
         );
+        await proveAccount(ctaNoCob.insertId, cliNoCob.insertId);
 
         try {
             const estado = await calcularEstadoCuenta(ctaNoCob.insertId);
@@ -410,6 +412,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         } finally {
             await dataSource.query('DELETE FROM PEDIDO WHERE id_pedido = ?', [pedNoCob.insertId]);
             await dataSource.query('DELETE FROM CUENTA_CORRIENTE WHERE id_cuenta_corriente = ?', [ctaNoCob.insertId]);
+            await dataSource.query('DELETE FROM USUARIO WHERE id_cliente = ?', [cliNoCob.insertId]);
             await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente = ?', [cliNoCob.insertId]);
         }
     });
@@ -454,6 +457,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
              VALUES (?, 1000.00, 1, 'COMPLETA', 30)`,
             [cliH08.insertId]
         );
+        await proveAccount(ctaH08.insertId, cliH08.insertId);
         const pedA = await dataSource.query(
             `INSERT INTO PEDIDO (id_cliente, total, estado, modalidad_pago, subtotal, descuento)
              VALUES (?, 700.00, 'PENDIENTE', 'CUENTA_CORRIENTE', 700.00, 0.00)`,
@@ -465,6 +469,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             [cliH08.insertId]
         );
 
+        await dataSource.query("UPDATE PEDIDO SET moneda_total='USD',evidencia_total_usd='DEMO FER17-v1' WHERE id_cliente=?", [cliH08.insertId]);
         const runnerA = dataSource.createQueryRunner();
         const runnerB = dataSource.createQueryRunner();
         await runnerA.connect();
@@ -514,7 +519,12 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             await dataSource.query('DELETE FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_cuenta_corriente = ?', [ctaH08.insertId]);
             await dataSource.query('DELETE FROM PEDIDO WHERE id_pedido IN (?, ?)', [pedA.insertId, pedB.insertId]);
             await dataSource.query('DELETE FROM CUENTA_CORRIENTE WHERE id_cuenta_corriente = ?', [ctaH08.insertId]);
+            await dataSource.query('DELETE FROM USUARIO WHERE id_cliente=?', [cliH08.insertId]);
             await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente = ?', [cliH08.insertId]);
         }
     });
 });
+async function proveAccount(id, client) {
+ await dataSource.query("UPDATE CUENTA_CORRIENTE SET moneda_limite='USD',evidencia_limite='DEMO autorización',evidencia_plazo='DEMO configuración ADMIN',evidencia_cobertura='DEMO alta sin saldo previo',cobertura_desde_utc='2000-01-01',origen_datos='DEMO' WHERE id_cuenta_corriente=?", [id]);
+ await dataSource.query("INSERT INTO USUARIO(id_cliente,email,password_hash,rol,activo) VALUES(?,?,?,'CLIENTE',1)", [client,'cc260-'+client+'@example.test','DEMO hash']);
+}

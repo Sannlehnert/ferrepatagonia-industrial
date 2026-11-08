@@ -1,120 +1,68 @@
-// backend/test/helpers/run-cuenta-corriente-mariadb.cjs
-const { execFileSync, spawnSync } = require('node:child_process');
-const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
-const mariadb = require('mariadb');
-
+const { spawn, spawnSync } = require('node:child_process');
+const { randomUUID } = require('node:crypto');
+const assert = require('node:assert/strict');
+const { docker, newProfile, connectOwned, validateProfile } = require('./cc260-disposable.cjs');
 const backend = path.resolve(__dirname, '../..');
-const token = randomUUID().replaceAll('-', '');
-const database = `audit_cc_${token}`;
-const container = `audit-cc-${token}`;
-const password = randomUUID();
-const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', timeout: 180000 }).trim();
 
-async function main() {
-    let started = false;
-    let connection;
-
-    try {
-        docker(
-            'run', '--rm', '-d',
-            '--name', container,
-            '-p', '127.0.0.1::3306',
-            '-e', `MARIADB_ROOT_PASSWORD=${password}`,
-            '-e', `MARIADB_DATABASE=${database}`,
-            'mariadb:11.4'
-        );
-        started = true;
-
-        const info = JSON.parse(docker('inspect', container))[0];
-        const port = Number(info.NetworkSettings.Ports['3306/tcp'][0].HostPort);
-
-        // Espera no bloqueante cross-platform con mariadb driver
-        for (let i = 0; i < 60; i++) {
-            try {
-                connection = await mariadb.createConnection({
-                    host: '127.0.0.1',
-                    port,
-                    user: 'root',
-                    password,
-                    database,
-                    connectTimeout: 1000
-                });
-                break;
-            } catch {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
-            }
-        }
-
-        if (!connection) {
-            throw new Error('MariaDB descartable no disponible tras 60 segundos.');
-        }
-
-        // Función para aplicar archivos SQL mediante el cliente mariadb dentro del contenedor (soporta DELIMITER //)
-        const applySqlFile = (filePath) => {
-            const input = fs.readFileSync(filePath);
-            const res = spawnSync('docker', [
-                'exec', '-i', container,
-                'mariadb', '--default-character-set=utf8mb4',
-                '-u', 'root', `-p${password}`, database
-            ], { input, stdio: ['pipe', 'inherit', 'inherit'] });
-            if (res.status !== 0) {
-                throw new Error(`Fallo al aplicar ${filePath} en MariaDB descartable.`);
-            }
-        };
-
-        // 1. Cargar esquema canónico base
-        applySqlFile(path.join(backend, '../database/schema.sql'));
-
-        // 2. Cargar migración de cuenta corriente dos veces consecutivas para verificar idempotencia
-        const migrationPath = path.join(backend, '../database/migrate-fer-20-account-movements.sql');
-        if (fs.existsSync(migrationPath)) {
-            applySqlFile(migrationPath);
-            applySqlFile(migrationPath);
-        }
-
-        console.log(JSON.stringify({
-            database,
-            port,
-            version: await connection.query('SELECT VERSION() AS version'),
-            image: info.Image
-        }));
-
-        // 3. Ejecutar la suite inyectando variables efímeras seguras (sin cargar .env)
-        const result = spawnSync(process.execPath, [
-            '--require', './test/helpers/test-env.cjs',
-            '--test',
-            'test/cuentaCorriente.test.cjs'
-        ], {
-            cwd: backend,
-            stdio: 'inherit',
-            env: {
-                ...process.env,
-                DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
-                JWT_SECRET: randomUUID(),
-                DB_HOST: '127.0.0.1',
-                DB_PORT: String(port),
-                DB_NAME: database,
-                DB_USER: 'root',
-                DB_PASSWORD: password,
-                CUENTA_CORRIENTE_TEST_DATABASE: database
-            }
-        });
-
-        if (result.error) throw result.error;
-        process.exitCode = result.status === 0 ? 0 : 1;
-    } finally {
-        if (connection) {
-            try { await connection.end(); } catch {}
-        }
-        if (started) {
-            docker('rm', '-f', '-v', container);
-        }
+async function run(mode = process.argv[2] || 'all') {
+  assert.ok(['all', 'baseline', 'cleanup-success', 'cleanup-failure', 'migration'].includes(mode));
+  const p = newProfile();
+  let session, child, interrupted = false;
+  const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
+  process.on('SIGINT', signal); process.on('SIGTERM', signal);
+  try {
+    p.id = docker('run', '--rm', '-d', '--name', p.container, '--label', `ferrepatagonia.cc260-test=${p.token}`,
+      '--tmpfs', '/var/lib/mysql:rw', '-p', '127.0.0.1::3306', '-e', `MARIADB_ROOT_PASSWORD=${p.password}`,
+      '-e', `MARIADB_DATABASE=${p.database}`, 'mariadb:11.4');
+    const info = JSON.parse(docker('inspect', p.id))[0];
+    p.port = Number(info.NetworkSettings.Ports['3306/tcp'][0].HostPort);
+    for (let n = 0; n < 60 && !interrupted; n++) {
+      try { session = await connectOwned(p); break; }
+      catch (e) { if (n === 59) throw e; await new Promise(r => setTimeout(r, 1000)); }
     }
+    assert.ok(session && !interrupted, 'MariaDB descartable no disponible');
+    console.log(JSON.stringify({ mode, database:p.database, host:p.host, port:p.port, container:p.container }));
+    if (mode === 'cleanup-failure') throw Error('EXPECTED_CLEANUP_FAILURE');
+    if (mode === 'cleanup-success') return;
+    const apply = file => {
+      validateProfile(p, JSON.parse(docker('inspect', p.id))[0]);
+      const result = spawnSync('docker', ['exec', '-i', p.id, 'mariadb', '-uroot', `-p${p.password}`, p.database],
+        { input: fs.readFileSync(file), encoding: 'utf8', windowsHide: true, timeout: 60000 });
+      if (result.status !== 0) throw Error(`SQL ${path.basename(file)}: ${result.stderr}`);
+    };
+    apply(path.join(backend, '../database/schema.sql'));
+    for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+    console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
+      version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
+    const files = mode === 'baseline' ? ['test/cc260.regression.test.cjs'] : mode === 'migration'
+      ? ['test/cc260.migration.test.cjs'] : ['test/cuentaCorriente.test.cjs', 'test/cc260.regression.test.cjs', 'test/cc260.migration.test.cjs'];
+    const code = await new Promise((resolve, reject) => {
+      child = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', ...files],
+        { cwd: backend, stdio: 'inherit', windowsHide: true, env: { ...process.env, NODE_ENV: 'test', TZ: 'UTC',
+          DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'), JWT_SECRET: randomUUID(),
+          DB_HOST: p.host, DB_PORT: String(p.port), DB_NAME: p.database, DB_USER: 'root', DB_PASSWORD: p.password,
+          CC260_TEST_PROFILE: JSON.stringify(p) } });
+      const timeout = setTimeout(() => { interrupted = true; child.kill('SIGTERM'); }, 240000);
+      child.on('error', e => { clearTimeout(timeout); reject(e); });
+      child.on('exit', code => { clearTimeout(timeout); child = null; resolve(code); });
+    });
+    assert.equal(code, 0, `Suite #260 falló (exit ${code})`);
+    assert.equal(interrupted, false);
+  } finally {
+    process.off('SIGINT', signal); process.off('SIGTERM', signal);
+    try { if (session) await session.connection.end(); }
+    finally {
+      if (p.id) {
+        const info = JSON.parse(docker('inspect', p.id))[0];
+        assert.equal(info.Config.Labels['ferrepatagonia.cc260-test'], p.token);
+        docker('rm', '-f', '-v', p.id);
+        assert.equal(docker('ps', '-aq', '--filter', `label=ferrepatagonia.cc260-test=${p.token}`), '');
+        console.log('CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.');
+      }
+    }
+  }
 }
-
-main().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-});
+if (require.main === module) run().catch(e => { console.error(e.message); process.exitCode = 1; });
+module.exports = { run };
