@@ -152,6 +152,8 @@ CREATE TABLE CUENTA_CORRIENTE (
     id_cliente INT NOT NULL,
     limite_credito DECIMAL(12,2) NOT NULL,
     habilitada BOOLEAN NOT NULL,
+    cobertura VARCHAR(20) NOT NULL DEFAULT 'NO_ACREDITADA',
+    plazo_dias INT NOT NULL DEFAULT 30,
     fecha_alta DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     observaciones TEXT NULL,
     PRIMARY KEY (id_cuenta_corriente),
@@ -159,7 +161,9 @@ CREATE TABLE CUENTA_CORRIENTE (
     CONSTRAINT fk_cuenta_cliente FOREIGN KEY (id_cliente)
         REFERENCES CLIENTE (id_cliente) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_cuenta_limite CHECK (limite_credito >= 0),
-    CONSTRAINT chk_cuenta_habilitada CHECK (habilitada IN (0, 1))
+    CONSTRAINT chk_cuenta_habilitada CHECK (habilitada IN (0, 1)),
+    CONSTRAINT chk_cuenta_cobertura CHECK (cobertura IN ('COMPLETA', 'PARCIAL', 'NO_ACREDITADA')),
+    CONSTRAINT chk_cuenta_plazo CHECK (plazo_dias IN (30, 60))
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE PAGO (
@@ -185,7 +189,66 @@ CREATE TABLE PAGO (
         OR (id_pedido IS NULL AND id_cuenta_corriente IS NOT NULL)
     ),
     CONSTRAINT chk_pago_monto CHECK (monto >= 0)
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE MOVIMIENTO_CUENTA_CORRIENTE (
+    id_movimiento_cuenta INT NOT NULL AUTO_INCREMENT,
+    id_cuenta_corriente INT NOT NULL,
+    tipo_movimiento VARCHAR(20) COLLATE utf8mb4_bin NOT NULL,
+    origen VARCHAR(50) NOT NULL,
+    id_pedido INT NULL,
+    id_pago INT NULL,
+    monto DECIMAL(12,2) NOT NULL,
+    moneda VARCHAR(3) NOT NULL DEFAULT 'USD',
+    fecha_efectiva DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_incorporacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_vencimiento DATETIME NULL,
+    estado VARCHAR(30) COLLATE utf8mb4_bin NOT NULL DEFAULT 'ACREDITADO',
+    motivo_invalidacion TEXT NULL,
+    autorizado_por VARCHAR(200) NULL,
+    observaciones TEXT NULL,
+    PRIMARY KEY (id_movimiento_cuenta),
+    UNIQUE KEY uq_movimiento_pedido (id_pedido),
+    UNIQUE KEY uq_movimiento_pago (id_pago),
+    KEY idx_movimiento_cuenta (id_cuenta_corriente),
+    KEY idx_movimiento_cuenta_estado (id_cuenta_corriente, estado),
+    CONSTRAINT fk_movimiento_cuenta FOREIGN KEY (id_cuenta_corriente)
+        REFERENCES CUENTA_CORRIENTE (id_cuenta_corriente) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_movimiento_pedido FOREIGN KEY (id_pedido)
+        REFERENCES PEDIDO (id_pedido) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_movimiento_pago FOREIGN KEY (id_pago)
+        REFERENCES PAGO (id_pago) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_movimiento_tipo CHECK (tipo_movimiento IN ('CARGO', 'ABONO')),
+    CONSTRAINT chk_movimiento_monto CHECK (monto > 0),
+    CONSTRAINT chk_movimiento_moneda CHECK (moneda = 'USD'),
+    CONSTRAINT chk_movimiento_estado CHECK (estado IN ('ACREDITADO', 'ANULADO')),
+    CONSTRAINT chk_movimiento_referencia CHECK (
+        (tipo_movimiento = 'CARGO' AND id_pedido IS NOT NULL AND id_pago IS NULL)
+        OR (tipo_movimiento = 'ABONO' AND id_pago IS NOT NULL AND id_pedido IS NULL)
+    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IMPUTACION_MOVIMIENTO_CUENTA (
+    id_imputacion INT NOT NULL AUTO_INCREMENT,
+    id_cuenta_corriente INT NOT NULL,
+    id_cargo INT NOT NULL,
+    id_abono INT NOT NULL,
+    monto_imputado DECIMAL(12,2) NOT NULL,
+    fecha_imputacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado VARCHAR(20) COLLATE utf8mb4_bin NOT NULL DEFAULT 'VIGENTE',
+    PRIMARY KEY (id_imputacion),
+    KEY idx_imputacion_cargo (id_cargo),
+    KEY idx_imputacion_abono (id_abono),
+    CONSTRAINT fk_imp_cuenta FOREIGN KEY (id_cuenta_corriente)
+        REFERENCES CUENTA_CORRIENTE (id_cuenta_corriente) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_imp_cargo FOREIGN KEY (id_cargo)
+        REFERENCES MOVIMIENTO_CUENTA_CORRIENTE (id_movimiento_cuenta) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_imp_abono FOREIGN KEY (id_abono)
+        REFERENCES MOVIMIENTO_CUENTA_CORRIENTE (id_movimiento_cuenta) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_imp_monto CHECK (monto_imputado > 0),
+    CONSTRAINT chk_imp_estado CHECK (estado IN ('VIGENTE', 'ANULADA'))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- #241: additive, idempotent. Run AFTER migrate-fer-17-price-lists.sql.
 -- No legacy price or quote is converted, verified or enabled by this migration.
 -- All *_utc timestamps are UTC, explicitly supplied by the verifying operator.
@@ -269,41 +332,4 @@ CREATE TABLE IF NOT EXISTS ITEM_CARRITO (
     CONSTRAINT fk_item_carrito_carrito FOREIGN KEY (id_carrito) REFERENCES CARRITO (id_carrito) ON DELETE CASCADE ON UPDATE RESTRICT,
     CONSTRAINT fk_item_carrito_producto FOREIGN KEY (id_producto) REFERENCES PRODUCTO (id_producto) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_item_carrito_cantidad CHECK (cantidad > 0)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE MOVIMIENTO_CUENTA_CORRIENTE (
-    id_movimiento_cuenta INT NOT NULL AUTO_INCREMENT,
-    id_cuenta_corriente INT NOT NULL,
-    tipo_movimiento VARCHAR(20) COLLATE utf8mb4_bin NOT NULL,
-    origen VARCHAR(50) NOT NULL,
-    id_pedido INT NULL,
-    id_pago INT NULL,
-    monto DECIMAL(12,2) NOT NULL,
-    moneda VARCHAR(3) NOT NULL DEFAULT 'USD',
-    fecha_efectiva DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_incorporacion DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_vencimiento DATETIME NULL,
-    estado VARCHAR(30) COLLATE utf8mb4_bin NOT NULL DEFAULT 'ACREDITADO',
-    motivo_invalidacion TEXT NULL,
-    autorizado_por VARCHAR(200) NULL,
-    observaciones TEXT NULL,
-    PRIMARY KEY (id_movimiento_cuenta),
-    UNIQUE KEY uq_movimiento_pedido (id_pedido),
-    UNIQUE KEY uq_movimiento_pago (id_pago),
-    KEY idx_movimiento_cuenta (id_cuenta_corriente),
-    KEY idx_movimiento_cuenta_estado (id_cuenta_corriente, estado),
-    CONSTRAINT fk_movimiento_cuenta FOREIGN KEY (id_cuenta_corriente)
-        REFERENCES CUENTA_CORRIENTE (id_cuenta_corriente) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT fk_movimiento_pedido FOREIGN KEY (id_pedido)
-        REFERENCES PEDIDO (id_pedido) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT fk_movimiento_pago FOREIGN KEY (id_pago)
-        REFERENCES PAGO (id_pago) ON DELETE RESTRICT ON UPDATE RESTRICT,
-    CONSTRAINT chk_movimiento_tipo CHECK (tipo_movimiento IN ('CARGO', 'ABONO')),
-    CONSTRAINT chk_movimiento_monto CHECK (monto > 0),
-    CONSTRAINT chk_movimiento_moneda CHECK (moneda IN ('USD', 'ARS')),
-    CONSTRAINT chk_movimiento_estado CHECK (estado IN ('ACREDITADO', 'ANULADO')),
-    CONSTRAINT chk_movimiento_referencia CHECK (
-        (tipo_movimiento = 'CARGO' AND id_pedido IS NOT NULL AND id_pago IS NULL)
-        OR (tipo_movimiento = 'ABONO' AND id_pedido IS NULL)
-    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
