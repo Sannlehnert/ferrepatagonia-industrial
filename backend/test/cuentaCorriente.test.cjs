@@ -1,13 +1,13 @@
+// backend/test/cuentaCorriente.test.cjs
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
-const path = require('node:path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const { dataSource, destroyDatabase, inTransaction } = require('../dist/config/database.config.js');
 const {
     findCuentaByClienteId,
     calcularEstadoCuenta,
-    registrarCargoPorPedido
+    registrarCargoPorPedido,
+    registrarAbonoPorPago
 } = require('../dist/repositories/cuentaCorriente.repository.js');
 
 describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corriente', async () => {
@@ -25,11 +25,19 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
     const fixtureEmailInh = `cc-test-inh-${Date.now()}@example.com`;
 
     before(async () => {
+        // H07: Guardia de seguridad que exige base de datos descartable
+        const isSafe = /^audit_cc_[a-f0-9]+$/.test(process.env.CUENTA_CORRIENTE_TEST_DATABASE || '') ||
+                      process.env.ALLOW_DEV_DB === 'true';
+        assert.ok(
+            isSafe,
+            `Guardia H07: se requiere base descartable (CUENTA_CORRIENTE_TEST_DATABASE="${process.env.CUENTA_CORRIENTE_TEST_DATABASE}"). Ejecute mediante run-cuenta-corriente-mariadb.cjs.`
+        );
+
         if (!dataSource.isInitialized) {
             await dataSource.initialize();
         }
 
-        // 1. Cliente y Cuenta Corriente activa (Límite: $1000.00)
+        // 1. Cliente y Cuenta Corriente activa con cobertura COMPLETA y plazo 30
         const clienteRes = await dataSource.query(
             `INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, email, estado_aprobacion_empresa, es_fiel, activo)
              VALUES ('EMPRESA', 'Empresa Test CC', ?, 'APROBADA', 0, 1)`,
@@ -38,8 +46,8 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         idClienteTest = clienteRes.insertId;
 
         const cuentaRes = await dataSource.query(
-            `INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, observaciones)
-             VALUES (?, 1000.00, 1, 'Cuenta habilitada para pruebas')`,
+            `INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, cobertura, plazo_dias, observaciones)
+             VALUES (?, 1000.00, 1, 'COMPLETA', 30, 'Cuenta habilitada para pruebas')`,
             [idClienteTest]
         );
         idCuentaTest = cuentaRes.insertId;
@@ -89,8 +97,8 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         idClienteInhabilitado = cliInh.insertId;
 
         const ctaInh = await dataSource.query(
-            `INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, observaciones)
-             VALUES (?, 500.00, 0, 'Cuenta inhabilitada administrativamente')`,
+            `INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, cobertura, plazo_dias, observaciones)
+             VALUES (?, 500.00, 0, 'COMPLETA', 30, 'Cuenta inhabilitada administrativamente')`,
             [idClienteInhabilitado]
         );
         idCuentaInhabilitada = ctaInh.insertId;
@@ -100,7 +108,15 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         try {
             if (dataSource.isInitialized) {
                 await dataSource.query(
+                    `DELETE FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_cuenta_corriente IN (?, ?)`,
+                    [idCuentaTest, idCuentaInhabilitada]
+                );
+                await dataSource.query(
                     `DELETE FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_cuenta_corriente IN (?, ?)`,
+                    [idCuentaTest, idCuentaInhabilitada]
+                );
+                await dataSource.query(
+                    `DELETE FROM PAGO WHERE id_cuenta_corriente IN (?, ?)`,
                     [idCuentaTest, idCuentaInhabilitada]
                 );
                 await dataSource.query(
@@ -166,13 +182,22 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         assert.ok(mov.fecha_vencimiento !== null);
     });
 
-    test('3. Imputación de abono: reduce la deuda vigente y libera crédito disponible', async () => {
-        await dataSource.query(
-            `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
-             (id_cuenta_corriente, tipo_movimiento, origen, id_pedido, id_pago, monto, moneda, estado, observaciones)
-             VALUES (?, 'ABONO', 'PAGO', NULL, NULL, 150.00, 'USD', 'ACREDITADO', 'Abono recibido')`,
+    test('3. H03/H04: Imputación de abono con PAGO acreditado reduce deuda y libera disponible', async () => {
+        // H03: El abono exige pago acreditado registrado en la tabla PAGO
+        const pagoRes = await dataSource.query(
+            `INSERT INTO PAGO (id_cuenta_corriente, monto, metodo_pago, estado, observaciones)
+             VALUES (?, 150.00, 'TRANSFERENCIA', 'ACREDITADO', 'Pago acreditado en cuenta')`,
             [idCuentaTest]
         );
+        const idPago = pagoRes.insertId;
+
+        const idAbono = await registrarAbonoPorPago({
+            id_cuenta_corriente: idCuentaTest,
+            id_pago: idPago,
+            monto: '150.00',
+            observaciones: 'Abono recibido'
+        });
+        assert.ok(idAbono > 0);
 
         const estado = await calcularEstadoCuenta(idCuentaTest);
         assert.ok(estado);
@@ -180,6 +205,15 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         assert.equal(estado.total_abonos, '150.00');
         assert.equal(estado.deuda_vigente, '200.00');
         assert.equal(estado.credito_disponible, '800.00');
+
+        // H04: Comprobar imputación FIFO registrada
+        const [imp] = await dataSource.query(
+            `SELECT * FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_abono = ?`,
+            [idAbono]
+        );
+        assert.ok(imp, 'Debe existir registro en IMPUTACION_MOVIMIENTO_CUENTA');
+        assert.equal(Number(imp.monto_imputado).toFixed(2), '150.00');
+        assert.equal(imp.estado, 'VIGENTE');
     });
 
     test('4. Movimientos anulados: conservan trazabilidad sin alterar balance', async () => {
@@ -235,7 +269,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         );
     });
 
-    test('8. Integración transaccional con #20.2: soporte para rollback atómico con externalManager', async () => {
+    test('8. Integración transaccional con rollback atómico con externalManager', async () => {
         const [movsBefore] = await dataSource.query(
             `SELECT COUNT(*) AS total FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pedido = ?`,
             [idPedidoTest3]
@@ -265,8 +299,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         assert.equal(Number(movsAfter.total), 0);
     });
 
-    test('9. H-01 (Auditoría): Serialización pesimista ante pedidos concurrentes que superan el disponible', async () => {
-        // Disponible actual: 800.00. Disparamos Pedido 4 ($450) y Pedido 5 ($450) simultáneamente en paralelo
+    test('9. Concurrencia normal: pedidos paralelos que superan el disponible se serializan', async () => {
         const p1 = registrarCargoPorPedido({
             id_cuenta_corriente: idCuentaTest,
             id_pedido: idPedidoTest4,
@@ -279,8 +312,8 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         });
 
         const results = await Promise.allSettled([p1, p2]);
-        const fulfilled = results.filter(r => r.status === 'fulfilled');
-        const rejected = results.filter(r => r.status === 'rejected');
+        const fulfilled = results.filter((r) => r.status === 'fulfilled');
+        const rejected = results.filter((r) => r.status === 'rejected');
 
         assert.equal(fulfilled.length, 1, 'Exactamente un pedido debe aprobarse');
         assert.equal(rejected.length, 1, 'El segundo pedido debe ser rechazado por sobregiro');
@@ -290,7 +323,7 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
         assert.ok(Number(estadoFinal.deuda_vigente) <= 1000.00, 'La deuda jamás puede sobregirar el límite');
     });
 
-    test('10. H-02 (Auditoría): Validación estricta de valores no finitos (NaN, cadenas vacías)', async () => {
+    test('10. H06: Validación estricta de valores no finitos (NaN, cadenas vacías)', async () => {
         await assert.rejects(
             registrarCargoPorPedido({
                 id_cuenta_corriente: idCuentaTest,
@@ -340,5 +373,148 @@ describe('Task #260 — S5-20.1: Modelo y registro de movimientos de cuenta corr
             ),
             /chk_movimiento_referencia/
         );
+    });
+
+    test('12. H01: Cuenta sin cobertura acreditada bloquea consumo y expone saldo null', async () => {
+        const fixtureEmail = `cc-nocob-${Date.now()}@test.com`;
+        const cliNoCob = await dataSource.query(
+            `INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, email, estado_aprobacion_empresa, es_fiel, activo)
+             VALUES ('EMPRESA', 'Empresa Sin Cobertura', ?, 'APROBADA', 0, 1)`,
+            [fixtureEmail]
+        );
+        const ctaNoCob = await dataSource.query(
+            `INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, cobertura, plazo_dias)
+             VALUES (?, 1000.00, 1, 'NO_ACREDITADA', 30)`,
+            [cliNoCob.insertId]
+        );
+        const pedNoCob = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, total, estado, modalidad_pago, subtotal, descuento)
+             VALUES (?, 100.00, 'PENDIENTE', 'CUENTA_CORRIENTE', 100.00, 0.00)`,
+            [cliNoCob.insertId]
+        );
+
+        try {
+            const estado = await calcularEstadoCuenta(ctaNoCob.insertId);
+            assert.equal(estado.cobertura, 'NO_ACREDITADA');
+            assert.equal(estado.credito_disponible, null);
+            assert.equal(estado.estado_credito, 'NO_DETERMINABLE');
+
+            await assert.rejects(
+                registrarCargoPorPedido({
+                    id_cuenta_corriente: ctaNoCob.insertId,
+                    id_pedido: pedNoCob.insertId,
+                    monto: '100.00'
+                }),
+                /no posee cobertura histórica acreditada/
+            );
+        } finally {
+            await dataSource.query('DELETE FROM PEDIDO WHERE id_pedido = ?', [pedNoCob.insertId]);
+            await dataSource.query('DELETE FROM CUENTA_CORRIENTE WHERE id_cuenta_corriente = ?', [ctaNoCob.insertId]);
+            await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente = ?', [cliNoCob.insertId]);
+        }
+    });
+
+    test('13. H03: Titularidad protegida rechaza asociar pedido de cliente ajeno', async () => {
+        const fixtureEmail = `cc-ajeno-${Date.now()}@test.com`;
+        const cliAjeno = await dataSource.query(
+            `INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, email, estado_aprobacion_empresa, es_fiel, activo)
+             VALUES ('EMPRESA', 'Empresa Ajena', ?, 'APROBADA', 0, 1)`,
+            [fixtureEmail]
+        );
+        const pedAjeno = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, total, estado, modalidad_pago, subtotal, descuento)
+             VALUES (?, 100.00, 'PENDIENTE', 'CUENTA_CORRIENTE', 100.00, 0.00)`,
+            [cliAjeno.insertId]
+        );
+
+        try {
+            await assert.rejects(
+                registrarCargoPorPedido({
+                    id_cuenta_corriente: idCuentaTest,
+                    id_pedido: pedAjeno.insertId,
+                    monto: '100.00'
+                }),
+                /Violación de titularidad/
+            );
+        } finally {
+            await dataSource.query('DELETE FROM PEDIDO WHERE id_pedido = ?', [pedAjeno.insertId]);
+            await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente = ?', [cliAjeno.insertId]);
+        }
+    });
+
+    test('14. H08: externalManager con snapshot previo en REPEATABLE READ impide sobregiro', async () => {
+        const fixtureEmail = `cc-h08-${Date.now()}@test.com`;
+        const cliH08 = await dataSource.query(
+            `INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, email, estado_aprobacion_empresa, es_fiel, activo)
+             VALUES ('EMPRESA', 'Empresa H08 Regresion', ?, 'APROBADA', 0, 1)`,
+            [fixtureEmail]
+        );
+        const ctaH08 = await dataSource.query(
+            `INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, cobertura, plazo_dias)
+             VALUES (?, 1000.00, 1, 'COMPLETA', 30)`,
+            [cliH08.insertId]
+        );
+        const pedA = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, total, estado, modalidad_pago, subtotal, descuento)
+             VALUES (?, 700.00, 'PENDIENTE', 'CUENTA_CORRIENTE', 700.00, 0.00)`,
+            [cliH08.insertId]
+        );
+        const pedB = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, total, estado, modalidad_pago, subtotal, descuento)
+             VALUES (?, 700.00, 'PENDIENTE', 'CUENTA_CORRIENTE', 700.00, 0.00)`,
+            [cliH08.insertId]
+        );
+
+        const runnerA = dataSource.createQueryRunner();
+        const runnerB = dataSource.createQueryRunner();
+        await runnerA.connect();
+        await runnerB.connect();
+
+        try {
+            // 1. Transacción A abre en REPEATABLE READ y consulta el estado (fija snapshot de deuda 0)
+            await runnerA.startTransaction('REPEATABLE READ');
+            const estadoAInicial = await calcularEstadoCuenta(ctaH08.insertId, runnerA.manager);
+            assert.equal(estadoAInicial.credito_disponible, '1000.00');
+
+            // 2. Transacción B registra cargo de 700 y confirma
+            await runnerB.startTransaction('REPEATABLE READ');
+            await registrarCargoPorPedido(
+                {
+                    id_cuenta_corriente: ctaH08.insertId,
+                    id_pedido: pedB.insertId,
+                    monto: '700.00'
+                },
+                runnerB.manager
+            );
+            await runnerB.commitTransaction();
+
+            // 3. Transacción A intenta registrar otros 700 con su externalManager
+            // El current read bloqueante de H08 lee deuda vigente 700 y disponible 300, rechazando el sobregiro
+            await assert.rejects(
+                registrarCargoPorPedido(
+                    {
+                        id_cuenta_corriente: ctaH08.insertId,
+                        id_pedido: pedA.insertId,
+                        monto: '700.00'
+                    },
+                    runnerA.manager
+                ),
+                /excede el crédito disponible/
+            );
+
+            await runnerA.rollbackTransaction();
+
+            // 4. Saldo final comprobado: deuda 700.00, disponible 300.00 (jamás 1400.00)
+            const estadoFinal = await calcularEstadoCuenta(ctaH08.insertId);
+            assert.equal(estadoFinal.deuda_vigente, '700.00');
+            assert.equal(estadoFinal.credito_disponible, '300.00');
+        } finally {
+            await runnerA.release();
+            await runnerB.release();
+            await dataSource.query('DELETE FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_cuenta_corriente = ?', [ctaH08.insertId]);
+            await dataSource.query('DELETE FROM PEDIDO WHERE id_pedido IN (?, ?)', [pedA.insertId, pedB.insertId]);
+            await dataSource.query('DELETE FROM CUENTA_CORRIENTE WHERE id_cuenta_corriente = ?', [ctaH08.insertId]);
+            await dataSource.query('DELETE FROM CLIENTE WHERE id_cliente = ?', [cliH08.insertId]);
+        }
     });
 });
