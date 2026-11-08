@@ -1,11 +1,15 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { dataSource } from '../config/database.config';
+import { EntityManager } from 'typeorm';
+import { inTransaction } from '../config/database.config';
 import { env } from '../config/env.config';
+import { civilDate } from './pricing/pricing.quote';
 import {
-    ClienteSchema,
-    CuentaCorrienteSchema,
-    UsuarioSchema
-} from '../entities/active.schemas';
+    calcularEstadoCuenta,
+    consultarVencimientos,
+    findCuentaByClienteId,
+    fromCents,
+    toCents
+} from '../repositories/cuentaCorriente.repository';
 import type {
     Consulta,
     CursorPayload,
@@ -16,8 +20,6 @@ import type {
     Resumen,
     Vencimiento
 } from '../dtos/cuentaCorriente/cuentaCorriente.dto';
-
-const toFixed2 = (n: number): Decimal => (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
 
 const getSecretKey = (): string => env.jwtSecret || 'ferrepatagonia_cursor_signature_secret';
 
@@ -63,60 +65,107 @@ export function verifyAndDecodeCursor(
     }
 }
 
-async function resolveClienteIdFromUserId(userId: number): Promise<number | null> {
-    const usuario = await dataSource.getRepository(UsuarioSchema).findOne({
-        where: { id_usuario: userId }
-    });
-    if (!usuario || !usuario.activo || usuario.rol !== 'CLIENTE' || !usuario.id_cliente) {
+function diffCivilDays(todayCivil: string, targetCivil: string): number {
+    const [y1, m1, d1] = todayCivil.split('-').map(Number);
+    const [y2, m2, d2] = targetCivil.split('-').map(Number);
+    const utc1 = Date.UTC(y1, m1 - 1, d1);
+    const utc2 = Date.UTC(y2, m2 - 1, d2);
+    return Math.round((utc1 - utc2) / (1000 * 60 * 60 * 24));
+}
+
+async function resolveClienteId(manager: EntityManager, userId: number): Promise<number | null> {
+    const [user] = await manager.query(
+        'SELECT id_usuario, id_cliente, rol, activo FROM USUARIO WHERE id_usuario = ?',
+        [userId]
+    );
+    if (!user || user.activo !== 1 || user.rol !== 'CLIENTE' || !user.id_cliente) {
         return null;
     }
-    const cliente = await dataSource.getRepository(ClienteSchema).findOne({
-        where: { id_cliente: usuario.id_cliente }
-    });
-    if (!cliente || !cliente.activo) {
+    const [client] = await manager.query(
+        'SELECT id_cliente, activo, tipo_cliente, estado_aprobacion_empresa FROM CLIENTE WHERE id_cliente = ?',
+        [user.id_cliente]
+    );
+    if (!client || client.activo !== 1) {
         return null;
     }
-    return cliente.id_cliente;
+    return client.id_cliente;
 }
 
 export async function getConsultaCuenta(userId: number): Promise<Consulta> {
     const corte: InstanteUTC = new Date().toISOString();
-    const clienteId = await resolveClienteIdFromUserId(userId);
-    if (!clienteId) {
-        return { corte, revision: 'rev-0', estado: 'SIN_CUENTA' };
-    }
+    return inTransaction(async (manager) => {
+        const clienteId = await resolveClienteId(manager, userId);
+        if (!clienteId) {
+            return { corte, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
 
-    const cuenta = await dataSource.getRepository(CuentaCorrienteSchema).findOne({
-        where: { id_cliente: clienteId }
-    });
-    if (!cuenta) {
-        return { corte, revision: 'rev-0', estado: 'SIN_CUENTA' };
-    }
+        const cuenta = await findCuentaByClienteId(clienteId, manager);
+        if (!cuenta) {
+            return { corte, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
 
-    const revision = `rev-${cuenta.id_cuenta_corriente}-${cuenta.habilitada}`;
-    const limiteNum = Number(cuenta.limite_credito);
+        const estado = await calcularEstadoCuenta(cuenta.id_cuenta_corriente, manager);
+        if (!estado) {
+            return { corte, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
 
-    const estadoCredito = cuenta.habilitada === 1 ? 'NO_DETERMINABLE' : 'BLOQUEADO';
+        const vencimientos = await consultarVencimientos(cuenta.id_cuenta_corriente, new Date(corte), manager);
 
-    const resumen: Resumen = {
-        estado: cuenta.habilitada === 1 ? 'HABILITADA' : 'INHABILITADA',
-        cuentaId: cuenta.id_cuenta_corriente,
-        origen: 'REAL',
-        moneda: 'USD',
-        plazoDias: 30,
-        saldo: null,
-        limite: toFixed2(limiteNum),
-        utilizado: null,
-        disponible: null,
-        deudaVencidaTotal: null,
-        deudaVencida30Dias: null,
-        deudaVencida60Dias: null,
-        deudaPorVencerTotal: null,
-        cobertura: 'NO_ACREDITADA',
-        estadoCredito
-    };
+        let deudaVencidaTotal: Decimal | null = null;
+        let deudaVencida30Dias: Decimal | null = null;
+        let deudaVencida60Dias: Decimal | null = null;
+        let deudaPorVencerTotal: Decimal | null = null;
 
-    return { corte, revision, ...resumen };
+        if (estado.cobertura === 'COMPLETA' && vencimientos) {
+            let centsPorVencer = 0n;
+            let centsVencidoTotal = 0n;
+            let centsVencido30 = 0n;
+            let centsVencido60 = 0n;
+
+            const hoyCivil = civilDate(new Date(corte));
+
+            for (const v of vencimientos) {
+                if (v.pendiente === null) continue;
+                const pCents = toCents(v.pendiente);
+                if (v.estado === 'POR_VENCER') {
+                    centsPorVencer += pCents;
+                } else if (v.estado === 'VENCIDO') {
+                    centsVencidoTotal += pCents;
+                    const diasMora = diffCivilDays(hoyCivil, v.venceEl);
+                    if (diasMora <= 30) {
+                        centsVencido30 += pCents;
+                    } else {
+                        centsVencido60 += pCents;
+                    }
+                }
+            }
+
+            deudaPorVencerTotal = fromCents(centsPorVencer);
+            deudaVencidaTotal = fromCents(centsVencidoTotal);
+            deudaVencida30Dias = fromCents(centsVencido30);
+            deudaVencida60Dias = fromCents(centsVencido60);
+        }
+
+        const resumen: Resumen = {
+            estado: estado.habilitada ? 'HABILITADA' : 'INHABILITADA',
+            cuentaId: estado.id_cuenta_corriente,
+            origen: estado.origen,
+            moneda: 'USD',
+            plazoDias: estado.plazo_dias,
+            saldo: estado.deuda_vigente,
+            limite: estado.limite_credito,
+            utilizado: estado.utilizado,
+            disponible: estado.credito_disponible,
+            deudaVencidaTotal,
+            deudaVencida30Dias,
+            deudaVencida60Dias,
+            deudaPorVencerTotal,
+            cobertura: estado.cobertura,
+            estadoCredito: estado.estado_credito
+        };
+
+        return { corte, revision: estado.revision, ...resumen };
+    }, { isolation: 'REPEATABLE READ' });
 }
 
 export async function getMovimientosCuenta(
@@ -130,38 +179,109 @@ export async function getMovimientosCuenta(
     }
 
     const ahoraUTC = new Date().toISOString();
-    const clienteId = await resolveClienteIdFromUserId(userId);
-    if (!clienteId) {
-        return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
-    }
-
-    const cuenta = await dataSource.getRepository(CuentaCorrienteSchema).findOne({
-        where: { id_cliente: clienteId }
-    });
-    if (!cuenta) {
-        return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
-    }
-
-    const currentRevision = `rev-${cuenta.id_cuenta_corriente}-${cuenta.habilitada}`;
-    let corte = ahoraUTC;
-
-    if (payload) {
-        if (payload.revision !== currentRevision) {
-            const err = new Error('Revisión de cuenta desactualizada.');
-            (err as unknown as { code: string }).code = 'CONSULTA_DESACTUALIZADA';
-            throw err;
+    return inTransaction(async (manager) => {
+        const clienteId = await resolveClienteId(manager, userId);
+        if (!clienteId) {
+            return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
         }
-        corte = payload.corte;
-    }
 
-    return {
-        corte,
-        revision: currentRevision,
-        estado: cuenta.habilitada === 1 ? 'HABILITADA' : 'INHABILITADA',
-        cobertura: 'NO_ACREDITADA',
-        items: [],
-        siguienteCursor: null
-    };
+        const cuenta = await findCuentaByClienteId(clienteId, manager);
+        if (!cuenta) {
+            return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
+
+        const estado = await calcularEstadoCuenta(cuenta.id_cuenta_corriente, manager);
+        if (!estado) {
+            return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
+
+        let corte = ahoraUTC;
+        let offset = 0;
+
+        if (payload) {
+            if (payload.revision !== estado.revision) {
+                const err = new Error('Revisión de cuenta desactualizada.');
+                (err as unknown as { code: string }).code = 'CONSULTA_DESACTUALIZADA';
+                throw err;
+            }
+            corte = payload.corte;
+            offset = payload.offset;
+        }
+
+        const rawRows: any[] = await manager.query(
+            `SELECT m.*, DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS vence_civil,
+                    DATE_FORMAT(m.fecha_efectiva, '%Y-%m-%dT%H:%i:%s.%fZ') AS efectiva_utc
+             FROM MOVIMIENTO_CUENTA_CORRIENTE m
+             WHERE m.id_cuenta_corriente = ?
+             ORDER BY m.fecha_efectiva ASC, m.id_movimiento_cuenta ASC`,
+            [cuenta.id_cuenta_corriente]
+        );
+
+        let running = 0n;
+        const movsWithBalance = rawRows.map((r) => {
+            if (r.estado === 'ACREDITADO') {
+                if (r.tipo_movimiento === 'CARGO') {
+                    running += toCents(r.monto);
+                } else if (r.tipo_movimiento === 'ABONO') {
+                    running -= toCents(r.monto);
+                }
+            }
+
+            const saldoResultante = estado.cobertura === 'COMPLETA' ? fromCents(running) : null;
+            const fechaOperacion = r.efectiva_utc
+                ? new Date(r.efectiva_utc).toISOString().replace('.000Z', 'Z')
+                : new Date(r.fecha_efectiva).toISOString().replace('.000Z', 'Z');
+
+            const mapped: Movimiento = {
+                id: String(r.id_movimiento_cuenta),
+                fechaOperacion,
+                concepto: r.observaciones || (r.tipo_movimiento === 'CARGO' ? `Pedido #${r.id_pedido}` : `Pago #${r.id_pago}`),
+                importe: fromCents(toCents(r.monto)),
+                saldoResultante,
+                moneda: 'USD',
+                estado: r.estado === 'ACREDITADO' ? 'VIGENTE' : 'ANULADO',
+                origen: r.origen === 'DEMO' || estado.origen === 'DEMO' ? 'DEMO' : 'REAL',
+                ...(r.tipo_movimiento === 'CARGO'
+                    ? {
+                        tipo: 'CARGO' as const,
+                        referencia: { pedidoId: r.id_pedido ?? 0 },
+                        plazoDias: (r.plazo_aplicado === 30 || r.plazo_aplicado === 60) ? r.plazo_aplicado : null,
+                        venceEl: r.vence_civil || null
+                    }
+                    : {
+                        tipo: 'ABONO' as const,
+                        referencia: { pagoId: r.id_pago ?? 0 },
+                        venceEl: null,
+                        plazoDias: null
+                    })
+            };
+            return mapped;
+        });
+
+        movsWithBalance.reverse();
+
+        const items = movsWithBalance.slice(offset, offset + limite);
+        const nextOffset = offset + limite;
+        const siguienteCursor = nextOffset < movsWithBalance.length
+            ? signCursor({
+                userId,
+                cuentaId: cuenta.id_cuenta_corriente,
+                scope: 'movimientos',
+                corte,
+                revision: estado.revision,
+                offset: nextOffset
+            })
+            : null;
+
+        return {
+            corte,
+            revision: estado.revision,
+            estado: estado.habilitada ? 'HABILITADA' : 'INHABILITADA',
+            cobertura: estado.cobertura,
+            items,
+            siguienteCursor
+        };
+    }, { isolation: 'REPEATABLE READ' });
 }
 
 export async function getVencimientosCuenta(
@@ -175,36 +295,66 @@ export async function getVencimientosCuenta(
     }
 
     const ahoraUTC = new Date().toISOString();
-    const clienteId = await resolveClienteIdFromUserId(userId);
-    if (!clienteId) {
-        return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
-    }
-
-    const cuenta = await dataSource.getRepository(CuentaCorrienteSchema).findOne({
-        where: { id_cliente: clienteId }
-    });
-    if (!cuenta) {
-        return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
-    }
-
-    const currentRevision = `rev-${cuenta.id_cuenta_corriente}-${cuenta.habilitada}`;
-    let corte = ahoraUTC;
-
-    if (payload) {
-        if (payload.revision !== currentRevision) {
-            const err = new Error('Revisión de cuenta desactualizada.');
-            (err as unknown as { code: string }).code = 'CONSULTA_DESACTUALIZADA';
-            throw err;
+    return inTransaction(async (manager) => {
+        const clienteId = await resolveClienteId(manager, userId);
+        if (!clienteId) {
+            return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
         }
-        corte = payload.corte;
-    }
 
-    return {
-        corte,
-        revision: currentRevision,
-        estado: cuenta.habilitada === 1 ? 'HABILITADA' : 'INHABILITADA',
-        cobertura: 'NO_ACREDITADA',
-        items: [],
-        siguienteCursor: null
-    };
+        const cuenta = await findCuentaByClienteId(clienteId, manager);
+        if (!cuenta) {
+            return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
+
+        const estado = await calcularEstadoCuenta(cuenta.id_cuenta_corriente, manager);
+        if (!estado) {
+            return { corte: ahoraUTC, revision: 'rev-0', estado: 'SIN_CUENTA' };
+        }
+
+        let corte = ahoraUTC;
+        let offset = 0;
+
+        if (payload) {
+            if (payload.revision !== estado.revision) {
+                const err = new Error('Revisión de cuenta desactualizada.');
+                (err as unknown as { code: string }).code = 'CONSULTA_DESACTUALIZADA';
+                throw err;
+            }
+            corte = payload.corte;
+            offset = payload.offset;
+        }
+
+        const rawVencimientos = await consultarVencimientos(cuenta.id_cuenta_corriente, new Date(corte), manager);
+        const allItems: Vencimiento[] = (rawVencimientos ?? []).map((v) => ({
+            movimientoId: v.movimientoId,
+            venceEl: v.venceEl,
+            plazoDias: (v.plazoDias === 30 || v.plazoDias === 60) ? v.plazoDias : null,
+            moneda: 'USD' as const,
+            pendiente: v.pendiente,
+            estado: v.estado as Vencimiento['estado'],
+            origen: estado.origen
+        }));
+
+        const items = allItems.slice(offset, offset + limite);
+        const nextOffset = offset + limite;
+        const siguienteCursor = nextOffset < allItems.length
+            ? signCursor({
+                userId,
+                cuentaId: cuenta.id_cuenta_corriente,
+                scope: 'vencimientos',
+                corte,
+                revision: estado.revision,
+                offset: nextOffset
+            })
+            : null;
+
+        return {
+            corte,
+            revision: estado.revision,
+            estado: estado.habilitada ? 'HABILITADA' : 'INHABILITADA',
+            cobertura: estado.cobertura,
+            items,
+            siguienteCursor
+        };
+    }, { isolation: 'REPEATABLE READ' });
 }

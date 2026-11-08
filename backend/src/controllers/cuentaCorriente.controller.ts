@@ -30,7 +30,11 @@ export async function consultarMovimientosCliente(req: Request, res: Response): 
 
     let limite = 25;
     if (req.query.limite !== undefined) {
-        const parsed = Number(req.query.limite);
+        if (typeof req.query.limite !== 'string' || !/^\d+$/.test(req.query.limite.trim())) {
+            res.status(400).json({ message: 'Límite inválido. Debe ser un entero entre 1 y 100.', code: 'CONSULTA_INVALIDA' });
+            return;
+        }
+        const parsed = Number(req.query.limite.trim());
         if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
             res.status(400).json({ message: 'Límite inválido. Debe ser un entero entre 1 y 100.', code: 'CONSULTA_INVALIDA' });
             return;
@@ -38,7 +42,14 @@ export async function consultarMovimientosCliente(req: Request, res: Response): 
         limite = parsed;
     }
 
-    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    let cursor: string | undefined;
+    if (req.query.cursor !== undefined) {
+        if (typeof req.query.cursor !== 'string' || req.query.cursor.trim() === '') {
+            res.status(400).json({ message: 'Cursor inválido.', code: 'CONSULTA_INVALIDA' });
+            return;
+        }
+        cursor = req.query.cursor.trim();
+    }
 
     try {
         const userId = req.auth!.id;
@@ -69,7 +80,11 @@ export async function consultarVencimientosCliente(req: Request, res: Response):
 
     let limite = 25;
     if (req.query.limite !== undefined) {
-        const parsed = Number(req.query.limite);
+        if (typeof req.query.limite !== 'string' || !/^\d+$/.test(req.query.limite.trim())) {
+            res.status(400).json({ message: 'Límite inválido. Debe ser un entero entre 1 y 100.', code: 'CONSULTA_INVALIDA' });
+            return;
+        }
+        const parsed = Number(req.query.limite.trim());
         if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
             res.status(400).json({ message: 'Límite inválido. Debe ser un entero entre 1 y 100.', code: 'CONSULTA_INVALIDA' });
             return;
@@ -77,7 +92,14 @@ export async function consultarVencimientosCliente(req: Request, res: Response):
         limite = parsed;
     }
 
-    const cursor = typeof req.query.cursor === 'string' ? req.query.cursor : undefined;
+    let cursor: string | undefined;
+    if (req.query.cursor !== undefined) {
+        if (typeof req.query.cursor !== 'string' || req.query.cursor.trim() === '') {
+            res.status(400).json({ message: 'Cursor inválido.', code: 'CONSULTA_INVALIDA' });
+            return;
+        }
+        cursor = req.query.cursor.trim();
+    }
 
     try {
         const userId = req.auth!.id;
