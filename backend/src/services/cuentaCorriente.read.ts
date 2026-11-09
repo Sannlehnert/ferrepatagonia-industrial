@@ -2,6 +2,13 @@ import type { EntityManager } from 'typeorm';
 import type { InstanteUTC, Decimal, Movimiento, Resumen, Vencimiento } from '../dtos/cuentaCorriente/cuentaCorriente.dto';
 import { consultarVencimientos, fromCents, toCents, type ResumenCredito } from '../repositories/cuentaCorriente.repository';
 import { civilDate } from './pricing/pricing.quote';
+import { accountSourceUnavailable } from './adminAccount.errors';
+
+function assertPublishable(state: ResumenCredito): void {
+    if (state.origen === 'DEMO' && process.env.NODE_ENV !== 'test') {
+        throw accountSourceUnavailable();
+    }
+}
 
 function diffCivilDays(todayCivil: string, targetCivil: string): number {
     const [y1, m1, d1] = todayCivil.split('-').map(Number);
@@ -12,6 +19,7 @@ function diffCivilDays(todayCivil: string, targetCivil: string): number {
 }
 
 export async function readAccountSummary(manager: EntityManager, estado: ResumenCredito, corte: InstanteUTC): Promise<Resumen> {
+    assertPublishable(estado);
     const vencimientos = await consultarVencimientos(estado.id_cuenta_corriente, new Date(corte), manager);
 
     let deudaVencidaTotal: Decimal | null = null;
@@ -70,12 +78,12 @@ export async function readAccountSummary(manager: EntityManager, estado: Resumen
 }
 
 export async function readAccountMovements(manager: EntityManager, estado: ResumenCredito, accreditedOnly = false): Promise<Movimiento[]> {
+    assertPublishable(estado);
     // H01: No seleccionamos ni exponemos m.observaciones bajo ningún concepto
     const rawRows: any[] = await manager.query(
         `SELECT m.id_movimiento_cuenta,
                 m.id_cuenta_corriente,
                 m.tipo_movimiento,
-                m.origen,
                 m.id_pedido,
                 m.id_pago,
                 m.monto,
@@ -119,7 +127,7 @@ export async function readAccountMovements(manager: EntityManager, estado: Resum
             saldoResultante,
             moneda: 'USD',
             estado: r.estado === 'ACREDITADO' ? 'VIGENTE' : 'ANULADO',
-            origen: r.origen === 'DEMO' || estado.origen === 'DEMO' ? 'DEMO' : 'REAL',
+            origen: estado.origen,
             ...(r.tipo_movimiento === 'CARGO'
                 ? {
                     tipo: 'CARGO' as const,
@@ -143,6 +151,7 @@ export async function readAccountMovements(manager: EntityManager, estado: Resum
 }
 
 export async function readAccountDueDates(manager: EntityManager, estado: ResumenCredito, corte: InstanteUTC): Promise<Vencimiento[]> {
+    assertPublishable(estado);
     const rawVencimientos = await consultarVencimientos(estado.id_cuenta_corriente, new Date(corte), manager);
     const allItems: Vencimiento[] = (rawVencimientos ?? []).map((v) => ({
         movimientoId: String(v.movimientoId),

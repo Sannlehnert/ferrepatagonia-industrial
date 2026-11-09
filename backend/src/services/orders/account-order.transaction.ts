@@ -23,12 +23,14 @@ import {
 import { quoteAccountOrderCart } from './account-order.pricing';
 import { AccountOrderError } from './account-order.errors';
 import type { AccountOrderResult } from './account-order.types';
+import { assertAccountOrderQuoteToken } from './account-order-quote-token';
 
 export async function executePendingAccountOrder(
   manager: EntityManager,
   auth: AuthContext,
   clientId: number,
   key: string,
+  quoteToken: unknown,
 ): Promise<AccountOrderResult> {
   const context = await lockAccountOrderContext(
     manager,
@@ -58,6 +60,7 @@ export async function executePendingAccountOrder(
 
   const cart = await lockAccountOrderCart(manager, auth.id, clientId);
   const quote = await quoteAccountOrderCart(manager, auth, cart);
+  assertAccountOrderQuoteToken(quoteToken, auth, clientId, cart.cartId, quote);
 
   if (toCents(quote.totalUSD) > toCents(context.availableUSD)) {
     throw new AccountOrderError(

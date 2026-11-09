@@ -97,6 +97,11 @@ const router = createRouter({
           component: () => import('@/views/CatalogoView.vue'),
         },
         {
+          path: 'producto/:id',
+          name: 'producto-detalle',
+          component: () => import('@/views/ProductDetailView.vue'),
+        },
+        {
           path: 'carrito',
           name: 'carrito',
           component: () => import('@/views/CartView.vue'),
@@ -137,6 +142,11 @@ const router = createRouter({
           path: 'pedidos',
           name: 'cuenta-pedidos',
           component: () => import('@/views/cuenta/HistorialPedidos.vue'),
+        },
+        {
+          path: 'cuenta-corriente',
+          name: 'cuenta-corriente',
+          component: () => import('@/views/cuenta/CuentaCorrienteView.vue'),
         },
       ],
     },

@@ -88,20 +88,24 @@ export async function validateOrderIdParam(value: unknown) {
 }
 
 export function validateConfirmationBody(value: unknown) {
-  const isEmptyObject =
+  const validObject =
     value !== null &&
     typeof value === 'object' &&
     !Array.isArray(value) &&
     Object.getPrototypeOf(value) === Object.prototype &&
-    Reflect.ownKeys(value).length === 0;
+    Reflect.ownKeys(value).length === 1 &&
+    Object.keys(value).length === 1 &&
+    typeof (value as { cotizacion?: unknown }).cotizacion === 'string' &&
+    (value as { cotizacion: string }).cotizacion.length >= 20 &&
+    (value as { cotizacion: string }).cotizacion.length <= 2048;
 
-  if (!isEmptyObject) {
+  if (!validObject) {
     return {
       valid: false as const,
       code: 'SOLICITUD_INVALIDA',
-      message: 'El cuerpo de la solicitud debe ser un objeto vacío.',
+      message: 'La solicitud debe incluir únicamente la cotización vigente.',
     };
   }
 
-  return { valid: true as const };
+  return { valid: true as const, quoteToken: (value as { cotizacion: string }).cotizacion };
 }

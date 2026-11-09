@@ -15,6 +15,7 @@ let database;
 let attempts;
 let transaction;
 let financial;
+let service;
 
 before(async () => {
   session = await connectOwned(childProfile());
@@ -30,6 +31,7 @@ before(async () => {
   financial = require(
     '../dist/repositories/cuentaCorriente.repository.js'
   );
+  service = require('../dist/services/orders/account-order.service.js');
 
   await database.initializeDatabase();
 });
@@ -45,6 +47,7 @@ after(async () => {
 async function fixture(options) {
   const f = await createOrderFixture(session, options);
   f.key = randomUUID();
+  f.quoteToken = (await service.getAccountOrderEligibility(f.auth)).body.data.cotizacion;
   await attempts.reserveAccountOrderAttempt(f.clientId, f.key);
   return f;
 }
@@ -52,7 +55,7 @@ async function fixture(options) {
 function buy(f, key = f.key) {
   return database.inTransaction(
     manager => transaction.executePendingAccountOrder(
-      manager, f.auth, f.clientId, key,
+      manager, f.auth, f.clientId, key, f.quoteToken,
     ),
     { isolation: 'READ COMMITTED', lockWaitSeconds: 2 },
   );
@@ -101,8 +104,12 @@ const untouched = {
   state: 'PENDIENTE',
 };
 
-test('#261: confirma al límite exacto y registra todos los cambios', async () => {
+test('#263 C02/P05: confirma al límite exacto y registra vencimiento a 60 días', async () => {
   const f = await fixture({ limit: '20.00' });
+  await session.connection.query(
+    'UPDATE CUENTA_CORRIENTE SET plazo_dias = 60 WHERE id_cuenta_corriente = ?',
+    [f.accountId],
+  );
   const result = await buy(f);
 
   assert.equal(result.status, 201);
@@ -121,6 +128,16 @@ test('#261: confirma al límite exacto y registra todos los cambios', async () =
   const state = await financial.calcularEstadoCuenta(f.accountId);
   assert.equal(state.deuda_vigente, '20.00');
   assert.equal(state.credito_disponible, '0.00');
+  const [charge] = await session.connection.query(`
+    SELECT plazo_aplicado, fecha_base_civil, vence_el,
+           DATE(DATE_SUB(fecha_efectiva, INTERVAL 3 HOUR)) AS civil,
+           DATE_ADD(fecha_base_civil, INTERVAL 60 DAY) AS due
+    FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_movimiento_cuenta = ?
+  `, [result.body.data.cargoId]);
+  assert.equal(charge.plazo_aplicado, 60);
+  assert.equal(charge.fecha_base_civil, charge.civil);
+  assert.equal(charge.vence_el, charge.due);
+  assert.equal(result.body.data.venceEl, charge.due);
 });
 
 test('#261: crédito insuficiente no deja escrituras parciales', async () => {

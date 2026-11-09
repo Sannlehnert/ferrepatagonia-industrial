@@ -13,6 +13,12 @@ export interface CatalogProduct {
     disponible: boolean
 }
 
+export interface CatalogProductDetail extends CatalogProduct {
+    descripcion: string | null
+    imagen: string | null
+    stock: number
+}
+
 export interface CatalogPagination {
     page: number
     limit: number

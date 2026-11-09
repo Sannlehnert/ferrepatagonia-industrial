@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { childProfile, connectOwned } = require("./cc260-disposable.cjs");
 const { seedAdminAccounts } = require("./admin-account-fixture.cjs");
+const { seedDemo } = require("../../../database/fixtures/fer19-demo.cjs");
 
 // El ejecutor deberá proporcionar una base exclusiva para esta ejecución.
 assert.equal(process.env.E2E_ISOLATED, "1");
@@ -55,14 +56,23 @@ process.once("SIGTERM", () => void stop());
 async function main() {
   const session = await connectOwned(childProfile("E2E"), "E2E");
   let fixture;
+  let fer19Fixture;
   try {
     await initializeDatabase();
-    fixture = await seedAdminAccounts(session, { browser: true });
+    if (process.env.E2E_FER19) {
+      fer19Fixture = await seedDemo(session, { browser: true });
+    } else {
+      fixture = await seedAdminAccounts(session, { browser: true });
+    }
   } finally {
     await session.connection.end();
   }
 
   if (stopping) return;
+
+  // Keep the isolated loopback transport. Exercise the real H04 read policy
+  // outside NODE_ENV=test after the guarded fixture has been seeded.
+  if (process.env.E2E_FER19 === "production") process.env.NODE_ENV = "development";
 
   server = app.listen(0, "127.0.0.1");
 
@@ -77,12 +87,13 @@ async function main() {
     process.send({
       type: "ready",
       port: address.port,
-      adminAccounts: Object.fromEntries(Object.entries(fixture.accounts).map(([key, account]) => [key, account.clientId])),
+      adminAccounts: fixture && Object.fromEntries(Object.entries(fixture.accounts).map(([key, account]) => [key, account.clientId])),
+      fer19Fixture,
     });
   });
 }
 
-main().catch(() => {
-  console.error("No se pudo inicializar la API aislada.");
+main().catch((error) => {
+  console.error("No se pudo inicializar la API aislada:", error?.stack || error);
   void stop(1);
 });

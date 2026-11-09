@@ -1,14 +1,30 @@
 import type { Page } from '@playwright/test'
 import type { CartSnapshot } from '../../../src/types/cart'
+import type { AccountOrderEligibility } from '../../../src/types/accountOrder'
 
 export async function mockCart(page: Page) {
   const state = {
     quantity: 1,
     removed: false,
     readFailures: 0,
+    failCartReadOnRecovery: false,
     readGate: null as Promise<void> | null,
+    confirmGate: null as Promise<void> | null,
     transform: null as ((value: CartSnapshot) => CartSnapshot) | null,
     writes: [] as Array<{ method: string; quantity?: number }>,
+    eligibility: {
+      elegible: false,
+      moneda: 'USD',
+      totalUSD: null,
+      creditoDisponibleUSD: null,
+      codigo: 'CUENTA_NO_HABILITADA',
+      mensaje: 'El cliente no tiene una cuenta corriente habilitada.',
+      cotizacion: null,
+    } as AccountOrderEligibility,
+    confirmationStatus: 201,
+    recoveryStatus: 202,
+    recoveryRequests: [] as string[],
+    orderRequests: [] as Array<{ method: string; key?: string; body?: unknown }>,
   }
 
   const amounts: Record<number, string> = {
@@ -78,6 +94,10 @@ export async function mockCart(page: Page) {
     }
 
     if (path === '/api/carrito' && method === 'GET') {
+      if (state.failCartReadOnRecovery) {
+        state.failCartReadOnRecovery = false
+        return route.fulfill({ status: 500, json: { message: 'Error al resincronizar.' } })
+      }
       if (state.readGate) {
         await state.readGate
       }
@@ -91,6 +111,85 @@ export async function mockCart(page: Page) {
       }
 
       return route.fulfill({ json: snapshot() })
+    }
+
+    if (path === '/api/pedidos/cuenta-corriente/eligibilidad' && method === 'GET') {
+      return route.fulfill({ json: { data: state.eligibility } })
+    }
+
+    if (path === '/api/pedidos/cuenta-corriente' && method === 'POST') {
+      state.orderRequests.push({
+        method,
+        key: request.headers()['idempotency-key'],
+        body: request.postDataJSON(),
+      })
+      if (state.confirmGate) await state.confirmGate
+      if (state.confirmationStatus === 409) {
+        return route.fulfill({
+          status: 409,
+          json: {
+            estado: 'RECHAZADO',
+            code: 'CREDITO_INSUFICIENTE',
+            message: 'El crédito disponible no alcanza para confirmar este pedido.',
+          },
+        })
+      }
+
+      state.removed = true
+      return route.fulfill({
+        status: state.confirmationStatus,
+        json: {
+          data: {
+            pedidoId: 456,
+            estado: 'CONFIRMADO',
+            modalidadPago: 'CUENTA_CORRIENTE',
+            moneda: 'USD',
+            totalUSD: amounts[state.quantity],
+            cargoId: '789',
+            venceEl: '2026-12-09',
+          },
+        },
+      })
+    }
+
+    const recoveryKey = path.match(/^\/api\/pedidos\/cuenta-corriente\/([^/]+)$/)?.[1]
+    if (recoveryKey && method === 'GET') {
+      state.recoveryRequests.push(decodeURIComponent(recoveryKey))
+      if (state.recoveryStatus === 202) {
+        return route.fulfill({
+          status: 202,
+          json: {
+            data: {
+              estado: 'PENDIENTE',
+              code: 'CONFIRMACION_PENDIENTE',
+              message: 'Todavía no hay un resultado definitivo.',
+            },
+          },
+        })
+      }
+
+      if (state.recoveryStatus === 404) {
+        return route.fulfill({
+          status: 404,
+          json: { code: 'INTENTO_NO_ENCONTRADO', message: 'No se encontró el intento.' },
+        })
+      }
+
+      state.removed = true
+      return route.fulfill({
+        status: 200,
+        json: {
+          data: {
+            pedidoId: 456,
+            estado: 'CONFIRMADO',
+            modalidadPago: 'CUENTA_CORRIENTE',
+            moneda: 'USD',
+            totalUSD: amounts[state.quantity],
+            cargoId: '789',
+            venceEl: '2026-12-09',
+          },
+        },
+      })
     }
 
     if (path === '/api/carrito/items/1' && method === 'PATCH') {

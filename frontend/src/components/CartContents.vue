@@ -3,28 +3,49 @@ import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import CartLine from '@/components/CartLine.vue'
 import CartSummary from '@/components/CartSummary.vue'
+import AccountOrderCheckout from '@/components/AccountOrderCheckout.vue'
+import { useAccountOrderStore } from '@/stores/accountOrder'
 import { useCartStore } from '@/stores/cart'
 import { useCartPanelStore } from '@/stores/cartPanel'
 
 const cart = useCartStore()
+const order = useAccountOrderStore()
 const panel = useCartPanelStore()
 
 onMounted(() => {
   void cart.cargarCarrito()
 })
 
+const cartBusy = computed(() => cart.loading || cart.operation !== null)
 const busy = computed(() =>
-  cart.loading || cart.operation !== null,
+  cartBusy.value || order.attemptState === 'submitting' ||
+  order.attemptState === 'pending',
 )
 </script>
 
 <template>
   <section
     aria-label="Contenido del carrito"
-    :aria-busy="busy"
+    :aria-busy="cartBusy || order.attemptState === 'submitting'"
     class="text-sm text-[#13293a]"
   >
-    <p v-if="busy" role="status" class="my-3">
+    <ul
+      v-if="order.receipts.length"
+      aria-label="Comprobantes de pedidos confirmados"
+      class="my-4 list-none rounded-lg border border-solid border-green-300 bg-green-50 p-3"
+    >
+      <li
+        v-for="receipt in order.receipts"
+        :key="receipt.pedidoId"
+        role="status"
+        class="mb-2 last:mb-0"
+      >
+        Pedido #{{ receipt.pedidoId }} confirmado por USD {{ receipt.totalUSD }}.
+        Vence el {{ receipt.venceEl }}.
+      </li>
+    </ul>
+
+    <p v-if="cartBusy" role="status" class="my-3">
       {{
         cart.operation
           ? 'Actualizando carrito…'
@@ -48,7 +69,7 @@ const busy = computed(() =>
 
       <button
         type="button"
-        :disabled="busy"
+        :disabled="cartBusy"
         class="min-h-11 cursor-pointer border-0 bg-transparent
           p-0 font-[inherit] text-[#103a5c] underline
           disabled:cursor-not-allowed disabled:opacity-50
@@ -100,5 +121,6 @@ const busy = computed(() =>
         :stale="cart.needsSync"
       />
     </template>
+    <AccountOrderCheckout v-if="!cart.items.length && order.pendingKey" />
   </section>
 </template>

@@ -25,9 +25,17 @@ import {
   presentStoredAccountOrder,
 } from './account-order.recovery';
 import { executePendingAccountOrder } from './account-order.transaction';
-import type { AccountOrderResult } from './account-order.types';
+import { lockAccountOrderContext } from '../../repositories/accountOrderContext.repository';
+import { lockAccountOrderCart } from '../../repositories/accountOrderCart.repository';
+import { quoteAccountOrderCart } from './account-order.pricing';
+import { toCents } from '../../repositories/cuentaCorriente.repository';
+import type {
+  AccountOrderEligibilityResult,
+  AccountOrderResult,
+} from './account-order.types';
+import { issueAccountOrderQuoteToken } from './account-order-quote-token';
 
-async function identifyClient(auth: AuthContext): Promise<number> {
+function validateClientAuth(auth: AuthContext): void {
   if (auth.rol !== 'CLIENTE' ||
     !Number.isInteger(auth.id) || auth.id < 1 ||
     auth.id > 2147483647) {
@@ -36,7 +44,9 @@ async function identifyClient(auth: AuthContext): Promise<number> {
       'Esta operación requiere una cuenta de cliente.',
     );
   }
+}
 
+async function findActiveClient(auth: AuthContext): Promise<number> {
   const [client] = await dataSource.query<{ clientId: number }[]>(`
     SELECT c.id_cliente AS clientId
     FROM USUARIO u
@@ -52,26 +62,17 @@ async function identifyClient(auth: AuthContext): Promise<number> {
     );
   }
 
-  return Number(client.clientId);
+  return client.clientId;
 }
 
 async function identify(auth: AuthContext, value: unknown) {
-  if (auth.rol !== 'CLIENTE' ||
-    !Number.isInteger(auth.id) || auth.id < 1 ||
-    auth.id > 2147483647) {
-    throw new AccountOrderError(
-      'NO_AUTORIZADO', 403,
-      'Esta operación requiere una cuenta de cliente.',
-    );
-  }
-
+  validateClientAuth(auth);
   const key = await validateConfirmationKey(value);
   if (!key.valid) {
     throw new AccountOrderError(key.code, 400, key.message);
   }
 
-  const clientId = await identifyClient(auth);
-  return { clientId, key: key.key };
+  return { clientId: await findActiveClient(auth), key: key.key };
 }
 
 async function recover(clientId: number, key: string) {
@@ -184,6 +185,7 @@ export async function getAccountOrderResult(
 export async function confirmAccountOrder(
   auth: AuthContext,
   value: unknown,
+  quoteToken: unknown,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -210,7 +212,7 @@ export async function confirmAccountOrder(
         }
 
         return await executePendingAccountOrder(
-          manager, auth, clientId, key,
+          manager, auth, clientId, key, quoteToken,
         );
       } catch (error) {
         workFailure = { error };

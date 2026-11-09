@@ -34,12 +34,25 @@ Un saldo desconocido nunca se interpreta como cero.
 
 ## Confirmación HTTP
 
+Antes de ofrecer la modalidad, el frontend consulta la elegibilidad vigente:
+
+```http
+GET /api/pedidos/cuenta-corriente/eligibilidad
+```
+
+La respuesta se calcula con el cliente, carrito, precios y crédito del servidor.
+Es una lectura: no crea intentos, pedidos ni cargos. Una respuesta elegible
+incluye el total y el crédito disponible como cadenas USD; una prevalidación
+negativa por crédito insuficiente también devuelve ambos importes. La
+respuesta incluye una cotización firmada y temporal que vincula la sesión,
+el cliente, el carrito, sus productos, cantidades, precios y total.
+
 ```http
 POST /api/pedidos/cuenta-corriente
 Content-Type: application/json
 Idempotency-Key: <UUID v4>
 
-{}
+{"cotizacion":"<cotización firmada devuelta por elegibilidad>"}
 ```
 
 La autenticación utiliza la cookie de sesión existente.
@@ -47,11 +60,16 @@ La autenticación utiliza la cookie de sesión existente.
 La clave es obligatoria y se normaliza a minúsculas.
 Identifica un intento dentro del cliente autenticado.
 
-El cuerpo debe ser un objeto vacío.
+El cuerpo debe incluir únicamente `cotizacion`.
 No se admiten parámetros de consulta ni campos con identidad,
 precios, descuentos, totales, límites o saldos.
 
-El backend obtiene el cliente y su carrito desde la sesión.
+El backend obtiene el cliente y su carrito desde la sesión y compara la
+cotización dentro de la transacción, luego de bloquear el carrito y recalcular
+precios. No confía en importes enviados por el frontend. Si cambió algún
+producto, cantidad o precio, devuelve 409 `COTIZACION_DESACTUALIZADA` y no crea
+pedido, cargo ni descuento de stock; el cliente debe revisar y aceptar una
+nueva cotización antes de usar una nueva clave.
 
 ### Resultado confirmado
 
@@ -90,9 +108,17 @@ parámetros de consulta y no inicia una compra.
 
 - Confirmación completada: 200 con el resultado histórico.
 - Intento pendiente: 202 con el estado pendiente.
-- Rechazo persistido: mismo estado HTTP y error del rechazo.
+- Rechazo persistido: mismo estado HTTP y error del rechazo, con
+  `estado: 'RECHAZADO'`. Un error de autorización no lleva ese estado y
+  conserva la clave para consultar cuando se restablezca el acceso.
 - Clave inexistente o perteneciente a otro cliente: 404,
   sin revelar operaciones ajenas.
+
+Un 404 durante la recuperación no prueba que sea seguro crear otra clave:
+se conserva el identificador original para volver a consultar o reintentar
+con la misma cotización. Un rechazo persistido finaliza ese intento; luego
+de corregir las condiciones comerciales se consulta y acepta una cotización
+nueva para iniciar otra compra.
 
 ### Resultado pendiente
 
@@ -109,8 +135,8 @@ parámetros de consulta y no inicia una compra.
 Las respuestas 202 incluyen `Retry-After: 1`.
 
 Un 202 no significa rechazo y no autoriza generar otra clave
-para repetir la compra. El frontend debe conservar la clave y consultar
-el resultado; cualquier reintento del mismo intento utiliza esa clave.
+para repetir la compra. El frontend conserva la clave y cotización, consulta
+el resultado y, si hace falta, reintenta con los mismos valores.
 
 ## Idempotencia y persistencia
 

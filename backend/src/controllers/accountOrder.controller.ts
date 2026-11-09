@@ -13,6 +13,7 @@ import {
 } from '../services/orders/account-order.errors';
 import {
   confirmAccountOrder,
+  getAccountOrderEligibility,
   getAccountOrderResult,
   getClientOrderDetail,
   listClientOrders,
@@ -50,7 +51,9 @@ function validateRequest(req: Request, operation: OrderMutationOperation | Order
     throw new AccountOrderError(
       'SOLICITUD_INVALIDA',
       400,
-      'La consulta no admite un cuerpo.',
+      operation === 'eligibility'
+        ? 'La consulta de elegibilidad no admite un cuerpo.'
+        : 'La consulta del resultado no admite un cuerpo.',
     );
   }
 }
@@ -86,8 +89,17 @@ export function handleAccountOrder(
           validateRequest(req, operation);
 
           const result = operation === 'confirm'
-            ? await confirmAccountOrder(auth, req.get('Idempotency-Key'))
-            : await getAccountOrderResult(auth, req.params.clave);
+            ? await confirmAccountOrder(
+              auth,
+              req.get('Idempotency-Key'),
+              (req.body as { cotizacion: string }).cotizacion,
+            )
+            : operation === 'recover'
+              ? await getAccountOrderResult(
+                auth,
+                req.params.clave,
+              )
+              : await getAccountOrderEligibility(auth);
 
           if (cancellation.signal.aborted) return;
 
@@ -97,7 +109,7 @@ export function handleAccountOrder(
 
           res.status(result.status).json(result.body);
         },
-        { serializePerUser: operation === 'confirm' },
+        { serializePerUser: operation !== 'recover' },
       );
     } catch (error) {
       if (cancellation.signal.aborted || res.headersSent) return;

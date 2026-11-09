@@ -1,13 +1,12 @@
 <script setup lang="ts">
-import { computed, useId } from 'vue'
+import { computed } from 'vue'
 import type { CartSnapshot } from '@/types/cart'
+import AccountOrderCheckout from '@/components/AccountOrderCheckout.vue'
 
 const props = defineProps<{
   snapshot: CartSnapshot
   stale: boolean
 }>()
-
-const checkoutNoteId = useId()
 
 const showTotal = computed(() =>
   !props.stale &&
@@ -78,22 +77,6 @@ const totalLabel = computed(() =>
       Precios en USD · IVA incluido.
     </p>
 
-    <button
-      type="button"
-      disabled
-      :aria-describedby="checkoutNoteId"
-      class="min-h-12 w-full cursor-not-allowed rounded-lg
-        border-0 bg-[#145a8d] px-4 py-2 font-[inherit]
-        font-semibold text-white opacity-60"
-    >
-      Finalizar compra
-    </button>
-
-    <p
-      :id="checkoutNoteId"
-      class="mb-0 mt-2 text-xs text-slate-500"
-    >
-      La finalización de compra todavía no está disponible.
-    </p>
+    <AccountOrderCheckout :snapshot="snapshot" :stale="stale" />
   </section>
 </template>

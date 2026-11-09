@@ -52,6 +52,11 @@ for (const width of [1280, 360]) {
       await expect(drawerRemove).toBeFocused()
 
       await page.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', {
+        name: 'Volver a consultar elegibilidad',
+      })).toBeFocused()
+
+      await page.keyboard.press('Tab')
       await expect(fullCart).toBeFocused()
 
       // El foco permanece dentro del diálogo en ambas direcciones.

@@ -50,6 +50,7 @@ export interface ClientOrderDetail extends ClientOrderSummary {
 export interface AccountOrderFailure {
   code: string;
   message: string;
+  estado?: 'RECHAZADO';
 }
 
 export type AccountOrderResponse =
@@ -74,4 +75,19 @@ export type AccountOrderHttpStatus =
 export interface AccountOrderResult {
   status: AccountOrderHttpStatus;
   body: AccountOrderResponse;
+}
+
+export interface AccountOrderEligibility {
+  elegible: boolean;
+  moneda: 'USD';
+  totalUSD: string | null;
+  creditoDisponibleUSD: string | null;
+  codigo: string | null;
+  mensaje: string | null;
+  cotizacion: string | null;
+}
+
+export interface AccountOrderEligibilityResult {
+  status: 200;
+  body: { data: AccountOrderEligibility };
 }
