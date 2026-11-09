@@ -110,7 +110,7 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  await seedFixtures(connection);
+  await seedFixtures(connection, { includeAccountOrderFixture: false });
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);

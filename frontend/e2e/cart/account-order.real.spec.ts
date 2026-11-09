@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 
 async function signIn(page: import('@playwright/test').Page) {
   await page.goto('/login')
-  await page.getByLabel('Email', { exact: true }).fill('empresa-cuenta@e2e.test')
+  await page.getByLabel('Email', { exact: true }).fill('cc258-empty@example.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
@@ -43,13 +43,13 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await page.goto('/carrito')
 
   const summary = page.getByRole('region', { name: 'Resumen del carrito' })
-  await expect(summary).toContainText('USD 111.60')
+  await expect(summary).toContainText('USD 124.00')
   await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
 
   const secondTab = await context.newPage()
   await secondTab.goto(page.url())
   const staleSummary = secondTab.getByRole('region', { name: 'Resumen del carrito' })
-  await expect(staleSummary).toContainText('USD 111.60')
+  await expect(staleSummary).toContainText('USD 124.00')
   const quantity = secondTab.getByRole('region', { name: 'Contenido del carrito' })
     .getByRole('spinbutton', { name: 'Cantidad de Producto E2E 24' })
   await quantity.fill('2')
@@ -60,11 +60,11 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
   await expect(summary.getByRole('alert')).toContainText('El carrito o sus precios cambiaron')
   await summary.getByRole('button', { name: 'Actualizar carrito y crédito para reintentar' }).click()
-  await expect(summary).toContainText('USD 223.20')
+  await expect(summary).toContainText('USD 248.00')
   await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
   await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
   await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
-    .toContainText('USD 223.20')
+    .toContainText('USD 248.00')
   await expect(page.getByText('Tu carrito está vacío.', { exact: true })).toBeVisible()
 
   await page.goto('/catalogo?busqueda=E2E-24')
@@ -80,7 +80,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   const nextSummary = page.getByRole('region', { name: 'Resumen del carrito' })
   await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
   await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
-    .toContainText('USD 223.20')
+    .toContainText('USD 248.00')
   await nextSummary.getByRole('radio', { name: 'Cuenta corriente' }).check()
   dropPostResponse = true
   await nextSummary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
@@ -88,7 +88,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   failCartRead = true
   await nextSummary.getByRole('button', { name: 'Consultar resultado' }).click()
   await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
-    .toContainText('USD 111.60')
+    .toContainText('USD 124.00')
   await expect(page.getByRole('region', { name: 'Contenido del carrito' }).getByRole('alert')
     .filter({ hasText: 'servidor no pudo procesar el carrito' }))
     .toContainText('servidor no pudo procesar el carrito')
