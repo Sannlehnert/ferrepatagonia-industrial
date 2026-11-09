@@ -7,10 +7,15 @@ import {
   reserveAccountOrderAttempt,
 } from '../../repositories/accountOrderAttempt.repository';
 import {
+  findClientOrderDetailById,
+  findClientOrdersByClientId,
+} from '../../repositories/accountOrder.repository';
+import {
   persistAccountOrderRejection,
 } from '../../repositories/accountOrderRejection.repository';
 import {
   validateConfirmationKey,
+  validateOrderIdParam,
 } from '../../dtos/orders/account-order.dto';
 import { hasDatabaseError } from '../cart.errors';
 import { PricingError } from '../pricing/money';
@@ -22,7 +27,7 @@ import {
 import { executePendingAccountOrder } from './account-order.transaction';
 import type { AccountOrderResult } from './account-order.types';
 
-async function identify(auth: AuthContext, value: unknown) {
+async function identifyClient(auth: AuthContext): Promise<number> {
   if (auth.rol !== 'CLIENTE' ||
     !Number.isInteger(auth.id) || auth.id < 1 ||
     auth.id > 2147483647) {
@@ -30,11 +35,6 @@ async function identify(auth: AuthContext, value: unknown) {
       'NO_AUTORIZADO', 403,
       'Esta operación requiere una cuenta de cliente.',
     );
-  }
-
-  const key = await validateConfirmationKey(value);
-  if (!key.valid) {
-    throw new AccountOrderError(key.code, 400, key.message);
   }
 
   const [client] = await dataSource.query<{ clientId: number }[]>(`
@@ -52,7 +52,26 @@ async function identify(auth: AuthContext, value: unknown) {
     );
   }
 
-  return { clientId: client.clientId, key: key.key };
+  return Number(client.clientId);
+}
+
+async function identify(auth: AuthContext, value: unknown) {
+  if (auth.rol !== 'CLIENTE' ||
+    !Number.isInteger(auth.id) || auth.id < 1 ||
+    auth.id > 2147483647) {
+    throw new AccountOrderError(
+      'NO_AUTORIZADO', 403,
+      'Esta operación requiere una cuenta de cliente.',
+    );
+  }
+
+  const key = await validateConfirmationKey(value);
+  if (!key.valid) {
+    throw new AccountOrderError(key.code, 400, key.message);
+  }
+
+  const clientId = await identifyClient(auth);
+  return { clientId, key: key.key };
 }
 
 async function recover(clientId: number, key: string) {
@@ -87,6 +106,63 @@ function rejection(error: unknown): AccountOrderError | null {
   }
 
   return null;
+}
+
+export async function listClientOrders(
+  auth: AuthContext,
+): Promise<AccountOrderResult> {
+  const clientId = await identifyClient(auth);
+  const items = await findClientOrdersByClientId(clientId);
+
+  return {
+    status: 200,
+    body: {
+      data: { items },
+    },
+  };
+}
+
+export async function getClientOrderDetail(
+  auth: AuthContext,
+  orderIdParam: unknown,
+): Promise<AccountOrderResult> {
+  if (auth.rol !== 'CLIENTE' ||
+    !Number.isInteger(auth.id) || auth.id < 1 ||
+    auth.id > 2147483647) {
+    throw new AccountOrderError(
+      'NO_AUTORIZADO', 403,
+      'Esta operación requiere una cuenta de cliente.',
+    );
+  }
+
+  const validation = await validateOrderIdParam(orderIdParam);
+  if (!validation.valid) {
+    throw new AccountOrderError(
+      validation.code,
+      400,
+      validation.message,
+    );
+  }
+
+  const clientId = await identifyClient(auth);
+  const order = await findClientOrderDetailById(clientId, validation.orderId);
+
+  if (!order) {
+    return {
+      status: 404,
+      body: {
+        code: 'PEDIDO_NO_ENCONTRADO',
+        message: 'No se encontró el pedido solicitado.',
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      data: order,
+    },
+  };
 }
 
 export async function getAccountOrderResult(
@@ -142,8 +218,6 @@ export async function confirmAccountOrder(
       }
     }, { isolation: 'READ COMMITTED', lockWaitSeconds: 2 });
   } catch (error) {
-    // Solo esta coincidencia acredita un fallo del trabajo
-    // que inTransaction devolvió después de confirmar el rollback.
     if (!workFailure || workFailure.error !== error ||
       error instanceof DatabaseOutcomeUnknownError) {
       return recover(clientId, key);

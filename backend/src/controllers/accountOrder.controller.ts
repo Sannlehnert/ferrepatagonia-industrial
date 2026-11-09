@@ -14,9 +14,11 @@ import {
 import {
   confirmAccountOrder,
   getAccountOrderResult,
+  getClientOrderDetail,
+  listClientOrders,
 } from '../services/orders/account-order.service';
 
-type Operation = 'confirm' | 'recover';
+type Operation = 'confirm' | 'recover' | 'list' | 'detail';
 
 function validateRequest(req: Request, operation: Operation): void {
   if (Object.keys(req.query).length > 0) {
@@ -47,7 +49,7 @@ function validateRequest(req: Request, operation: Operation): void {
     throw new AccountOrderError(
       'SOLICITUD_INVALIDA',
       400,
-      'La consulta del resultado no admite un cuerpo.',
+      'La consulta no admite un cuerpo.',
     );
   }
 }
@@ -82,15 +84,16 @@ export function handleAccountOrder(
         async auth => {
           validateRequest(req, operation);
 
-          const result = operation === 'confirm'
-            ? await confirmAccountOrder(
-              auth,
-              req.get('Idempotency-Key'),
-            )
-            : await getAccountOrderResult(
-              auth,
-              req.params.clave,
-            );
+          let result;
+          if (operation === 'confirm') {
+            result = await confirmAccountOrder(auth, req.get('Idempotency-Key'));
+          } else if (operation === 'recover') {
+            result = await getAccountOrderResult(auth, req.params.clave);
+          } else if (operation === 'list') {
+            result = await listClientOrders(auth);
+          } else {
+            result = await getClientOrderDetail(auth, req.params.id);
+          }
 
           if (cancellation.signal.aborted) return;
 
@@ -113,11 +116,14 @@ export function handleAccountOrder(
         return;
       }
 
+      const isReadOperation = operation === 'list' || operation === 'detail';
       res.status(503).json({
         code: error instanceof CartError
-          ? 'CONFIRMACION_OCUPADA'
-          : 'CONFIRMACION_NO_DISPONIBLE',
-        message: 'Consultá el resultado con la misma clave antes de reintentar.',
+          ? (isReadOperation ? 'CONSULTA_PEDIDOS_OCUPADA' : 'CONFIRMACION_OCUPADA')
+          : (isReadOperation ? 'CONSULTA_PEDIDOS_NO_DISPONIBLE' : 'CONFIRMACION_NO_DISPONIBLE'),
+        message: isReadOperation
+          ? 'El historial de pedidos no está disponible temporalmente. Reintentá en unos instantes.'
+          : 'Consultá el resultado con la misma clave antes de reintentar.',
       });
     } finally {
       res.removeListener('close', disconnect);
