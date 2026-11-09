@@ -5,9 +5,22 @@ const { seedDemo, clearDemo } = require('../../database/fixtures/fer19-demo.cjs'
 const c = accountContext();
 
 test('seed reproducible con IDs autogenerados diferentes y segunda carga rechazada sin escrituras', async () => {
-  const snapshot = () => c.db.query(`SELECT cl.email,m.tipo_movimiento,m.monto,m.moneda,m.fecha_efectiva,m.fecha_vencimiento,m.estado
-    FROM MOVIMIENTO_CUENTA_CORRIENTE m JOIN CUENTA_CORRIENTE cc USING(id_cuenta_corriente)
-    JOIN CLIENTE cl USING(id_cliente) ORDER BY cl.email,m.id_movimiento_cuenta`);
+  const snapshot = async () => ({
+    accounts: await c.db.query(`SELECT cl.email,cc.limite_credito,cc.habilitada,cc.cobertura,cc.plazo_dias,cc.origen_datos,
+      cc.moneda_limite,cc.evidencia_limite,cc.evidencia_plazo,cc.evidencia_cobertura,cc.cobertura_desde_utc,
+      CAST(cc.revision AS CHAR) AS revision
+      FROM CLIENTE cl LEFT JOIN CUENTA_CORRIENTE cc USING(id_cliente) ORDER BY cl.email`),
+    movements: await c.db.query(`SELECT cl.email,m.tipo_movimiento,m.monto,m.moneda,m.fecha_efectiva,
+      m.fecha_base_civil,m.plazo_aplicado,m.vence_el,m.estado,m.invalidado_utc
+      FROM MOVIMIENTO_CUENTA_CORRIENTE m JOIN CUENTA_CORRIENTE cc USING(id_cuenta_corriente)
+      JOIN CLIENTE cl USING(id_cliente) ORDER BY cl.email,m.id_movimiento_cuenta`),
+    allocations: await c.db.query(`SELECT cl.email,cargo.monto AS cargo,abono.monto AS abono,i.monto_imputado,
+      i.estado,CAST(i.revision AS CHAR) AS revision,i.fecha_imputacion,i.invalidada_utc
+      FROM IMPUTACION_MOVIMIENTO_CUENTA i JOIN CUENTA_CORRIENTE cc USING(id_cuenta_corriente)
+      JOIN CLIENTE cl USING(id_cliente) JOIN MOVIMIENTO_CUENTA_CORRIENTE cargo ON cargo.id_movimiento_cuenta=i.id_cargo
+      JOIN MOVIMIENTO_CUENTA_CORRIENTE abono ON abono.id_movimiento_cuenta=i.id_abono
+      ORDER BY cl.email,i.id_imputacion`),
+  });
   const first = JSON.stringify(await snapshot());
   const id = c.a.accountId;
   await assert.rejects(seedDemo(c.session), /debe estar vacía/);
@@ -20,9 +33,10 @@ test('seed reproducible con IDs autogenerados diferentes y segunda carga rechaza
 
 test('seed: usuarios válidos, contraseña de login DEMO y relaciones propias', async () => {
   const users = await c.db.query('SELECT * FROM USUARIO');
-  assert.equal(users.length, 12);
+  assert.equal(users.length, 14);
   const bcrypt = require('bcryptjs');
   assert.ok(bcrypt.compareSync(c.fixture.password, users[0].password_hash));
+  assert.equal(users.filter(u => u.rol === 'ADMIN' && u.id_cliente === null).length, 1);
   assert.equal(Number((await c.db.query(`SELECT COUNT(*) n FROM MOVIMIENTO_CUENTA_CORRIENTE m
     JOIN CUENTA_CORRIENTE cc USING(id_cuenta_corriente) LEFT JOIN PEDIDO p USING(id_pedido) LEFT JOIN PAGO a USING(id_pago)
     WHERE (m.tipo_movimiento='CARGO' AND p.id_cliente<>cc.id_cliente)
@@ -32,11 +46,12 @@ test('seed: usuarios válidos, contraseña de login DEMO y relaciones propias', 
 
 test('fallo a mitad del seed revierte todas sus escrituras', async () => {
   await clearDemo(c.session);
-  await c.db.query(`CREATE TRIGGER demo_seed_fail BEFORE INSERT ON CLIENTE FOR EACH ROW
-    BEGIN IF NEW.email='fer19-empresa30@example.test' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='DEMO_SEED_FAILURE'; END IF; END`);
+  await c.db.query(`CREATE TRIGGER demo_seed_fail BEFORE INSERT ON PAGO FOR EACH ROW
+    BEGIN IF NEW.monto=999.00 AND NEW.estado='RECHAZADO' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT='DEMO_SEED_FAILURE'; END IF; END`);
   try {
     await assert.rejects(seedDemo(c.session), /DEMO_SEED_FAILURE/);
-    for (const table of ['USUARIO', 'CLIENTE', 'CUENTA_CORRIENTE', 'MOVIMIENTO_CUENTA_CORRIENTE'])
+    for (const table of ['USUARIO', 'CLIENTE', 'CUENTA_CORRIENTE', 'MOVIMIENTO_CUENTA_CORRIENTE',
+      'IMPUTACION_MOVIMIENTO_CUENTA', 'PAGO', 'PEDIDO'])
       assert.equal(Number((await c.db.query(`SELECT COUNT(*) n FROM ${table}`))[0].n), 0);
   } finally { await c.db.query('DROP TRIGGER demo_seed_fail'); }
 });
@@ -56,7 +71,7 @@ for (const [key, charges, credits, debt, available] of [
   ['inhabilitada', '70.00', '0.00', '70.00', '0.00'],
   ['vacia', '0.00', '0.00', '0.00', '300.00'],
   ['cero', '0.00', '0.00', '0.00', '0.00'],
-]) test(`repositorio #260: agregación conocida de fixture ${key} (no acredita cobertura productiva)`, async () => {
+]) test(`repositorio #260: saldo y crédito del escenario ${key}`, async () => {
   const s = await c.repo.calcularEstadoCuenta(c.fixture.clients[key].accountId);
   assert.deepEqual([s.total_cargos, s.total_abonos, s.deuda_vigente, s.credito_disponible], [charges, credits, debt, available]);
 });
@@ -75,9 +90,9 @@ test('cargo exacto seguido de abono exacto cancela deuda', async () => {
   const a = c.fixture.clients.vacia;
   await c.charge(a, '0.30');
   assert.equal((await c.repo.calcularEstadoCuenta(a.accountId)).deuda_vigente, '0.30');
-  const payment = Number((await c.db.query(`INSERT INTO PAGO(id_cuenta_corriente,monto,metodo_pago,estado) VALUES(?,'0.30','DEMO_USD','ACREDITADO')`, [a.accountId])).insertId);
-  await c.db.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE(id_cuenta_corriente,tipo_movimiento,origen,id_pago,monto) VALUES(?,'ABONO','PAGO',?,'0.30')`, [a.accountId, payment]);
+  await c.credit(a, '0.30');
   assert.equal((await c.repo.calcularEstadoCuenta(a.accountId)).deuda_vigente, '0.00');
+  assert.deepEqual(await c.repo.consultarVencimientos(a.accountId), []);
 });
 
 test('pagos pendientes/rechazados no generan movimientos ni alteran saldo', async () => {
@@ -117,18 +132,25 @@ test('dos cargos simultáneos compiten por 775.00: solo uno de 450.00 persiste',
 
 test('unicidad pedido/pago y FK reales MariaDB', async () => {
   const cargo = c.a.movements[0], abono = c.a.movements.find(m => m.type === 'ABONO');
-  await assert.rejects(c.repo.registrarCargoPorPedido({ id_cuenta_corriente: c.a.accountId, id_pedido: cargo.orderId, monto: '1.00' }), /Duplicate entry/);
-  await assert.rejects(c.db.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE(id_cuenta_corriente,tipo_movimiento,origen,id_pago,monto) VALUES(?,'ABONO','PAGO',?,'1.00')`, [c.a.accountId, abono.paymentId]), /Duplicate entry/);
-  await assert.rejects(c.db.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE(id_cuenta_corriente,tipo_movimiento,origen,id_pago,monto) VALUES(?,'ABONO','PAGO',2147483647,'1.00')`, [c.a.accountId]), /foreign key/i);
+  const insert = (type, order, payment) => c.db.query(
+    "INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE(id_cuenta_corriente,tipo_movimiento,origen,id_pedido,id_pago,monto) VALUES(?,?,'DEMO',?,?,'1.00')",
+    [c.a.accountId, type, order, payment]);
+  await assert.rejects(insert('CARGO', cargo.orderId, null), /uq_movimiento_pedido/);
+  await assert.rejects(insert('ABONO', null, abono.paymentId), /uq_movimiento_pago/);
+  await assert.rejects(insert('ABONO', null, 2147483647), /fk_movimiento_pago/);
 });
 
 test('rollback externo revierte cargo; cuenta B permanece intacta', async () => {
-  const orderId = await c.order();
+  const orderId = await c.order(c.a, '100.00');
+  const before = await c.repo.calcularEstadoCuenta(c.a.accountId);
+  const allocations = () => c.db.query('SELECT * FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_cuenta_corriente=? ORDER BY id_imputacion', [c.a.accountId]);
+  const beforeAllocations = await allocations();
   await assert.rejects(c.database.inTransaction(async manager => {
     await c.repo.registrarCargoPorPedido({ id_cuenta_corriente: c.a.accountId, id_pedido: orderId, monto: '100.00' }, manager);
     throw Error('DEMO_ROLLBACK');
   }), /DEMO_ROLLBACK/);
-  assert.equal((await c.repo.calcularEstadoCuenta(c.a.accountId)).deuda_vigente, '225.00');
+  assert.deepEqual(await c.repo.calcularEstadoCuenta(c.a.accountId), before);
+  assert.deepEqual(await allocations(), beforeAllocations);
   assert.equal((await c.repo.calcularEstadoCuenta(c.fixture.clients.empresa60.accountId)).deuda_vigente, '500.00');
   assert.equal(Number((await c.db.query('SELECT COUNT(*) n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pedido=?', [orderId]))[0].n), 0);
 });
@@ -157,6 +179,7 @@ for (const [column, value, constraint] of [
   ['estado', 'PENDIENTE', 'chk_movimiento_estado'],
 ]) test(`migración real conserva CHECK ${constraint}`, async () => {
   const fields = { monto: '1.00', tipo_movimiento: 'ABONO', moneda: 'USD', estado: 'ACREDITADO', [column]: value };
-  await assert.rejects(c.db.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE(id_cuenta_corriente,origen,monto,tipo_movimiento,moneda,estado)
-    VALUES(?,'DEMO',?,?,?,?)`, [c.a.accountId, fields.monto, fields.tipo_movimiento, fields.moneda, fields.estado]), new RegExp(constraint));
+  const payment = await c.payment(c.a, '1.00');
+  await assert.rejects(c.db.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE(id_cuenta_corriente,origen,monto,tipo_movimiento,moneda,estado,id_pago)
+    VALUES(?,'DEMO',?,?,?,?,?)`, [c.a.accountId, fields.monto, fields.tipo_movimiento, fields.moneda, fields.estado, payment]), new RegExp(constraint));
 });

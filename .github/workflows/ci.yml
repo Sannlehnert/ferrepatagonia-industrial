@@ -71,11 +71,9 @@ jobs:
                   npm run test:account:safety
                   npm run test:account:cleanup
 
-            # Deliberately fails closed until #260 is integrated. A green build of
-            # unrelated suites must not imply account persistence was exercised.
-            - name: Run account seed integration (requires task 260)
+            - name: Run account seed, contract and client HTTP integration
               working-directory: backend
-              run: npm run test:account:isolated
+              run: node test/helpers/run-account-mariadb.cjs all
 
             - name: Verify MariaDB container and volume cleanup
               if: always()

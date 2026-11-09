@@ -1,78 +1,153 @@
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
+const { once } = require('node:events');
+const { setTimeout: delay } = require('node:timers/promises');
 const { randomUUID } = require('node:crypto');
-const assert = require('node:assert/strict');
-const { docker, newProfile, connectOwned } = require('./account-disposable.cjs');
+const owned = require('./account-disposable.cjs');
+
 const backend = path.resolve(__dirname, '../..');
-const mode = process.argv[2] || 'persistence';
 const suites = {
-  persistence: ['test/account.seed.mariadb.test.cjs'],
-  contract: ['test/account.contract.mariadb.test.cjs'],
-  client: ['test/account.client.mariadb.test.cjs'],
-  'cleanup-success': [],
-  'cleanup-failure': [],
+  persistence: 'test/account.seed.mariadb.test.cjs',
+  contract: 'test/account.contract.mariadb.test.cjs',
+  client: 'test/account.client.mariadb.test.cjs',
 };
 
-async function main() {
-  assert.ok(Object.hasOwn(suites, mode), 'Modo esperado: persistence, contract o client');
-  for (const file of (mode.startsWith('cleanup-') ? [] : ['../database/migrate-fer-20-account-movements.sql', 'dist/repositories/cuentaCorriente.repository.js',
-    ...(mode === 'client' ? ['dist/routes/cuentaCorriente.routes.js'] : [])])) {
-    assert.ok(fs.existsSync(path.join(backend, file)), `PENDIENTE POR DEPENDENCIA #260/#251: falta ${file}. Build requerido; no se creó ninguna BD.`);
+async function removeOwnContainer(profile, docker = owned.docker) {
+  const list = filter => docker('ps', '-aq', '--no-trunc', '--filter', filter);
+  const filter = profile.id ? 'id=' + profile.id : 'name=^/' + profile.container + '$';
+  let id = list(filter);
+  for (let attempt = 0; !profile.id && !id && attempt < 10; attempt++) {
+    await delay(200);
+    id = list(filter);
   }
-  const p = newProfile();
-  let session, child, interrupted = false;
-  const signal = () => { interrupted = true; if (child) child.kill('SIGTERM'); };
-  process.on('SIGINT', signal); process.on('SIGTERM', signal);
+  if (!id) return;
   try {
-    p.id = docker('run', '--rm', '-d', '--name', p.container, '--label', `ferrepatagonia.account-test=${p.token}`,
-      '--tmpfs', '/var/lib/mysql:rw', '-p', '127.0.0.1::3306', '-e', `MARIADB_ROOT_PASSWORD=${p.password}`,
-      '-e', `MARIADB_DATABASE=${p.database}`, 'mariadb:11.4');
-    const info = JSON.parse(docker('inspect', p.id))[0];
-    p.port = Number(info.NetworkSettings.Ports['3306/tcp'][0].HostPort);
-    for (let n = 0; n < 60 && !interrupted; n++) {
-      try { session = await connectOwned(p); break; }
-      catch (error) { if (n === 59) throw error; await new Promise(r => setTimeout(r, 1000)); }
+    owned.assertContainerOwner(profile, id, owned.inspect(id));
+    docker('rm', '-f', '-v', id);
+  } catch (error) {
+    if (list('id=' + id)) throw error;
+  }
+  assert.equal(list('id=' + id), '', 'El contenedor descartable sigue presente');
+}
+
+async function run(mode = 'persistence', {
+  docker = owned.docker, connect = owned.connectOwned, execute = execFileSync, signal,
+} = {}) {
+  const cleanup = mode === 'cleanup-success' || mode === 'cleanup-failure';
+  assert.ok(cleanup || mode === 'all' || Object.hasOwn(suites, mode), 'Modo #253 inválido');
+  const modes = mode === 'all' ? Object.keys(suites) : [mode];
+  const profile = owned.newProfile();
+  const errors = [];
+  let session, child, interrupted, killTimer;
+  const interrupt = () => {
+    interrupted = true;
+    if (child && !killTimer) {
+      child.kill('SIGTERM');
+      killTimer = setTimeout(() => child?.kill('SIGKILL'), 5000);
     }
-    assert.ok(session && !interrupted, 'MariaDB descartable no disponible o ejecución interrumpida');
-    console.log(JSON.stringify({ mode, host: p.host, port: p.port, database: p.database, container: p.container }));
-    if (mode === 'cleanup-failure') throw Error('DEMO_EXPECTED_FAILURE: prueba de limpieza');
-    if (mode === 'cleanup-success') return;
-    const db = session.connection;
-    await db.query("SET SESSION time_zone = '+00:00'");
-    const schema = fs.readFileSync(path.join(backend, '../database/schema.sql'), 'utf8');
-    // Exercise the real additive migration on the base schema, then its idempotence.
-    for (const sql of schema.split(/CREATE TABLE (?:IF NOT EXISTS )?MOVIMIENTO_CUENTA_CORRIENTE/)[0].split(';').filter(s => s.trim())) await db.query(sql);
-    const migration = fs.readFileSync(path.join(backend, '../database/migrate-fer-20-account-movements.sql'), 'utf8')
-      .replace(/^SET NAMES\s+\S+;\s*$/gim, '').replace(/^DELIMITER\s+\S+\s*$/gim, '').replace(/END\s*\/\//g, 'END;').trim();
-    for (let n = 0; n < 2; n++) await db.query(migration);
-    console.log(JSON.stringify({ mode, host: p.host, port: p.port, database: p.database, container: p.container,
-      image: info.Image, version: (await db.query('SELECT VERSION() AS v'))[0].v, migrationApplications: 2 }));
-    const env = { ...process.env, NODE_ENV: 'test', TZ: 'UTC', DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
-      JWT_SECRET: randomUUID(), DB_HOST: p.host, DB_PORT: String(p.port), DB_NAME: p.database, DB_USER: 'root', DB_PASSWORD: p.password,
-      ACCOUNT_TEST_PROFILE: JSON.stringify(p) };
-    const code = await new Promise((resolve, reject) => {
-      child = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', ...suites[mode]],
-        { cwd: backend, env, stdio: 'inherit', windowsHide: true });
-      const timeout = setTimeout(() => { interrupted = true; child.kill('SIGTERM'); }, 180000);
-      child.on('error', e => { clearTimeout(timeout); reject(e); });
-      child.on('exit', code => { clearTimeout(timeout); child = null; resolve(code); });
+  };
+  const checkInterrupted = () => assert.ok(!interrupted && !signal?.aborted, 'Suite #253 interrumpida');
+  process.on('SIGINT', interrupt);
+  process.on('SIGTERM', interrupt);
+  signal?.addEventListener('abort', interrupt, { once: true });
+
+  async function runTest(args) {
+    checkInterrupted();
+    child = spawn(process.execPath, args, {
+      cwd: backend, stdio: 'inherit', windowsHide: true,
+      env: {
+        ...process.env, NODE_ENV: 'test', TZ: 'UTC', DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
+        JWT_SECRET: randomUUID(), DB_HOST: profile.host, DB_PORT: String(profile.port), DB_NAME: profile.database,
+        DB_USER: 'root', DB_PASSWORD: profile.password, CC253_TEST_PROFILE: JSON.stringify(profile),
+      },
     });
-    assert.equal(code, 0, `Suite ${mode} falló (exit ${code}); revisar TAP, no equivale a aceptación aprobada`);
-    assert.equal(interrupted, false);
-  } finally {
-    process.off('SIGINT', signal); process.off('SIGTERM', signal);
-    try { if (session) await session.connection.end(); }
-    finally {
-      if (p.id) {
-        // Only remove the exact newly-created ID, with its ownership label.
-        const info = JSON.parse(docker('inspect', p.id))[0];
-        assert.equal(info.Config.Labels['ferrepatagonia.account-test'], p.token);
-        docker('rm', '-f', '-v', p.id);
-        assert.equal(docker('ps', '-aq', '--filter', `label=ferrepatagonia.account-test=${p.token}`), '');
-        console.log('CLEANUP OK: contenedor propio eliminado; datos tmpfs, sin volúmenes persistentes.');
+    const timeout = setTimeout(interrupt, 240000);
+    try {
+      const [code, signalName] = await once(child, 'exit');
+      checkInterrupted();
+      assert.equal(code, 0, 'Suite #253 falló (exit ' + (code ?? signalName) + ')');
+    } finally {
+      clearTimeout(timeout);
+      clearTimeout(killTimer);
+      killTimer = undefined;
+      child = undefined;
+    }
+  }
+
+  try {
+    checkInterrupted();
+    profile.id = docker('run', '--rm', '-d', '--name', profile.container, '--label', owned.label(profile),
+      '--tmpfs', '/var/lib/mysql:rw', '-p', profile.host + '::3306', '-e', 'MARIADB_ROOT_PASSWORD=' + profile.password,
+      '-e', 'MARIADB_DATABASE=' + profile.database, owned.image);
+    const info = owned.inspect(profile.id);
+    profile.port = Number(info.NetworkSettings.Ports['3306/tcp']?.[0]?.HostPort);
+    owned.validateProfile(profile, info);
+    for (let attempt = 0; attempt < 60; attempt++) {
+      checkInterrupted();
+      try {
+        session = await connect(profile);
+        break;
+      } catch (error) {
+        if (error.code === 'ERR_ASSERTION' || error instanceof AggregateError || attempt === 59) throw error;
+        await delay(1000);
       }
     }
+    checkInterrupted();
+    console.log(JSON.stringify({
+      mode, database: profile.database, container: profile.container, port: profile.port,
+      version: (await session.connection.query('SELECT VERSION() AS version'))[0].version,
+    }));
+    if (mode === 'cleanup-failure') await runTest(['-e', 'throw Error("DEMO_EXPECTED_FAILURE")']);
+    if (!cleanup) {
+      const apply = async file => {
+        checkInterrupted();
+        await owned.assertOwned(session);
+        try {
+          execute('docker', ['exec', '-i', profile.id, 'mariadb', '-uroot', '-p' + profile.password, profile.database], {
+            input: fs.readFileSync(path.resolve(backend, '../database', file)), stdio: 'pipe', windowsHide: true, timeout: 60000,
+          });
+        } catch (error) {
+          throw new Error('SQL ' + file + ': ' + (error.stderr?.toString().trim() || error.message));
+        }
+      };
+      await apply('schema.sql');
+      await apply('migrate-fer-20-account-movements.sql');
+      await apply('migrate-fer-20-account-movements.sql');
+      for (const name of modes) {
+        console.log('Suite #253: ' + name);
+        // Run each node:test file directly so SIGTERM targets the process owning the connections.
+        try { await runTest(['--require', './test/helpers/test-env.cjs', suites[name]]); }
+        catch (error) { errors.push(error); }
+        if (interrupted) break;
+      }
+    }
+  } catch (error) {
+    errors.push(error);
+  } finally {
+    try { await session?.connection.end(); }
+    catch (error) { errors.push(error); }
+    try {
+      await removeOwnContainer(profile, docker);
+      console.log('CLEANUP OK #253: ' + profile.container);
+    } catch (error) {
+      errors.push(error);
+    }
+    process.off('SIGINT', interrupt);
+    process.off('SIGTERM', interrupt);
+    signal?.removeEventListener('abort', interrupt);
+  }
+  if (errors.length) {
+    throw new AggregateError(errors.map(error => new Error(error.message.replaceAll(profile.password, '[oculta]'))),
+      'Ejecución #253 fallida');
   }
 }
-main().catch(error => { console.error(error.message); process.exitCode = 1; });
+
+if (require.main === module) {
+  run(process.argv[2]).catch(error => {
+    for (const cause of error.errors ?? [error]) console.error(cause.message);
+    process.exitCode = 1;
+  });
+}
+module.exports = { run, removeOwnContainer };

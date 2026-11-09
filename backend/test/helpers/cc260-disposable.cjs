@@ -7,6 +7,7 @@ const docker = (...args) => execFileSync('docker', args, {
 }).trim();
 const runners = {
   251: { database: 'cc_client_test_', container: 'cc-client-test-', label: 'ferrepatagonia.cc251-test' },
+  253: { database: 'account_test_', container: 'account-test-', label: 'ferrepatagonia.account-test' },
   260: { database: 'cc260_test_', container: 'cc260-test-', label: 'ferrepatagonia.cc260-test' },
 };
 const image = 'mariadb:11.4';

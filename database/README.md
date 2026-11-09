@@ -451,9 +451,10 @@ esquemas distintos al oficial.
 
 ## Consideraciones
 
-El seed específico de cuenta corriente #253 se ejecuta únicamente con
-`npm run test:account:isolated --prefix backend` en MariaDB descartable.
-No modifica el seed general. Ver [escenarios, protecciones, pruebas y dependencias](../docs/pruebas-cuenta-corriente-253.md).
+El seed específico de cuenta corriente #253 requiere MariaDB descartable.
+Ejecutar `npm run test:account:isolated --prefix backend` para persistencia,
+o `node backend/test/helpers/run-account-mariadb.cjs all` para incluir contrato y HTTP.
+Consultar [escenarios, protecciones y pruebas](../docs/pruebas-cuenta-corriente-253.md).
 
 - `schema.sql` no debe ejecutarse sobre una base con datos importantes sin revisar previamente su contenido.
 - `seed.sql` contiene datos ficticios y debe utilizarse únicamente en entornos de desarrollo o prueba.
