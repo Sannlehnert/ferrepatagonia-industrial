@@ -9,8 +9,10 @@ const backend = path.resolve(__dirname, '../..');
 async function run(mode = process.argv[2] || 'all') {
   assert.ok([
     'all', 'baseline', 'cleanup-success',
-    'cleanup-failure', 'migration', 'orders',
+    'cleanup-failure', 'migration', 'orders', 'orders-acceptance',
   ].includes(mode));
+  const acceptance = mode === 'orders-acceptance';
+  const orders = acceptance || mode === 'orders';
   const p = newProfile();
   let session, child, interrupted = false;
   const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
@@ -37,7 +39,7 @@ async function run(mode = process.argv[2] || 'all') {
     };
     apply(path.join(backend, '../database/schema.sql'));
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
-      if (mode === 'orders') {
+      if (orders) {
         apply(path.join(
           backend,
           '../database/migrate-fer-20-order-confirmation.sql',
@@ -45,7 +47,9 @@ async function run(mode = process.argv[2] || 'all') {
       }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
-    const files = mode === 'orders'
+    const files = acceptance
+      ? ['test/account-order-http.test.cjs', 'test/account-order-transaction.test.cjs']
+      : orders
       ? [
           'test/account-order.persistence.test.cjs',
           'test/account-order-attempt.test.cjs',
@@ -68,7 +72,8 @@ async function run(mode = process.argv[2] || 'all') {
               'test/cc260.migration.test.cjs',
             ];
     const code = await new Promise((resolve, reject) => {
-      child = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', ...files],
+      child = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1',
+        ...(acceptance ? ['--test-name-pattern', '^#263'] : []), ...files],
         { cwd: backend, stdio: 'inherit', windowsHide: true, env: { ...process.env, NODE_ENV: 'test', TZ: 'UTC',
           DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'), JWT_SECRET: randomUUID(),
           DB_HOST: p.host, DB_PORT: String(p.port), DB_NAME: p.database, DB_USER: 'root', DB_PASSWORD: p.password,
