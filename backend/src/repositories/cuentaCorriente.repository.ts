@@ -274,11 +274,17 @@ export async function consultarVencimientos(id: number, at = new Date(), manager
 
 // Hashes the entire scoped financial/identity view without GROUP_CONCAT limits.
 // Consumers sign their own cursors and compare this token in a consistent snapshot.
-export async function revisionConjunto(manager: EntityManager, filter: { clienteId?: number; habilitada?: boolean } = {}): Promise<string> {
+export async function revisionConjunto(
+    manager: EntityManager,
+    filter: { clienteId?: number; habilitada?: boolean; excludeDemo?: boolean } = {}
+): Promise<string> {
     if (!manager.queryRunner?.isTransactionActive) throw Error('Revisión exige snapshot transaccional.');
     const accounts: Row[] = await manager.query(`SELECT c.*,k.activo AS cliente_activo,k.estado_aprobacion_empresa,k.tipo_cliente,
         u.id_usuario,u.activo AS usuario_activo,u.rol FROM CUENTA_CORRIENTE c JOIN CLIENTE k USING(id_cliente)
-        LEFT JOIN USUARIO u USING(id_cliente) WHERE (? IS NULL OR c.id_cliente=?) AND (? IS NULL OR c.habilitada=?) ORDER BY c.id_cuenta_corriente`,
+        LEFT JOIN USUARIO u USING(id_cliente)
+        WHERE (? IS NULL OR c.id_cliente=?) AND (? IS NULL OR c.habilitada=?)
+            ${filter.excludeDemo ? "AND c.origen_datos = 'REAL'" : ''}
+        ORDER BY c.id_cuenta_corriente`,
         [filter.clienteId ?? null, filter.clienteId ?? null, filter.habilitada ?? null, filter.habilitada ?? null]);
     const hash = createHash('sha256');
     for (const c of accounts) {
