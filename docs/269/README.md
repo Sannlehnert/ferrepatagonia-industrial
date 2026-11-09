@@ -30,7 +30,14 @@ El pie utiliza información institucional genérica respaldada por el catálogo.
 - 40 E2E de Home, filtros, detalle público, precios, acceso por rol y carrito por teclado. Se ejecutaron en Chromium con el build de producción y el backend aislado del repositorio.
 - Navegación por nombre y código, categoría y ficha. Visitante, cliente particular, empresa aprobada sin cuenta, empresa con cuenta habilitada y administración. Carga, error, reintento, vacío e imagen rota.
 - Responsive a 360, 390, 768, 1280 y 1440 px con navegación por teclado, foco visible y sin desbordamiento horizontal.
+- El E2E de precios reales contrasta las tarjetas del Home con los artículos devueltos por el catálogo y verifica para cada uno el bloqueo sin evidencia USD. El tamaño de la grilla se comprueba por separado en la suite del Home.
 
 ### Capturas
 
 [Escritorio · 1440 px](home-1440.png) · [Móvil · 390 px](home-390.png)
+
+## Integración con #270
+
+Tras el cierre de la release del Sprint 5, integrar primero el PR #88 en `develop` y actualizar la rama del PR #89 desde esa base. Al resolver los cambios comunes, conservar el grupo Institucional del pie y los enlaces del menú público definidos por #270. En el router deben coexistir las rutas `/ayuda` y `/sobre-nosotros` con la configuración de movimiento reducido de #269.
+
+En el resultado combinado, ejecutar `e2e/institutional/public-pages.spec.ts` y `e2e/catalog/home-premium.spec.ts`. Verificar que Preguntas frecuentes y Quiénes somos abran sus páginas desde el encabezado y el pie. Para la prueba de acordeones, comprobar el foco desde el acceso al contenido principal, ya que el orden del encabezado cambió en #269.
