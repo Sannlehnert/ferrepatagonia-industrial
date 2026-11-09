@@ -25,6 +25,18 @@ function hasItems<T>(
     return 'items' in page
 }
 
+function matchesRevision(
+    consulta: CuentaCorrienteConsulta,
+    movimientos: CuentaCorrientePaginaMovimientos,
+    vencimientos: CuentaCorrientePaginaVencimientos,
+): boolean {
+    return hasItems(movimientos) &&
+        hasItems(vencimientos) &&
+        consulta.estado !== 'SIN_CUENTA' &&
+        movimientos.revision === consulta.revision &&
+        vencimientos.revision === consulta.revision
+}
+
 export const useCuentaCorrienteStore = defineStore('cuenta-corriente', {
     state: () => ({
         consulta: null as CuentaCorrienteConsulta | null,
@@ -62,46 +74,70 @@ export const useCuentaCorrienteStore = defineStore('cuenta-corriente', {
             this.clear()
             const requestId = this.requestId
             const session = currentSessionGeneration()
-            this.consultaCargando = true
-
-            try {
-                const consulta = await getCuentaCorriente()
+            for (let attempt = 0; attempt < 2; attempt++) {
                 if (!this.isCurrent(requestId, session)) return
-                this.consulta = consulta
-                if (consulta.estado === 'SIN_CUENTA') return
-            } catch (error: unknown) {
-                if (this.isCurrent(requestId, session)) {
-                    this.consultaError = errorMessage(error, 'No pudimos consultar tu cuenta corriente. Intentá nuevamente.')
+                this.consultaCargando = true
+
+                try {
+                    const consulta = await getCuentaCorriente()
+                    if (!this.isCurrent(requestId, session)) return
+                    this.consulta = consulta
+                    if (consulta.estado === 'SIN_CUENTA') return
+                } catch (error: unknown) {
+                    if (this.isCurrent(requestId, session)) {
+                        this.consultaError = errorMessage(error, 'No pudimos consultar tu cuenta corriente. Intentá nuevamente.')
+                    }
+                    return
+                } finally {
+                    if (this.isCurrent(requestId, session)) this.consultaCargando = false
                 }
-                return
-            } finally {
-                if (this.isCurrent(requestId, session)) this.consultaCargando = false
+
+                if (!this.isCurrent(requestId, session)) return
+                this.movimientosCargando = true
+                this.vencimientosCargando = true
+
+                const [movimientos, vencimientos] = await Promise.allSettled([
+                    getCuentaCorrienteMovimientos(),
+                    getCuentaCorrienteVencimientos(),
+                ])
+
+                if (!this.isCurrent(requestId, session)) return
+                this.movimientosCargando = false
+                this.vencimientosCargando = false
+
+                if (movimientos.status === 'rejected') {
+                    this.movimientosError = errorMessage(
+                        movimientos.reason,
+                        'No pudimos cargar los movimientos. Actualizá la cuenta para reintentar.',
+                    )
+                }
+                if (vencimientos.status === 'rejected') {
+                    this.vencimientosError = errorMessage(
+                        vencimientos.reason,
+                        'No pudimos cargar los vencimientos. Actualizá la cuenta para reintentar.',
+                    )
+                }
+                if (movimientos.status === 'rejected' || vencimientos.status === 'rejected') return
+
+                const consulta = this.consulta
+                if (consulta && matchesRevision(
+                    consulta,
+                    movimientos.value,
+                    vencimientos.value,
+                )) {
+                    this.movimientos = movimientos.value
+                    this.vencimientos = vencimientos.value
+                    return
+                }
+
+                this.consulta = null
+                this.movimientos = null
+                this.vencimientos = null
+                if (attempt === 1) {
+                    this.consultaError = 'La información cambió durante la consulta. Actualizá la cuenta para continuar.'
+                    return
+                }
             }
-
-            if (!this.isCurrent(requestId, session)) return
-            this.movimientosCargando = true
-            this.vencimientosCargando = true
-
-            const [movimientos, vencimientos] = await Promise.allSettled([
-                getCuentaCorrienteMovimientos(),
-                getCuentaCorrienteVencimientos(),
-            ])
-
-            if (!this.isCurrent(requestId, session)) return
-            this.movimientosCargando = false
-            this.vencimientosCargando = false
-
-            if (movimientos.status === 'fulfilled') this.movimientos = movimientos.value
-            else this.movimientosError = errorMessage(
-                movimientos.reason,
-                'No pudimos cargar los movimientos. Actualizá la cuenta para reintentar.',
-            )
-
-            if (vencimientos.status === 'fulfilled') this.vencimientos = vencimientos.value
-            else this.vencimientosError = errorMessage(
-                vencimientos.reason,
-                'No pudimos cargar los vencimientos. Actualizá la cuenta para reintentar.',
-            )
         },
         async loadMoreMovimientos() {
             const cursor = this.movimientos && hasItems(this.movimientos)
@@ -118,7 +154,8 @@ export const useCuentaCorrienteStore = defineStore('cuenta-corriente', {
                 if (!this.isCurrent(requestId, session)) return
                 const previous = this.movimientos
                 if (!previous || !hasItems(previous) || !hasItems(page) ||
-                    previous.revision !== page.revision || previous.corte !== page.corte) {
+                    previous.revision !== page.revision ||
+                    page.revision !== this.consulta?.revision) {
                     this.movimientosError = 'La consulta de movimientos cambió. Actualizá la cuenta para continuar.'
                     return
                 }
@@ -146,7 +183,8 @@ export const useCuentaCorrienteStore = defineStore('cuenta-corriente', {
                 if (!this.isCurrent(requestId, session)) return
                 const previous = this.vencimientos
                 if (!previous || !hasItems(previous) || !hasItems(page) ||
-                    previous.revision !== page.revision || previous.corte !== page.corte) {
+                    previous.revision !== page.revision ||
+                    page.revision !== this.consulta?.revision) {
                     this.vencimientosError = 'La consulta de vencimientos cambió. Actualizá la cuenta para continuar.'
                     return
                 }

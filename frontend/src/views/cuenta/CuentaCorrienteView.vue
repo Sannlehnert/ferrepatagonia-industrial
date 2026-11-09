@@ -25,11 +25,34 @@ const movimientos = computed(() => cuenta.movimientos && 'items' in cuenta.movim
 const vencimientos = computed(() => cuenta.vencimientos && 'items' in cuenta.vencimientos
     ? cuenta.vencimientos.items
     : [])
-const demoDataBlocked = computed(() => !import.meta.env.DEV && (
+const financialDataReady = computed(() =>
+    Boolean(
+        resumen.value &&
+        cuenta.movimientos && 'items' in cuenta.movimientos &&
+        cuenta.vencimientos && 'items' in cuenta.vencimientos &&
+        !cuenta.consultaCargando &&
+        !cuenta.movimientosCargando &&
+        !cuenta.vencimientosCargando &&
+        !cuenta.movimientosMasCargando &&
+        !cuenta.vencimientosMasCargando &&
+        !cuenta.consultaError &&
+        !cuenta.movimientosError &&
+        !cuenta.vencimientosError &&
+        cuenta.movimientos.revision === cuenta.consulta?.revision &&
+        cuenta.vencimientos.revision === cuenta.consulta?.revision
+    ),
+)
+const demoDataBlocked = computed(() => financialDataReady.value && !import.meta.env.DEV && (
     resumen.value?.origen === 'DEMO' ||
     movimientos.value.some(item => item.origen === 'DEMO') ||
     vencimientos.value.some(item => item.origen === 'DEMO')
 ))
+const financialDataUnavailable = computed(() =>
+    !cuenta.consultaCargando &&
+    !cuenta.movimientosCargando &&
+    !cuenta.vencimientosCargando &&
+    Boolean(cuenta.movimientosError || cuenta.vencimientosError),
+)
 
 function dueClasses(item: CuentaCorrienteVencimiento): string {
     if (item.estado === 'VENCIDO') return 'border-red-300 bg-red-50'
@@ -68,7 +91,9 @@ onBeforeRouteLeave(() => cuenta.clear())
             </button>
         </header>
 
-        <p v-if="cuenta.consultaCargando" role="status" class="rounded-md bg-slate-50 p-4">
+        <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando ||
+            cuenta.movimientosMasCargando || cuenta.vencimientosMasCargando" role="status"
+            class="rounded-md bg-slate-50 p-4">
             Consultando la cuenta corriente…
         </p>
         <div v-else-if="cuenta.consultaError" class="rounded-md border border-red-200 bg-red-50 p-4">
@@ -80,12 +105,21 @@ onBeforeRouteLeave(() => cuenta.clear())
             class="rounded-md border border-slate-200 bg-slate-50 p-4">
             No tenés una cuenta corriente asociada.
         </p>
+        <div v-else-if="financialDataUnavailable || (resumen && !financialDataReady)"
+            class="rounded-md border border-red-200 bg-red-50 p-4">
+            <p role="alert" class="m-0 mb-3">
+                No se pudieron verificar todos los datos financieros de la cuenta. No mostraremos cifras hasta completar la consulta.
+                {{ cuenta.movimientosError }} {{ cuenta.vencimientosError }}
+            </p>
+            <button type="button" class="min-h-11 rounded-md border border-red-300 px-4 py-2"
+                @click="cuenta.load()">Actualizar cuenta</button>
+        </div>
         <p v-else-if="demoDataBlocked" role="alert"
             class="rounded-md border border-amber-300 bg-amber-50 p-4">
             Se recibió información de demostración y no se mostrará fuera del entorno de pruebas.
         </p>
 
-        <template v-else-if="resumen && !demoDataBlocked">
+        <template v-else-if="resumen && financialDataReady && !demoDataBlocked">
             <p v-if="resumen.estado === 'INHABILITADA'" role="status"
                 class="mb-5 rounded-md border border-amber-300 bg-amber-50 p-4">
                 La cuenta está inhabilitada. Podés consultar el saldo acreditado y su historial, pero no operar a crédito.
@@ -203,7 +237,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                                     </td>
                                     <td class="border-t border-slate-200 p-3">{{ movement.tipo === 'CARGO' ? 'Cargo' : 'Abono' }}</td>
                                     <td class="border-t border-slate-200 p-3 font-medium">
-                                        {{ movement.tipo === 'CARGO' ? '− ' : '+ ' }}{{ formatUsd(movement.importe) }}
+                                        {{ formatUsd(movement.importe) }}
                                     </td>
                                     <td class="border-t border-slate-200 p-3">
                                         {{ movement.venceEl ? formatCivilDate(movement.venceEl) : '—' }}
