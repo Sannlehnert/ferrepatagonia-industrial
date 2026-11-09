@@ -74,7 +74,8 @@ export async function lockAccountOrderContext(
     );
   }
 
-  if (state.cobertura !== 'COMPLETA' ||
+  if (state.libro_mixto ||
+    state.cobertura !== 'COMPLETA' ||
     state.deuda_vigente === null ||
     state.limite_credito === null ||
     state.credito_disponible === null) {

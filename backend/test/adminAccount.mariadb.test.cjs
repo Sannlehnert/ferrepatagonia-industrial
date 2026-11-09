@@ -321,3 +321,84 @@ test('un bloqueo real de MariaDB provoca 503 y permite reintentar', { timeout: 1
   } finally { await session.connection.query('UNLOCK TABLES'); }
   await data(pathFor('debt'));
 });
+
+for (const demoFirst of [false, true]) {
+  test(`H04 protege todo el libro con el abono DEMO ${demoFirst ? 'primero' : 'en página 2'}`, async () => {
+    const { mock } = require('node:test');
+    const { lockAccountOrderContext } = require('../dist/repositories/accountOrderContext.repository');
+    await assertOwned(session);
+    const connection = session.connection;
+    const insert = async (sql, args) => Number((await connection.query(sql, args)).insertId);
+    const email = `h04-${demoFirst}@example.test`;
+    const clientId = await insert(`INSERT INTO CLIENTE(tipo_cliente,nombre_razon_social,email,estado_aprobacion_empresa,es_fiel,activo)
+      VALUES('EMPRESA','Fixture H04',?,'APROBADA',0,1)`, [email]);
+    const userId = await insert(`INSERT INTO USUARIO(id_cliente,email,password_hash,rol,activo)
+      VALUES(?,?,'fixture-no-login','CLIENTE',1)`, [clientId, email]);
+    const accountId = await insert(`INSERT INTO CUENTA_CORRIENTE
+      (id_cliente,limite_credito,habilitada,cobertura,plazo_dias,moneda_limite,evidencia_limite,evidencia_plazo,
+       evidencia_cobertura,cobertura_desde_utc,origen_datos)
+      VALUES(?,300,1,'COMPLETA',30,'USD','Límite fixture','Plazo fixture','Alta fixture','2025-01-01','REAL')`, [clientId]);
+    const auth = { id: userId, rol: 'CLIENTE' };
+    const token = signToken(auth);
+    const own = '/cuenta-corriente';
+    const adminList = list + '?clienteId=' + clientId;
+    assert.equal((await data(own, token)).saldo, '0.00');
+    const order = () => insert(`INSERT INTO PEDIDO(id_cliente,fecha,estado,modalidad_pago,subtotal,descuento,total,moneda_total,evidencia_total_usd)
+      VALUES(?,'2026-03-01','CONFIRMADO','CUENTA_CORRIENTE',1,0,1,'USD','Total fixture')`, [clientId]);
+    mock.timers.enable({ apis: ['Date'], now: new Date('2026-03-01T12:00:00Z') });
+    try {
+      for (let i = 0; i < 26; i++) {
+        await ledger.registrarCargoPorPedido({ id_cuenta_corriente: accountId, id_pedido: await order(), monto: '1.00' });
+      }
+    } finally { mock.timers.reset(); }
+    const clean = await data(own, token);
+    assert.deepEqual([clean.origen, clean.saldo, clean.disponible], ['REAL', '26.00', '274.00']);
+    const firstClean = await data(own + '/movimientos', token);
+    const firstAdminClean = await data(detail(clientId, '/movimientos'));
+    const paidAt = demoFirst ? '2026-03-02 12:00:00' : '2026-02-01 12:00:00';
+    const paymentId = await insert(`INSERT INTO PAGO(id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,fecha_acreditacion_utc,evidencia_acreditacion)
+      VALUES(?,?,6.25,'DEMO','ACREDITADO','USD',?,'Pago fixture')`, [accountId, paidAt, paidAt]);
+    const demoId = await ledger.registrarAbonoPorPago({ id_cuenta_corriente: accountId, id_pago: paymentId, monto: '6.25', origen: 'DEMO' });
+    const paths = ['', '/movimientos', '/vencimientos'];
+    const environment = process.env.NODE_ENV;
+    process.env.NODE_ENV = 'production';
+    try {
+      await expectCode(own + '/movimientos?' + cursorParam(firstClean.siguienteCursor), 409, 'CONSULTA_DESACTUALIZADA', token);
+      await expectCode(detail(clientId, '/movimientos?') + cursorParam(firstAdminClean.siguienteCursor), 409, 'CONSULTA_DESACTUALIZADA');
+      for (const path of paths) {
+        await expectCode(own + path, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE', token);
+        await expectCode(detail(clientId, path), 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE');
+      }
+      await expectCode(adminList, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE');
+      assert.equal((await data(own, client)).estado, 'SIN_CUENTA');
+    } finally { process.env.NODE_ENV = environment; }
+    await assert.rejects(db.inTransaction(manager => lockAccountOrderContext(manager, auth, clientId)),
+      { code: 'CREDITO_NO_VERIFICADO' });
+    await assert.rejects(ledger.registrarCargoPorPedido({ id_cuenta_corriente: accountId, id_pedido: await order(), monto: '1.00' }),
+      /procedencia del libro/);
+    const mixed = await data(own, token);
+    assert.deepEqual([mixed.origen, mixed.saldo, mixed.disponible], ['DEMO', '19.75', '280.25']);
+    const first = await data(own + '/movimientos', token);
+    const nextPath = own + '/movimientos?' + cursorParam(first.siguienteCursor);
+    const second = await data(nextPath, token);
+    assert.equal(first.items.length, 25);
+    assert.equal(second.items.length, 2);
+    assert.equal(first.items.some(row => row.id === String(demoId)), demoFirst);
+    assert.equal(second.items.some(row => row.id === String(demoId)), !demoFirst);
+    assert.deepEqual([second.revision, second.corte], [first.revision, first.corte]);
+    for (const row of [...first.items, ...second.items, ...(await data(own + '/vencimientos', token)).items]) {
+      assert.equal(row.origen, 'DEMO');
+    }
+    assert.equal((await data(adminList)).items[0].origen, 'DEMO');
+    process.env.NODE_ENV = 'production';
+    try { await expectCode(nextPath, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE', token); }
+    finally { process.env.NODE_ENV = environment; }
+    await ledger.anularMovimiento({ id_cuenta_corriente: accountId, id_movimiento_cuenta: demoId, actor: '1',
+      evento: `h04-void-${demoFirst}`, motivo: 'Conservar trazabilidad DEMO' });
+    const voided = await data(own, token);
+    assert.deepEqual([voided.origen, voided.saldo], ['DEMO', '26.00']);
+    const history = await data(own + '/movimientos?limite=100', token);
+    assert.equal(history.items.find(row => row.id === String(demoId)).estado, 'ANULADO');
+    await expectCode(nextPath, 409, 'CONSULTA_DESACTUALIZADA', token);
+  });
+}

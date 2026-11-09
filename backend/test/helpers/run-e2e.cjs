@@ -165,6 +165,12 @@ async function main() {
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
   };
+  if (browserEnv.E2E_PRODUCTION_BUILD === '1') {
+    assert.ok(
+      fs.existsSync(path.join(frontend, 'dist/index.html')),
+      'Primero compilá el frontend para E2E de producción.',
+    );
+  }
 
   const { port: webPort } = await startService(
     path.join(frontend, 'e2e/helpers/vite-server.mjs'),
