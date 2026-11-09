@@ -110,7 +110,7 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  await seedFixtures(connection);
+  await seedFixtures(connection, { includeAccountOrderFixture: false });
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);
@@ -190,7 +190,11 @@ async function main() {
       ...process.argv.slice(2),
     ], {
       cwd: frontend,
-      env: { ...browserEnv, E2E_BASE_URL: baseURL },
+      env: {
+        ...browserEnv,
+        E2E_BASE_URL: baseURL,
+        CCE2E_TEST_PROFILE: JSON.stringify(profile),
+      },
       stdio: 'inherit',
       windowsHide: true,
     });

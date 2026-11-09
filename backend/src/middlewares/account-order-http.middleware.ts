@@ -34,6 +34,7 @@ export const accountOrderPrivateResponses: RequestHandler = (
       : {};
 
     return sendJson({
+      ...(failure.estado === 'RECHAZADO' ? { estado: 'RECHAZADO' } : {}),
       code: typeof failure.code === 'string'
         ? failure.code
         : defaultCode(res.statusCode),

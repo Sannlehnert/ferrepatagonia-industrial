@@ -123,6 +123,12 @@ async function countForClient(table, clientId) {
   return Number(row.cantidad);
 }
 
+async function quoteFor(auth) {
+  const body = await responseBody(await request({ path: '/eligibilidad', auth }), 200);
+  assert.equal(typeof body.data.cotizacion, 'string');
+  return body.data.cotizacion;
+}
+
 test('#261 HTTP: visitante y ADMIN no confirman ni consultan pedidos', async () => {
   const f = await createOrderFixture(session);
   const key = randomUUID();
@@ -153,18 +159,53 @@ test('#261 HTTP: visitante y ADMIN no confirman ni consultan pedidos', async () 
   );
 });
 
+test('#262 HTTP: la prevalidación requiere cliente y no admite cuerpo ni consulta', async () => {
+  const f = await createOrderFixture(session);
+
+  await responseBody(await request({
+    path: '/eligibilidad',
+  }), 401);
+  await responseBody(await request({
+    path: '/eligibilidad',
+    auth: { id: f.adminId, rol: 'ADMIN' },
+  }), 403);
+  await responseBody(await request({
+    path: '/eligibilidad?cliente=1',
+    auth: f.auth,
+  }), 400);
+
+  const result = await responseBody(await request({
+    path: '/eligibilidad',
+    auth: f.auth,
+  }), 200);
+  assert.deepEqual({ ...result.data, cotizacion: '<signed>' }, {
+    elegible: true,
+    moneda: 'USD',
+    totalUSD: '20.00',
+    creditoDisponibleUSD: '1000.00',
+    codigo: null,
+    mensaje: null,
+    cotizacion: '<signed>',
+  });
+  assert.equal(await countForClient('PEDIDO', f.clientId), 0);
+  assert.equal(
+    await countForClient('CONFIRMACION_PEDIDO_CC', f.clientId),
+    0,
+  );
+});
+
 test('#261 HTTP: rechaza solicitudes inválidas antes de reservar el intento', async () => {
   const f = await createOrderFixture(session);
   const key = randomUUID();
 
   const cases = [
-    { body: {} },
-    { key: 'clave-invalida', body: {} },
+    { body: { cotizacion: 'a'.repeat(40) } },
+    { key: 'clave-invalida', body: { cotizacion: 'a'.repeat(40) } },
     { key },
     { key, body: [] },
     { key, body: { id_cliente: f.clientId } },
     { key, body: { totalUSD: '0.01' } },
-    { key, body: {}, path: '?cliente=1' },
+    { key, body: { cotizacion: 'a'.repeat(40) }, path: '?cliente=1' },
   ];
 
   for (const input of cases) {
@@ -190,12 +231,13 @@ test('#261 HTTP: rechaza solicitudes inválidas antes de reservar el intento', a
 test('#261 HTTP: confirma, consulta y repite la misma compra sin duplicarla', async () => {
   const f = await createOrderFixture(session);
   const key = randomUUID();
+  const cotizacion = await quoteFor(f.auth);
 
   const first = await responseBody(await request({
     method: 'POST',
     auth: f.auth,
     key,
-    body: {},
+    body: { cotizacion },
   }), 201);
 
   assert.equal(first.data.estado, 'CONFIRMADO');
@@ -211,12 +253,18 @@ test('#261 HTTP: confirma, consulta y repite la misma compra sin duplicarla', as
     method: 'POST',
     auth: f.auth,
     key,
-    body: {},
+    body: { cotizacion },
   }), 200);
 
   assert.deepEqual(recovered, first);
   assert.deepEqual(repeated, first);
   assert.equal(await countForClient('PEDIDO', f.clientId), 1);
+  const [movementCount] = await session.connection.query(`
+    SELECT COUNT(*) cantidad FROM MOVIMIENTO_CUENTA_CORRIENTE m
+    INNER JOIN CUENTA_CORRIENTE c USING (id_cuenta_corriente)
+    WHERE c.id_cliente = ? AND m.origen = 'PEDIDO'
+  `, [f.clientId]);
+  assert.equal(Number(movementCount.cantidad), 1);
 
   const [product] = await session.connection.query(
     'SELECT stock FROM PRODUCTO WHERE id_producto = ?',
@@ -226,16 +274,79 @@ test('#261 HTTP: confirma, consulta y repite la misma compra sin duplicarla', as
   assert.equal(Number(product.stock), 3);
 });
 
+test('#262 H01 HTTP/SQL: rechaza una cotización vieja sin pedido, cargo ni descuento de stock', async () => {
+  const f = await createOrderFixture(session);
+  const key = randomUUID();
+  const cotizacion = await quoteFor(f.auth);
+  await session.connection.query(
+    'UPDATE ITEM_CARRITO SET cantidad = 3 WHERE id_carrito = ? AND id_producto = ?',
+    [f.cartId, f.productId],
+  );
+
+  const rejected = await responseBody(await request({
+    method: 'POST', auth: f.auth, key, body: { cotizacion },
+  }), 409);
+  assert.equal(rejected.code, 'COTIZACION_DESACTUALIZADA');
+  assert.equal(await countForClient('PEDIDO', f.clientId), 0);
+  assert.equal(await countForClient('CONFIRMACION_PEDIDO_CC', f.clientId), 1);
+  const [movementCount] = await session.connection.query(`
+    SELECT COUNT(*) cantidad FROM MOVIMIENTO_CUENTA_CORRIENTE m
+    INNER JOIN CUENTA_CORRIENTE c USING (id_cuenta_corriente)
+    WHERE c.id_cliente = ?
+  `, [f.clientId]);
+  assert.equal(Number(movementCount.cantidad), 0);
+  const [product] = await session.connection.query(
+    'SELECT stock FROM PRODUCTO WHERE id_producto = ?', [f.productId],
+  );
+  const [item] = await session.connection.query(
+    'SELECT cantidad FROM ITEM_CARRITO WHERE id_carrito = ? AND id_producto = ?',
+    [f.cartId, f.productId],
+  );
+  assert.equal(Number(product.stock), 5);
+  assert.equal(Number(item.cantidad), 3);
+});
+
+test('#262 H01 HTTP/SQL: rechaza un cambio de precio posterior a la cotización', async () => {
+  const f = await createOrderFixture(session);
+  const cotizacion = await quoteFor(f.auth);
+  const key = randomUUID();
+  await session.connection.query(`
+    UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado = 12.00
+    WHERE id_producto = ? AND valida = 1 AND sintetica = 0
+  `, [f.productId]);
+  await session.connection.query(
+    'UPDATE PRODUCTO SET precio = 12.00 WHERE id_producto = ?',
+    [f.productId],
+  );
+
+  const rejected = await responseBody(await request({
+    method: 'POST', auth: f.auth, key, body: { cotizacion },
+  }), 409);
+  assert.equal(rejected.code, 'COTIZACION_DESACTUALIZADA');
+  assert.equal(await countForClient('PEDIDO', f.clientId), 0);
+  const [movementCount] = await session.connection.query(`
+    SELECT COUNT(*) cantidad FROM MOVIMIENTO_CUENTA_CORRIENTE m
+    INNER JOIN CUENTA_CORRIENTE c USING (id_cuenta_corriente)
+    WHERE c.id_cliente = ?
+  `, [f.clientId]);
+  assert.equal(Number(movementCount.cantidad), 0);
+  const [product] = await session.connection.query(
+    'SELECT stock FROM PRODUCTO WHERE id_producto = ?', [f.productId],
+  );
+  assert.equal(Number(product.stock), 5);
+});
+
 test('#261 HTTP: una clave de otro cliente no expone su resultado', async () => {
   const owner = await createOrderFixture(session);
   const other = await createOrderFixture(session);
   const key = randomUUID();
+  const cotizacion = await quoteFor(owner.auth);
 
   await responseBody(await request({
     method: 'POST',
     auth: owner.auth,
     key,
-    body: {},
+    body: { cotizacion },
   }), 201);
 
   const foreign = await responseBody(await request({
@@ -255,15 +366,17 @@ test('#261 HTTP: una clave de otro cliente no expone su resultado', async () => 
 test('#261 HTTP: conserva y permite consultar un rechazo por crédito insuficiente', async () => {
   const f = await createOrderFixture(session, { limit: '1.00' });
   const key = randomUUID();
+  const cotizacion = await quoteFor(f.auth);
 
   const rejected = await responseBody(await request({
     method: 'POST',
     auth: f.auth,
     key,
-    body: {},
+    body: { cotizacion },
   }), 409);
 
   assert.equal(rejected.code, 'CREDITO_INSUFICIENTE');
+  assert.equal(rejected.estado, 'RECHAZADO');
 
   const recovered = await responseBody(await request({
     path: `/${key}`,
@@ -301,12 +414,13 @@ test('#261 HTTP: informa un intento pendiente con 202 y Retry-After', async () =
 test('#261 HTTP: errores de origen y JSON también mantienen respuestas privadas', async () => {
   const f = await createOrderFixture(session);
   const key = randomUUID();
+  const cotizacion = await quoteFor(f.auth);
 
   await responseBody(await request({
     method: 'POST',
     auth: f.auth,
     key,
-    body: {},
+    body: { cotizacion },
     headers: { Origin: 'https://origen-no-autorizado.example' },
   }), 403);
 

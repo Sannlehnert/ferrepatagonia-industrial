@@ -23,6 +23,7 @@ export function createCartStore(transport: CartTransport) {
     const checksPending = ref(0)
     const items = computed(() => cart.value?.items ?? [])
     let active: AbortController | undefined
+    let reading = false
     let revision = 0
     let disposed = false
 
@@ -45,6 +46,7 @@ export function createCartStore(transport: CartTransport) {
       revision++
       const previous = active
       active = undefined
+      reading = false
       cart.value = null
       loading.value = false
       operation.value = null
@@ -64,6 +66,7 @@ export function createCartStore(transport: CartTransport) {
         finish: () => {
           if (active === controller) {
             active = undefined
+            reading = false
             loading.value = false
             operation.value = null
           }
@@ -73,6 +76,7 @@ export function createCartStore(transport: CartTransport) {
 
     async function sync(request: ReturnType<typeof start>) {
       if (!request.isCurrent()) return false
+      reading = true
       loadError.value = ''
       needsSync.value = true
       try {
@@ -87,16 +91,32 @@ export function createCartStore(transport: CartTransport) {
       }
     }
 
-    async function cargarCarrito() {
-      const key = sessionKey.value
-      if (!key || active || disposed) return false
+    async function readCart(key: string) {
+      const previous = active
       const request = start(key)
       loading.value = true
+      previous?.abort()
       try {
         return await sync(request)
       } finally {
         request.finish()
       }
+    }
+
+    async function cargarCarrito() {
+      const key = sessionKey.value
+      if (!key || active || disposed) return false
+      return readCart(key)
+    }
+
+    function reconciliarPedidoConfirmado() {
+      const key = sessionKey.value
+      if (!key || disposed) return
+      needsSync.value = true
+      cart.value = null
+      // Una escritura en curso hará su propia lectura al terminar.
+      if (active && !reading) return
+      void readCart(key)
     }
 
     async function mutate(command: CartMutation) {
@@ -154,7 +174,7 @@ export function createCartStore(transport: CartTransport) {
     return {
       cart, items, loading, operation, loadError, operationError, needsSync,
       pricesNeedValidation, stockNeedsValidation,
-      cargarCarrito, limpiarEstado,
+      cargarCarrito, reconciliarPedidoConfirmado, limpiarEstado,
       agregarProducto: (productoId: number, cantidad: number) => mutate({ type: 'add', productoId, cantidad }),
       actualizarCantidad: (productoId: number, cantidad: number) => mutate({ type: 'update', productoId, cantidad }),
       quitarProducto: (productoId: number) => mutate({ type: 'remove', productoId }),

@@ -31,10 +31,12 @@ async function main() {
     await database.initializeDatabase();
 
     const auth = { id: userId, rol: 'CLIENTE' };
+    const eligibility = await service.getAccountOrderEligibility(auth);
+    const quoteToken = eligibility.body.data.cotizacion;
 
     if (mode === 'recover') {
       const previous = await service.getAccountOrderResult(auth, key);
-      const confirmed = await service.confirmAccountOrder(auth, key);
+      const confirmed = await service.confirmAccountOrder(auth, key, quoteToken);
       const recovered = await service.getAccountOrderResult(auth, key);
 
       process.stdout.write(
@@ -81,7 +83,7 @@ async function main() {
       return runner;
     };
 
-    await service.confirmAccountOrder(auth, key);
+    await service.confirmAccountOrder(auth, key, quoteToken);
     throw new Error('No se alcanzó el punto de interrupción esperado.');
   } finally {
     try {

@@ -18,7 +18,7 @@ const client = signToken({ id: 2, rol: 'CLIENTE' });
 
 before(async () => {
   session = await connectOwned(profile, 258);
-  await seedFixtures(session.connection);
+  await seedFixtures(session.connection, { includeAccountOrderFixture: false });
   await db.initializeDatabase();
   server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
@@ -196,7 +196,7 @@ for (const [key, saldo, limite, utilizado, disponible, cobertura, estado] of [
   ['long', '500.00', '2000.00', '500.00', '1500.00', 'COMPLETA', 'HABILITADA'],
   ['favor', '-150.00', '100.00', '0.00', '100.00', 'COMPLETA', 'HABILITADA'],
   ['disabled', '70.00', '1000.00', '70.00', '0.00', 'COMPLETA', 'INHABILITADA'],
-  ['empty', '0.00', '300.00', '0.00', '300.00', 'COMPLETA', 'HABILITADA'],
+  ['empty', '0.00', '400.00', '0.00', '400.00', 'COMPLETA', 'HABILITADA'],
   ['zero', '0.00', '0.00', '0.00', '0.00', 'COMPLETA', 'HABILITADA'],
   ['partial', null, '1000.00', null, null, 'PARCIAL', 'HABILITADA'],
   ['unknown', null, null, null, null, 'NO_ACREDITADA', 'HABILITADA'],

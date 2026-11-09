@@ -89,7 +89,7 @@ export function presentStoredAccountOrder(
     body.message.length <= 400) {
     return {
       status,
-      body: { code: body.code, message: body.message },
+      body: { estado: 'RECHAZADO', code: body.code, message: body.message },
     };
   }
 
