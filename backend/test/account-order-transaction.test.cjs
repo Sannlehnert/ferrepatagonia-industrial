@@ -15,6 +15,7 @@ let database;
 let attempts;
 let transaction;
 let financial;
+let service;
 
 before(async () => {
   session = await connectOwned(childProfile());
@@ -30,6 +31,7 @@ before(async () => {
   financial = require(
     '../dist/repositories/cuentaCorriente.repository.js'
   );
+  service = require('../dist/services/orders/account-order.service.js');
 
   await database.initializeDatabase();
 });
@@ -45,6 +47,7 @@ after(async () => {
 async function fixture(options) {
   const f = await createOrderFixture(session, options);
   f.key = randomUUID();
+  f.quoteToken = (await service.getAccountOrderEligibility(f.auth)).body.data.cotizacion;
   await attempts.reserveAccountOrderAttempt(f.clientId, f.key);
   return f;
 }
@@ -52,7 +55,7 @@ async function fixture(options) {
 function buy(f, key = f.key) {
   return database.inTransaction(
     manager => transaction.executePendingAccountOrder(
-      manager, f.auth, f.clientId, key,
+      manager, f.auth, f.clientId, key, f.quoteToken,
     ),
     { isolation: 'READ COMMITTED', lockWaitSeconds: 2 },
   );

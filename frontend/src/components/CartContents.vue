@@ -3,6 +3,7 @@ import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import CartLine from '@/components/CartLine.vue'
 import CartSummary from '@/components/CartSummary.vue'
+import AccountOrderCheckout from '@/components/AccountOrderCheckout.vue'
 import { useAccountOrderStore } from '@/stores/accountOrder'
 import { useCartStore } from '@/stores/cart'
 import { useCartPanelStore } from '@/stores/cartPanel'
@@ -29,15 +30,21 @@ const busy = computed(() =>
     :aria-busy="busy"
     class="text-sm text-[#13293a]"
   >
-    <p
-      v-if="order.attemptState === 'confirmed' && order.confirmation"
-      role="status"
-      class="my-4 rounded-lg border border-solid border-green-300 bg-green-50 p-3"
+    <ul
+      v-if="order.receipts.length"
+      aria-label="Comprobantes de pedidos confirmados"
+      class="my-4 list-none rounded-lg border border-solid border-green-300 bg-green-50 p-3"
     >
-      Pedido #{{ order.confirmation.pedidoId }} confirmado por
-      USD {{ order.confirmation.totalUSD }}.
-      Vence el {{ order.confirmation.venceEl }}.
-    </p>
+      <li
+        v-for="receipt in order.receipts"
+        :key="receipt.pedidoId"
+        role="status"
+        class="mb-2 last:mb-0"
+      >
+        Pedido #{{ receipt.pedidoId }} confirmado por USD {{ receipt.totalUSD }}.
+        Vence el {{ receipt.venceEl }}.
+      </li>
+    </ul>
 
     <p v-if="busy" role="status" class="my-3">
       {{
@@ -111,6 +118,11 @@ const busy = computed(() =>
 
       <CartSummary
         v-if="cart.items.length"
+        :snapshot="cart.cart"
+        :stale="cart.needsSync"
+      />
+      <AccountOrderCheckout
+        v-if="!cart.items.length && order.attemptState === 'pending'"
         :snapshot="cart.cart"
         :stale="cart.needsSync"
       />

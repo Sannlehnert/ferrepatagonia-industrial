@@ -20,9 +20,9 @@ const browserStorage: PendingAccountOrderStorage = {
       ? null
       : window.sessionStorage.getItem(`account-order:${userId}`)
   },
-  set(userId, key) {
+  set(userId, key, quoteToken) {
     if (typeof window !== 'undefined') {
-      window.sessionStorage.setItem(`account-order:${userId}`, key)
+      window.sessionStorage.setItem(`account-order:${userId}`, JSON.stringify({ key, quoteToken }))
     }
   },
   remove(userId) {
@@ -45,7 +45,10 @@ export function createAccountOrderStore(
     const attemptState = ref<'idle' | 'submitting' | 'pending' | 'confirmed' | 'rejected'>('idle')
     const attemptError = ref('')
     const confirmation = shallowRef<ConfirmedAccountOrder | null>(null)
+    const receipts = ref<ConfirmedAccountOrder[]>([])
     const pendingKey = ref('')
+    const pendingQuoteToken = ref('')
+    const confirmationRevision = ref(0)
     const storageError = ref('')
     const canUseCredit = computed(() => eligibility.value?.elegible === true)
 
@@ -80,16 +83,44 @@ export function createAccountOrderStore(
       attemptState.value = 'idle'
       attemptError.value = ''
       confirmation.value = null
+      receipts.value = []
       pendingKey.value = ''
+      pendingQuoteToken.value = ''
       storageError.value = ''
 
       if (userId === null) return
       try {
-        const savedKey = storage.get(userId)
-        if (savedKey && uuidV4.test(savedKey)) {
-          pendingKey.value = savedKey
+        const savedReceipts = typeof window === 'undefined'
+          ? null
+          : window.sessionStorage.getItem(`account-order-receipts:${userId}`)
+        if (savedReceipts) {
+          try {
+            const parsedReceipts: unknown = JSON.parse(savedReceipts)
+            if (Array.isArray(parsedReceipts)) {
+              receipts.value = parsedReceipts.filter((receipt): receipt is ConfirmedAccountOrder =>
+                typeof receipt === 'object' && receipt !== null &&
+                Number.isSafeInteger((receipt as ConfirmedAccountOrder).pedidoId) &&
+                (receipt as ConfirmedAccountOrder).estado === 'CONFIRMADO' &&
+                (receipt as ConfirmedAccountOrder).modalidadPago === 'CUENTA_CORRIENTE' &&
+                (receipt as ConfirmedAccountOrder).moneda === 'USD' &&
+                typeof (receipt as ConfirmedAccountOrder).totalUSD === 'string' &&
+                typeof (receipt as ConfirmedAccountOrder).cargoId === 'string' &&
+                typeof (receipt as ConfirmedAccountOrder).venceEl === 'string')
+            }
+          } catch { /* Ignora únicamente el historial local corrupto. */ }
+        }
+        const saved = storage.get(userId)
+        let decoded: { key?: unknown; quoteToken?: unknown } | null = null
+        if (saved) {
+          try { decoded = JSON.parse(saved) as { key?: unknown; quoteToken?: unknown } }
+          catch { decoded = uuidV4.test(saved) ? { key: saved } : null }
+        }
+        if (decoded && typeof decoded.key === 'string' && uuidV4.test(decoded.key) &&
+            (decoded.quoteToken === undefined || typeof decoded.quoteToken === 'string')) {
+          pendingKey.value = decoded.key
+          pendingQuoteToken.value = typeof decoded.quoteToken === 'string' ? decoded.quoteToken : ''
           attemptState.value = 'pending'
-        } else if (savedKey) {
+        } else if (saved) {
           storage.remove(userId)
         }
       } catch {
@@ -116,6 +147,10 @@ export function createAccountOrderStore(
         const result = await transport.getEligibility(controller.signal)
         if (activeEligibility !== controller || !isCurrent(requestId, userId, version)) return false
         eligibility.value = result
+        if (result.elegible && attemptState.value === 'confirmed') {
+          attemptState.value = 'idle'
+          attemptError.value = ''
+        }
         return true
       } catch (error: unknown) {
         if (activeEligibility === controller && isCurrent(requestId, userId, version)) {
@@ -149,8 +184,20 @@ export function createAccountOrderStore(
       }
 
       confirmation.value = result.result
+      if (!receipts.value.some(receipt => receipt.pedidoId === result.result.pedidoId)) {
+        receipts.value.push(result.result)
+        try {
+          if (typeof window !== 'undefined') {
+            window.sessionStorage.setItem(`account-order-receipts:${userId}`, JSON.stringify(receipts.value))
+          }
+        } catch {
+          storageError.value = 'El pedido está confirmado, pero no se pudieron guardar los comprobantes en esta sesión.'
+        }
+      }
       attemptState.value = 'confirmed'
+      confirmationRevision.value++
       pendingKey.value = ''
+      pendingQuoteToken.value = ''
       try {
         storage.remove(userId)
         storageError.value = ''
@@ -163,14 +210,14 @@ export function createAccountOrderStore(
     async function confirm() {
       const userId = auth.user?.id
       const version = currentSessionGeneration()
-      if (userId === undefined || !sessionKey.value ||
-          !canUseCredit.value || attemptState.value !== 'idle' || disposed) return false
+      if (userId === undefined || !sessionKey.value || !canUseCredit.value ||
+          !eligibility.value?.cotizacion || attemptState.value !== 'idle' || disposed) return false
 
       let key: string
       try {
         key = createKey()
         if (!uuidV4.test(key)) throw new Error('La clave de confirmación no es un UUID v4 válido.')
-        storage.set(userId, key)
+        storage.set(userId, key, eligibility.value.cotizacion)
       } catch {
         attemptState.value = 'rejected'
         attemptError.value = 'No se pudo iniciar un intento seguro de confirmación. Volvé a intentarlo.'
@@ -178,12 +225,13 @@ export function createAccountOrderStore(
       }
 
       pendingKey.value = key
+      pendingQuoteToken.value = eligibility.value.cotizacion
       attemptState.value = 'submitting'
       attemptError.value = ''
       const requestId = revision
       const controller = activeAttempt = new AbortController()
       try {
-        const result = await transport.confirm(key, controller.signal)
+        const result = await transport.confirm(key, pendingQuoteToken.value, controller.signal)
         return finishAttempt(result, userId, requestId, version)
       } catch (error: unknown) {
         if (!isCurrent(requestId, userId, version)) return false
@@ -191,13 +239,16 @@ export function createAccountOrderStore(
         if (status === 400 || status === 403 || status === 409 || status === 422) {
           attemptState.value = 'rejected'
           pendingKey.value = ''
+          pendingQuoteToken.value = ''
           attemptError.value = accountOrderErrorMessage(error)
-          try {
-            storage.remove(userId)
-          } catch {
+          try { storage.remove(userId) } catch {
             storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.'
           }
-          if (status === 409 || status === 422) void loadEligibility()
+          if (status === 409 || status === 422) {
+            pendingKey.value = ''
+            pendingQuoteToken.value = ''
+            void loadEligibility()
+          }
         } else {
           attemptState.value = 'pending'
           attemptError.value = accountOrderErrorMessage(error)
@@ -224,8 +275,55 @@ export function createAccountOrderStore(
         return finishAttempt(result, userId, requestId, version)
       } catch (error: unknown) {
         if (isCurrent(requestId, userId, version)) {
-          attemptState.value = 'pending'
-          attemptError.value = accountOrderErrorMessage(error)
+          const status = axios.isAxiosError(error) ? error.response?.status : undefined
+          if (status === 400 || status === 403 || status === 409 || status === 422) {
+            attemptState.value = 'rejected'
+            pendingKey.value = ''
+            pendingQuoteToken.value = ''
+            attemptError.value = accountOrderErrorMessage(error)
+            try { storage.remove(userId) } catch {
+              storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.'
+            }
+          } else {
+            attemptState.value = 'pending'
+            attemptError.value = status === 404
+              ? 'No encontramos todavía un resultado para esta clave. Conservamos el mismo identificador; reintentá la consulta o la confirmación con él.'
+              : accountOrderErrorMessage(error)
+          }
+        }
+        return false
+      } finally {
+        if (activeAttempt === controller) activeAttempt = undefined
+      }
+    }
+
+    async function retryPendingConfirmation() {
+      const userId = auth.user?.id
+      const version = currentSessionGeneration()
+      const key = pendingKey.value
+      const token = pendingQuoteToken.value
+      if (userId === undefined || !sessionKey.value || !key || !token ||
+          attemptState.value !== 'pending' || disposed) return false
+      attemptState.value = 'submitting'
+      attemptError.value = ''
+      const requestId = revision
+      const controller = activeAttempt = new AbortController()
+      try {
+        return finishAttempt(await transport.confirm(key, token, controller.signal), userId, requestId, version)
+      } catch (error: unknown) {
+        if (isCurrent(requestId, userId, version)) {
+          const status = axios.isAxiosError(error) ? error.response?.status : undefined
+          if (status === 400 || status === 403 || status === 409 || status === 422) {
+            attemptState.value = 'rejected'
+            pendingKey.value = ''
+            pendingQuoteToken.value = ''
+            attemptError.value = accountOrderErrorMessage(error)
+            try { storage.remove(userId) } catch { storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.' }
+            if (status === 409 || status === 422) void loadEligibility()
+          } else {
+            attemptState.value = 'pending'
+            attemptError.value = accountOrderErrorMessage(error)
+          }
         }
         return false
       } finally {
@@ -260,8 +358,9 @@ export function createAccountOrderStore(
 
     return {
       eligibility, eligibilityLoading, eligibilityError, canUseCredit, attemptState,
-      attemptError, confirmation, pendingKey, storageError,
-      loadEligibility, confirm, consultResult, prepareRetry,
+      attemptError, confirmation, receipts, pendingKey, storageError,
+      pendingQuoteToken, confirmationRevision,
+      loadEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
     }
   })
 }

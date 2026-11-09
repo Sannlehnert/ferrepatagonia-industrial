@@ -31,12 +31,14 @@ function parseEligibility(value: unknown): AccountOrderEligibility {
     (value.creditoDisponibleUSD !== null && !isMoney(value.creditoDisponibleUSD)) ||
     (value.codigo !== null && typeof value.codigo !== 'string') ||
     (value.mensaje !== null && typeof value.mensaje !== 'string') ||
+      (value.cotizacion !== null && typeof value.cotizacion !== 'string') ||
     (value.elegible && (
       !isMoney(value.totalUSD) ||
       value.totalUSD === '0.00' ||
       !isMoney(value.creditoDisponibleUSD) ||
       value.codigo !== null ||
-      value.mensaje !== null
+      value.mensaje !== null ||
+      typeof value.cotizacion !== 'string'
     ))
   ) {
     throw new Error('La respuesta de elegibilidad no es válida.')
@@ -48,6 +50,7 @@ function parseEligibility(value: unknown): AccountOrderEligibility {
     creditoDisponibleUSD: value.creditoDisponibleUSD,
     codigo: value.codigo,
     mensaje: value.mensaje,
+    cotizacion: value.cotizacion,
   }
 }
 
@@ -107,10 +110,10 @@ export const accountOrderService: AccountOrderTransport = {
     )
     return parseEligibility(data?.data)
   },
-  async confirm(key, signal) {
+  async confirm(key, quoteToken, signal) {
     const response = await api.post<{ data: unknown }>(
       '/pedidos/cuenta-corriente',
-      {},
+      { cotizacion: quoteToken },
       { signal, headers: { 'Idempotency-Key': key } },
     )
     return parseAttempt(response.data, response.status)

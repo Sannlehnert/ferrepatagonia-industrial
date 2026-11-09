@@ -7,6 +7,7 @@ export async function mockCart(page: Page) {
     quantity: 1,
     removed: false,
     readFailures: 0,
+    failCartReadOnRecovery: false,
     readGate: null as Promise<void> | null,
     confirmGate: null as Promise<void> | null,
     transform: null as ((value: CartSnapshot) => CartSnapshot) | null,
@@ -18,6 +19,7 @@ export async function mockCart(page: Page) {
       creditoDisponibleUSD: null,
       codigo: 'CUENTA_NO_HABILITADA',
       mensaje: 'El cliente no tiene una cuenta corriente habilitada.',
+      cotizacion: null,
     } as AccountOrderEligibility,
     confirmationStatus: 201,
     recoveryStatus: 202,
@@ -92,6 +94,10 @@ export async function mockCart(page: Page) {
     }
 
     if (path === '/api/carrito' && method === 'GET') {
+      if (state.failCartReadOnRecovery) {
+        state.failCartReadOnRecovery = false
+        return route.fulfill({ status: 500, json: { message: 'Error al resincronizar.' } })
+      }
       if (state.readGate) {
         await state.readGate
       }
@@ -158,6 +164,13 @@ export async function mockCart(page: Page) {
               message: 'Todavía no hay un resultado definitivo.',
             },
           },
+        })
+      }
+
+      if (state.recoveryStatus === 404) {
+        return route.fulfill({
+          status: 404,
+          json: { code: 'INTENTO_NO_ENCONTRADO', message: 'No se encontró el intento.' },
         })
       }
 

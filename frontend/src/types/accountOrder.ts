@@ -5,6 +5,7 @@ export interface AccountOrderEligibility {
   creditoDisponibleUSD: string | null
   codigo: string | null
   mensaje: string | null
+  cotizacion: string | null
 }
 
 export interface ConfirmedAccountOrder {
@@ -29,12 +30,12 @@ export type AccountOrderAttempt =
 
 export interface AccountOrderTransport {
   getEligibility(signal: AbortSignal): Promise<AccountOrderEligibility>
-  confirm(key: string, signal: AbortSignal): Promise<AccountOrderAttempt>
+  confirm(key: string, quoteToken: string, signal: AbortSignal): Promise<AccountOrderAttempt>
   recover(key: string, signal: AbortSignal): Promise<AccountOrderAttempt>
 }
 
 export interface PendingAccountOrderStorage {
   get(userId: number): string | null
-  set(userId: number, key: string): void
+  set(userId: number, key: string, quoteToken: string): void
   remove(userId: number): void
 }

@@ -10,6 +10,10 @@ const credentials = {
     email: "cliente@e2e.test",
     password: "E2eLocal-214!",
   },
+  account: {
+    email: "empresa-cuenta@e2e.test",
+    password: "E2eLocal-214!",
+  },
 };
 
 async function seedFixtures(connection) {
@@ -91,7 +95,20 @@ async function seedFixtures(connection) {
         estado_aprobacion_empresa, es_fiel, activo, id_lista_precio)
       VALUES
         (2, 'PARTICULAR', 'Segundo cliente E2E', 'segundo-cliente@e2e.test', NULL, 0, 1, 2),
-        (3, 'PARTICULAR', 'Cliente nuevo E2E', 'cliente-nuevo@e2e.test', NULL, 1, 1, NULL)
+        (3, 'PARTICULAR', 'Cliente nuevo E2E', 'cliente-nuevo@e2e.test', NULL, 1, 1, NULL),
+        (4, 'EMPRESA', 'Empresa E2E aprobada', 'empresa-cuenta@e2e.test', 'APROBADA', 0, 1, 1)
+    `);
+
+    await connection.query(`
+      INSERT INTO CUENTA_CORRIENTE (
+        id_cliente, limite_credito, habilitada, cobertura, plazo_dias,
+        moneda_limite, evidencia_limite, evidencia_plazo, evidencia_cobertura,
+        cobertura_desde_utc, origen_datos
+      ) VALUES (
+        4, 1000.00, 1, 'COMPLETA', 30, 'USD',
+        'TEST-ONLY E2E', 'TEST-ONLY E2E', 'TEST-ONLY E2E',
+        UTC_TIMESTAMP(3) - INTERVAL 1 DAY, 'DEMO'
+      )
     `);
 
     const hash = await bcrypt.hash(credentials.admin.password, 10);
@@ -104,9 +121,11 @@ async function seedFixtures(connection) {
         (1, NULL, ?, ?, 'ADMIN', 1),
         (2, 1, ?, ?, 'CLIENTE', 1),
         (3, 2, 'segundo-cliente@e2e.test', ?, 'CLIENTE', 1),
-        (4, 3, 'cliente-nuevo@e2e.test', ?, 'CLIENTE', 1)
+        (4, 3, 'cliente-nuevo@e2e.test', ?, 'CLIENTE', 1),
+        (5, 4, ?, ?, 'CLIENTE', 1)
     `,
-      [credentials.admin.email, hash, credentials.client.email, hash, hash, hash],
+      [credentials.admin.email, hash, credentials.client.email, hash, hash, hash,
+        credentials.account.email, hash],
     );
 
     await connection.query(`

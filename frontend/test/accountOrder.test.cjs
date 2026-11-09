@@ -15,6 +15,7 @@ const eligibleOrder = {
     creditoDisponibleUSD: '500.00',
     codigo: null,
     mensaje: null,
+    cotizacion: 'signed-quote-token-for-tests',
 }
 const confirmed = {
     estado: 'CONFIRMADO',
@@ -57,7 +58,7 @@ function createRuntime(t, transport, savedKey = null) {
     const values = new Map(savedKey ? [[7, savedKey]] : [])
     const storage = {
         get: userId => values.get(userId) || null,
-        set: (userId, value) => values.set(userId, value),
+        set: (userId, value, quoteToken) => values.set(userId, JSON.stringify({ key: value, quoteToken })),
         remove: userId => values.delete(userId),
     }
     const storeModule = loadTypeScript('stores/accountOrder.ts', {
@@ -108,7 +109,7 @@ test('service queries server credit and submits only an empty body with idempote
     const signal = new AbortController().signal
 
     assert.deepEqual(await service.accountOrderService.getEligibility(signal), eligibleOrder)
-    assert.deepEqual(await service.accountOrderService.confirm(key, signal), {
+    assert.deepEqual(await service.accountOrderService.confirm(key, eligibleOrder.cotizacion, signal), {
         estado: 'CONFIRMADO',
         result: confirmed,
     })
@@ -118,7 +119,7 @@ test('service queries server credit and submits only an empty body with idempote
     })
     assert.deepEqual(calls.map(call => call.slice(0, 3)), [
         ['GET', '/pedidos/cuenta-corriente/eligibilidad', { signal }],
-        ['POST', '/pedidos/cuenta-corriente', {}],
+      ['POST', '/pedidos/cuenta-corriente', { cotizacion: eligibleOrder.cotizacion }],
         ['GET', `/pedidos/cuenta-corriente/${key}`, { signal }],
     ])
     assert.deepEqual(calls[1][3], {
@@ -171,7 +172,7 @@ test('ignora doble confirmación y mantiene el resultado incierto bajo la misma 
     assert.equal(await store.confirm(), false)
     assert.equal(requests.length, 1)
     assert.equal(requests[0].requestKey, key)
-    assert.equal(storage.get(7), key)
+    assert.deepEqual(JSON.parse(storage.get(7)), { key, quoteToken: eligibleOrder.cotizacion })
     assert.equal(store.attemptState, 'submitting')
 
     response.resolve({ estado: 'PENDIENTE', result: {
@@ -181,7 +182,7 @@ test('ignora doble confirmación y mantiene el resultado incierto bajo la misma 
     } })
     assert.equal(await first, false)
     assert.equal(store.attemptState, 'pending')
-    assert.equal(storage.get(7), key)
+    assert.deepEqual(JSON.parse(storage.get(7)), { key, quoteToken: eligibleOrder.cotizacion })
     assert.equal(await store.confirm(), false)
     assert.equal(requests.length, 1)
 })
@@ -195,7 +196,7 @@ test('recupera un intento persistido sin crear otra clave', async t => {
             recovered.push(requestKey)
             return { estado: 'CONFIRMADO', result: confirmed }
         },
-    }, key)
+    }, JSON.stringify({ key, quoteToken: eligibleOrder.cotizacion }))
     await tick()
 
     assert.deepEqual(recovered, [key])
@@ -226,4 +227,47 @@ test('muestra el rechazo real de crédito insuficiente y exige preparar un nuevo
     assert.equal(storage.has(7), false)
     assert.equal(await store.confirm(), false)
     assert.equal(requests.length, 1)
+})
+
+test('H03: 404 al reconciliar conserva clave y reintenta el POST con esa misma clave', async t => {
+    const missing = new AxiosError('Missing', undefined, undefined, undefined, {
+        status: 404, data: { code: 'INTENTO_NO_ENCONTRADO', message: 'No se encontró.' },
+    })
+    const posted = []
+    const saved = JSON.stringify({ key, quoteToken: eligibleOrder.cotizacion })
+    const { store, storage } = createRuntime(t, {
+        getEligibility: async () => eligibleOrder,
+        confirm: async (requestKey, quoteToken) => {
+            posted.push({ requestKey, quoteToken })
+            return { estado: 'PENDIENTE', result: { estado: 'PENDIENTE', code: 'CONFIRMACION_PENDIENTE', message: 'Pendiente' } }
+        },
+        recover: async () => { throw missing },
+    }, saved)
+    await tick()
+    assert.equal(store.attemptState, 'pending')
+    assert.equal(store.pendingKey, key)
+    assert.match(store.attemptError, /Conservamos el mismo identificador/)
+    await store.retryPendingConfirmation()
+    assert.deepEqual(posted, [{ requestKey: key, quoteToken: eligibleOrder.cotizacion }])
+    assert.deepEqual(JSON.parse(storage.get(7)), { key, quoteToken: eligibleOrder.cotizacion })
+    assert.equal(store.attemptState, 'pending')
+})
+
+test('H03: rechazo persistido durante recuperación finaliza el intento y permite corregir', async t => {
+    const rejection = new AxiosError('Credit rejected', undefined, undefined, undefined, {
+        status: 409, data: { code: 'CREDITO_INSUFICIENTE', message: 'Crédito insuficiente.' },
+    })
+    const saved = JSON.stringify({ key, quoteToken: eligibleOrder.cotizacion })
+    const { store, storage } = createRuntime(t, {
+        getEligibility: async () => eligibleOrder,
+        confirm: async () => assert.fail('No debe reintentar automáticamente'),
+        recover: async () => { throw rejection },
+    }, saved)
+    await tick()
+    assert.equal(store.attemptState, 'rejected')
+    assert.equal(store.pendingKey, '')
+    assert.equal(storage.has(7), false)
+    assert.equal(store.attemptError, 'Crédito insuficiente.')
+    store.prepareRetry()
+    assert.equal(store.attemptState, 'idle')
 })

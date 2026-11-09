@@ -8,6 +8,7 @@ const eligibleOrder = {
   creditoDisponibleUSD: '500.00',
   codigo: null,
   mensaje: null,
+  cotizacion: 'mock-signed-quote-token-for-e2e',
 }
 
 for (const width of [1280, 360]) {
@@ -38,7 +39,10 @@ for (const width of [1280, 360]) {
 
       await option.check()
       await expect(confirm).toBeEnabled()
+      const postObserved = page.waitForRequest(request =>
+        request.method() === 'POST' && request.url().includes('/pedidos/cuenta-corriente'))
       await confirm.click()
+      await postObserved
       const confirming = summary.getByRole('button', { name: 'Confirmando…' })
       await expect(confirming).toBeVisible()
       await expect(confirming).toBeDisabled()
@@ -54,7 +58,7 @@ for (const width of [1280, 360]) {
       expect(state.orderRequests).toHaveLength(1)
       expect(state.orderRequests[0]).toMatchObject({
         method: 'POST',
-        body: {},
+        body: { cotizacion: 'mock-signed-quote-token-for-e2e' },
       })
       expect(state.orderRequests[0].key).toMatch(
         /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
@@ -110,6 +114,7 @@ test('oculta la modalidad y muestra el rechazo de elegibilidad del backend', asy
     creditoDisponibleUSD: '20.00',
     codigo: 'CREDITO_INSUFICIENTE',
     mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: null,
   }
   await page.goto('/carrito')
 
@@ -152,4 +157,44 @@ test('recupera un resultado pendiente con la misma clave idempotente', async ({
   await expect(page.getByText('Pedido #456 confirmado por USD 80.00')).toBeVisible()
   expect(state.recoveryRequests).toEqual([key])
   expect(state.orderRequests).toHaveLength(1)
+})
+
+test('H04: ofrece consultar un intento pendiente incluso con el carrito vacío', async ({ page }) => {
+  const state = await mockCart(page)
+  state.removed = true
+  state.recoveryStatus = 404
+  const key = 'd01e9632-24a2-4ad7-a2ba-d383f8f3edbc'
+  await page.addInitScript(({ storageKey, value }) => sessionStorage.setItem(storageKey, value), {
+    storageKey: 'account-order:2',
+    value: JSON.stringify({ key, quoteToken: eligibleOrder.cotizacion }),
+  })
+  await page.goto('/carrito')
+  const content = page.getByRole('region', { name: 'Contenido del carrito' })
+  await expect(page.getByText('Tu carrito está vacío.', { exact: true })).toBeVisible()
+  await expect(content.getByRole('button', { name: 'Consultar resultado' })).toBeVisible()
+  await content.getByRole('button', { name: 'Consultar resultado' }).click()
+  await expect(content).toContainText('Conservamos el mismo identificador')
+  expect(state.recoveryRequests).toEqual([key, key])
+})
+
+test('H05: al recuperar confirmación, conserva comprobante si falla recargar el carrito', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = eligibleOrder
+  state.confirmationStatus = 202
+  state.recoveryStatus = 200
+  await page.goto('/carrito')
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
+  await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
+  await expect(summary).toContainText('todavía no tiene un resultado definitivo')
+  state.failCartReadOnRecovery = true
+  await summary.getByRole('button', { name: 'Consultar resultado' }).click()
+  await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
+    .toContainText('Pedido #456 confirmado por USD 80.00.')
+  const content = page.getByRole('region', { name: 'Contenido del carrito' })
+  await expect(content.getByRole('alert').filter({ hasText: 'servidor no pudo procesar el carrito' }))
+    .toContainText('servidor no pudo procesar el carrito')
+  await content.getByRole('button', { name: 'Volver a consultar carrito' }).click()
+  await expect(page.getByText('Tu carrito está vacío.', { exact: true })).toBeVisible()
+  expect(state.recoveryRequests).toHaveLength(1)
 })

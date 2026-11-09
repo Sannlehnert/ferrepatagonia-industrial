@@ -52,12 +52,22 @@ async function countAttempts(f) {
   return Number(row.cantidad);
 }
 
+async function confirm(f, key) {
+  const eligibility = await service.getAccountOrderEligibility(f.auth);
+  return service.confirmAccountOrder(
+    f.auth, key, eligibility.body.data.cotizacion,
+  );
+}
+
 test('#262: la prevalidación devuelve total y crédito del servidor sin iniciar una compra', async () => {
   const f = await createOrderFixture(session);
 
   const result = await service.getAccountOrderEligibility(f.auth);
 
-  assert.deepEqual(result, {
+  assert.deepEqual({
+    ...result,
+    body: { data: { ...result.body.data, cotizacion: '<signed>' } },
+  }, {
     status: 200,
     body: {
       data: {
@@ -67,6 +77,7 @@ test('#262: la prevalidación devuelve total y crédito del servidor sin iniciar
         creditoDisponibleUSD: '1000.00',
         codigo: null,
         mensaje: null,
+        cotizacion: '<signed>',
       },
     },
   });
@@ -84,13 +95,14 @@ test('#262: la prevalidación informa crédito insuficiente y no reserva intento
 
   const result = await service.getAccountOrderEligibility(f.auth);
 
-  assert.deepEqual(result.body.data, {
+  assert.deepEqual({ ...result.body.data, cotizacion: '<signed>' }, {
     elegible: false,
     moneda: 'USD',
     totalUSD: '20.00',
     creditoDisponibleUSD: '1.00',
     codigo: 'CREDITO_INSUFICIENTE',
     mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: '<signed>',
   });
   assert.equal(await countOrders(f), 0);
   assert.equal(await countAttempts(f), 0);
@@ -112,6 +124,7 @@ test('#262: la prevalidación rechaza una empresa no aprobada', async () => {
     creditoDisponibleUSD: null,
     codigo: 'EMPRESA_NO_HABILITADA',
     mensaje: 'La empresa no está aprobada para esta operación.',
+    cotizacion: null,
   });
   assert.equal(await countOrders(f), 0);
   assert.equal(await countAttempts(f), 0);
@@ -121,7 +134,7 @@ test('#261: repetir y consultar devuelve el mismo pedido histórico', async () =
   const f = await createOrderFixture(session);
   const key = randomUUID();
 
-  const first = await service.confirmAccountOrder(f.auth, key);
+  const first = await confirm(f, key);
   assert.equal(first.status, 201);
 
   await session.connection.query(
@@ -133,7 +146,7 @@ test('#261: repetir y consultar devuelve el mismo pedido histórico', async () =
     [f.accountId],
   );
 
-  const repeated = await service.confirmAccountOrder(f.auth, key);
+  const repeated = await confirm(f, key);
   const recovered = await service.getAccountOrderResult(f.auth, key);
 
   assert.equal(repeated.status, 200);
@@ -152,7 +165,7 @@ test('#261: conserva el rechazo aunque después aumente el crédito', async () =
   const f = await createOrderFixture(session, { limit: '1.00' });
   const key = randomUUID();
 
-  const first = await service.confirmAccountOrder(f.auth, key);
+  const first = await confirm(f, key);
   assert.equal(first.status, 409);
   assert.equal(first.body.code, 'CREDITO_INSUFICIENTE');
 
@@ -162,7 +175,7 @@ test('#261: conserva el rechazo aunque después aumente el crédito', async () =
   );
 
   assert.deepEqual(
-    await service.confirmAccountOrder(f.auth, key),
+    await confirm(f, key),
     first,
   );
   assert.equal(await countOrders(f), 0);
@@ -173,8 +186,8 @@ test('#261: dos solicitudes con la misma clave generan una sola compra', async (
   const key = randomUUID();
 
   const responses = await Promise.all([
-    service.confirmAccountOrder(f.auth, key),
-    service.confirmAccountOrder(f.auth, key),
+    confirm(f, key),
+    confirm(f, key),
   ]);
 
   assert.deepEqual(
@@ -212,7 +225,7 @@ test('#261: consulta pendiente devuelve 202 y permite recuperar el intento', asy
   }
 
   assert.equal(
-    (await service.confirmAccountOrder(f.auth, key)).status,
+    (await confirm(f, key)).status,
     201,
   );
   assert.equal(await countOrders(f), 1);
@@ -249,14 +262,14 @@ test('#261: COMMIT ejecutado con acuse perdido recupera el resultado real', asyn
     return runner;
   });
 
-  const result = await service.confirmAccountOrder(f.auth, key);
+  const result = await confirm(f, key);
 
   assert.equal(dropped, true);
   assert.equal(result.status, 200);
   assert.equal(result.body.data.estado, 'CONFIRMADO');
   assert.equal(await countOrders(f), 1);
 
-  const repeated = await service.confirmAccountOrder(f.auth, key);
+  const repeated = await confirm(f, key);
   assert.deepEqual(repeated, result);
   assert.equal(await countOrders(f), 1);
 

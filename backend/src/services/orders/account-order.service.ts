@@ -28,6 +28,7 @@ import type {
   AccountOrderEligibilityResult,
   AccountOrderResult,
 } from './account-order.types';
+import { issueAccountOrderQuoteToken } from './account-order-quote-token';
 
 function validateClientAuth(auth: AuthContext): void {
   if (auth.rol !== 'CLIENTE' ||
@@ -119,6 +120,7 @@ export async function getAccountOrderEligibility(
       );
       const quote = await quoteAccountOrderCart(manager, auth, cart);
       const eligible = toCents(quote.totalUSD) <= toCents(context.availableUSD);
+      const quoteToken = issueAccountOrderQuoteToken(auth, clientId, cart.cartId, quote);
 
       return {
         status: 200,
@@ -132,6 +134,7 @@ export async function getAccountOrderEligibility(
             mensaje: eligible
               ? null
               : 'El crédito disponible no alcanza para confirmar el pedido.',
+            cotizacion: quoteToken,
           },
         },
       };
@@ -153,6 +156,7 @@ export async function getAccountOrderEligibility(
           creditoDisponibleUSD: null,
           codigo: failure.code,
           mensaje: failure.message,
+          cotizacion: null,
         },
       },
     };
@@ -178,6 +182,7 @@ export async function getAccountOrderResult(
 export async function confirmAccountOrder(
   auth: AuthContext,
   value: unknown,
+  quoteToken: unknown,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -204,7 +209,7 @@ export async function confirmAccountOrder(
         }
 
         return await executePendingAccountOrder(
-          manager, auth, clientId, key,
+          manager, auth, clientId, key, quoteToken,
         );
       } catch (error) {
         workFailure = { error };

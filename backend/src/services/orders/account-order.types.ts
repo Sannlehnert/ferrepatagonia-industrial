@@ -48,6 +48,7 @@ export interface AccountOrderEligibility {
   creditoDisponibleUSD: string | null;
   codigo: string | null;
   mensaje: string | null;
+  cotizacion: string | null;
 }
 
 export interface AccountOrderEligibilityResult {

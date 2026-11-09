@@ -89,6 +89,7 @@ export function handleAccountOrder(
             ? await confirmAccountOrder(
               auth,
               req.get('Idempotency-Key'),
+              (req.body as { cotizacion: string }).cotizacion,
             )
             : operation === 'recover'
               ? await getAccountOrderResult(

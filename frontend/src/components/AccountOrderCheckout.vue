@@ -72,9 +72,12 @@ watch(
 )
 
 async function confirmOrder() {
-  const confirmed = await order.confirm()
-  if (confirmed) void cart.cargarCarrito()
+  await order.confirm()
 }
+
+watch(() => order.confirmationRevision, revision => {
+  if (revision > 0) void cart.cargarCarrito()
+})
 
 async function retryAfterRejection() {
   order.prepareRetry()
@@ -102,6 +105,9 @@ async function retryAfterRejection() {
       La confirmación todavía no tiene un resultado definitivo. Conservamos el mismo identificador para evitar duplicados.
       <button type="button" class="ml-1 min-h-11 underline" @click="order.consultResult()">
         Consultar resultado
+      </button>
+      <button v-if="order.pendingQuoteToken" type="button" class="ml-3 min-h-11 underline" @click="order.retryPendingConfirmation()">
+        Reintentar con el mismo identificador
       </button>
     </p>
     <button
