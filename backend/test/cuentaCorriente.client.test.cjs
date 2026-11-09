@@ -3,64 +3,21 @@ const { describe, test, before, after } = require('node:test');
 const { once } = require('node:events');
 const jwt = require('jsonwebtoken');
 
-const SAFE_DB_REGEX = /^(cc_|audit_cc_)(client_)?test_[0-9a-f]{32}$/;
+const { childProfile, connectOwned } = require('./helpers/cc260-disposable.cjs');
 
-function assertOwnershipGuardBeforeConnect() {
-    assert.equal(
-        process.env.NODE_ENV,
-        'test',
-        'Guardia H05: NODE_ENV debe ser exactamente "test" antes de inicializar DataSource.'
-    );
-
-    const hasCc260Profile = Boolean(process.env.CC260_TEST_PROFILE);
-    const clientMarker =
-        process.env.CUENTA_CORRIENTE_CLIENT_TEST_DATABASE ||
-        process.env.CUENTA_CORRIENTE_TEST_DATABASE;
-
-    assert.ok(
-        hasCc260Profile || clientMarker,
-        'Guardia H05: se requiere base descartable exclusiva (CC260_TEST_PROFILE o CUENTA_CORRIENTE_CLIENT_TEST_DATABASE) antes de conectar.'
-    );
-
-    const dbHost = process.env.DB_HOST;
-    const dbPort = Number(process.env.DB_PORT);
-    assert.equal(dbHost, '127.0.0.1', 'Guardia H05: DB_HOST debe ser exclusivamente loopback (127.0.0.1).');
-    assert.ok(
-        Number.isInteger(dbPort) && dbPort > 1024 && dbPort !== 3306 && dbPort !== 3307,
-        'Guardia H05: DB_PORT debe ser un puerto efímero válido distinto de 3306/3307.'
-    );
-
-    if (hasCc260Profile) {
-        let profile;
-        try {
-            profile = JSON.parse(process.env.CC260_TEST_PROFILE);
-        } catch {
-            assert.fail('Guardia H05: CC260_TEST_PROFILE corrupto.');
-        }
-        assert.ok(profile && profile.database, 'Guardia H05: CC260_TEST_PROFILE inválido.');
-        assert.equal(process.env.DB_NAME, profile.database, 'Guardia H05: DB_NAME no coincide con CC260_TEST_PROFILE.');
-    } else {
-        assert.ok(
-            SAFE_DB_REGEX.test(clientMarker),
-            'Guardia H05: nombre de base descartable no cumple el patrón seguro.'
-        );
-        assert.equal(process.env.DB_NAME, clientMarker, 'Guardia H05: DB_NAME no coincide con la base autorizada.');
-    }
+async function assertOwnershipGuardBeforeConnect() {
+    assert.equal(process.env.NODE_ENV, 'test', 'Guardia H05: NODE_ENV debe ser test');
+    const runner = process.env.CC251_TEST_PROFILE === undefined ? 260 : 251;
+    const profile = childProfile(runner);
+    const session = await connectOwned(profile, runner);
+    await session.connection.end();
+    return profile;
 }
-
-const { app } = require('../dist/app');
-const db = require('../dist/config/database.config');
-const dataSource = db.dataSource;
-const { env } = require('../dist/config/env.config');
-const { signCursor } = require('../dist/services/cuentaCorriente.service');
-const {
-    registrarCargoPorPedido,
-    registrarAbonoPorPago
-} = require('../dist/repositories/cuentaCorriente.repository');
 
 describe('Task #251 — API de cuenta corriente para cliente', () => {
     let server;
     let baseUrl;
+    let db, dataSource, env, signCursor, registrarCargoPorPedido, registrarAbonoPorPago;
 
     const createdUserIds = [];
     const createdClienteIds = [];
@@ -152,7 +109,17 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
     }
 
     before(async () => {
-        assertOwnershipGuardBeforeConnect();
+        const profile = await assertOwnershipGuardBeforeConnect();
+        db = require('../dist/config/database.config');
+        dataSource = db.dataSource;
+        const { host, port, database, username, password } = dataSource.options;
+        assert.ok(host === profile.host && port === profile.port && database === profile.database &&
+            username === 'root' && password === profile.password, 'Guardia H05: DataSource no coincide con el perfil');
+
+        const { app } = require('../dist/app');
+        ({ env } = require('../dist/config/env.config'));
+        ({ signCursor } = require('../dist/services/cuentaCorriente.service'));
+        ({ registrarCargoPorPedido, registrarAbonoPorPago } = require('../dist/repositories/cuentaCorriente.repository'));
 
         if (!dataSource.isInitialized) {
             await dataSource.initialize();
@@ -252,7 +219,7 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
                     }
                 });
             }
-            if (typeof db.destroyDatabase === 'function') {
+            if (typeof db?.destroyDatabase === 'function') {
                 await db.destroyDatabase();
             } else if (dataSource && dataSource.isInitialized) {
                 await dataSource.destroy();

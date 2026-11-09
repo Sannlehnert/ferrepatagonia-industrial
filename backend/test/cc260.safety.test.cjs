@@ -2,9 +2,10 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { newProfile, validateProfile, assertOwned, childProfile } = require('./helpers/cc260-disposable.cjs');
 const p = { ...newProfile(), id: 'a'.repeat(64), port: 49152 };
-const info = { Id: p.id, Name: `/${p.container}`, Config: { Image: 'mariadb:11.4',
+const info = { Id: p.id, Name: `/${p.container}`, Config: { Image: 'mariadb:11.4', Hostname: p.id.slice(0, 12),
   Labels: { 'ferrepatagonia.cc260-test': p.token }, Env: [`MARIADB_DATABASE=${p.database}`, `MARIADB_ROOT_PASSWORD=${p.password}`] },
-  State: { Running: true }, HostConfig: { AutoRemove: true, Tmpfs: { '/var/lib/mysql': 'rw' } },
+  State: { Running: true }, HostConfig: { AutoRemove: true, Tmpfs: { '/var/lib/mysql': 'rw' },
+    PortBindings: { '3306/tcp': [{ HostIp: p.host, HostPort: '' }] } },
   Mounts: [], NetworkSettings: { Ports: { '3306/tcp': [{ HostIp: p.host, HostPort: String(p.port) }] } } };
 
 test('perfil descartable exacto aceptado', () => validateProfile(p, info));

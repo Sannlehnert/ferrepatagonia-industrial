@@ -1,114 +1,161 @@
-const { execFileSync, spawnSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
+const { once } = require('node:events');
+const { setTimeout: delay } = require('node:timers/promises');
+const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const mariadb = require('mariadb');
+const {
+    docker, image, label, inspect, assertContainerOwner, newProfile, validateProfile, connectOwned, assertOwned
+} = require('./cc260-disposable.cjs');
 
 const backend = path.resolve(__dirname, '../..');
-const token = randomUUID().replaceAll('-', '');
-const database = `cc_client_test_${token}`;
-const container = `cc-client-test-${token}`;
-const password = randomUUID();
+const runner = 251;
 
-const docker = (...args) =>
-    execFileSync('docker', args, { encoding: 'utf8', timeout: 180000 }).trim();
-
-function runSqlViaDocker(containerName, filePath, dbName, dbPassword) {
-    const sqlContent = fs.readFileSync(filePath);
-    execFileSync(
-        'docker',
-        ['exec', '-i', containerName, 'mariadb', '-uroot', `-p${dbPassword}`, dbName],
-        { input: sqlContent, timeout: 60000 }
-    );
+function findContainer(filter) {
+    return docker('ps', '-aq', '--no-trunc', '--filter', filter);
 }
 
-async function main() {
-    let started = false;
-    let connection;
+async function removeOwnContainer(profile) {
+    // A failed Docker CLI call can leave a container without returning its ID.
+    const filter = profile.id ? `id=${profile.id}` : `name=^/${profile.container}$`;
+    let id = findContainer(filter);
+    if (!profile.id) {
+        for (let attempt = 0; !id && attempt < 10; attempt++) {
+            await delay(200);
+            id = findContainer(filter);
+        }
+    }
+    if (!id) return;
+
     try {
-        docker(
-            'run',
-            '--rm',
-            '-d',
-            '--name',
-            container,
-            '-p',
-            '127.0.0.1::3306',
-            '-e',
-            `MARIADB_ROOT_PASSWORD=${password}`,
-            '-e',
-            `MARIADB_DATABASE=${database}`,
-            'mariadb:11.4'
+        assertContainerOwner(profile, id, inspect(id), runner);
+        docker('rm', '-f', '-v', id);
+    } catch (error) {
+        // --rm can remove a stopped container between listing and inspection.
+        if (findContainer(`id=${id}`)) throw error;
+        return;
+    }
+    assert.equal(findContainer(`id=${id}`), '', 'Docker dejó el contenedor descartable');
+}
+
+async function applySql(session, filePath) {
+    await assertOwned(session);
+    const { id, password, database } = session.profile;
+    execFileSync('docker', ['exec', '-i', id, 'mariadb', '-uroot', `-p${password}`, database], {
+        input: fs.readFileSync(filePath), stdio: 'pipe', windowsHide: true, timeout: 60000
+    });
+}
+
+async function run() {
+    const profile = newProfile(runner);
+    const errors = [];
+    let session;
+    let child;
+    let interruption;
+    let killTimer;
+    let exitCode = 1;
+
+    function interrupt(reason) {
+        interruption ??= reason;
+        if (child && !killTimer) {
+            child.kill('SIGTERM');
+            killTimer = setTimeout(() => child.kill('SIGKILL'), 5000);
+        }
+    }
+
+    function checkInterrupted() {
+        assert.ok(!interruption, `Suite #251 interrumpida (${interruption})`);
+    }
+
+    process.on('SIGINT', interrupt);
+    process.on('SIGTERM', interrupt);
+    try {
+        const id = docker(
+            'run', '--rm', '-d', '--name', profile.container, '--label', label(profile, runner),
+            '--tmpfs', '/var/lib/mysql:rw', '-p', `${profile.host}::3306`,
+            '-e', `MARIADB_ROOT_PASSWORD=${profile.password}`, '-e', `MARIADB_DATABASE=${profile.database}`, image
         );
-        started = true;
+        const info = inspect(id);
+        profile.id = id;
+        profile.port = Number(info.NetworkSettings.Ports['3306/tcp']?.[0]?.HostPort);
+        validateProfile(profile, info, runner);
 
-        const info = JSON.parse(docker('inspect', container))[0];
-        const port = Number(info.NetworkSettings.Ports['3306/tcp'][0].HostPort);
-
-        for (let i = 0; i < 60; i++) {
+        for (let attempt = 0; attempt < 60; attempt++) {
+            checkInterrupted();
             try {
-                connection = await mariadb.createConnection({
-                    host: '127.0.0.1',
-                    port,
-                    user: 'root',
-                    password,
-                    database,
-                    connectTimeout: 1000
-                });
+                session = await connectOwned(profile, runner);
                 break;
-            } catch {
-                await new Promise((resolve) => setTimeout(resolve, 1000));
+            } catch (error) {
+                if (error.code === 'ERR_ASSERTION' || error instanceof AggregateError || attempt === 59) throw error;
+                await delay(1000);
             }
         }
-        if (!connection) {
-            throw new Error('MariaDB descartable no disponible para suite #251');
-        }
 
-        const schemaPath = path.join(backend, '../database/schema.sql');
-        runSqlViaDocker(container, schemaPath, database, password);
+        checkInterrupted();
+        await applySql(session, path.join(backend, '../database/schema.sql'));
+        checkInterrupted();
+        await applySql(session, path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+        checkInterrupted();
 
-        const migrationPath = path.join(backend, '../database/migrate-fer-20-account-movements.sql');
-        if (fs.existsSync(migrationPath)) {
-            runSqlViaDocker(container, migrationPath, database, password);
-        }
-
-        const result = spawnSync(
-            process.execPath,
-            [
-                '--require',
-                './test/helpers/test-env.cjs',
-                '--test',
-                '--test-concurrency=1',
-                'test/cuentaCorriente.client.test.cjs'
-            ],
-            {
-                cwd: backend,
-                stdio: 'inherit',
-                env: {
-                    ...process.env,
-                    NODE_ENV: 'test',
-                    DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
-                    JWT_SECRET: randomUUID(),
-                    DB_HOST: '127.0.0.1',
-                    DB_PORT: String(port),
-                    DB_NAME: database,
-                    DB_USER: 'root',
-                    DB_PASSWORD: password,
-                    CUENTA_CORRIENTE_CLIENT_TEST_DATABASE: database,
-                    CUENTA_CORRIENTE_TEST_DATABASE: database
-                }
+        // The file uses node:test directly, so there is no test worker to orphan.
+        child = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', 'test/cuentaCorriente.client.test.cjs'], {
+            cwd: backend,
+            stdio: 'inherit',
+            windowsHide: true,
+            env: {
+                ...process.env,
+                NODE_ENV: 'test',
+                DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
+                JWT_SECRET: randomUUID(),
+                DB_HOST: profile.host,
+                DB_PORT: String(profile.port),
+                DB_NAME: profile.database,
+                DB_USER: 'root',
+                DB_PASSWORD: profile.password,
+                CC251_TEST_PROFILE: JSON.stringify(profile)
             }
-        );
-
-        if (result.error) throw result.error;
-        process.exitCode = result.status === 0 ? 0 : 1;
+        });
+        const timeout = setTimeout(() => interrupt('tiempo agotado'), 240000);
+        try {
+            const [code, signal] = await once(child, 'exit');
+            exitCode = code ?? 1;
+            checkInterrupted();
+            assert.equal(code, 0, `Suite #251 falló (exit ${code ?? signal})`);
+        } finally {
+            clearTimeout(timeout);
+            clearTimeout(killTimer);
+            child = undefined;
+        }
+    } catch (error) {
+        errors.push(error);
     } finally {
-        if (connection) await connection.end();
-        if (started) docker('rm', '-f', '-v', container);
+        try {
+            if (session) await session.connection.end();
+        } catch (error) {
+            errors.push(new Error(`Cierre de MariaDB #251: ${error.message}`));
+        } finally {
+            try {
+                await removeOwnContainer(profile);
+            } catch (error) {
+                errors.push(new Error(`Limpieza de Docker #251: ${error.message}`));
+            }
+            process.off('SIGINT', interrupt);
+            process.off('SIGTERM', interrupt);
+        }
+    }
+
+    if (interruption && !errors.length) errors.push(new Error(`Suite #251 interrumpida (${interruption})`));
+    for (const error of errors) report(error, profile.password);
+    return errors.length ? exitCode || 1 : 0;
+}
+
+function report(error, password) {
+    console.error(error.message.replaceAll(password, '[oculta]'));
+    if (error instanceof AggregateError) {
+        for (const cause of error.errors) report(cause, password);
     }
 }
 
-main().catch((error) => {
-    console.error(error.message);
-    process.exitCode = 1;
-});
+if (require.main === module) run().then(code => { process.exitCode = code; });
+module.exports = { run };

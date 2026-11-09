@@ -16,7 +16,7 @@
     "test:pricing:mariadb": "node test/helpers/run-pricing-mariadb.cjs",
     "test:cart:isolated": "node test/helpers/run-cart-mariadb.cjs",
     "test:cuenta-corriente": "node test/helpers/run-cuenta-corriente-mariadb.cjs",
-    "test:cuenta-corriente:client": "node test/helpers/run-cuenta-corriente-client-mariadb.cjs",
+    "test:cuenta-corriente:client": "node --test test/cc251.h05.test.cjs && node test/helpers/run-cuenta-corriente-client-mariadb.cjs",
     "test:cuenta-corriente:safety": "node --test test/cc260.safety.test.cjs test/cc260.cleanup.test.cjs"
   },
   "engines": {
