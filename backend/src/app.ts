@@ -13,10 +13,18 @@ import { MariaDbPricingSource } from './repositories/pricing.source';
 import { PricingService } from './services/pricing/pricing.service';
 import { createPricingRouter } from './routes/pricing.routes';
 import { adminAccountPrivacy } from './middlewares/adminAccountPrivacy.middleware';
+import { cuentaCorrienteRouter } from './routes/cuentaCorriente.routes';
+import {accountOrderPrivateResponses} from './middlewares/account-order-http.middleware';
+import {accountOrderRouter} from './routes/accountOrder.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
-// Includes security, parsing, authentication and authorization errors.
+
+app.use(
+  '/api/pedidos/cuenta-corriente',
+  accountOrderPrivateResponses,
+);
+
 app.use(adminAccountPrivacy);
 app.use('/api', httpSecurity(env.httpSecurity));
 
@@ -32,6 +40,8 @@ app.use('/api', categoryRouter);
 app.use('/api', createPricingRouter(new PricingService(new MariaDbPricingSource())));
 app.use('/api/admin', adminRouter);
 app.use('/api/carrito', cartRouter);
+app.use('/api/cuenta-corriente', cuentaCorrienteRouter);
+app.use('/api/pedidos/cuenta-corriente', accountOrderRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });
