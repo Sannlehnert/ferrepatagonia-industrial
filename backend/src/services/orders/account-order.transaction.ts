@@ -22,7 +22,7 @@ import {
 } from '../../repositories/cuentaCorriente.repository';
 import { quoteAccountOrderCart } from './account-order.pricing';
 import { AccountOrderError } from './account-order.errors';
-import type { AccountOrderResult } from './account-order.types';
+import type { ConfirmedAccountOrder } from './account-order.types';
 import { assertAccountOrderQuoteToken } from './account-order-quote-token';
 
 export async function executePendingAccountOrder(
@@ -31,7 +31,7 @@ export async function executePendingAccountOrder(
   clientId: number,
   key: string,
   quoteToken: unknown,
-): Promise<AccountOrderResult> {
+): Promise<{ status: 201; body: { data: ConfirmedAccountOrder } }> {
   const context = await lockAccountOrderContext(
     manager,
     auth,

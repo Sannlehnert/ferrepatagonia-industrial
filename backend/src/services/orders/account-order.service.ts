@@ -27,6 +27,8 @@ import { toCents } from '../../repositories/cuentaCorriente.repository';
 import type {
   AccountOrderEligibilityResult,
   AccountOrderResult,
+  ConfirmedAccountOrder,
+  NotifyAccountOrderConfirmed,
 } from './account-order.types';
 import { issueAccountOrderQuoteToken } from './account-order-quote-token';
 
@@ -183,6 +185,7 @@ export async function confirmAccountOrder(
   auth: AuthContext,
   value: unknown,
   quoteToken: unknown,
+  notify?: NotifyAccountOrderConfirmed,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -198,19 +201,21 @@ export async function confirmAccountOrder(
   }
 
   let workFailure: { error: unknown } | undefined;
+  let committed: { result: AccountOrderResult; fresh?: ConfirmedAccountOrder };
 
   try {
-    return await inTransaction(async manager => {
+    committed = await inTransaction(async manager => {
       try {
         const attempt = await lockAccountOrderAttempt(manager, clientId, key);
 
         if (attempt && attempt.state !== 'PENDIENTE') {
-          return presentStoredAccountOrder(attempt);
+          return { result: presentStoredAccountOrder(attempt) };
         }
 
-        return await executePendingAccountOrder(
+        const result = await executePendingAccountOrder(
           manager, auth, clientId, key, quoteToken,
         );
+        return { result, fresh: result.body.data };
       } catch (error) {
         workFailure = { error };
         throw error;
@@ -251,4 +256,16 @@ export async function confirmAccountOrder(
       },
     };
   }
+
+  // Recovery and historical responses never reach this branch with a fresh order.
+  // The transaction wrapper has acknowledged COMMIT and released its connection.
+  if (committed.fresh && notify) {
+    try {
+      const { pedidoId, estado } = committed.fresh;
+      await notify(clientId, { pedidoId, estado });
+    } catch {
+      console.error('No se pudo publicar la notificación de pedido confirmado.');
+    }
+  }
+  return committed.result;
 }

@@ -2,11 +2,11 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.config';
 import type { AuthContext } from '../types/auth';
 
-const algorithm = 'HS256';
+export const sessionJwtAlgorithm = 'HS256';
 
 export function signToken(auth: AuthContext): string {
   return jwt.sign({ id: auth.id, rol: auth.rol }, env.jwtSecret, {
-    algorithm,
+    algorithm: sessionJwtAlgorithm,
     expiresIn: '2h',
   });
 }
@@ -27,5 +27,5 @@ export function readAuthClaims(payload: unknown): AuthContext {
 }
 
 export function verifyToken(token: string): AuthContext {
-  return readAuthClaims(jwt.verify(token, env.jwtSecret, { algorithms: [algorithm] }));
+  return readAuthClaims(jwt.verify(token, env.jwtSecret, { algorithms: [sessionJwtAlgorithm] }));
 }
