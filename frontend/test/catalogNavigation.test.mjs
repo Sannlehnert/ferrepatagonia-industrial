@@ -35,3 +35,8 @@ test('el encabezado utiliza el menú público con permisos', async () => {
     /<NavigationMenu\b[^>]*:items="publicMenu"[^>]*:permissions="permissions"/,
   )
 })
+
+test('el detalle público tiene una ruta estable bajo el layout público', async () => {
+  const router = await readSource('../src/router/index.ts')
+  assert.match(router, /path: 'producto\/:id',\s+name: 'producto-detalle',\s+component: \(\) => import\('@\/views\/ProductDetailView\.vue'\)/)
+})

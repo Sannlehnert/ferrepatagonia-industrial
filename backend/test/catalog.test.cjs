@@ -136,6 +136,60 @@ test('error interno no filtra detalles ni adopta status del driver', async t => 
   assert.deepEqual(await response.json(), { message: 'Error interno del servidor.' });
 });
 
+test('detalle público expone catálogo y stock reales, pero no publica precio', async t => {
+  const detail = { ...row, descripcion: 'Percutor industrial', imagen: '/uploads/taladro.webp', stock: 6 };
+  const stub = t.mock.method(repository, 'findCatalogProductById', async id => {
+    assert.equal(id, 7);
+    return detail;
+  });
+  const response = await fetch(`${url}/7`);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('set-cookie'), null);
+  assert.deepEqual(await response.json(), { data: { producto: {
+    id: 7, nombre: 'Taladro', codigo: 'T-7', descripcion: 'Percutor industrial',
+    imagen: '/uploads/taladro.webp', stock: 6,
+    categoria: { id: 2, nombre: 'Herramientas' }, precio: null,
+    estadoPrecio: 'PENDIENTE_DEFINICION', disponible: true,
+  } } });
+  assert.equal(stub.mock.callCount(), 1);
+});
+
+test('detalle público oculta productos ausentes o no disponibles', async t => {
+  const stub = t.mock.method(repository, 'findCatalogProductById', async () => null);
+  const response = await fetch(`${url}/7`);
+  assert.equal(response.status, 404);
+  assert.deepEqual(await response.json(), { message: 'Producto no encontrado.' });
+  assert.equal(stub.mock.callCount(), 1);
+});
+
+for (const id of ['0', '-1', '01', '1.5', '2147483648', 'abc']) {
+  test(`detalle público valida el ID ${id} antes de consultar BD`, async t => {
+    const stub = t.mock.method(repository, 'findCatalogProductById', async () => { throw Error('no ejecutar'); });
+    assert.equal((await fetch(`${url}/${id}`)).status, 400);
+    assert.equal(stub.mock.callCount(), 0);
+  });
+}
+
+test('detalle MariaDB usa parámetros y devuelve solo productos y categorías activos', async t => {
+  const events = [];
+  const connection = {
+    query: async (query, values) => {
+      events.push({ sql: typeof query === 'string' ? query : query.sql, values });
+      return [{ ...row, descripcion: 'Texto', imagen: null, stock: 3 }];
+    },
+    release: () => events.push('release'), destroy: () => events.push('destroy'),
+  };
+  t.mock.method(pool, 'getConnection', async () => connection);
+  const result = await repository.findCatalogProductById(7);
+  assert.equal(result.stock, 3);
+  assert.equal(result.descripcion, 'Texto');
+  assert.match(events[0].sql, /p\.id_producto = \?/);
+  assert.match(events[0].sql, /p\.activo = 1 AND c\.activo = 1/);
+  assert.doesNotMatch(events[0].sql, /p\.precio/);
+  assert.deepEqual(events[0].values, [7]);
+  assert.equal(events[1], 'release');
+});
+
 for (const failAt of [null, 'acquire', 'isolation', 'start', 'count', 'rows', 'commit', 'rollback']) {
   test(`repositorio: snapshot, parámetros y limpieza (${failAt})`, async t => {
     const events = [];
