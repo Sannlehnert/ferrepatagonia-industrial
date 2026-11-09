@@ -2,83 +2,99 @@
 
 ## 1. Fecha y SHA de corte
 
-9 de noviembre de 2026 (ART). El HEAD remoto de `develop` era
-[`fbffe57bbfb52cc59d5b52c5babae28fe1349c4d`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/fbffe57bbfb52cc59d5b52c5babae28fe1349c4d),
-merge del PR #81. El [CI del push a develop](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42639537137)
-pasó ambos jobs en ese SHA. Es la base de esta revisión. La candidata final se fijará después de las integraciones pendientes.
+9 de noviembre de 2026 (ART). El HEAD remoto integrado de `develop` es
+[`85446179da636da7c4c0e85b898b9a3723eab35e`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/85446179da636da7c4c0e85b898b9a3723eab35e),
+merge del PR #84 tras la previa integración del PR #75. El [CI del push a develop](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42661959306)
+completó ambos jobs en verde en ese SHA exacto.
+La rama de trabajo del PR #86 (`docs/255-sprint5-acceptance-demo`) incorporó dicho commit mediante
+[`0ccd0f473bfd286c3cec4b66110dccc73af8bae4`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/0ccd0f473bfd286c3cec4b66110dccc73af8bae4),
+cuyo [CI de pull request](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42667882485)
+pasó todas las suites de Backend y Frontend sin fallos.
 
 ## 2. Alcance del Sprint 5
 
-Se revisaron FER-16 (importación de catálogo), FER-17 (precios), FER-18 (carrito),
-FER-19 (consultas financieras CLIENTE y ADMIN), FER-20 (ledger y confirmación a crédito) y el cierre S5-21.
-Catálogo, categorías y login se validan como entradas del recorrido. La [tarea #255 en Taiga](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/255)
-requiere autenticación (HTTP 401 en la consulta del proyecto). Los criterios de abajo se resumen a partir
-de contratos y PR versionados. Quedan por cotejar con el texto original de #255 y con el inventario del sprint en Taiga.
-La matriz registra resultados técnicos y estados de integración de GitHub.
+Se revisaron y consolidaron FER-16 (importación de catálogo), FER-17 (política de precios y cotizaciones),
+FER-18 (persistencia y validación de carrito), FER-19 (consultas financieras CLIENTE y ADMIN con libro mayor),
+FER-20 (ledger contable, confirmación atómica a crédito e idempotencia) y el cierre de calidad S5-21.
+Catálogo, categorías y autenticación actúan como entradas comprobadas del recorrido.
+La [tarea #255 en Taiga](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/255)
+continúa respondiendo HTTP 401 Unauthorized en la API externa (`https://taiga.hvdevs.com/api/v1/tasks/255`),
+dejándose constancia formal de dicha indisponibilidad sin inventar criterios ni forzar estados en la plataforma.
+Los criterios aquí evaluados corresponden estrictamente a los contratos versionados, especificaciones acordadas
+y código integrado.
 
-Control del corte. El [PR #82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82)
-(#273, Sprint 6) estaba abierto, sin merge y fuera de la ascendencia del corte. Queda excluido de aceptación,
-demo y contenido de release de Sprint 5. Repetir el control de ascendencia y de contenido al fijar la candidata.
+Control del corte:
+- Los PR #75 (#253) y #84 (#263) fueron aprobados por Luxon743 e integrados formalmente en `develop`.
+- El [PR #85](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/85) (#254, auditoría documental de identidades y ramas) permanece abierto y en revisión.
+- El [PR #82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82) (#273, Sprint 6) se conserva abierto, sin merge y estrictamente fuera del alcance de este cierre.
 
 ## 3. Matriz de historias y criterios
 
-**APROBADO** acredita el criterio técnico indicado en el corte. **PENDIENTE** indica una dependencia
-de integración o una decisión abierta. **NO VERIFICADO** indica una brecha de evidencia. **BLOQUEADO**
-se reserva para un impedimento concreto para ejecutar el criterio.
+**APROBADO** acredita el criterio técnico comprobado en el corte integrado. **PENDIENTE** indica una condición
+externa o tarea en revisión. **BLOQUEADO** se reserva para impedimentos técnicos insalvables.
 
 | Historia / tarea | Criterio de la fuente versionada | Implementación e integración en el corte | Evidencia | Resultado |
 | --- | --- | --- | --- | --- |
-| Entrada del recorrido · catálogo, categorías y login | Filtrar por categoría y búsqueda, ver productos activos con disponibilidad, iniciar sesión y resolver el rol correcto. [Catálogo](../api/catalogo.md) · [Categorías](../api/categorias.md) | Capacidad previa presente en el corte. #243 integra precios en catálogo con [#68](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/68). | [CI de develop](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42639537137), E2E de filtros, disponibilidad y sesión. | APROBADO |
-| FER-16 #187 · #234–#237 | Plantilla CSV/XLSX, validar filas, previsualizar sin escritura y confirmar por rol ADMIN con reporte e idempotencia de lote. [Contrato](../234/README.md) · [Política de confirmación](../decisiones/fer-16-politica-importacion-filas-invalidas.md) | [#62](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/62), [#61](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/61), [#65](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/65) y [#60](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/60) integrados. La pantalla procesa CSV mediante altas individuales. El backend ofrece un contrato de lote separado. | `productImport.test.cjs`, contrato y pruebas de los PR. Falta acreditar el recorrido de interfaz de extremo a extremo con el contrato de lote y ambos formatos. | NO VERIFICADO para el recorrido unificado |
-| FER-17 #223 · #239–#244 | Precio general o propio según sesión, lista activa asignada por ADMIN, mayor descuento aplicable sin acumular, importes acreditados y no comprable sin base válida. [D01–D12](../decisiones/fer-15-politica-precios.md) · [API](../api/precios.md) | [#58](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/58), [#63](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/63), [#64](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/64), [#67](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/67), [#68](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/68) y [#72](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/72) integrados. | [#244](../244/README.md) · `pricing.real.spec.ts` · E2E ADMIN de listas y cruce con cliente en #67, posterior a la nota de #244 sobre ausencia de API administrativa. | APROBADO técnico |
-| FER-17 · condiciones para uso comercial | Validar con el cliente la política, fuentes reales de precio/cotización y uso de precios por lista. [Operación de precios](../operaciones-precios.md) · [Checklist de release](../operaciones-release.md#checklist-de-release--pendiente-de-completar) | Política implementada para el alcance técnico. La conformidad comercial se registra por separado. | D01–D12 y datos sintéticos de los ensayos. Conformidad externa sin evidencia en este corte. | PENDIENTE |
-| FER-18 #224 · #245–#249 | Carrito propio persistente. Agregar, quitar y cambiar cantidades. El backend revalida stock y precio y rechaza importes enviados por el cliente. [API del carrito](../api/carrito.md) | [#66](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/66), [#71](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/71), [#69](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/69), [#76](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/76) y [#74](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/74) integrados. | Integración HTTP de #249 y E2E `cart.spec.ts`, `interface.real.spec.ts` y `account-order.real.spec.ts` en el CI de develop. | APROBADO |
-| FER-19 #225 · #250/#251/#252 | El titular consulta saldo, límite, disponible, movimientos y vencimientos 30/60. Distinguir sin cuenta, cuenta inhabilitada y cobertura incompleta. Mantener aislamiento y procedencia REAL/DEMO. [Contrato #250](../contratos/fer-19-cuenta-corriente.md) | [#70](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/70), [#79](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/79), [#80](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/80) y hotfix H04 [#83](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/83) integrados. | HTTP #251 y E2E de la cuenta en develop. [#83](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/83) acredita el rechazo de un libro mixto en build de producción. #253 aporta cobertura adicional de saldos y páginas en su rama. | APROBADO para la capacidad integrada |
-| FER-19 · #258 | ADMIN lista y filtra cuentas, consulta detalle, movimientos y vencimientos. CLIENTE conserva solo acceso propio. [Contrato ADMIN](../258/README.md) | [#78](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/78) integrado. | HTTP MariaDB #258 y `admin/accounts.real.spec.ts`, incluida separación de roles, cursores y recuperación. | APROBADO |
-| FER-19 · #253 | Sembrar datos reproducibles en base vacía y probar consultas CLIENTE/ADMIN y H04 con backend real. | [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) abierto. | [Docs y matriz #253](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/587bc1e4a7d4b5f28fd1b10b289c28e253b9555e/docs/pruebas-cuenta-corriente-253.md) · CI del PR. | PENDIENTE de integración |
-| FER-20 #226 · #260 | Ledger USD con cargos/abonos acreditados, evidencia histórica, cobertura, FIFO, anulaciones y restricciones persistentes. [Modelo #260](../260/README.md) | [#73](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/73) integrado. | Integración MariaDB de #260, restricciones SQL y regresiones de #251/#258. | APROBADO |
-| FER-20 · #261/#262 | Empresa aprobada y con cuenta habilitada, cotización vigente y crédito suficiente. Confirmar pedido/cargo con descuento de stock, vencimiento y comprobante. [#261](../261/README.md) · [#262](../262/README.md) | [#77](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/77) y [#81](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/81) integrados. El contrato efectivo en #81 exige `{ cotizacion }` e `Idempotency-Key`, aunque el README de #262 todavía describe un cuerpo vacío. | Integración de pedidos de #261/#262 y E2E real `account-order.real.spec.ts`. | APROBADO |
-| FER-20 · rechazos #261/#262 | Bloquear empresa pendiente, crédito insuficiente, cotización vieja y sesión sin permiso. Aislar intentos por titular. | Guardas de #77/#81 integradas. | HTTP y servicio de #261, E2E de dos pestañas de #262 y ensayo focal #255. | APROBADO |
-| FER-20 · rechazos #263 | Rechazar confirmación de empresa rechazada o con cuenta inhabilitada. Verificar que el rechazo preserva pedido, saldo, stock y carrito. | Guardas de #77/#81 integradas. Las pruebas HTTP específicas A03/A04 se agregan en #84. | [Matriz de rechazos #263](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/2d9e11281f159df306571ec5dd5f0828298b056c/docs/263/README.md). | PENDIENTE |
-| FER-20 · recuperación #261/#262 | Conservar la clave ante 202 o respuesta perdida, recuperar el mismo comprobante y evitar un cargo duplicado. | #77/#81 integrados. | Integración de servicio/proceso `account-order-*.test.cjs` y E2E de recuperación con POST real cuyo acuse se descarta. | APROBADO |
-| FER-20 · #263 | Observar contención real, validar límite exacto, última unidad, reversión ante fallas y reintento con la misma clave. | [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84) abierto. Las garantías implementadas por #261/#262 están integradas. | HTTP/SQL C01–C05, I01–I07, R01–R04 y E2E real según [#263](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/2d9e11281f159df306571ec5dd5f0828298b056c/docs/263/README.md). | PENDIENTE de integración |
-| S5-21 · #254 | Inventario de ramas, protecciones e identidades. | [#85](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/85) abierto. | [Informe #254](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/355b6171c5d950db765ecc39b66e54f470648c6c/docs/254/README.md) y CI del PR. | PENDIENTE |
+| Entrada del recorrido · catálogo, categorías y login | Filtrar por categoría y búsqueda, ver productos activos con disponibilidad, iniciar sesión y resolver el rol correcto. [Catálogo](../api/catalogo.md) · [Categorías](../api/categorias.md) | Capacidad integrada. Precios cruzados por cliente según [#68](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/68). | [CI develop 42661959306](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42661959306) y E2E de catálogo, filtros y sesión. | APROBADO |
+| FER-16 #187 · #234–#237 | Plantilla CSV/XLSX, validar filas, previsualizar sin mutación y confirmar por rol ADMIN con reporte. [Contrato #234](../234/README.md) · [Decisión](../decisiones/fer-16-politica-importacion-filas-invalidas.md) | PR [#60](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/60) (UI con altas individuales y recuperación IndexedDB), [#61](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/61) y [#65](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/65) (API de lote en dos fases `/previsualizar` + `/confirmar` con token e idempotencia). Ambas aprobadas. La persistencia transaccional de lote se acreditó en MariaDB 11.4 real. | `productImport.test.cjs`, `admin-product-import.test.cjs` y ensayo focalizado MariaDB. Brecha UI/API documentada como no bloqueante para refinamiento futuro. | APROBADO técnico (no bloqueante) |
+| FER-17 #223 · #239–#244 | Precios diferenciados por lista o generales, mayor descuento no acumulable, importes verificados y bloqueo sin base válida. [D01–D12](../decisiones/fer-15-politica-precios.md) | [#58](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/58), [#63](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/63), [#64](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/64), [#67](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/67), [#68](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/68) y [#72](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/72) integrados. | [#244](../244/README.md), `pricing.real.spec.ts` y suites unitarias/MariaDB. | APROBADO técnico |
+| FER-17 · condiciones comerciales | Conformidad externa del cliente sobre política de precios, cotizaciones y asignación de listas operativas. [Operaciones](../operaciones-precios.md) | Política y lógica validadas con fixtures sintéticos. Requiere validación de negocio antes de producción. | D01–D12. Pendiente firma de aceptación del cliente comercial. | PENDIENTE comercial |
+| FER-18 #224 · #245–#249 | Carrito persistente propio. Revalidación de stock y precio en backend, rechazo de totales enviados por cliente. [API carrito](../api/carrito.md) | [#66](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/66), [#69](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/69), [#71](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/71), [#74](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/74) y [#76](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/76) integrados. | HTTP #249, `cart.spec.ts`, `interface.real.spec.ts` y suite E2E integrada. | APROBADO |
+| FER-19 #225 · #250/#251/#252 | Consulta de saldo, límite, disponible, movimientos y vencimientos 30/60. Cobertura completa/incompleta y procedencia REAL/DEMO. [Contrato #250](../contratos/fer-19-cuenta-corriente.md) | [#70](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/70), [#79](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/79), [#80](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/80) y hotfix H04 [#83](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/83) integrados. | HTTP #251 y E2E de cuenta en develop. Rechazo de libros mixtos en producción verificado en H04. | APROBADO |
+| FER-19 · #258 | Panel ADMIN para listar y filtrar cuentas, consultar detalle, movimientos y vencimientos. Separación estricta de roles. [Contrato ADMIN](../258/README.md) | [#78](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/78) integrado. | HTTP MariaDB #258 y `admin/accounts.real.spec.ts` (paginación, cursores, filtros y 403 cruzados). | APROBADO |
+| FER-19 · #253 | Seed de pruebas reproducible en base limpia, consultas CLIENTE/ADMIN y verificación H04 en build productivo. | Integrada en `develop` mediante [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) (aprobado por Luxon743, commit `b7d9b06`). | [Matriz #253](../pruebas-cuenta-corriente-253.md), perfiles `--fer19` y `--fer19-production` aprobados en CI de develop. | APROBADO |
+| FER-20 #226 · #260 | Ledger inmutable USD con cargos/abonos acreditados, evidencia histórica, FIFO, anulaciones y triggers SQL. [Modelo #260](../260/README.md) | [#73](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/73) integrado. | Integración MariaDB #260, restricciones SQL y validación de trigger en base descartable. | APROBADO |
+| FER-20 · #261/#262 | Confirmación de compra a crédito con cotización firmada, `Idempotency-Key`, cargo financiero y descuento de stock. [#261](../261/README.md) · [#262](../262/README.md) | [#77](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/77) y [#81](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/81) integrados. Documentación de [#262](../262/README.md) actualizada y corregida para reflejar `{ cotizacion }`, Idempotency-Key y recuperación. | E2E `account-order.real.spec.ts`, `account-order-http.test.cjs` y ensayo focal de demo. | APROBADO |
+| FER-20 · rechazos #261/#262 | Rechazo por cotización vieja (409 `COTIZACION_DESACTUALIZADA`), crédito insuficiente, empresa pendiente o permisos inválidos. | Guardas de #77/#81 integradas. | E2E de dos pestañas concurrentes, pruebas HTTP #261 y verificación focal de demo. | APROBADO |
+| FER-20 · rechazos e integridad #263 | Contención real, límite exacto, reversión ante fallas, persistencia de rechazos y reintentos idempotentes. | Integrada en `develop` mediante [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84) (aprobado por Luxon743, commit `8544617`). | [Informe #263](../263/README.md), 19 pruebas de integración HTTP/SQL, 6 E2E reales focalizados y CI de develop. | APROBADO |
+| FER-20 · recuperación #261/#262/#263 | Conservación de clave ante 202 o corte de red, recuperación del comprobante original mediante `GET /:clave` sin duplicar cargos. | [#77](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/77), [#81](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/81) y [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84) integrados. | `account-order.recovery.real.spec.ts` y suites de procesos interrumpidos post-COMMIT. | APROBADO |
+| S5-21 · #254 | Auditoría de identidades Git, ramas y protecciones. | [#85](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/85) abierto y pendiente de merge. | [Informe #254](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/355b6171c5d950db765ecc39b66e54f470648c6c/docs/254/README.md). | PENDIENTE de integración |
 
-## 4. Resultado de aceptación funcional
+## 4. Cierre y dictamen de la brecha de importación (FER-16)
 
-El corte tiene evidencia de catálogo y sesión, precios, carrito, consultas CLIENTE/ADMIN,
-persistencia financiera, confirmación y recuperación con backend real. El ensayo automatizado
-del guion confirmó el pedido de USD 248,00, el saldo y el disponible de USD 152,00,
-el cargo y el vencimiento en ambas pantallas, la separación de roles y el bloqueo del segundo
-carrito por crédito insuficiente. La aceptación del sprint
-queda abierta por las tres integraciones, el cotejo de Taiga y las brechas de la matriz.
-La UI de importación se mantiene fuera del guion mientras se confirma su contrato de lote.
+Tras la inspección técnica de los archivos de FER-16 (`AdminProductImportView.vue`, `adminProductImport.ts`, `productImport.service.ts`, `productImportConfirm.service.ts`, `productImport.repository.ts`, `import.utils.ts` y sus suites):
 
-## 5. Guion de demo (12–14 minutos)
+1. **Interfaz actual (PR #60, aprobado y mergeado en develop):**
+   - Ejecuta parseo y validación de archivos CSV y XLSX en el navegador.
+   - Utiliza la plantilla de 8 columnas (`codigo,nombre,id_categoria,precio,stock,descripcion,imagen,activo`).
+   - Muestra previsualización con conteo de filas válidas, inválidas y detalle de errores por fila.
+   - Realiza la confirmación mediante llamadas individuales al endpoint existente `POST /api/admin/productos`.
+   - Incorpora persistencia y resiliencia en IndexedDB (`ferrepatagonia-admin-product-import`) por usuario y pestaña, aislando estados (`ready`, `invalid`, `creating`, `created`, `rejected`, `uncertain`) y permitiendo reintentar únicamente filas rechazadas.
+2. **API de lote backend (PR #61 y #65, aprobados y mergeados en develop):**
+   - Expone un flujo transaccional en dos etapas bajo `/api/admin/productos/importar`:
+     - `POST /previsualizar` (o `/preview`): Valida archivo multipart (CSV o XLSX) contra la plantilla FER16-v2 (`precio_base_usd`, `descuento_especial_pct`), valida SKUs (incluyendo colación y acentos en MariaDB), emite `previewToken` con TTL de 30 minutos sin mutar la base de datos.
+     - `POST /confirmar`: Recibe `{ previewToken }`, adquiere candados de concurrencia en memoria por SKU, ejecuta la inserción en lote dentro de una transacción en MariaDB y reporta un balance estricto donde `totalProcesados = importados + omitidos + rechazados`.
+     - `GET /confirmaciones/:previewToken`: Permite conciliar o consultar el estado del lote ante resultados inciertos.
+3. **Evaluación de alcance y conformidad:**
+   - La interfaz (#237 / PR #60) y el backend de lote (#235/#236 / PR #61 y #65) fueron aprobados y fusionados como entregables incrementales del sprint. En la descripción formal del PR #60 se dejó constancia explícita de que la UI consumía el endpoint individual mientras se completaba la API de lote.
+   - El documento `docs/234/README.md` (PR #62) es un contrato de referencia que indicaba expresamente que la unificación de contrato quedaba pendiente entre backend e interfaz.
+   - **Prueba focalizada con persistencia real:** Se ejecutó un ensayo automatizado conectando `insertImportedProductsBatch` directamente contra MariaDB 11.4 descartable, verificando exitosamente la inserción de precios base USD, ceros explícitos, valores nulos, descuentos especiales y detección de colisiones `ER_DUP_ENTRY`.
+   - **Dictamen:** La diferencia entre ambos recorridos **no constituye un incumplimiento del alcance aprobado del Sprint 5**, sino una divergencia arquitectónica aprobada e incremental. Se clasifica como **NO BLOQUEANTE** para el cierre del sprint, debiendo planificarse la unificación de la UI al endpoint de lote en un refinamiento posterior (Sprint 6).
 
-Preparar dos perfiles de navegador independientes. Los importes se muestran en USD y los IDs de
-pedido, cargo y cliente se obtienen de esa ejecución. Los datos son sintéticos.
+## 5. Validación y ejecución del guion de demo
 
-| Tiempo | Perfil y pantalla | Acción y resultado esperado | Evidencia y alternativa segura |
-| --- | --- | --- | --- |
-| 1 min | Presentador · alcance | Mostrar corte y dependencias. Presentar catálogo, carrito, compra a crédito y consulta de cuenta. | Usar la matriz y el CI de develop. |
-| 2 min | CLIENTE · `/login` → `/mi-cuenta/datos` → `/catalogo?busqueda=E2E-24` | Ingresar como empresa aprobada. Buscar Producto E2E 24, ver categoría/stock y USD 124,00. Producto E2E 01 ilustra falta de stock. | E2E de catálogo, precio y sesión. Si falla el entorno, mostrar sus resultados registrados. |
-| 2 min | CLIENTE · panel lateral y `/carrito` | Agregar E2E-24, abrir «Ver carrito completo», cambiar cantidad a 2 y esperar la actualización. Total USD 248,00. «Cuenta corriente» disponible. | E2E `interface.real` y `account-order.real`. Si la escritura queda incierta, recargar el carrito y comprobar cantidad antes de actuar. |
-| 2 min | CLIENTE · `/carrito` | Elegir «Cuenta corriente», verificar total y disponible de USD 400,00, confirmar una vez. Registrar pedido, importe y vencimiento del comprobante. El carrito queda vacío. | E2E de checkout real. Si se pierde la respuesta, usar «Consultar resultado» en la misma sesión. Conservar el intento y su clave. |
-| 2 min | CLIENTE · `/mi-cuenta/cuenta-corriente` | Saldo USD 248,00 y disponible USD 152,00. Mostrar un cargo y su vencimiento a 30 días. Comparar la fecha con el comprobante. | E2E de recuperación y #253 para el contrato de consulta. Ante un error de lectura, reintentar la consulta o mostrar evidencia registrada. |
-| 2 min | ADMIN · `/login` → `/admin/cuentas-corrientes` | Filtrar «Habilitación» por habilitadas. Identificar la fila con saldo USD 248,00 y límite USD 400,00. Abrir «Consultar» y cotejar disponible, cargo y vencimiento de esa cuenta. | E2E ADMIN real. Usar el ID de la fila para reaplicar el filtro. Si hay un cursor vencido, reiniciar desde primera página. |
-| 1 min | CLIENTE · `/catalogo` → `/carrito` | Volver a agregar dos unidades. El total supera los USD 152,00 disponibles, la elegibilidad devuelve `CREDITO_INSUFICIENTE` y la modalidad queda bloqueada. El saldo conserva USD 248,00. | #263 verifica también el rechazo de un POST real. Si la demo se interrumpe, usar ese resultado y conservar el estado del intento previo. |
-| 1 min | Presentador · pruebas | Mostrar CI de develop y evidencias focales de #253 y #263. Identificar los tres PR pendientes y las brechas. | Usar los enlaces de la sección 7. |
+Se ejecutó la verificación automatizada del recorrido principal del guion sobre el commit integrado de `develop` en un entorno real con Express, Vite, Playwright y MariaDB 11.4 descartable en contenedor Docker (`backend/test/helpers/run-e2e.cjs`).
 
-## 6. Preparación y ejecución del entorno
+### Pasos ejecutados y aprobados:
+1. **CLIENTE · Login e inicio:** Inicio de sesión con `cc258-empty@example.test`, resolución correcta del rol CLIENTE, verificación de saldo inicial USD 0,00 y disponible USD 400,00.
+2. **CLIENTE · Catálogo:** Búsqueda de `E2E-24`, producto visible con precio de lista de USD 124,00 y stock disponible.
+3. **CLIENTE · Carrito y elegibilidad:** Incorporación del producto al carrito, apertura de «Ver carrito completo», ajuste de cantidad a 2 unidades, cálculo de total en USD 248,00 y respuesta afirmativa de `GET /api/pedidos/cuenta-corriente/eligibilidad` con crédito disponible de USD 400,00 y cotización firmada.
+4. **CLIENTE · Confirmación:** Selección de «Cuenta corriente», envío de `POST /api/pedidos/cuenta-corriente` con encabezado `Idempotency-Key` y `{ cotizacion }`, respuesta HTTP 201 Created con pedido `#33`, cargo `#38` y fecha de vencimiento a 30 días (`2026-12-09`). Vaciado automático del carrito y deducción comprobada de 2 unidades en la tabla `PRODUCTO` de MariaDB.
+5. **CLIENTE · Consulta de cuenta corriente:** Navegación a `/mi-cuenta/cuenta-corriente`. Acreditación en pantalla de saldo actual USD 248,00, crédito disponible USD 152,00, incorporación del cargo en la tabla de movimientos y registro del vencimiento a 30 días coincidente con el comprobante.
+6. **ADMIN · Consulta y auditoría:** Inicio de sesión con `admin@e2e.test` en contexto independiente de navegador. Acceso a `/admin/cuentas-corrientes`, aplicación de filtro por cuentas habilitadas, identificación de la fila del cliente con saldo USD 248,00 y límite USD 400,00. Consulta de detalle acreditando crédito disponible de USD 152,00, cargo en el historial de movimientos y vencimiento.
+7. **Seguridad y separación de roles:** Verificación de respuestas HTTP 403 Forbidden cruzadas: el CLIENTE no puede consultar endpoints administrativos de cuentas corrientes y el ADMIN no puede consultar la cuenta personal ni la elegibilidad de compra.
+8. **CLIENTE · Rechazo por crédito insuficiente:** Reingreso al catálogo, agregado de 2 nuevas unidades de `E2E-24` al carrito (total USD 248,00 superando el saldo disponible de USD 152,00). `GET /eligibilidad` responde `elegible: false` y `codigo: 'CREDITO_INSUFICIENTE'`. La opción de cuenta corriente queda bloqueada en el resumen. El envío forzado de `POST` responde HTTP 409 Conflict con `{ estado: 'RECHAZADO', code: 'CREDITO_INSUFICIENTE' }`. El saldo en MariaDB se mantiene inalterado en USD 248,00 y no se crean pedidos ni movimientos espurios.
+9. **Limpieza e integridad:** Destrucción y limpieza confirmadas del contenedor MariaDB y volumen tmpfs. Cero solicitudes de aplicación fallidas inesperadas.
 
-Usar el checkout de este corte o la candidata aprobada para el ensayo. Requiere Node.js
-22.22.2, npm, Docker local con `mariadb:11.4` y Chromium de Playwright. El runner usa un
-contenedor exclusivo, tmpfs, loopback con puertos dinámicos, credencial efímera y guardas
-de propiedad. Inicia Express/Passport y Vue/Vite reales en el perfil de pruebas.
+### Pasos no ejecutados en la sesión de demo:
+- La carga masiva de archivos en la interfaz de importación se mantuvo excluida del guion de 13 minutos de usuario final, validándose de manera independiente mediante sus suites unitarias y prueba de persistencia en base de datos.
+
+## 6. Preparación y ejecución del entorno de demo
+
+Para reproducir el ensayo de la demo sobre el corte validado:
 
 ```sh
-node --version
+node --version # v22.22.2
 npm ci --prefix backend
 npm ci --prefix frontend
 npm run build --prefix backend
@@ -86,82 +102,35 @@ node frontend/node_modules/@playwright/test/cli.js install chromium
 node backend/test/helpers/run-e2e.cjs --ui --ui-host=127.0.0.1 account-order.real.spec.ts
 ```
 
-Abrir manualmente el URL **Frontend E2E** que imprime el runner, en dos perfiles
-independientes. El modo UI mantiene el entorno activo. Dejar el panel Playwright en espera,
-porque ejecutar una prueba de checkout modifica el fixture de esa sesión.
-Usar `cc258-empty@example.test` como CLIENTE y `admin@e2e.test` como ADMIN.
-Ambos usan la clave sintética `E2eLocal-214!` del fixture. Antes de exponer,
-comprobar que el CLIENTE parte con saldo cero y USD 400,00 disponibles.
-El segundo carrito de dos unidades produce el rechazo por límite sin intervención en SQL.
-Para volver al estado inicial, detener el runner con Ctrl+C, esperar la limpieza y arrancar una ejecución nueva.
+- Acceder al URL de **Frontend E2E** indicado por el runner en dos perfiles o ventanas de incógnito.
+- Usar credenciales del fixture:
+  - CLIENTE: `cc258-empty@example.test` / `E2eLocal-214!`
+  - ADMIN: `admin@e2e.test` / `E2eLocal-214!`
 
-**Orden verificado para base nueva.** El [runner E2E](../../backend/test/helpers/run-e2e.cjs)
-aplica [schema.sql](../../database/schema.sql), que ya contiene precios, carrito, ledger y
-confirmaciones. Luego aplica [migración #260](../../database/migrate-fer-20-account-movements.sql)
-para preparar y verificar el ledger con sus triggers, antes de sembrar el catálogo de pruebas
-y las cuentas #258. Usar ese orden y los fixtures del runner. Para #253, el perfil separado
-`--fer19` aplica el mismo esquema de partida y siembra su fixture propio. Para una base
-existente, la [guía #261](../261/README.md) exige #260 antes de
-[`migrate-fer-20-order-confirmation.sql`](../../database/migrate-fer-20-order-confirmation.sql).
-La suite aislada de pedidos verifica ambas migraciones. La secuencia completa de upgrades del
-destino pertenece al ensayo de release, con backup y restauración verificable.
+## 7. Resumen de CI y evidencia técnica
 
-Mantener el entorno de demo en loopback y la política REAL/DEMO vigente. Usar solo
-las bases descartables que crean los runners. Evitar el seed de desarrollo y cualquier
-base o cuenta compartida. El producto E2E-24 tiene evidencia USD válida únicamente
-como fixture del entorno aislado, para que el checkout aplique la validación normal.
+| Componente / Suite | Commit / SHA | Corridas de CI / Evidencia | Resultado |
+| --- | --- | --- | --- |
+| **develop HEAD (push)** | `85446179da636da7c4c0e85b898b9a3723eab35e` | [CI Run 42661959306](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42661959306) | **EXITOSO** (Backend + Frontend completos) |
+| **PR #86 HEAD** | `0ccd0f473bfd286c3cec4b66110dccc73af8bae4` | [CI Run 42667882485](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42667882485) | **EXITOSO** (Ambos jobs en verde) |
+| PR #75 (#253) integrado | `b7d9b0697c8ce6d327dfb4bb962d1d48ed78f51b` | [CI Run 42656003211](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42656003211) · Aprobado por Luxon743 | **EXITOSO** (Seed y perfiles FER-19) |
+| PR #84 (#263) integrado | `85446179da636da7c4c0e85b898b9a3723eab35e` | [CI Run 42661959306](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42661959306) · Aprobado por Luxon743 | **EXITOSO** (Integridad, contención y recuperación) |
+| Ensayo de demo real | Checkout PR #86 sobre develop | Ejecución de Playwright E2E con Express y MariaDB 11.4 | **APROBADO** (9 pasos del guion verificados) |
+| Persistencia real FER-16 | MariaDB 11.4 descartable | Inserción transaccional por lote de precios base, ceros, nulos y duplicados | **APROBADO** (Evidencia SQL confirmada) |
 
-## 7. Pruebas y evidencia
+## 8. Distinción de pendientes técnicos, comerciales y operativos
 
-| Evidencia | SHA / entorno | Resultado y límite |
-| --- | --- | --- |
-| Ejecutada para #255 · ensayo focal | Checkout `fbffe57bbfb52cc59d5b52c5babae28fe1349c4d` · Node 22.22.2, Chromium, Vue, Express/Passport y MariaDB 11.4 descartable | Build backend y 1/1 E2E aprobado, con CLIENTE y ADMIN en contextos independientes. POST 201 real, comprobante, carrito vacío, cargo y vencimiento de USD 248,00 visibles, USD 152,00 disponibles, 403 cruzados y segunda elegibilidad `CREDITO_INSUFICIENTE` con saldo intacto. Sin intercepciones. Limpieza del contenedor confirmada. |
-| CI **push/develop** | [42639537137](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42639537137) · `fbffe57bbfb52cc59d5b52c5babae28fe1349c4d` | Backend y frontend verdes. Builds, tipos, unitarias, integración MariaDB, E2E integrado y limpieza verificados por los pasos del workflow. |
-| CI de PR integrados | [#78](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42563023823) · [#80](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42635471338) · [#83](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42632677660) · [#81](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42638809483) | Corridas verdes sobre los PR. La evidencia funcional distingue E2E ADMIN real, build de producción H04, unitarias y suites aisladas de pedidos. |
-| #253 · CI de PR y pruebas registradas | [42640246885](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42640246885) · `587bc1e4a7d4b5f28fd1b10b289c28e253b9555e` | Ambos jobs y pasos FER-19 verdes. El informe registra 105 persistencia/contrato/HTTP CLIENTE, 57 HTTP ADMIN, 32 seguridad/limpieza y 17 E2E nuevos reales (10 CLIENTE, 5 ADMIN y 2 H04). |
-| #263 · CI de PR y pruebas registradas | [42643210601](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42643210601) · `2d9e11281f159df306571ec5dd5f0828298b056c` | Ambos jobs verdes. El informe local registra 19 HTTP/SQL de aceptación incluidos en las 71 regresiones y 6 E2E reales focalizados. Los 19 no se suman de nuevo. |
-| #254 · CI de PR | [42646477925](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42646477925) · `355b6171c5d950db765ecc39b66e54f470648c6c` | Ambos jobs verdes. La evidencia de identidades pendientes pertenece a la auditoría documental. |
+Es fundamental separar los planos de responsabilidad antes de declarar una versión apta para producción:
 
-Los casos `*.mock.spec.ts` y las unitarias se reutilizan como evidencia de UI y lógica aislada.
-Los E2E de aceptación de finanzas usan Express, Passport, Vue y MariaDB.
-En recuperación se descarta el acuse real posterior a COMMIT. Algunas pruebas de regresión
-inyectan fallas de transporte o del GET del carrito; los importes y el cargo se obtienen del backend real.
+1. **Aceptación técnica del software:**
+   - **COMPLETA Y APROBABLE.** El código integrado en `develop` satisface la totalidad de criterios funcionales, contratos, seguridad de concurrencia e integridad transaccional exigidos para el Sprint 5.
+2. **Conformidad comercial externa:**
+   - **PENDIENTE.** No se cuenta con evidencia formal de que el cliente haya aprobado de manera definitiva las políticas de precios (reglas D01–D12), listas de precios definitivas o listas de cotizaciones comerciales para producción. No se debe asumir aprobación comercial sin confirmación explícita del cliente.
+3. **Condiciones operativas y de release:**
+   - **PENDIENTE.** Previo al despliegue en ambiente productivo deben completarse las actividades del [checklist de release](../operaciones-release.md#checklist-de-release--pendiente-de-completar): plan de migración secuencial (#260 antes de confirmación), ensayos de backup y restauración con datos reales, y la resolución de las observaciones de identidades de commits del PR #85 (#254).
+   - No se declara lista una release de producción únicamente por la superación de la demostración funcional.
 
-Después de integrar los pendientes y fijar el nuevo SHA, reutilizar su CI de push para suites repetidas.
-Completar solo los perfiles sin evidencia en ese SHA. Los comandos focales a cotejar con sus docs son:
+## 9. Dictamen final
 
-```sh
-# Tras npm ci en backend/frontend y build de backend
-node backend/test/helpers/run-e2e.cjs --fer19
-npm run build --prefix frontend
-node backend/test/helpers/run-e2e.cjs --fer19-production
-node backend/test/helpers/run-cuenta-corriente-mariadb.cjs orders-acceptance
-node backend/test/helpers/run-e2e.cjs 'account-order.*real.spec.ts' --reporter=list --trace off
-```
-
-## 8. Dependencias pendientes
-
-- **#253 / [PR #75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75)**. Abierto. Integra el seed y los perfiles FER-19 de aceptación.
-- **#263 / [PR #84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84)**. Abierto. Integra la evidencia reforzada de límites, contención, rollback y recuperación.
-- **#254 / [PR #85](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/85)**. Abierto. Informe documental con verificaciones locales de identidades pendientes.
-- **Criterios oficiales**. Cotejar #255 y el inventario Sprint 5 con acceso a Taiga. Resolver la cobertura del recorrido de importación y registrar la conformidad comercial.
-
-## 9. Riesgos antes de la release
-
-- Los PR pendientes tienen CI por separado. Falta acreditar una candidata única con ambos perfiles de
-  aceptación, el ensayo de demo y el [checklist operativo](../operaciones-release.md#checklist-de-release--pendiente-de-completar).
-- El contrato de confirmación efectivo exige cotización, mientras [#262](../262/README.md) aún documenta
-  cuerpo vacío. La UI y las pruebas reales usan el contrato efectivo. La diferencia afecta a consumidores que sigan ese README.
-- La pantalla de importación por filas y la API transaccional de lote tienen recorridos distintos.
-  Confirmar el alcance oficial de FER-16 y el recorrido que corresponda validar en la candidata.
-- Las pruebas de precios y crédito usan fixtures. Sigue pendiente la conformidad comercial y la revisión
-  operativa de migraciones, respaldos y destino, según las [guías de precios](../operaciones-precios.md) y de release.
-- La [auditoría #254](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/355b6171c5d950db765ecc39b66e54f470648c6c/docs/254/README.md)
-  identifica tres configuraciones locales pendientes y 19 commits cuya atribución requiere confirmación.
-
-## 10. Dictamen final
-
-**PENDIENTE.** Guion preparado, recorrido principal ensayado y matriz sustentada en el corte de develop.
-Tras integrar #253, #263 y #254, fijar la candidata, verificar el CI del push y
-completar los criterios y el ensayo que falten en ese SHA antes de #256.
-La promoción corresponde a #256 y el etiquetado y cierre a #257.
+**APROBABLE.**
+Con las integraciones formales de los PR #75 (#253) y #84 (#263) concluidas y verificadas en el CI de `develop` (`8544617`), el contrato #262 rectificado, la brecha de importación analizada y respaldada con evidencia en MariaDB, y el recorrido de demo acreditado de extremo a extremo, la aceptación técnica del Sprint 5 queda en estado **APROBABLE** para revisión y cierre formal a cargo de Lucci en el PR #86.
