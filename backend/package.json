@@ -18,6 +18,11 @@
     "test:cuenta-corriente": "node test/helpers/run-cuenta-corriente-mariadb.cjs",
     "test:cuenta-corriente:client": "node --test test/cc251.h05.test.cjs && node test/helpers/run-cuenta-corriente-client-mariadb.cjs",
     "test:cuenta-corriente:safety": "node --test test/cc260.safety.test.cjs test/cc260.cleanup.test.cjs",
+    "test:account:safety": "node --test test/account.safety.test.cjs",
+    "test:account:cleanup": "node --test test/account.cleanup.test.cjs",
+    "test:account:isolated": "node test/helpers/run-account-mariadb.cjs",
+    "test:account:contract": "node test/helpers/run-account-mariadb.cjs contract",
+    "test:account:client": "node test/helpers/run-account-mariadb.cjs client",
     "test:account-admin:isolated": "node test/helpers/run-admin-account-mariadb.cjs"
   },
   "engines": {
