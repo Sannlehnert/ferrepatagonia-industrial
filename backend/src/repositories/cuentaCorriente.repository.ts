@@ -36,7 +36,7 @@ export interface ResumenCredito {
     limite_credito: string | null; total_cargos: string | null; total_abonos: string | null;
     deuda_vigente: string | null; utilizado: string | null; credito_disponible: string | null;
     estado_credito: 'DISPONIBLE' | 'BLOQUEADO' | 'NO_DETERMINABLE';
-    revision: string; origen: 'REAL' | 'DEMO';
+    revision: string; origen: 'REAL' | 'DEMO'; libro_mixto: boolean;
 }
 export interface RegistrarCargoPedidoDTO {
     id_cuenta_corriente: number; id_pedido: number; monto: number | string; moneda?: 'USD';
@@ -87,6 +87,9 @@ function complete(c: Row, rows: Row[]): boolean {
             && (r.tipo_movimiento !== 'CARGO' || (r.vence_el && [30, 60].includes(r.plazo_aplicado))));
 }
 async function summarize(manager: EntityManager, c: Row, rows: Row[], lock: boolean): Promise<ResumenCredito> {
+    // A voided DEMO entry still appears in the history, even though it contributes no balance.
+    const mixed = c.origen_datos === 'REAL' &&
+        rows.some(row => typeof row.origen === 'string' && row.origen.trim().toUpperCase() === 'DEMO');
     const known = complete(c, rows);
     const limit = c.moneda_limite === 'USD' && present(c.evidencia_limite) ? toCents(c.limite_credito) : null;
     const term = present(c.evidencia_plazo) && (c.plazo_dias === 30 || c.plazo_dias === 60) ? c.plazo_dias : null;
@@ -106,7 +109,8 @@ async function summarize(manager: EntityManager, c: Row, rows: Row[], lock: bool
         deuda_vigente: known ? fromCents(balance) : null, utilizado: known ? fromCents(used) : null,
         credito_disponible: available === null ? null : fromCents(available),
         estado_credito: available === null ? 'NO_DETERMINABLE' : available > 0n ? 'DISPONIBLE' : 'BLOQUEADO',
-        revision: await revisionConjunto(manager, { clienteId: c.id_cliente }), origen: c.origen_datos };
+        revision: await revisionConjunto(manager, { clienteId: c.id_cliente }),
+        origen: mixed ? 'DEMO' : c.origen_datos, libro_mixto: mixed };
 }
 export const findCuentaByClienteId = async (id: number, manager?: EntityManager) =>
     (manager ?? dataSource).getRepository(CuentaCorrienteSchema).findOne({ where: { id_cliente: identifier(id) } });
@@ -171,6 +175,9 @@ export const registrarCargoPorPedido = async (dto: RegistrarCargoPedidoDTO, exte
         if (!complete(c, rows)) throw Error('No se puede autorizar crédito: la cuenta no posee cobertura histórica acreditada.');
         if (!c.habilitada) throw Error('La cuenta corriente no se encuentra habilitada.');
         const state = await summarize(manager, c, rows, true);
+        if (state.libro_mixto) {
+            throw Error('No se pudo verificar la procedencia del libro para autorizar crédito.');
+        }
         if (!state.plazo_dias || (dto.dias_vencimiento !== undefined && dto.dias_vencimiento !== state.plazo_dias)) throw Error('Plazo no configurado o diferente del plazo acreditado de la cuenta.');
         const [pedido] = await manager.query('SELECT * FROM PEDIDO WHERE id_pedido=? FOR UPDATE', [dto.id_pedido]);
         if (!pedido) throw Error('Pedido no encontrado.');
@@ -274,11 +281,17 @@ export async function consultarVencimientos(id: number, at = new Date(), manager
 
 // Hashes the entire scoped financial/identity view without GROUP_CONCAT limits.
 // Consumers sign their own cursors and compare this token in a consistent snapshot.
-export async function revisionConjunto(manager: EntityManager, filter: { clienteId?: number; habilitada?: boolean } = {}): Promise<string> {
+export async function revisionConjunto(
+    manager: EntityManager,
+    filter: { clienteId?: number; habilitada?: boolean; excludeDemo?: boolean } = {}
+): Promise<string> {
     if (!manager.queryRunner?.isTransactionActive) throw Error('Revisión exige snapshot transaccional.');
     const accounts: Row[] = await manager.query(`SELECT c.*,k.activo AS cliente_activo,k.estado_aprobacion_empresa,k.tipo_cliente,
         u.id_usuario,u.activo AS usuario_activo,u.rol FROM CUENTA_CORRIENTE c JOIN CLIENTE k USING(id_cliente)
-        LEFT JOIN USUARIO u USING(id_cliente) WHERE (? IS NULL OR c.id_cliente=?) AND (? IS NULL OR c.habilitada=?) ORDER BY c.id_cuenta_corriente`,
+        LEFT JOIN USUARIO u USING(id_cliente)
+        WHERE (? IS NULL OR c.id_cliente=?) AND (? IS NULL OR c.habilitada=?)
+            ${filter.excludeDemo ? "AND c.origen_datos = 'REAL'" : ''}
+        ORDER BY c.id_cuenta_corriente`,
         [filter.clienteId ?? null, filter.clienteId ?? null, filter.habilitada ?? null, filter.habilitada ?? null]);
     const hash = createHash('sha256');
     for (const c of accounts) {

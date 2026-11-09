@@ -1,4 +1,5 @@
 import type { Request, Response } from 'express';
+import { AccountQueryError } from '../services/adminAccount.errors';
 import {
     getConsultaCuenta,
     getMovimientosCuenta,
@@ -12,6 +13,10 @@ function setPrivacyHeaders(res: Response): void {
 
 function handleControllerError(error: unknown, res: Response, defaultMessage: string): void {
     setPrivacyHeaders(res);
+    if (error instanceof AccountQueryError) {
+        res.status(error.status).json({ message: error.message, code: error.code });
+        return;
+    }
     const err = error as { message?: string; code?: string };
     if (err.code === 'USUARIO_INACTIVO') {
         res.status(401).json({ message: err.message ?? 'Sesión inválida o usuario inactivo.', code: 'NO_AUTENTICADO' });
