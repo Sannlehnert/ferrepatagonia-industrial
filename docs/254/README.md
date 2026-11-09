@@ -27,14 +27,14 @@ Se revisaron autor y committer de 181 commits, los 170 exclusivos de `develop` f
 
 Cada integrante pendiente debe ejecutar los dos comandos de configuración local que figuran al final desde su copia del repositorio. Si no devuelven valores, corresponde comprobar la configuración global y la identidad efectiva. Basta informar si el correo está asociado a su cuenta de GitHub.
 
-## Ramas remotas
+## Inventario general de ramas y PR abiertos
 
-La tabla usa conteos por ascendencia respecto de cada destino. Los tres PR abiertos tienen commits fuera de ambas ramas permanentes y el SHA de cada PR coincide con la punta de su rama remota. [PR abiertos](https://github.com/Sannlehnert/ferrepatagonia-industrial/pulls?q=is%3Apr+is%3Aopen)
+La tabla registra el inventario general al corte, anterior a la apertura del PR #85. En ese momento estaban abiertos los PR #75, #82 y #84. Los tres tienen commits fuera de ambas ramas permanentes y el SHA de cada PR coincide con la punta de su rama remota. Los conteos se basan en la ascendencia respecto de cada destino. [PR abiertos](https://github.com/Sannlehnert/ferrepatagonia-industrial/pulls?q=is%3Apr+is%3Aopen)
 
 | Rama | Último commit | PR asociado | Frente a `develop` | Frente a `main` | Recomendación |
 | --- | --- | --- | --- | --- | --- |
 | `develop` | [`fbffe57b`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/fbffe57bbfb52cc59d5b52c5babae28fe1349c4d) | [#81](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/81), fusionado en `develop` | Referencia | No es ancestro de `main` | CONSERVAR · permanente |
-| `feature/FER-24-273-client-orders-api` | [`ac456de7`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/ac456de7de4416be75b437be78377f0afc1b3083) | [#82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82), abierto hacia `develop` | 4 por delante / 15 por detrás | 159 por delante / 5 por detrás | CONSERVAR |
+| `feature/FER-24-273-client-orders-api` | [`ac456de7`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/ac456de7de4416be75b437be78377f0afc1b3083) | [#82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82), abierto hacia `develop` · Sprint 6 | 4 por delante / 15 por detrás | 159 por delante / 5 por detrás | CONSERVAR · trabajo activo del Sprint 6 |
 | `feature/253-account-seed-tests` | [`587bc1e4`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/587bc1e4a7d4b5f28fd1b10b289c28e253b9555e) | [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75), abierto hacia `develop` | 6 por delante / 0 por detrás | 176 por delante / 5 por detrás | CONSERVAR |
 | `main` | [`93b00b65`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/93b00b65f8767685757628b15c69198b0d5ac099) | [#57](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/57), fusionado en `main` | No es ancestro de `develop` | Referencia | CONSERVAR · permanente |
 | `test/263-credit-order-integrity` | [`2d9e1128`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/2d9e11281f159df306571ec5dd5f0828298b056c) | [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84), abierto hacia `develop` | 1 por delante / 0 por detrás | 171 por delante / 5 por detrás | CONSERVAR |
@@ -42,6 +42,16 @@ La tabla usa conteos por ascendencia respecto de cada destino. Los tres PR abier
 - **Permanentes** 2. **Con PR abierto** 3, todas con trabajo pendiente de integración.
 - **Trabajo sin integrar y sin PR abierto** 0. **Fusionadas candidatas a limpieza** 0. **Antiguas sin PR** 0. **Inciertas** 0.
 - **Candidatas a limpieza** ninguna. Las ramas de los PR #80, #81 y #83, fusionados en `develop`, ya estaban ausentes del inventario remoto. Para futuras limpiezas, un PR cerrado sin merge requiere comprobar qué trabajo queda fuera de ambas ramas.
+
+## Alcance del cierre del Sprint 5
+
+| PR | Tarea | Estado para el cierre |
+| --- | --- | --- |
+| [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) | #253 | Pendiente del Sprint 5 |
+| [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84) | #263 | Pendiente del Sprint 5 |
+| [#85](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/85) | #254 | Informe de cierre del Sprint 5, publicado después del corte del inventario |
+
+El [PR #82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82) (tarea #273) corresponde al Sprint 6. Su rama se conserva porque contiene trabajo activo. El PR y su rama quedan fuera del alcance y de los criterios de cierre del Sprint 5.
 
 ## Protecciones de `main` y `develop`
 
@@ -75,7 +85,7 @@ Para repetir la revisión visual con una cuenta administradora, abrir [Settings 
 El árbol de `main` y el del ancestro común tienen el mismo SHA (`436e04204a3f96b7020553d03762d1b5d0990dc0`). Los cinco commits representan divergencia de historial sin cambio neto de archivos en `main` desde esa base. GitHub devuelve 237 archivos cambiados en el lado de `develop`. [Comparación main → develop](https://github.com/Sannlehnert/ferrepatagonia-industrial/compare/93b00b65f8767685757628b15c69198b0d5ac099...fbffe57bbfb52cc59d5b52c5babae28fe1349c4d) · [Comparación inversa](https://github.com/Sannlehnert/ferrepatagonia-industrial/compare/fbffe57bbfb52cc59d5b52c5babae28fe1349c4d...93b00b65f8767685757628b15c69198b0d5ac099)
 
 - El alcance acumulado incluye importación, listas de precios, carrito, migraciones de cuenta corriente y confirmación de pedidos. En la tarea de integración conviene comprobar los checks y el orden de despliegue de migraciones sobre el candidato de release.
-- #253 y #263 seguían abiertos en [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) y [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84). Una promoción del SHA auditado no incluiría sus commits exclusivos. [#82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82) también está abierto y su rama queda 15 commits detrás de `develop`.
+- #253 y #263 seguían abiertos en [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) y [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84). Una promoción del SHA auditado no incluiría los commits exclusivos de estos dos pendientes del Sprint 5.
 - Para cerrar la auditoría de identidades faltan las comprobaciones locales de tres integrantes y la confirmación de atribución de los commits con correo de ejemplo.
 
 ### Trazabilidad de PR desde la release #57
@@ -101,16 +111,16 @@ Todos los PR de esta tabla tienen como base `develop`. Los SHA de merge identifi
 | [#72](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/72) | 244 | Fusionado · [`2b178eea`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/2b178eea65ffbd964c6ab9ba4a0214d17c7fcd15) |
 | [#73](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/73) | 260 | Fusionado · [`cc29774e`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/cc29774e005edaa6ab392ba412a7890d07fcbcd7) |
 | [#74](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/74) | 249 | Fusionado · [`f71f8350`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/f71f835088cd246621ac010c081c59db2f7ad71a) |
-| [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) | 253 | Abierto |
+| [#75](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/75) | 253 | Abierto · pendiente del Sprint 5 |
 | [#76](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/76) | 248 | Fusionado · [`56e5e814`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/56e5e8147251f5197ac7a4ccd3b6ced3983e9055) |
 | [#77](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/77) | 261 | Fusionado · [`4af931e9`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/4af931e96c8978a65c99ca58ca0eeaac47d243cc) |
 | [#78](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/78) | 258 | Fusionado · [`f0f06d17`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/f0f06d1727a0af5ac9bcb1586e9d713afc9c3b83) |
 | [#79](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/79) | 251 | Fusionado · [`151339d1`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/151339d1640a9498118c53b3c0106db0f3278f55) |
 | [#80](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/80) | 252 | Fusionado · [`d5c7da08`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/d5c7da083505dbba04048dae416190bdbfdbd8c5) |
 | [#81](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/81) | 262 | Fusionado · [`fbffe57b`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/fbffe57bbfb52cc59d5b52c5babae28fe1349c4d) |
-| [#82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82) | 273 | Abierto |
+| [#82](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/82) | 273 | Abierto · Sprint 6 |
 | [#83](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/83) | 252 · H04 | Fusionado · [`34c99bb5`](https://github.com/Sannlehnert/ferrepatagonia-industrial/commit/34c99bb5c96873f626545a7173e902af1033d05a) |
-| [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84) | 263 | Abierto |
+| [#84](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/84) | 263 | Abierto · pendiente del Sprint 5 |
 
 ## Cómo repetir las comprobaciones
 
