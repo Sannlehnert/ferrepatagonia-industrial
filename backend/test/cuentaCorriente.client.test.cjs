@@ -1,10 +1,53 @@
-const path = require('node:path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-
 const assert = require('node:assert/strict');
 const { describe, test, before, after } = require('node:test');
 const { once } = require('node:events');
 const jwt = require('jsonwebtoken');
+
+const SAFE_DB_REGEX = /^(cc_|audit_cc_)(client_)?test_[0-9a-f]{32}$/;
+
+function assertOwnershipGuardBeforeConnect() {
+    assert.equal(
+        process.env.NODE_ENV,
+        'test',
+        'Guardia H05: NODE_ENV debe ser exactamente "test" antes de inicializar DataSource.'
+    );
+
+    const hasCc260Profile = Boolean(process.env.CC260_TEST_PROFILE);
+    const clientMarker =
+        process.env.CUENTA_CORRIENTE_CLIENT_TEST_DATABASE ||
+        process.env.CUENTA_CORRIENTE_TEST_DATABASE;
+
+    assert.ok(
+        hasCc260Profile || clientMarker,
+        'Guardia H05: se requiere base descartable exclusiva (CC260_TEST_PROFILE o CUENTA_CORRIENTE_CLIENT_TEST_DATABASE) antes de conectar.'
+    );
+
+    const dbHost = process.env.DB_HOST;
+    const dbPort = Number(process.env.DB_PORT);
+    assert.equal(dbHost, '127.0.0.1', 'Guardia H05: DB_HOST debe ser exclusivamente loopback (127.0.0.1).');
+    assert.ok(
+        Number.isInteger(dbPort) && dbPort > 1024 && dbPort !== 3306 && dbPort !== 3307,
+        'Guardia H05: DB_PORT debe ser un puerto efímero válido distinto de 3306/3307.'
+    );
+
+    if (hasCc260Profile) {
+        let profile;
+        try {
+            profile = JSON.parse(process.env.CC260_TEST_PROFILE);
+        } catch {
+            assert.fail('Guardia H05: CC260_TEST_PROFILE corrupto.');
+        }
+        assert.ok(profile && profile.database, 'Guardia H05: CC260_TEST_PROFILE inválido.');
+        assert.equal(process.env.DB_NAME, profile.database, 'Guardia H05: DB_NAME no coincide con CC260_TEST_PROFILE.');
+    } else {
+        assert.ok(
+            SAFE_DB_REGEX.test(clientMarker),
+            'Guardia H05: nombre de base descartable no cumple el patrón seguro.'
+        );
+        assert.equal(process.env.DB_NAME, clientMarker, 'Guardia H05: DB_NAME no coincide con la base autorizada.');
+    }
+}
+
 const { app } = require('../dist/app');
 const db = require('../dist/config/database.config');
 const dataSource = db.dataSource;
@@ -40,6 +83,8 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
     async function createScenarioClient({
         tipo = 'EMPRESA',
         empresaAprobada = 'APROBADA',
+        clienteActivo = 1,
+        usuarioActivo = 1,
         conCuenta = true,
         cuentaHabilitada = true,
         limiteCredito = '1000.00',
@@ -52,23 +97,24 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
 
         const clienteRes = await dataSource.query(
             `INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, cuit, estado_aprobacion_empresa, es_fiel, activo)
-             VALUES (?, ?, ?, ?, 0, 1)`,
+             VALUES (?, ?, ?, ?, 0, ?)`,
             [
                 tipo,
                 `Cliente ${timestamp}`,
                 tipo === 'EMPRESA' ? `30${String(timestamp).slice(-8)}1` : null,
-                tipo === 'EMPRESA' ? empresaAprobada : null
+                tipo === 'EMPRESA' ? empresaAprobada : null,
+                clienteActivo
             ]
         );
-        const idCliente = clienteRes.insertId;
+        const idCliente = Number(clienteRes.insertId);
         createdClienteIds.push(idCliente);
 
         const userRes = await dataSource.query(
             `INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo)
-             VALUES (?, ?, 'hash_dummy', 'CLIENTE', 1)`,
-            [idCliente, email]
+             VALUES (?, ?, 'hash_dummy', 'CLIENTE', ?)`,
+            [idCliente, email, usuarioActivo]
         );
-        const idUsuario = userRes.insertId;
+        const idUsuario = Number(userRes.insertId);
         createdUserIds.push(idUsuario);
 
         let idCuenta = null;
@@ -95,7 +141,7 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
                     esCompleta ? '2026-01-01 00:00:00.000' : null
                 ]
             );
-            idCuenta = cuentaRes.insertId;
+            idCuenta = Number(cuentaRes.insertId);
             createdCuentaIds.push(idCuenta);
         }
 
@@ -106,9 +152,12 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
     }
 
     before(async () => {
+        assertOwnershipGuardBeforeConnect();
+
         if (!dataSource.isInitialized) {
             await dataSource.initialize();
         }
+
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');
         baseUrl = `http://127.0.0.1:${server.address().port}/api/cuenta-corriente`;
@@ -116,40 +165,98 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
 
     after(async () => {
         try {
-            if (createdCuentaIds.length > 0) {
-                const placeholders = createdCuentaIds.map(() => '?').join(',');
-                await dataSource.query(`DELETE FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_cuenta_corriente IN (${placeholders})`, createdCuentaIds);
-                await dataSource.query(`DELETE FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_cuenta_corriente IN (${placeholders})`, createdCuentaIds);
-                await dataSource.query(`DELETE FROM CUENTA_CORRIENTE WHERE id_cuenta_corriente IN (${placeholders})`, createdCuentaIds);
-            }
-            if (createdPedidoIds.length > 0) {
-                const placeholders = createdPedidoIds.map(() => '?').join(',');
-                await dataSource.query(`DELETE FROM PEDIDO WHERE id_pedido IN (${placeholders})`, createdPedidoIds);
-            }
-            if (createdPagoIds.length > 0) {
-                const placeholders = createdPagoIds.map(() => '?').join(',');
-                await dataSource.query(`DELETE FROM PAGO WHERE id_pago IN (${placeholders})`, createdPagoIds);
-            }
-            if (createdUserIds.length > 0) {
-                const placeholders = createdUserIds.map(() => '?').join(',');
-                await dataSource.query(`DELETE FROM USUARIO WHERE id_usuario IN (${placeholders})`, createdUserIds);
-            }
-            if (createdClienteIds.length > 0) {
-                const placeholders = createdClienteIds.map(() => '?').join(',');
-                await dataSource.query(`DELETE FROM CLIENTE WHERE id_cliente IN (${placeholders})`, createdClienteIds);
-            }
-        } catch {
-            // Ignorar errores en limpieza de cascada
-        }
+            if (dataSource && dataSource.isInitialized) {
+                // 1. Imputaciones y movimientos
+                if (createdCuentaIds.length > 0) {
+                    const placeholders = createdCuentaIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_cuenta_corriente IN (${placeholders})`,
+                        createdCuentaIds
+                    );
+                    await dataSource.query(
+                        `DELETE FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_cuenta_corriente IN (${placeholders})`,
+                        createdCuentaIds
+                    );
+                }
 
-        if (server) {
-            await new Promise((resolve) => server.close(resolve));
-        }
+                // 2. Pagos (deben borrarse ANTES de CUENTA_CORRIENTE por fk_pago_cuenta)
+                if (createdCuentaIds.length > 0) {
+                    const placeholders = createdCuentaIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM PAGO WHERE id_cuenta_corriente IN (${placeholders})`,
+                        createdCuentaIds
+                    );
+                }
+                if (createdPagoIds.length > 0) {
+                    const placeholders = createdPagoIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM PAGO WHERE id_pago IN (${placeholders})`,
+                        createdPagoIds
+                    );
+                }
 
-        if (typeof db.destroyDatabase === 'function') {
-            await db.destroyDatabase();
-        } else if (dataSource && dataSource.isInitialized) {
-            await dataSource.destroy();
+                // 3. Pedidos
+                if (createdClienteIds.length > 0) {
+                    const placeholders = createdClienteIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM PEDIDO WHERE id_cliente IN (${placeholders})`,
+                        createdClienteIds
+                    );
+                }
+                if (createdPedidoIds.length > 0) {
+                    const placeholders = createdPedidoIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM PEDIDO WHERE id_pedido IN (${placeholders})`,
+                        createdPedidoIds
+                    );
+                }
+
+                // 4. Cuentas corrientes
+                if (createdCuentaIds.length > 0) {
+                    const placeholders = createdCuentaIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM CUENTA_CORRIENTE WHERE id_cuenta_corriente IN (${placeholders})`,
+                        createdCuentaIds
+                    );
+                }
+
+                // 5. Usuarios
+                if (createdUserIds.length > 0) {
+                    const placeholders = createdUserIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM USUARIO WHERE id_usuario IN (${placeholders})`,
+                        createdUserIds
+                    );
+                }
+
+                // 6. Clientes y validación de residuo cero
+                if (createdClienteIds.length > 0) {
+                    const placeholders = createdClienteIds.map(() => '?').join(',');
+                    await dataSource.query(
+                        `DELETE FROM CLIENTE WHERE id_cliente IN (${placeholders})`,
+                        createdClienteIds
+                    );
+                    const [rem] = await dataSource.query(
+                        `SELECT COUNT(*) AS cnt FROM CLIENTE WHERE id_cliente IN (${placeholders})`,
+                        createdClienteIds
+                    );
+                    assert.equal(Number(rem.cnt), 0, 'Fallo de limpieza: quedaron clientes residuales.');
+                }
+            }
+        } finally {
+            if (server) {
+                await new Promise((resolve) => {
+                    server.close(resolve);
+                    if (typeof server.closeAllConnections === 'function') {
+                        server.closeAllConnections();
+                    }
+                });
+            }
+            if (typeof db.destroyDatabase === 'function') {
+                await db.destroyDatabase();
+            } else if (dataSource && dataSource.isInitialized) {
+                await dataSource.destroy();
+            }
         }
     });
 
@@ -200,11 +307,12 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
              VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 250.00, 0.00, 250.00, 'USD', 'EV_TOTAL_PEDIDO')`,
             [client.idCliente]
         );
-        createdPedidoIds.push(pedRes.insertId);
+        const idPedido = Number(pedRes.insertId);
+        createdPedidoIds.push(idPedido);
 
         await registrarCargoPorPedido({
             id_cuenta_corriente: client.idCuenta,
-            id_pedido: pedRes.insertId,
+            id_pedido: idPedido,
             monto: '250.00',
             dias_vencimiento: 30
         });
@@ -223,7 +331,7 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
         assert.equal(body.data.deudaVencidaTotal, '0.00');
     });
 
-    test('4. Movimientos: Paginación, orden descendente y saldoResultante acumulado', async () => {
+    test('4. Movimientos (H04): Paginación por clave sin offset, orden descendente y saldoResultante acumulado', async () => {
         const client = await createScenarioClient({
             tipo: 'EMPRESA',
             conCuenta: true,
@@ -237,10 +345,10 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
              VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 100.00, 0.00, 100.00, 'USD', 'EV_P1')`,
             [client.idCliente]
         );
-        createdPedidoIds.push(p1.insertId);
+        createdPedidoIds.push(Number(p1.insertId));
         await registrarCargoPorPedido({
             id_cuenta_corriente: client.idCuenta,
-            id_pedido: p1.insertId,
+            id_pedido: Number(p1.insertId),
             monto: '100.00'
         });
 
@@ -249,10 +357,10 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
              VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 200.00, 0.00, 200.00, 'USD', 'EV_P2')`,
             [client.idCliente]
         );
-        createdPedidoIds.push(p2.insertId);
+        createdPedidoIds.push(Number(p2.insertId));
         await registrarCargoPorPedido({
             id_cuenta_corriente: client.idCuenta,
-            id_pedido: p2.insertId,
+            id_pedido: Number(p2.insertId),
             monto: '200.00'
         });
 
@@ -263,6 +371,14 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
         assert.equal(bodyP1.data.items[0].importe, '200.00');
         assert.equal(bodyP1.data.items[0].saldoResultante, '300.00');
         assert.ok(bodyP1.data.siguienteCursor !== null);
+
+        const rawPayload = JSON.parse(
+            Buffer.from(bodyP1.data.siguienteCursor.split('.')[0], 'base64url').toString('utf8')
+        );
+        assert.equal('offset' in rawPayload, false);
+        assert.ok(rawPayload.ultimaClave);
+        assert.equal(rawPayload.ultimaClave.id, Number(bodyP1.data.items[0].id));
+        assert.equal(rawPayload.ultimaClave.fechaOperacion, bodyP1.data.items[0].fechaOperacion);
 
         const resP2 = await fetch(`${baseUrl}/movimientos?limite=1&cursor=${bodyP1.data.siguienteCursor}`, {
             headers: { Cookie: client.cookie }
@@ -275,25 +391,40 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
         assert.equal(bodyP2.data.siguienteCursor, null);
     });
 
-    test('5. Vencimientos: Orden ascendente y cálculo de pendiente por imputación FIFO', async () => {
+    test('5. Vencimientos (H04): Orden ascendente, imputación FIFO y paginación por clave sin offset', async () => {
         const client = await createScenarioClient({
             tipo: 'EMPRESA',
             conCuenta: true,
             cuentaHabilitada: true,
             cobertura: 'COMPLETA',
-            limiteCredito: '1000.00'
+            limiteCredito: '1000.00',
+            plazoDias: 30
         });
 
-        const ped = await dataSource.query(
+        const ped1 = await dataSource.query(
             `INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total, evidencia_total_usd)
-             VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 150.00, 0.00, 150.00, 'USD', 'EV_PED_VENC')`,
+             VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 150.00, 0.00, 150.00, 'USD', 'EV_PED_VENC1')`,
             [client.idCliente]
         );
-        createdPedidoIds.push(ped.insertId);
+        createdPedidoIds.push(Number(ped1.insertId));
         await registrarCargoPorPedido({
             id_cuenta_corriente: client.idCuenta,
-            id_pedido: ped.insertId,
-            monto: '150.00'
+            id_pedido: Number(ped1.insertId),
+            monto: '150.00',
+            dias_vencimiento: 30
+        });
+
+        const ped2 = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total, evidencia_total_usd)
+             VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 80.00, 0.00, 80.00, 'USD', 'EV_PED_VENC2')`,
+            [client.idCliente]
+        );
+        createdPedidoIds.push(Number(ped2.insertId));
+        await registrarCargoPorPedido({
+            id_cuenta_corriente: client.idCuenta,
+            id_pedido: Number(ped2.insertId),
+            monto: '80.00',
+            dias_vencimiento: 30
         });
 
         const pago = await dataSource.query(
@@ -301,19 +432,36 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
              VALUES (?, NULL, NOW(), 50.00, 'TRANSFERENCIA', 'ACREDITADO', 'USD', 'EV_PAGO_VENC', NOW())`,
             [client.idCuenta]
         );
-        createdPagoIds.push(pago.insertId);
+        createdPagoIds.push(Number(pago.insertId));
         await registrarAbonoPorPago({
             id_cuenta_corriente: client.idCuenta,
-            id_pago: pago.insertId,
+            id_pago: Number(pago.insertId),
             monto: '50.00'
         });
 
-        const res = await fetch(`${baseUrl}/vencimientos`, { headers: { Cookie: client.cookie } });
-        assert.equal(res.status, 200);
-        const body = await res.json();
-        assert.equal(body.data.items.length, 1);
-        assert.equal(body.data.items[0].pendiente, '100.00');
-        assert.equal(body.data.items[0].estado, 'POR_VENCER');
+        const resV1 = await fetch(`${baseUrl}/vencimientos?limite=1`, { headers: { Cookie: client.cookie } });
+        assert.equal(resV1.status, 200);
+        const bodyV1 = await resV1.json();
+        assert.equal(bodyV1.data.items.length, 1);
+        assert.equal(bodyV1.data.items[0].pendiente, '100.00');
+        assert.equal(bodyV1.data.items[0].estado, 'POR_VENCER');
+        assert.ok(bodyV1.data.siguienteCursor !== null);
+
+        const decodedVencCursor = JSON.parse(
+            Buffer.from(bodyV1.data.siguienteCursor.split('.')[0], 'base64url').toString('utf8')
+        );
+        assert.equal('offset' in decodedVencCursor, false);
+        assert.equal(decodedVencCursor.ultimaClave.venceEl, bodyV1.data.items[0].venceEl);
+        assert.equal(decodedVencCursor.ultimaClave.id, Number(bodyV1.data.items[0].movimientoId));
+
+        const resV2 = await fetch(`${baseUrl}/vencimientos?limite=1&cursor=${bodyV1.data.siguienteCursor}`, {
+            headers: { Cookie: client.cookie }
+        });
+        assert.equal(resV2.status, 200);
+        const bodyV2 = await resV2.json();
+        assert.equal(bodyV2.data.items.length, 1);
+        assert.equal(bodyV2.data.items[0].pendiente, '80.00');
+        assert.equal(bodyV2.data.siguienteCursor, null);
     });
 
     test('6. Anti-IDOR: Rechazo 400 CONSULTA_INVALIDA ante parámetros manipulados (clienteId)', async () => {
@@ -332,7 +480,7 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
              VALUES (NULL, ?, 'hash_dummy', 'ADMIN', 1)`,
             [adminEmail]
         );
-        const idAdmin = adminRes.insertId;
+        const idAdmin = Number(adminRes.insertId);
         createdUserIds.push(idAdmin);
 
         const adminToken = signTestToken({ id: idAdmin, rol: 'ADMIN' });
@@ -344,27 +492,22 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
     test('8. Movimientos: Validación de límites, parámetros repetidos y cursores inválidos', async () => {
         const client = await createScenarioClient({ tipo: 'EMPRESA', conCuenta: true });
 
-        // Límite fuera de rango
         const resBadLimit = await fetch(`${baseUrl}/movimientos?limite=150`, { headers: { Cookie: client.cookie } });
         assert.equal(resBadLimit.status, 400);
         assert.equal((await resBadLimit.json()).code, 'CONSULTA_INVALIDA');
 
-        // Límite repetido (?limite=10&limite=20 => array)
         const resRepLimit = await fetch(`${baseUrl}/movimientos?limite=10&limite=20`, { headers: { Cookie: client.cookie } });
         assert.equal(resRepLimit.status, 400);
         assert.equal((await resRepLimit.json()).code, 'CONSULTA_INVALIDA');
 
-        // Cursor corrupto
         const resBadCursor = await fetch(`${baseUrl}/movimientos?cursor=cursor_invalido`, { headers: { Cookie: client.cookie } });
         assert.equal(resBadCursor.status, 400);
         assert.equal((await resBadCursor.json()).code, 'CONSULTA_INVALIDA');
 
-        // Cursor vacío (?cursor=)
         const resEmptyCursor = await fetch(`${baseUrl}/movimientos?cursor=`, { headers: { Cookie: client.cookie } });
         assert.equal(resEmptyCursor.status, 400);
         assert.equal((await resEmptyCursor.json()).code, 'CONSULTA_INVALIDA');
 
-        // Cursor repetido (?cursor=a&cursor=b => array)
         const resRepCursor = await fetch(`${baseUrl}/movimientos?cursor=a&cursor=b`, { headers: { Cookie: client.cookie } });
         assert.equal(resRepCursor.status, 400);
         assert.equal((await resRepCursor.json()).code, 'CONSULTA_INVALIDA');
@@ -372,17 +515,148 @@ describe('Task #251 — API de cuenta corriente para cliente', () => {
 
     test('9. Concurrencia: Retorno 409 Conflict si la revisión de la cuenta cambia', async () => {
         const client = await createScenarioClient({ tipo: 'EMPRESA', conCuenta: true, cobertura: 'COMPLETA' });
+        const nowIso = new Date().toISOString();
 
         const staleCursor = signCursor({
             userId: client.idUsuario,
+            rol: 'CLIENTE',
             cuentaId: client.idCuenta,
             scope: 'movimientos',
-            corte: new Date().toISOString(),
+            filtros: {},
+            corte: nowIso,
             revision: 'sha256-revision-obsoleta',
-            offset: 0
+            exp: Date.now() + 3600000,
+            ultimaClave: {
+                fechaEfectiva: nowIso,
+                fechaOperacion: nowIso,
+                id: 1
+            }
         });
 
         const res = await fetch(`${baseUrl}/movimientos?cursor=${staleCursor}`, { headers: { Cookie: client.cookie } });
+        assert.equal(res.status, 409);
+        const body = await res.json();
+        assert.equal(body.code, 'CONSULTA_DESACTUALIZADA');
+    });
+
+    test('10. Regresión H01: Observaciones internas del libro jamás se exponen en concepto', async () => {
+        const client = await createScenarioClient({
+            tipo: 'EMPRESA',
+            conCuenta: true,
+            cuentaHabilitada: true,
+            cobertura: 'COMPLETA',
+            limiteCredito: '1000.00'
+        });
+
+        const ped = await dataSource.query(
+            `INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total, evidencia_total_usd)
+             VALUES (?, 'PENDIENTE', 'CUENTA_CORRIENTE', 95.00, 0.00, 95.00, 'USD', 'EV_H01')`,
+            [client.idCliente]
+        );
+        const pedidoId = Number(ped.insertId);
+        createdPedidoIds.push(pedidoId);
+
+        const notaSecreta = 'INTERNO_AUDIT79: riesgo crediticio, verificación privada';
+        await registrarCargoPorPedido({
+            id_cuenta_corriente: client.idCuenta,
+            id_pedido: pedidoId,
+            monto: '95.00',
+            observaciones: notaSecreta
+        });
+
+        const res = await fetch(`${baseUrl}/movimientos`, { headers: { Cookie: client.cookie } });
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.equal(body.data.items.length, 1);
+        assert.equal(body.data.items[0].concepto, `Pedido #${pedidoId}`);
+        assert.equal(JSON.stringify(body).includes('INTERNO_AUDIT79'), false);
+    });
+
+    test('11. Regresión H02: CLIENTE inactivo con sesión válida recibe 403 en los tres endpoints', async () => {
+        const client = await createScenarioClient({
+            tipo: 'EMPRESA',
+            clienteActivo: 0,
+            usuarioActivo: 1,
+            conCuenta: true
+        });
+
+        for (const suffix of ['', '/movimientos', '/vencimientos']) {
+            const res = await fetch(`${baseUrl}${suffix}`, { headers: { Cookie: client.cookie } });
+            assert.equal(res.status, 403, `Se esperaba 403 en ${suffix || '/'}`);
+            assert.equal(res.headers.get('cache-control'), 'private, no-store');
+            const body = await res.json();
+            assert.notEqual(body?.data?.estado, 'SIN_CUENTA');
+        }
+    });
+
+    test('12. Regresión H03: PARTICULAR con fila asociada en CUENTA_CORRIENTE recibe 200 SIN_CUENTA', async () => {
+        const client = await createScenarioClient({
+            tipo: 'PARTICULAR',
+            conCuenta: true,
+            cuentaHabilitada: true,
+            limiteCredito: '1000.00',
+            cobertura: 'COMPLETA'
+        });
+
+        for (const suffix of ['', '/movimientos', '/vencimientos']) {
+            const res = await fetch(`${baseUrl}${suffix}`, { headers: { Cookie: client.cookie } });
+            assert.equal(res.status, 200);
+            const body = await res.json();
+            assert.equal(body.data.estado, 'SIN_CUENTA');
+            assert.equal('limite' in body.data, false);
+            assert.equal('saldo' in body.data, false);
+            assert.equal('cuentaId' in body.data, false);
+        }
+    });
+
+    test('13. Regresión H03b: EMPRESA con aprobación cambiada o cuenta inhabilitada conserva lectura histórica con disponible 0.00', async () => {
+        const client = await createScenarioClient({
+            tipo: 'EMPRESA',
+            empresaAprobada: 'RECHAZADA',
+            conCuenta: true,
+            cuentaHabilitada: false,
+            limiteCredito: '1000.00',
+            cobertura: 'COMPLETA'
+        });
+
+        const res = await fetch(baseUrl, { headers: { Cookie: client.cookie } });
+        assert.equal(res.status, 200);
+        const body = await res.json();
+        assert.equal(body.data.estado, 'INHABILITADA');
+        assert.equal(body.data.disponible, '0.00');
+        assert.equal(body.data.estadoCredito, 'BLOQUEADO');
+    });
+
+    test('14. Observación O01: Cursor expirado devuelve 409 CONSULTA_DESACTUALIZADA', async () => {
+        const client = await createScenarioClient({
+            tipo: 'EMPRESA',
+            conCuenta: true,
+            cobertura: 'COMPLETA'
+        });
+
+        const resSummary = await fetch(baseUrl, { headers: { Cookie: client.cookie } });
+        const summaryBody = await resSummary.json();
+        const pastIso = new Date(Date.now() - 365 * 24 * 60 * 60 * 1000).toISOString();
+
+        const expiredCursor = signCursor({
+            userId: client.idUsuario,
+            rol: 'CLIENTE',
+            cuentaId: client.idCuenta,
+            scope: 'movimientos',
+            filtros: {},
+            corte: pastIso,
+            revision: summaryBody.data.revision,
+            exp: Date.parse(pastIso) + 24 * 60 * 60 * 1000,
+            ultimaClave: {
+                fechaEfectiva: pastIso,
+                fechaOperacion: pastIso,
+                id: 999999
+            }
+        });
+
+        const res = await fetch(`${baseUrl}/movimientos?cursor=${expiredCursor}`, {
+            headers: { Cookie: client.cookie }
+        });
         assert.equal(res.status, 409);
         const body = await res.json();
         assert.equal(body.code, 'CONSULTA_DESACTUALIZADA');

@@ -70,11 +70,27 @@ export type Detalle<T> = Contexto & (
     }
 );
 
+export interface CursorClaveMovimiento {
+    fechaEfectiva: InstanteUTC;
+    fechaOperacion: InstanteUTC;
+    id: number;
+}
+
+export interface CursorClaveVencimiento {
+    fechaCivil: FechaCivil;
+    venceEl: FechaCivil;
+    id: number;
+    movimientoId: number;
+}
+
 export interface CursorPayload {
     userId: number;
+    rol: 'CLIENTE';
     cuentaId: number;
     scope: 'movimientos' | 'vencimientos';
+    filtros: Record<string, never>;
     corte: InstanteUTC;
     revision: string;
-    offset: number;
+    exp: number;
+    ultimaClave: CursorClaveMovimiento | CursorClaveVencimiento;
 }
