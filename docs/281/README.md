@@ -5,11 +5,14 @@
 La rama independiente parte de `develop`
 `09c92b5d553e22507c7feb4b7b6783a8d52bbaa3`. La confirmación #261 y la regresión
 #263 están integradas mediante los PR #81 y #84. La evidencia de aceptación
-técnica del Sprint 5 de [#255](../255/README.md) se integró mediante el PR #86.
-Al corte de implementación, GitHub no registraba etiquetas ni releases para el
-Sprint 5. La verificación del cierre en Taiga requiere acceso al proyecto.
-Mantener #281 fuera de la candidata congelada del Sprint 5. La obligatoriedad
-para la presentación del 11/11 sigue pendiente de confirmación.
+técnica del Sprint 5 de [#255](../255/README.md) se integró mediante el PR #86
+y la [tarea de aceptación](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/255)
+figura cerrada. GitHub no registraba etiquetas ni releases para el Sprint 5 en
+el corte consultado. [Taiga #281](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/281)
+figura en curso, con validación docente pendiente. El congelamiento comenzó el
+09/11 y la demo es el 11/11. Si la integración resulta obligatoria para la
+presentación, registrar el conflicto con #255/#227/#259. La planificación del
+12/11 sitúa #281 fuera de la candidata congelada.
 
 ## Montaje y seguridad
 
@@ -85,4 +88,4 @@ El 09/11/2026, con Node 24.14.0, pasaron type-check, build y
 pasaron. Con MariaDB 11.4.13 descartable pasaron las 13 integraciones de
 Socket.IO (S01–S15) y las 71 pruebas de regresión de pedidos.
 `npm audit --audit-level=high` informó 0 vulnerabilidades.
-CI del PR valida el entorno de referencia con Node 22.22.2.
+El entorno de CI usa Node 22.22.2. Su corrida queda pendiente de abrir el PR.
