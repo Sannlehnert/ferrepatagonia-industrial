@@ -12,6 +12,7 @@ import { httpSecurity } from './middlewares/http-security.middleware';
 import { MariaDbPricingSource } from './repositories/pricing.source';
 import { PricingService } from './services/pricing/pricing.service';
 import { createPricingRouter } from './routes/pricing.routes';
+import { cuentaCorrienteRouter } from './routes/cuentaCorriente.routes';
 import {accountOrderPrivateResponses} from './middlewares/account-order-http.middleware';
 import {accountOrderRouter} from './routes/accountOrder.routes';
 
@@ -37,6 +38,7 @@ app.use('/api', categoryRouter);
 app.use('/api', createPricingRouter(new PricingService(new MariaDbPricingSource())));
 app.use('/api/admin', adminRouter);
 app.use('/api/carrito', cartRouter);
+app.use('/api/cuenta-corriente', cuentaCorrienteRouter);
 app.use('/api/pedidos/cuenta-corriente', accountOrderRouter);
 
 app.use((_req, res) => {
