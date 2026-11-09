@@ -14,10 +14,16 @@ for (const width of [360, 390, 768, 1280]) {
     const errors: string[] = []
     page.on('pageerror', (error) => errors.push(error.message))
     page.on('console', (message) => {
+      if (message.type() !== 'error') return
+      const source = message.location().url
+      const path = new URL(source || page.url()).pathname
       const expectedGuestResponse = message.text().includes('401')
-        && new URL(message.location().url || page.url()).pathname === '/api/auth/me'
-      if (message.type() === 'error' && !expectedGuestResponse) {
-        errors.push(message.text())
+        && path === '/api/auth/me'
+      // Vite's development inspector is absent from the production build.
+      const devInspectorError = message.text().includes('404')
+        && path === '/@id/virtual:vue-inspector-path:load.js'
+      if (!expectedGuestResponse && !devInspectorError) {
+        errors.push(`${message.text()} (${source})`)
       }
     })
 

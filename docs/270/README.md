@@ -37,4 +37,4 @@ Quedan por validar con el responsable comercial la historia y trayectoria, la mi
 
 ## Alcance de la validación
 
-Las pruebas de navegador cubren Chromium con sesión de visitante. Las condiciones comerciales se documentaron a partir de los contratos vigentes. La rama parte del `develop` remoto en `09c92b5`. Al integrar #269, revisar los cambios concurrentes en el router y el pie público.
+Las pruebas de navegador cubren Chromium con sesión de visitante. El chequeo de consola excluye el 401 esperado de la sesión anónima y el 404 del módulo virtual del inspector de Vite que se observó en el servidor de desarrollo de CI. Las condiciones comerciales se documentaron a partir de los contratos vigentes. La rama parte del `develop` remoto en `09c92b5`. Al integrar #269, revisar los cambios concurrentes en el router y el pie público.
