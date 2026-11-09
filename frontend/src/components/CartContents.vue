@@ -16,10 +16,9 @@ onMounted(() => {
   void cart.cargarCarrito()
 })
 
+const cartBusy = computed(() => cart.loading || cart.operation !== null)
 const busy = computed(() =>
-  cart.loading ||
-  cart.operation !== null ||
-  order.attemptState === 'submitting' ||
+  cartBusy.value || order.attemptState === 'submitting' ||
   order.attemptState === 'pending',
 )
 </script>
@@ -27,7 +26,7 @@ const busy = computed(() =>
 <template>
   <section
     aria-label="Contenido del carrito"
-    :aria-busy="busy"
+    :aria-busy="cartBusy || order.attemptState === 'submitting'"
     class="text-sm text-[#13293a]"
   >
     <ul
@@ -46,7 +45,7 @@ const busy = computed(() =>
       </li>
     </ul>
 
-    <p v-if="busy" role="status" class="my-3">
+    <p v-if="cartBusy" role="status" class="my-3">
       {{
         cart.operation
           ? 'Actualizando carrito…'
@@ -70,7 +69,7 @@ const busy = computed(() =>
 
       <button
         type="button"
-        :disabled="busy"
+        :disabled="cartBusy"
         class="min-h-11 cursor-pointer border-0 bg-transparent
           p-0 font-[inherit] text-[#103a5c] underline
           disabled:cursor-not-allowed disabled:opacity-50
@@ -121,11 +120,7 @@ const busy = computed(() =>
         :snapshot="cart.cart"
         :stale="cart.needsSync"
       />
-      <AccountOrderCheckout
-        v-if="!cart.items.length && order.attemptState === 'pending'"
-        :snapshot="cart.cart"
-        :stale="cart.needsSync"
-      />
     </template>
+    <AccountOrderCheckout v-if="!cart.items.length && order.pendingKey" />
   </section>
 </template>

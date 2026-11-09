@@ -4,6 +4,7 @@ import axios from 'axios'
 import { accountOrderErrorMessage, accountOrderService } from '@/services/accountOrderService'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
 import { useAuthStore } from '@/stores/auth'
+import { useCartStore } from '@/stores/cart'
 import type {
   AccountOrderAttempt,
   AccountOrderEligibility,
@@ -39,6 +40,7 @@ export function createAccountOrderStore(
 ) {
   return defineStore('account-order', () => {
     const auth = useAuthStore()
+    const cart = useCartStore()
     const eligibility = shallowRef<AccountOrderEligibility | null>(null)
     const eligibilityLoading = ref(false)
     const eligibilityError = ref('')
@@ -48,7 +50,6 @@ export function createAccountOrderStore(
     const receipts = ref<ConfirmedAccountOrder[]>([])
     const pendingKey = ref('')
     const pendingQuoteToken = ref('')
-    const confirmationRevision = ref(0)
     const storageError = ref('')
     const canUseCredit = computed(() => eligibility.value?.elegible === true)
 
@@ -195,7 +196,6 @@ export function createAccountOrderStore(
         }
       }
       attemptState.value = 'confirmed'
-      confirmationRevision.value++
       pendingKey.value = ''
       pendingQuoteToken.value = ''
       try {
@@ -204,7 +204,30 @@ export function createAccountOrderStore(
       } catch {
         storageError.value = 'El pedido está confirmado, pero no se pudo limpiar el intento guardado.'
       }
+      cart.reconciliarPedidoConfirmado()
       return true
+    }
+
+    function handleAttemptError(error: unknown, userId: number) {
+      const response = axios.isAxiosError<{ estado?: string }>(error) ? error.response : undefined
+      attemptError.value = accountOrderErrorMessage(error)
+      if (response?.data?.estado !== 'RECHAZADO') {
+        attemptState.value = 'pending'
+        if (response?.status === 404) {
+          attemptError.value = 'No encontramos todavía un resultado para esta clave. Conservamos el mismo identificador; reintentá la consulta o la confirmación con él.'
+        }
+        return
+      }
+
+      attemptState.value = 'rejected'
+      pendingKey.value = ''
+      pendingQuoteToken.value = ''
+      try {
+        storage.remove(userId)
+      } catch {
+        storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.'
+      }
+      if (response.status === 409 || response.status === 422) void loadEligibility()
     }
 
     async function confirm() {
@@ -235,24 +258,7 @@ export function createAccountOrderStore(
         return finishAttempt(result, userId, requestId, version)
       } catch (error: unknown) {
         if (!isCurrent(requestId, userId, version)) return false
-        const status = axios.isAxiosError(error) ? error.response?.status : undefined
-        if (status === 400 || status === 403 || status === 409 || status === 422) {
-          attemptState.value = 'rejected'
-          pendingKey.value = ''
-          pendingQuoteToken.value = ''
-          attemptError.value = accountOrderErrorMessage(error)
-          try { storage.remove(userId) } catch {
-            storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.'
-          }
-          if (status === 409 || status === 422) {
-            pendingKey.value = ''
-            pendingQuoteToken.value = ''
-            void loadEligibility()
-          }
-        } else {
-          attemptState.value = 'pending'
-          attemptError.value = accountOrderErrorMessage(error)
-        }
+        handleAttemptError(error, userId)
         return false
       } finally {
         if (activeAttempt === controller) activeAttempt = undefined
@@ -275,21 +281,7 @@ export function createAccountOrderStore(
         return finishAttempt(result, userId, requestId, version)
       } catch (error: unknown) {
         if (isCurrent(requestId, userId, version)) {
-          const status = axios.isAxiosError(error) ? error.response?.status : undefined
-          if (status === 400 || status === 403 || status === 409 || status === 422) {
-            attemptState.value = 'rejected'
-            pendingKey.value = ''
-            pendingQuoteToken.value = ''
-            attemptError.value = accountOrderErrorMessage(error)
-            try { storage.remove(userId) } catch {
-              storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.'
-            }
-          } else {
-            attemptState.value = 'pending'
-            attemptError.value = status === 404
-              ? 'No encontramos todavía un resultado para esta clave. Conservamos el mismo identificador; reintentá la consulta o la confirmación con él.'
-              : accountOrderErrorMessage(error)
-          }
+          handleAttemptError(error, userId)
         }
         return false
       } finally {
@@ -312,18 +304,7 @@ export function createAccountOrderStore(
         return finishAttempt(await transport.confirm(key, token, controller.signal), userId, requestId, version)
       } catch (error: unknown) {
         if (isCurrent(requestId, userId, version)) {
-          const status = axios.isAxiosError(error) ? error.response?.status : undefined
-          if (status === 400 || status === 403 || status === 409 || status === 422) {
-            attemptState.value = 'rejected'
-            pendingKey.value = ''
-            pendingQuoteToken.value = ''
-            attemptError.value = accountOrderErrorMessage(error)
-            try { storage.remove(userId) } catch { storageError.value = 'No se pudo limpiar el intento rechazado de esta sesión.' }
-            if (status === 409 || status === 422) void loadEligibility()
-          } else {
-            attemptState.value = 'pending'
-            attemptError.value = accountOrderErrorMessage(error)
-          }
+          handleAttemptError(error, userId)
         }
         return false
       } finally {
@@ -359,7 +340,7 @@ export function createAccountOrderStore(
     return {
       eligibility, eligibilityLoading, eligibilityError, canUseCredit, attemptState,
       attemptError, confirmation, receipts, pendingKey, storageError,
-      pendingQuoteToken, confirmationRevision,
+      pendingQuoteToken,
       loadEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
     }
   })

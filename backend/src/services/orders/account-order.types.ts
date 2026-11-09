@@ -17,6 +17,7 @@ export interface PendingAccountOrder {
 export interface AccountOrderFailure {
   code: string;
   message: string;
+  estado?: 'RECHAZADO';
 }
 
 export type AccountOrderResponse =

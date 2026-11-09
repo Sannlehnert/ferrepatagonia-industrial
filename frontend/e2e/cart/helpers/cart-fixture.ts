@@ -128,6 +128,7 @@ export async function mockCart(page: Page) {
         return route.fulfill({
           status: 409,
           json: {
+            estado: 'RECHAZADO',
             code: 'CREDITO_INSUFICIENTE',
             message: 'El crédito disponible no alcanza para confirmar este pedido.',
           },

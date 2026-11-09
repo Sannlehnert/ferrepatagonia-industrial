@@ -115,6 +115,52 @@ test('loads existing session, retains data on GET failure and supports explicit 
   assert.equal(cart.loadError, '')
 })
 
+test('ignores the old cart even if its transport delivers a response after abort', async t => {
+  const old = deferred()
+  const fresh = deferred()
+  let count = 0
+  const { cart, reads } = runtime(t, {
+    restore: user(1),
+    read: () => ++count === 1 ? old.promise : fresh.promise,
+  })
+  await tick()
+  cart.reconciliarPedidoConfirmado()
+  assert.equal(reads.length, 2)
+  assert.equal(reads[0].aborted, true)
+  fresh.resolve(snapshot(1, 0))
+  await tick()
+  old.resolve(snapshot(1, 2))
+  await tick()
+  assert.deepEqual(cart.cart, snapshot(1, 0))
+  assert.equal(cart.loading, false)
+  assert.equal(cart.needsSync, false)
+})
+
+test('reconciliation lets an in-flight write finish and reads its resulting cart', async t => {
+  const write = deferred()
+  let signal
+  let data = snapshot(1, 2)
+  const { cart, reads } = runtime(t, {
+    restore: user(1),
+    read: async () => data,
+    mutate: async (_command, currentSignal) => {
+      signal = currentSignal
+      await write.promise
+    },
+  })
+  await tick()
+  const pending = cart.agregarProducto(7, 1)
+  cart.reconciliarPedidoConfirmado()
+  assert.equal(signal.aborted, false)
+  assert.equal(reads.length, 1)
+  assert.equal(cart.cart, null)
+  data = snapshot(1, 1)
+  write.resolve()
+  assert.equal(await pending, true)
+  assert.equal(reads.length, 2)
+  assert.deepEqual(cart.cart, data)
+})
+
 test('production adapter sends absolute quantities, accepts empty 204s and reconciles each write', async t => {
   const requests = []
   let data = snapshot(1, 2)

@@ -190,7 +190,11 @@ async function main() {
       ...process.argv.slice(2),
     ], {
       cwd: frontend,
-      env: { ...browserEnv, E2E_BASE_URL: baseURL },
+      env: {
+        ...browserEnv,
+        E2E_BASE_URL: baseURL,
+        CCE2E_TEST_PROFILE: JSON.stringify(profile),
+      },
       stdio: 'inherit',
       windowsHide: true,
     });

@@ -69,6 +69,7 @@ function createRuntime(t, transport, savedKey = null) {
             currentSessionGeneration: () => generation,
         },
         '@/stores/auth': { useAuthStore: () => auth },
+        '@/stores/cart': { useCartStore: () => ({ reconciliarPedidoConfirmado() {} }) },
     })
     const useStore = storeModule.createAccountOrderStore(transport, storage, () => key)
     return {
@@ -208,7 +209,7 @@ test('recupera un intento persistido sin crear otra clave', async t => {
 test('muestra el rechazo real de crédito insuficiente y exige preparar un nuevo intento', async t => {
     const rejection = new AxiosError('Insufficient', undefined, undefined, undefined, {
         status: 409,
-        data: { code: 'CREDITO_INSUFICIENTE', message: 'Crédito insuficiente.' },
+        data: { estado: 'RECHAZADO', code: 'CREDITO_INSUFICIENTE', message: 'Crédito insuficiente.' },
     })
     const requests = []
     const { store, storage } = createRuntime(t, {
@@ -255,7 +256,7 @@ test('H03: 404 al reconciliar conserva clave y reintenta el POST con esa misma c
 
 test('H03: rechazo persistido durante recuperación finaliza el intento y permite corregir', async t => {
     const rejection = new AxiosError('Credit rejected', undefined, undefined, undefined, {
-        status: 409, data: { code: 'CREDITO_INSUFICIENTE', message: 'Crédito insuficiente.' },
+        status: 409, data: { estado: 'RECHAZADO', code: 'CREDITO_INSUFICIENTE', message: 'Crédito insuficiente.' },
     })
     const saved = JSON.stringify({ key, quoteToken: eligibleOrder.cotizacion })
     const { store, storage } = createRuntime(t, {

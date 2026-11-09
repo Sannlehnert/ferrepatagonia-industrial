@@ -5,14 +5,14 @@ import { useAccountOrderStore } from '@/stores/accountOrder'
 import { useCartStore } from '@/stores/cart'
 
 const props = defineProps<{
-  snapshot: CartSnapshot
-  stale: boolean
+  snapshot?: CartSnapshot
+  stale?: boolean
 }>()
 
 const order = useAccountOrderStore()
 const cart = useCartStore()
 const selected = ref(false)
-const eligibilityKey = computed(() => JSON.stringify({
+const eligibilityKey = computed(() => props.snapshot && JSON.stringify({
   id: props.snapshot.id_carrito,
   total: props.snapshot.totalUSD,
   stale: props.stale,
@@ -24,20 +24,22 @@ const eligibilityKey = computed(() => JSON.stringify({
   ]),
 }))
 
-const showTotal = computed(() =>
-  !props.stale &&
-  props.snapshot.estado_total === 'DEFINIDO' &&
-  !props.snapshot.tiene_incompatibles &&
-  props.snapshot.totalUSD !== null &&
-  /^(0|[1-9]\d{0,9})\.\d{2}$/.test(props.snapshot.totalUSD) &&
-  props.snapshot.totalUSD !== '0.00' &&
-  props.snapshot.items.every(item =>
-    item.disponible &&
-    item.precio?.estadoPrecio === 'DEFINIDO' &&
-    item.precio.precioComprable === true &&
-    item.precio.datosSinteticos === false,
-  ),
-)
+const showTotal = computed(() => {
+  const snapshot = props.snapshot
+  return snapshot !== undefined &&
+    !props.stale &&
+    snapshot.estado_total === 'DEFINIDO' &&
+    !snapshot.tiene_incompatibles &&
+    snapshot.totalUSD !== null &&
+    /^(0|[1-9]\d{0,9})\.\d{2}$/.test(snapshot.totalUSD) &&
+    snapshot.totalUSD !== '0.00' &&
+    snapshot.items.every(item =>
+      item.disponible &&
+      item.precio?.estadoPrecio === 'DEFINIDO' &&
+      item.precio.precioComprable === true &&
+      item.precio.datosSinteticos === false,
+    )
+})
 
 const hasServerAmounts = computed(() =>
   order.eligibility?.totalUSD !== null &&
@@ -74,10 +76,6 @@ watch(
 async function confirmOrder() {
   await order.confirm()
 }
-
-watch(() => order.confirmationRevision, revision => {
-  if (revision > 0) void cart.cargarCarrito()
-})
 
 async function retryAfterRejection() {
   order.prepareRetry()
@@ -156,7 +154,7 @@ async function retryAfterRejection() {
       </button>
     </template>
 
-    <template v-else-if="order.attemptState !== 'confirmed'">
+    <template v-else-if="snapshot && order.attemptState !== 'confirmed'">
       <dl
         v-if="!order.eligibilityLoading && !order.eligibilityError && hasServerAmounts"
         class="mb-3 grid gap-2 text-sm sm:grid-cols-2"

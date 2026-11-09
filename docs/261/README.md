@@ -108,7 +108,9 @@ parámetros de consulta y no inicia una compra.
 
 - Confirmación completada: 200 con el resultado histórico.
 - Intento pendiente: 202 con el estado pendiente.
-- Rechazo persistido: mismo estado HTTP y error del rechazo.
+- Rechazo persistido: mismo estado HTTP y error del rechazo, con
+  `estado: 'RECHAZADO'`. Un error de autorización no lleva ese estado y
+  conserva la clave para consultar cuando se restablezca el acceso.
 - Clave inexistente o perteneciente a otro cliente: 404,
   sin revelar operaciones ajenas.
 

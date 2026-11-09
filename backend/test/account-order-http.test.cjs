@@ -376,6 +376,7 @@ test('#261 HTTP: conserva y permite consultar un rechazo por crédito insuficien
   }), 409);
 
   assert.equal(rejected.code, 'CREDITO_INSUFICIENTE');
+  assert.equal(rejected.estado, 'RECHAZADO');
 
   const recovered = await responseBody(await request({
     path: `/${key}`,
