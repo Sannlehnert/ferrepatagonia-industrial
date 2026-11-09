@@ -16,7 +16,8 @@ export function positiveInt(value: string): number {
 
 // Read the raw query: Express may otherwise collapse duplicates or parse nested keys.
 export function parseAdminAccountQuery(url: string, scope: AccountScope, clienteId?: string): AdminAccountQuery {
-  const params = new URLSearchParams(url.split('?')[1] ?? '');
+  const separator = url.indexOf('?');
+  const params = new URLSearchParams(separator < 0 ? '' : url.slice(separator + 1));
   const allowed = scope === 'listado' ? ['limite', 'cursor', 'clienteId', 'habilitada']
     : scope === 'resumen' ? [] : ['limite', 'cursor'];
   for (const key of params.keys()) {

@@ -14,7 +14,7 @@ test('#258 filtros exactos, combinables y límite predeterminado', () => {
 for (const query of ['limite=0', 'limite=101', 'limite=-1', 'limite=1.5', 'limite=1e1', 'limite=01',
   'limite=', 'limite=25&limite=25', 'limite[]=2', 'cursor=a&cursor=b', 'cursor=', 'cursor=alterado',
   'clienteId=0', 'clienteId=2147483648', 'clienteId=1.1', 'clienteId=01', 'clienteId=-1', 'clienteId=1&clienteId=2',
-  'habilitada=1', 'habilitada=True', 'habilitada=false&habilitada=true', 'rol=ADMIN', 'cuentaId=1', '__proto__=x']) {
+  'habilitada=1', 'habilitada=True', 'habilitada=false&habilitada=true', 'rol=ADMIN', 'cuentaId=1', '__proto__=x', 'limite=2?clienteId=1']) {
   test(`#258 rechaza query ${query}`, () => assert.throws(() => parse('/?' + query, 'listado'), invalid));
 }
 for (const scope of ['resumen', 'movimientos', 'vencimientos']) {
@@ -25,7 +25,11 @@ for (const scope of ['resumen', 'movimientos', 'vencimientos']) {
   });
 }
 test('#258 resumen rechaza paginación', () => assert.throws(() => parse('/?limite=25', 'resumen', '1'), invalid));
-test('#258 fuente ausente no devuelve datos financieros ni un vacío exitoso', async () => {
-  const { queryAdminAccounts } = require('../dist/services/adminAccount.service');
-  await assert.rejects(queryAdminAccounts(1, parse('/', 'listado')), e => e.status === 503 && e.code === 'CUENTA_CORRIENTE_NO_DISPONIBLE');
+test('#258 distingue fallos transitorios de errores de esquema e integridad', () => {
+  const { isAccountSourceUnavailable } = require('../dist/services/adminAccount.errors');
+  assert.equal(isAccountSourceUnavailable({ driverError: { code: 'ER_STATEMENT_TIMEOUT' } }), true);
+  assert.equal(isAccountSourceUnavailable({ driverError: { errno: 1969 } }), true);
+  assert.equal(isAccountSourceUnavailable({ code: 'ECONNREFUSED' }), true);
+  assert.equal(isAccountSourceUnavailable({ driverError: { code: 'ER_NO_SUCH_TABLE' } }), false);
+  assert.equal(isAccountSourceUnavailable(new Error('Integridad de imputaciones inválida.')), false);
 });

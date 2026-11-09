@@ -62,7 +62,7 @@ jobs:
               working-directory: backend
               run: npm run test:integration
 
-            - name: Verify admin account authorization and blocked source in MariaDB
+            - name: Verify administrative account queries in MariaDB
               working-directory: backend
               run: npm run test:account-admin:isolated
 
