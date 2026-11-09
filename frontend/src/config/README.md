@@ -41,25 +41,28 @@ la pantalla y los datos necesarios para distinguir esos pedidos.
 
 ## Cuenta corriente
 
-El permiso VIEW_OWN_CREDIT_ACCOUNT requiere:
+La consulta de la propia cuenta está disponible para cualquier sesión CLIENTE:
+el backend devuelve `SIN_CUENTA` cuando no existe una cuenta y permite consultar
+el historial propio aunque esté inhabilitada. El enlace usa `VIEW_OWN_ACCOUNT`,
+que no concede la posibilidad de operar a crédito.
 
-- Rol CLIENTE.
-- Tipo EMPRESA.
-- Estado de aprobación APROBADA.
-- Cuenta corriente habilitada explícitamente.
+`VIEW_OWN_CREDIT_ACCOUNT` representa la condición comercial para operar a
+crédito; aprobación empresarial, usuario activo y habilitación de la cuenta
+siguen siendo condiciones separadas.
 
-Aprobación, usuario activo/inactivo y habilitación de cuenta corriente
-son conceptos diferentes.
-
-Actualmente /auth/me devuelve id, nombre, email, rol y tipo_cliente.
-No devuelve aprobación ni habilitación comercial. Por eso, la integración
-actual no concede este permiso ni inventa esos datos.
-
-La pantalla y su destino también permanecen pendientes por acuerdo del equipo.
+La pantalla consume `GET /api/cuenta-corriente`,
+`GET /api/cuenta-corriente/movimientos` y
+`GET /api/cuenta-corriente/vencimientos`, con importes y cobertura entregados
+por la API disponible en `develop`. El backend autoriza el rol CLIENTE y
+resuelve la cuenta a partir de la sesión; el cliente no envía un ID de cliente.
+No se calculan saldos ni se crean importes de muestra. En producción, el
+contenido de origen DEMO se bloquea, incluso si aparece en movimientos o
+vencimientos de una cuenta cuyo resumen es REAL.
 
 ## Validación realizada
 
 - Build y comprobación de tipos sin errores.
+- 188 pruebas del frontend aprobadas.
 - git diff --check sin errores.
 - Visitante: Home sin acceso administrativo.
 - PARTICULAR: menú de cuenta correcto y sesión conservada con F5.
@@ -79,8 +82,6 @@ a la aplicación. No equivalen a probar operaciones comerciales del backend.
 ## Límites y pendientes
 
 - Integrar los destinos públicos y comerciales cuando estén disponibles.
-- Incorporar los datos comerciales reales cuando exista el contrato de API.
-- Validar la navegación comercial al disponer de sus pantallas.
 - Los errores de carga de datos personales o pedidos se revisan por separado;
   las pruebas del menú no validan esas funcionalidades.
 - Esta rama no cambia el destino después del login ni la política del JWT.

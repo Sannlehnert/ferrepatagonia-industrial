@@ -62,6 +62,10 @@ jobs:
               working-directory: backend
               run: npm run test:integration
 
+            - name: Verify administrative account queries in MariaDB
+              working-directory: backend
+              run: npm run test:account-admin:isolated
+
             - name: Run E2E cleanup resilience tests
               run: node --test backend/test/e2e-cleanup.test.cjs
 

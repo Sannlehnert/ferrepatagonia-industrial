@@ -8,7 +8,9 @@ const docker = (...args) => execFileSync('docker', args, {
 const runners = {
   251: { database: 'cc_client_test_', container: 'cc-client-test-', label: 'ferrepatagonia.cc251-test' },
   253: { database: 'account_test_', container: 'account-test-', label: 'ferrepatagonia.account-test' },
+  258: { database: 'e2e_test_', container: 'cc258-test-', label: 'ferrepatagonia.cc258-test' },
   260: { database: 'cc260_test_', container: 'cc260-test-', label: 'ferrepatagonia.cc260-test' },
+  E2E: { database: 'e2e_test_', container: 'ferrepatagonia-e2e-', label: 'ferrepatagonia.e2e-test' },
 };
 const image = 'mariadb:11.4';
 const containerId = /^[a-f0-9]{64}$/;

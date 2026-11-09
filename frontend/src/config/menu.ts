@@ -33,9 +33,8 @@ export const accountMenu: readonly MenuItem[] = [
     {
         id: 'account-credit',
         label: 'Cuenta corriente',
-        // Pendiente de implementar la pantalla de cuenta corriente.
-        routeName: null,
-        permission: PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT,
+        routeName: 'cuenta-corriente',
+        permission: PERMISSIONS.VIEW_OWN_ACCOUNT,
     },
     {
         id: 'account-details',
@@ -46,6 +45,12 @@ export const accountMenu: readonly MenuItem[] = [
 ]
 
 export const adminMenu: readonly MenuItem[] = [
+    {
+        id: 'admin-accounts',
+        label: 'Cuentas corrientes',
+        routeName: 'admin-accounts',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
     {
         id: 'admin-dashboard',
         label: 'Dashboard',

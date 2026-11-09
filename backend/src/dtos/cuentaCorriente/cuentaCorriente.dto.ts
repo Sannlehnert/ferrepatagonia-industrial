@@ -60,6 +60,20 @@ export interface Vencimiento {
 
 export type Pagina<T> = Contexto & { items: T[]; siguienteCursor: string | null };
 
+export type ResumenAdmin = Resumen & { clienteId: number };
+export type ListadoAdmin = Pagina<ResumenAdmin>;
+
+export interface AdminCursorPayload extends Contexto {
+    version: 1;
+    userId: number;
+    rol: 'ADMIN';
+    scope: 'listado' | 'movimientos' | 'vencimientos';
+    filtros: { clienteId?: number; habilitada?: boolean };
+    cuentaId: number | null;
+    exp: number;
+    ultimaClave: { id: number; fecha?: string };
+}
+
 export type Detalle<T> = Contexto & (
     | SinCuenta
     | {
