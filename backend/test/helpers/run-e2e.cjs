@@ -113,7 +113,7 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  if (!fer19) await seedFixtures(connection);
+  if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: false });
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);
@@ -204,7 +204,7 @@ async function main() {
           FER19_E2E_FIXTURE: JSON.stringify(fer19Fixture),
           FER19_E2E_PROFILE: JSON.stringify(profile),
           FER19_E2E_CURSOR_KEY: apiEnv.JWT_SECRET,
-        } : {}),
+        } : { CCE2E_TEST_PROFILE: JSON.stringify(profile) }),
       },
       stdio: 'inherit',
       windowsHide: true,

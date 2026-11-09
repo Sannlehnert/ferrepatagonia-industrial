@@ -13,10 +13,11 @@ import {
 } from '../services/orders/account-order.errors';
 import {
   confirmAccountOrder,
+  getAccountOrderEligibility,
   getAccountOrderResult,
 } from '../services/orders/account-order.service';
 
-type Operation = 'confirm' | 'recover';
+type Operation = 'confirm' | 'recover' | 'eligibility';
 
 function validateRequest(req: Request, operation: Operation): void {
   if (Object.keys(req.query).length > 0) {
@@ -47,7 +48,9 @@ function validateRequest(req: Request, operation: Operation): void {
     throw new AccountOrderError(
       'SOLICITUD_INVALIDA',
       400,
-      'La consulta del resultado no admite un cuerpo.',
+      operation === 'eligibility'
+        ? 'La consulta de elegibilidad no admite un cuerpo.'
+        : 'La consulta del resultado no admite un cuerpo.',
     );
   }
 }
@@ -86,11 +89,14 @@ export function handleAccountOrder(
             ? await confirmAccountOrder(
               auth,
               req.get('Idempotency-Key'),
+              (req.body as { cotizacion: string }).cotizacion,
             )
-            : await getAccountOrderResult(
-              auth,
-              req.params.clave,
-            );
+            : operation === 'recover'
+              ? await getAccountOrderResult(
+                auth,
+                req.params.clave,
+              )
+              : await getAccountOrderEligibility(auth);
 
           if (cancellation.signal.aborted) return;
 
@@ -100,7 +106,7 @@ export function handleAccountOrder(
 
           res.status(result.status).json(result.body);
         },
-        { serializePerUser: operation === 'confirm' },
+        { serializePerUser: operation !== 'recover' },
       );
     } catch (error) {
       if (cancellation.signal.aborted || res.headersSent) return;

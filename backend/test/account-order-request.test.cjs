@@ -42,8 +42,8 @@ test('#261: rechaza claves ausentes, ambiguas o malformadas', async () => {
   }
 });
 
-test('#261: acepta solamente un cuerpo vacío', () => {
-  assert.equal(validateConfirmationBody({}).valid, true);
+test('#262: acepta únicamente la cotización firmada', () => {
+  assert.equal(validateConfirmationBody({ cotizacion: 'a'.repeat(40) }).valid, true);
 
   const invalid = [
     undefined,
@@ -56,6 +56,9 @@ test('#261: acepta solamente un cuerpo vacío', () => {
     { totalUSD: '0.01' },
     { precio: '0.01' },
     { idempotencyKey: key },
+    {},
+    { cotizacion: 'short' },
+    { cotizacion: 'a'.repeat(40), totalUSD: '20.00' },
     JSON.parse('{"__proto__":{"clienteId":1}}'),
   ];
 

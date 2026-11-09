@@ -93,7 +93,7 @@ async function main() {
   });
 }
 
-main().catch(() => {
-  console.error("No se pudo inicializar la API aislada.");
+main().catch((error) => {
+  console.error("No se pudo inicializar la API aislada:", error?.stack || error);
   void stop(1);
 });

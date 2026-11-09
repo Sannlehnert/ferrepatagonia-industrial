@@ -37,7 +37,9 @@ for (const width of [1280, 360]) {
 
       await quantity.fill('4')
       await quantity.press('Tab')
-      await expect(content.getByRole('alert')).toContainText(
+      await expect(content.getByRole('alert').filter({
+        hasText: 'Ingresá una cantidad entre 1 y 3.',
+      })).toContainText(
         'Ingresá una cantidad entre 1 y 3.',
       )
       expect(state.writes).toEqual([

@@ -69,7 +69,7 @@ async function seedAdminAccounts(session, { browser = false } = {}) {
       const debt = await account('debt');
       const long = await account('long', '2000.00', 60);
       const disabled = await account('disabled');
-      await account('empty', '300.00');
+      await account('empty', '400.00');
       await account('unknown', '700.00', 30, 'NO_ACREDITADA');
       const partial = await account('partial');
       const favor = await account('favor', '100.00');
