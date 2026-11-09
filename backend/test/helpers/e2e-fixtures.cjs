@@ -118,6 +118,18 @@ async function seedFixtures(connection) {
         '2020-01-01 12:00:00', 1, 1)
     `);
 
+    // Exclusivo de la base descartable E2E: simula una verificación
+    // USD aceptada para probar el recorrido de compra de la interfaz.
+    // No agrega productos ni modifica los precios legacy restantes.
+    await connection.query(`
+      INSERT INTO PRECIO_USD_EVIDENCIA
+        (id_producto, precio_verificado, evidencia, id_admin,
+        verificado_utc, valida, sintetica)
+      VALUES
+        (24, 124.00, 'TEST-ONLY: verificación para interfaz de carrito',
+        1, '2020-01-01 12:00:00', 1, 0)
+    `);
+
     await connection.commit();
   } catch (error) {
     await connection.rollback();

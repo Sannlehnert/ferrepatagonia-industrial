@@ -15,6 +15,30 @@ async function setup(page: Page, initial: ReturnType<typeof user> | null = null)
     if (url.pathname === '/api/auth/login') { state.identity = user(Number(route.request().postDataJSON().email.split('@')[0])); return json({user:state.identity}) }
     if (url.pathname === '/api/auth/logout') { state.identity = null; return json({message:'OK'}) }
     if (url.pathname === '/api/categorias') return json({data:{categorias:[{id:1,nombre:'Herramientas'}]}})
+    if (
+      url.pathname === '/api/carrito' &&
+      route.request().method() === 'GET'
+    ) {
+      if (!state.identity) {
+        return json({ message: 'No autenticado' }, 401)
+      }
+
+      if (state.identity.rol !== 'CLIENTE') {
+        return json({ message: 'Sin permiso' }, 403)
+      }
+
+      return json({
+        id_carrito: state.identity.id,
+        items: [],
+        total_items: 0,
+        tiene_incompatibles: false,
+        moneda: 'USD',
+        regla: 'FER17-v1',
+        ivaIncluido: true,
+        totalUSD: '0.00',
+        estado_total: 'DEFINIDO',
+      })
+    }
     if (url.pathname === '/api/catalogo') {
       const pageNumber = Number(url.searchParams.get('page') || 1), id = pageNumber === 1 ? 1 : 2
       return json({data:{productos:[{id,nombre:`Producto ${id}`,codigo:`SKU-${id}`,categoria:{id:1,nombre:'Herramientas'},precio:null,estadoPrecio:'PENDIENTE_DEFINICION',disponible:id===1}],pagination:{page:pageNumber,limit:12,total:13,totalPages:2,hasNext:pageNumber===1,hasPrevious:pageNumber===2}}})
@@ -50,8 +74,22 @@ for (const [name,identity,endpoint,label,amount] of [
   await expect(page.getByText(`USD ${amount}`,{exact:true})).toBeVisible()
   await expect(page.getByText(`${label} · IVA incluido`)).toBeVisible()
   expect(s.requests[0]).toEqual({path:endpoint,body:{moneda:'USD',productos:[{productoId:1,cantidad:1}]}})
-  await expect(page.getByRole('button',{name:'Agregar',exact:true})).toBeDisabled()
-  await expect(page.getByText('Carrito aún no disponible.')).toBeVisible()
+  const add = page.getByRole('button', {
+    name: 'Agregar',
+    exact: true,
+  })
+
+  if (name === 'CLIENTE') {
+    await expect(add).toBeEnabled()
+  } else {
+    await expect(add).toBeDisabled()
+
+    const description = name === 'visitante'
+      ? 'Iniciá sesión para agregar productos.'
+      : 'El carrito está disponible para cuentas de cliente.'
+
+    await expect(add).toHaveAccessibleDescription(description)
+  }
 })
 
 test('contrato interceptado: Home y Catálogo comparten precio, descuento y promoción',async({page})=>{
