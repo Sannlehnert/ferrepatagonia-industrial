@@ -108,7 +108,7 @@ async function submitSearch() {
   flex: 1;
   min-width: 0;
   min-height: 44px;
-  border: 1px solid #a9bdcd;
+  border: 1px solid #7b90a2;
   border-right: 0;
   border-radius: 7px 0 0 7px;
   padding: .55rem .7rem;
