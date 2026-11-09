@@ -18,9 +18,10 @@ import {
   listClientOrders,
 } from '../services/orders/account-order.service';
 
-type Operation = 'confirm' | 'recover' | 'list' | 'detail';
+type OrderMutationOperation = 'confirm' | 'recover';
+type OrderReadOperation = 'list' | 'detail';
 
-function validateRequest(req: Request, operation: Operation): void {
+function validateRequest(req: Request, operation: OrderMutationOperation | OrderReadOperation): void {
   if (Object.keys(req.query).length > 0) {
     throw new AccountOrderError(
       'SOLICITUD_INVALIDA',
@@ -55,7 +56,7 @@ function validateRequest(req: Request, operation: Operation): void {
 }
 
 export function handleAccountOrder(
-  operation: Operation,
+  operation: OrderMutationOperation,
 ): RequestHandler {
   return async (req, res) => {
     const cancellation = new AbortController();
@@ -84,16 +85,9 @@ export function handleAccountOrder(
         async auth => {
           validateRequest(req, operation);
 
-          let result;
-          if (operation === 'confirm') {
-            result = await confirmAccountOrder(auth, req.get('Idempotency-Key'));
-          } else if (operation === 'recover') {
-            result = await getAccountOrderResult(auth, req.params.clave);
-          } else if (operation === 'list') {
-            result = await listClientOrders(auth);
-          } else {
-            result = await getClientOrderDetail(auth, req.params.id);
-          }
+          const result = operation === 'confirm'
+            ? await confirmAccountOrder(auth, req.get('Idempotency-Key'))
+            : await getAccountOrderResult(auth, req.params.clave);
 
           if (cancellation.signal.aborted) return;
 
@@ -116,17 +110,53 @@ export function handleAccountOrder(
         return;
       }
 
-      const isReadOperation = operation === 'list' || operation === 'detail';
       res.status(503).json({
         code: error instanceof CartError
-          ? (isReadOperation ? 'CONSULTA_PEDIDOS_OCUPADA' : 'CONFIRMACION_OCUPADA')
-          : (isReadOperation ? 'CONSULTA_PEDIDOS_NO_DISPONIBLE' : 'CONFIRMACION_NO_DISPONIBLE'),
-        message: isReadOperation
-          ? 'El historial de pedidos no está disponible temporalmente. Reintentá en unos instantes.'
-          : 'Consultá el resultado con la misma clave antes de reintentar.',
+          ? 'CONFIRMACION_OCUPADA'
+          : 'CONFIRMACION_NO_DISPONIBLE',
+        message: 'Consultá el resultado con la misma clave antes de reintentar.',
       });
     } finally {
       res.removeListener('close', disconnect);
+    }
+  };
+}
+
+export function handleClientOrderRead(
+  operation: OrderReadOperation,
+): RequestHandler {
+  return async (req, res) => {
+    try {
+      if (!await authenticateRequest(req, res)) {
+        return;
+      }
+
+      if (!authorizeRequest(req, res, ['CLIENTE'])) {
+        return;
+      }
+
+      validateRequest(req, operation);
+
+      const result = operation === 'list'
+        ? await listClientOrders(req.auth!)
+        : await getClientOrderDetail(req.auth!, req.params.id);
+
+      res.status(result.status).json(result.body);
+    } catch (error) {
+      if (res.headersSent) return;
+
+      if (error instanceof AccountOrderError) {
+        res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
+      res.status(503).json({
+        code: 'CONSULTA_PEDIDOS_NO_DISPONIBLE',
+        message: 'El historial de pedidos no está disponible temporalmente. Reintentá en unos instantes.',
+      });
     }
   };
 }

@@ -182,7 +182,7 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   return {
     pedidoId,
     numero: `PED-${String(pedidoId).padStart(6, '0')}`,
-    fecha: toIsoDateTime(row.fecha),
+    fecha: String(row.fecha),
     estado: row.estado,
     modalidadPago: row.modalidadPago,
     moneda,
@@ -206,7 +206,7 @@ export async function findClientOrdersByClientId(
   const rows = await dataSource.query<OrderSummaryRow[]>(`
     SELECT
       p.id_pedido AS pedidoId,
-      p.fecha AS fecha,
+      DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
       p.estado AS estado,
       p.modalidad_pago AS modalidadPago,
       COALESCE(p.moneda_total, 'USD') AS moneda,
@@ -214,30 +214,25 @@ export async function findClientOrdersByClientId(
       p.descuento AS descuento,
       p.total AS total,
       p.observaciones AS observaciones,
-      COUNT(dp.id_detalle_pedido) AS cantidadLineas,
-      COALESCE(SUM(dp.cantidad), 0) AS cantidadUnidades,
+      COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
+      COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
       m.id_movimiento_cuenta AS cargoId,
       DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
     FROM PEDIDO p
-    LEFT JOIN DETALLE_PEDIDO dp
-      ON dp.id_pedido = p.id_pedido
+    LEFT JOIN (
+      SELECT
+        id_pedido,
+        COUNT(id_detalle_pedido) AS cantidadLineas,
+        COALESCE(SUM(cantidad), 0) AS cantidadUnidades
+      FROM DETALLE_PEDIDO
+      GROUP BY id_pedido
+    ) dp_stat
+      ON dp_stat.id_pedido = p.id_pedido
     LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
       ON m.id_pedido = p.id_pedido
       AND m.tipo_movimiento = 'CARGO'
       AND m.estado = 'ACREDITADO'
     WHERE p.id_cliente = ?
-    GROUP BY
-      p.id_pedido,
-      p.fecha,
-      p.estado,
-      p.modalidad_pago,
-      p.moneda_total,
-      p.subtotal,
-      p.descuento,
-      p.total,
-      p.observaciones,
-      m.id_movimiento_cuenta,
-      m.vence_el
     ORDER BY p.fecha DESC, p.id_pedido DESC
   `, [clientId]);
 
@@ -251,7 +246,7 @@ export async function findClientOrderDetailById(
   const [headerRow] = await dataSource.query<OrderSummaryRow[]>(`
     SELECT
       p.id_pedido AS pedidoId,
-      p.fecha AS fecha,
+      DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
       p.estado AS estado,
       p.modalidad_pago AS modalidadPago,
       COALESCE(p.moneda_total, 'USD') AS moneda,
@@ -259,31 +254,26 @@ export async function findClientOrderDetailById(
       p.descuento AS descuento,
       p.total AS total,
       p.observaciones AS observaciones,
-      COUNT(dp.id_detalle_pedido) AS cantidadLineas,
-      COALESCE(SUM(dp.cantidad), 0) AS cantidadUnidades,
+      COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
+      COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
       m.id_movimiento_cuenta AS cargoId,
       DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
     FROM PEDIDO p
-    LEFT JOIN DETALLE_PEDIDO dp
-      ON dp.id_pedido = p.id_pedido
+    LEFT JOIN (
+      SELECT
+        id_pedido,
+        COUNT(id_detalle_pedido) AS cantidadLineas,
+        COALESCE(SUM(cantidad), 0) AS cantidadUnidades
+      FROM DETALLE_PEDIDO
+      GROUP BY id_pedido
+    ) dp_stat
+      ON dp_stat.id_pedido = p.id_pedido
     LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
       ON m.id_pedido = p.id_pedido
       AND m.tipo_movimiento = 'CARGO'
       AND m.estado = 'ACREDITADO'
     WHERE p.id_pedido = ?
       AND p.id_cliente = ?
-    GROUP BY
-      p.id_pedido,
-      p.fecha,
-      p.estado,
-      p.modalidad_pago,
-      p.moneda_total,
-      p.subtotal,
-      p.descuento,
-      p.total,
-      p.observaciones,
-      m.id_movimiento_cuenta,
-      m.vence_el
   `, [orderId, clientId]);
 
   if (!headerRow) {

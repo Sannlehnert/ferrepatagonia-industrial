@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import {
   handleAccountOrder,
+  handleClientOrderRead,
 } from '../controllers/accountOrder.controller';
 
 export const accountOrderRouter = Router();
@@ -22,9 +23,5 @@ clientOrderRouter.use((req, _res, next) => {
   next();
 });
 
-clientOrderRouter.get('/', handleAccountOrder('list'));
-
-clientOrderRouter.get(
-  '/:id',
-  handleAccountOrder('detail'),
-);
+clientOrderRouter.get('/', handleClientOrderRead('list'));
+clientOrderRouter.get('/:id', handleClientOrderRead('detail'));
