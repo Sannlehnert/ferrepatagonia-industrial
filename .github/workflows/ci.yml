@@ -69,6 +69,16 @@ jobs:
             - name: Run E2E cleanup resilience tests
               run: node --test backend/test/e2e-cleanup.test.cjs
 
+            - name: Run account seed safety and cleanup tests
+              working-directory: backend
+              run: |
+                  npm run test:account:safety
+                  npm run test:account:cleanup
+
+            - name: Run account seed, contract and client HTTP integration
+              working-directory: backend
+              run: node test/helpers/run-account-mariadb.cjs all
+
             - name: Verify MariaDB container and volume cleanup
               if: always()
               shell: bash
@@ -168,6 +178,14 @@ jobs:
             - name: Run integrated E2E suite
               run: node backend/test/helpers/run-e2e.cjs
 
+            - name: Run FER-19 acceptance with the disposable #253 ledger
+              run: node backend/test/helpers/run-e2e.cjs --fer19
+
+            - name: Verify H04 against the production frontend build
+              run: |
+                  E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs current-account.production.spec.ts
+                  node backend/test/helpers/run-e2e.cjs --fer19-production
+
             - name: Verify MariaDB E2E container and volume cleanup
               if: always()
               shell: bash
@@ -208,6 +226,8 @@ jobs:
                   name: frontend-e2e-ci-diagnostics
                   path: |
                       ci-diagnostics/
-                      frontend/playwright-report/index.html
+                      frontend/playwright-report
+                      frontend/test-results/fer19-*
+                      frontend/test-results/production
                   if-no-files-found: ignore
                   retention-days: 7

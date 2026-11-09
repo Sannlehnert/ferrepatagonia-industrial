@@ -11,6 +11,9 @@ const root = path.resolve(__dirname, '../../..');
 const backend = path.join(root, 'backend');
 const frontend = path.join(root, 'frontend');
 const profile = newProfile('E2E');
+const args = process.argv.slice(2);
+const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
+const testArgs = args.filter(arg => arg !== '--fer19' && arg !== '--fer19-production');
 
 const services = [];
 let connection;
@@ -110,7 +113,7 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  await seedFixtures(connection, { includeAccountOrderFixture: false });
+  if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: false });
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);
@@ -140,6 +143,7 @@ async function main() {
     DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
     E2E_ISOLATED: '1',
     JWT_SECRET: randomUUID(),
+    E2E_FER19: fer19,
     DB_HOST: profile.host,
     DB_PORT: String(profile.port),
     DB_NAME: profile.database,
@@ -149,7 +153,7 @@ async function main() {
     PORT: '3000',
   };
 
-  const { port: apiPort, adminAccounts } = await startService(
+  const { port: apiPort, adminAccounts, fer19Fixture } = await startService(
     path.join(__dirname, 'e2e-server.cjs'),
     backend,
     apiEnv,
@@ -164,7 +168,10 @@ async function main() {
     E2E_WEB_PORT: String(plannedWebPort),
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
+    E2E_FER19: fer19,
   };
+  if (fer19 === 'production') browserEnv.E2E_PRODUCTION_BUILD = '1';
+  else if (fer19) browserEnv.E2E_PRODUCTION_BUILD = '0';
   if (browserEnv.E2E_PRODUCTION_BUILD === '1') {
     assert.ok(
       fs.existsSync(path.join(frontend, 'dist/index.html')),
@@ -187,13 +194,17 @@ async function main() {
     testProcess = spawn(process.execPath, [
       path.join(frontend, 'node_modules/@playwright/test/cli.js'),
       'test',
-      ...process.argv.slice(2),
+      ...testArgs,
     ], {
       cwd: frontend,
       env: {
-        ...browserEnv,
-        E2E_BASE_URL: baseURL,
-        CCE2E_TEST_PROFILE: JSON.stringify(profile),
+        ...browserEnv, E2E_BASE_URL: baseURL,
+        // Only the Playwright worker needs access to test controls, never Vite.
+        ...(fer19 ? {
+          FER19_E2E_FIXTURE: JSON.stringify(fer19Fixture),
+          FER19_E2E_PROFILE: JSON.stringify(profile),
+          FER19_E2E_CURSOR_KEY: apiEnv.JWT_SECRET,
+        } : { CCE2E_TEST_PROFILE: JSON.stringify(profile) }),
       },
       stdio: 'inherit',
       windowsHide: true,

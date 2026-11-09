@@ -14,8 +14,15 @@ if (target.protocol !== 'http:' || target.hostname !== '127.0.0.1') {
     throw new Error('Las E2E solo pueden ejecutarse contra el servidor local aislado.');
 }
 
+const profile = process.env.E2E_FER19 ? 'fer19-' + process.env.E2E_FER19
+    : process.env.E2E_PRODUCTION_BUILD === '1' ? 'production' : '';
+
 export default defineConfig({
     testDir: './e2e',
+    ...(process.env.E2E_FER19
+        ? { testMatch: process.env.E2E_FER19 === 'production' ? '**/fer19/provenance.spec.ts' : '**/fer19/*.real.spec.ts' }
+        : { testIgnore: '**/fer19/**' }),
+    outputDir: profile ? 'test-results/' + profile : 'test-results',
     fullyParallel: false,
     workers: 1,
     retries: 0,
@@ -26,7 +33,7 @@ export default defineConfig({
     },
     reporter: [
         ['list'],
-        ['html', { open: 'never' }],
+        ['html', { open: 'never', ...(profile ? { outputFolder: 'playwright-report/' + profile } : {}) }],
     ],
     use: {
         baseURL,
