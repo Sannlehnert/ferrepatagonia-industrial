@@ -49,9 +49,28 @@ A corte fijo del 3 de marzo de 2026 en Buenos Aires, el abono vigente de 125.00 
 
 La repetición de un evento ahora comprueba que devuelve el mismo ID y conserva revisión e imputaciones. La violación de unicidad física se prueba directamente con SQL. La moneda ARS se rechaza en el ledger y se prueba como evidencia original de un pago convertido a USD. El plazo omitido usa el plazo acreditado de la cuenta. La falta de evidencia o un plazo incompatible bloquean el cargo. Las fechas límite esperadas son literales y el reloj de prueba fija el corte y la expiración de cursores. El HTTP y la persistencia operan sobre el servidor real.
 
-## E2E de aceptación pendientes
+## E2E de aceptación CLIENTE y ADMIN
 
-- CLIENTE requiere la pantalla #252 integrada y accesible. El E2E debe cubrir login, resumen, movimientos y vencimientos con paginación, cuenta ausente o inhabilitada, vacío acreditado, cobertura desconocida, error y cambio de sesión sin datos del titular anterior.
-- ADMIN requiere que el PR #78 habilite las lecturas financieras reales de #258. Su E2E disponible en Draft cubre login, autorización, reintento de 503 y logout. Para la aceptación faltan listado, filtros, resumen y detalle por cliente, paginación, estados vacío/error y rechazo del rol CLIENTE con las rutas financieras habilitadas.
+Las pantallas #252 y #258, sus APIs y el hotfix H04 están integrados. El runner de Playwright usa Chromium, Vue, Express, Passport JWT y MariaDB 11.4 descartable. Reutiliza la verificación Docker y SQL del perfil E2E y siembra #253 en un esquema vacío. La variante de navegador conserva los 13 clientes originales y agrega 18 para paginación y procedencia. La cuenta paginada tiene 27 cargos abiertos, y hay 29 cuentas para recorrer dos páginas del listado ADMIN.
 
-Los escenarios del fixture y los usuarios se pueden reutilizar en el futuro runner de pantalla que valide un perfil #253. La cobertura de los endpoints propios queda en la suite HTTP.
+```sh
+npm ci --prefix backend
+npm ci --prefix frontend
+npm run build --prefix backend
+npm run build --prefix frontend
+node frontend/node_modules/@playwright/test/cli.js install chromium
+node backend/test/helpers/run-e2e.cjs --fer19
+node backend/test/helpers/run-e2e.cjs --fer19-production
+```
+
+| Grupo | Casos | Qué se verifica |
+| --- | ---: | --- |
+| CLIENTE | 10 | Login y navegación, importes visibles contra la API real, FIFO, vencimientos 30/60, páginas, saldo a favor, historial inhabilitado, vacío, cobertura parcial/desconocida, SIN_CUENTA, carga con bloqueo SQL, cambio de sesión y rechazo de ADMIN |
+| ADMIN | 5 | Listado, filtros combinados, resumen, páginas de movimientos y vencimientos, vacío, cobertura e historial, 503 por bloqueo real y recuperación, cursores alterado/expirado, cambio real de revisión con 409, logout y cuatro 403 para CLIENTE |
+| H04 con build de producción | 2 | Saldo de una cuenta sintética REAL visible, rechazo de datos DEMO y de un libro mixto con abono DEMO en segunda página, 503 sin cifras y recuperación de la consulta ADMIN mediante filtro REAL |
+
+Verificación local con Node 22.22.2 y MariaDB 11.4.13. Pasaron los 17 E2E nuevos, los 3 casos de UI de producción existentes, las 105 pruebas de persistencia/contrato/HTTP de #253, las 57 de HTTP ADMIN, las 25 regresiones focales de frontend y las 32 pruebas de seguridad y limpieza.
+
+Los E2E nuevos usan respuestas del backend real. La expiración del cursor ADMIN se prueba desplazando el corte de un cursor emitido y firmándolo con la clave efímera del runner. El 409 de revisión se prueba con una actualización SQL propia del contenedor, restaurada al finalizar. El bloqueo de MariaDB también se libera en `finally`. Los secretos de control se pasan al proceso de pruebas, separado del proceso Vite.
+
+El modo `--fer19-production` ejecuta el build compilado y activa la política H04 fuera de `NODE_ENV=test` después de sembrar. El transporte se mantiene en loopback con la configuración HTTP aislada. El caso CLIENTE de cuenta completamente DEMO se bloquea con 500 y el libro mixto recibe 503 sanitizado. El despliegue y la terminación TLS quedan fuera de esta prueba. CI también ejecuta los tres casos de UI de producción preexistentes de #252 en el perfil correspondiente. Los reportes se guardan por perfil y CI compara los contenedores y volúmenes antes y después.

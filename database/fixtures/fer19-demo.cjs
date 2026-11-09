@@ -58,8 +58,8 @@ async function demoPayment(db, client, amount, {
       state === 'ACREDITADO' ? 'DEMO: constancia sintética de acreditación' : null]));
 }
 
-async function seedDemo(session) {
-  await assertOwned(session);
+async function seedDemo(session, { browser = false } = {}) {
+  await assertOwned(session, browser ? 'E2E' : 253);
   for (const table of tables) {
     const [row] = await session.connection.query('SELECT COUNT(*) AS n FROM ' + table);
     assert.equal(Number(row.n), 0, table + ' debe estar vacía');
@@ -74,7 +74,11 @@ async function seedDemo(session) {
   mock.timers.enable({ apis: ['Date'], now: new Date(cut).getTime() });
   try {
     return await database.inTransaction(async manager => {
-      for (const [key, limit, term, coverage = 'COMPLETA'] of scenarios) {
+      const browserScenarios = [
+        ['paginada', '1000.00', 30], ['real', '500.00', 30], ['mixta', '500.00', 30],
+        ...Array.from({ length: 15 }, (_, i) => ['pagina-' + i, '300.00', 30]),
+      ];
+      for (const [key, limit, term, coverage = 'COMPLETA'] of [...scenarios, ...(browser ? browserScenarios : [])]) {
         const particular = key === 'particular';
         const email = 'fer19-' + key + '@example.test';
         const clientId = id(await manager.query(
@@ -90,10 +94,11 @@ async function seedDemo(session) {
           accountId = id(await manager.query(
             'INSERT INTO CUENTA_CORRIENTE(id_cliente,limite_credito,habilitada,fecha_alta,cobertura,plazo_dias,' +
             'moneda_limite,evidencia_limite,evidencia_plazo,evidencia_cobertura,cobertura_desde_utc,origen_datos,revision) ' +
-            "VALUES(?,?,1,?,?,?,?,?,?,?,?,'DEMO',0)",
+            "VALUES(?,?,1,?,?,?,?,?,?,?,?,?,0)",
             [clientId, limit, opened, coverage, term, complete ? 'USD' : null,
               complete ? 'DEMO: autorización de límite USD' : null, 'DEMO: plazo autorizado',
-              complete ? 'DEMO: alta sin saldo previo' : null, complete ? opened : null]));
+              complete ? 'DEMO: alta sin saldo previo' : null, complete ? opened : null,
+              key === 'real' || key === 'mixta' ? 'REAL' : 'DEMO']));
         }
         fixture.clients[key] = { key, email, clientId, userId, accountId, limit, term, movements: [] };
       }
@@ -103,10 +108,10 @@ async function seedDemo(session) {
         [adminEmail, hash, opened]));
       fixture.admin = { userId: adminId, email: adminEmail };
 
-      async function movement(key, type, amount, instant) {
+      async function movement(key, type, amount, instant, origin = 'DEMO') {
         const client = fixture.clients[key];
         mock.timers.setTime(Date.parse(instant));
-        const dto = { id_cuenta_corriente: client.accountId, monto: amount, origen: 'DEMO' };
+        const dto = { id_cuenta_corriente: client.accountId, monto: amount, origen: origin };
         let orderId, paymentId, movementId;
         if (type === 'CARGO') {
           orderId = await demoOrder(manager, client, amount, instant);
@@ -149,6 +154,13 @@ async function seedDemo(session) {
         [fixture.clients.parcial.accountId]);
       for (const state of ['PENDIENTE', 'RECHAZADO']) {
         await demoPayment(manager, fixture.clients.empresa30, '999.00', { state, instant: '2026-02-10T12:00:00Z' });
+      }
+      if (browser) {
+        for (let i = 0; i < 27; i++) await movement('paginada', 'CARGO', '1.00', '2026-02-01T12:00:00Z');
+        await movement('real', 'CARGO', '80.00', '2026-02-01T12:00:00Z', 'PEDIDO');
+        for (let i = 0; i < 25; i++) await movement('mixta', 'CARGO', '1.00', '2026-02-01T12:00:00Z', 'PEDIDO');
+        // A historical credit on page two must taint the entire ledger.
+        await movement('mixta', 'ABONO', '19.37', '2026-01-01T12:00:00Z');
       }
       return fixture;
     });

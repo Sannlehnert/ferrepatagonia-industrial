@@ -8,8 +8,8 @@ const childProfile = () => {
   return disposable.childProfile(runner);
 };
 
-async function assertOwned(session) {
-  assert.equal(session?.runner, runner, 'Seed rechazado: sesión ajena al runner #253');
+async function assertOwned(session, expectedRunner = runner) {
+  assert.equal(session?.runner, expectedRunner, 'Seed rechazado: sesión ajena al runner autorizado');
   await disposable.assertOwned(session);
 }
 
