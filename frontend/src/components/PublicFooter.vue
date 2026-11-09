@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
+import { publicMenu, type NavigableMenuItem } from '@/config/menu'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const year = new Date().getFullYear()
+const institutionalLinks = publicMenu.filter(
+  (item): item is NavigableMenuItem =>
+    item.routeName !== null && (item.id === 'public-about' || item.id === 'public-faq'),
+)
 
 const accountLinks = computed(() => {
   if (auth.rol === 'ADMIN') {
@@ -34,9 +39,9 @@ const linkClass =
   <footer class="bg-[#0b2438] text-white">
     <div class="box-border w-full px-4 sm:px-6 lg:px-10">
       <div
-        class="grid grid-cols-1 gap-8 py-8 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr] lg:gap-16"
+        class="grid grid-cols-1 gap-8 py-8 sm:grid-cols-3 lg:grid-cols-[2fr_1fr_1fr_1fr]"
       >
-        <div class="sm:col-span-2 lg:col-span-1">
+        <div class="sm:col-span-3 lg:col-span-1">
           <RouterLink
             :to="{ name: 'home' }"
             aria-label="Ferrepatagonia Industrial — Inicio"
@@ -72,6 +77,23 @@ const linkClass =
                 :class="linkClass"
               >
                 Ver productos
+              </RouterLink>
+            </li>
+          </ul>
+        </nav>
+
+        <nav aria-labelledby="footer-institutional-title">
+          <h2
+            id="footer-institutional-title"
+            class="m-0 mb-3 text-sm font-bold tracking-[1.6px]"
+          >
+            INSTITUCIONAL
+          </h2>
+
+          <ul class="m-0 list-none p-0">
+            <li v-for="link in institutionalLinks" :key="link.id">
+              <RouterLink :to="{ name: link.routeName }" :class="linkClass">
+                {{ link.label }}
               </RouterLink>
             </li>
           </ul>
