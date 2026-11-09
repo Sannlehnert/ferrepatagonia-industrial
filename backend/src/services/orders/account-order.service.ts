@@ -20,9 +20,16 @@ import {
   presentStoredAccountOrder,
 } from './account-order.recovery';
 import { executePendingAccountOrder } from './account-order.transaction';
-import type { AccountOrderResult } from './account-order.types';
+import { lockAccountOrderContext } from '../../repositories/accountOrderContext.repository';
+import { lockAccountOrderCart } from '../../repositories/accountOrderCart.repository';
+import { quoteAccountOrderCart } from './account-order.pricing';
+import { toCents } from '../../repositories/cuentaCorriente.repository';
+import type {
+  AccountOrderEligibilityResult,
+  AccountOrderResult,
+} from './account-order.types';
 
-async function identify(auth: AuthContext, value: unknown) {
+function validateClientAuth(auth: AuthContext): void {
   if (auth.rol !== 'CLIENTE' ||
     !Number.isInteger(auth.id) || auth.id < 1 ||
     auth.id > 2147483647) {
@@ -31,12 +38,9 @@ async function identify(auth: AuthContext, value: unknown) {
       'Esta operación requiere una cuenta de cliente.',
     );
   }
+}
 
-  const key = await validateConfirmationKey(value);
-  if (!key.valid) {
-    throw new AccountOrderError(key.code, 400, key.message);
-  }
-
+async function findActiveClient(auth: AuthContext): Promise<number> {
   const [client] = await dataSource.query<{ clientId: number }[]>(`
     SELECT c.id_cliente AS clientId
     FROM USUARIO u
@@ -52,7 +56,17 @@ async function identify(auth: AuthContext, value: unknown) {
     );
   }
 
-  return { clientId: client.clientId, key: key.key };
+  return client.clientId;
+}
+
+async function identify(auth: AuthContext, value: unknown) {
+  validateClientAuth(auth);
+  const key = await validateConfirmationKey(value);
+  if (!key.valid) {
+    throw new AccountOrderError(key.code, 400, key.message);
+  }
+
+  return { clientId: await findActiveClient(auth), key: key.key };
 }
 
 async function recover(clientId: number, key: string) {
@@ -87,6 +101,62 @@ function rejection(error: unknown): AccountOrderError | null {
   }
 
   return null;
+}
+
+export async function getAccountOrderEligibility(
+  auth: AuthContext,
+): Promise<AccountOrderEligibilityResult> {
+  validateClientAuth(auth);
+  const clientId = await findActiveClient(auth);
+
+  try {
+    return await inTransaction(async manager => {
+      const context = await lockAccountOrderContext(
+        manager, auth, clientId,
+      );
+      const cart = await lockAccountOrderCart(
+        manager, auth.id, clientId,
+      );
+      const quote = await quoteAccountOrderCart(manager, auth, cart);
+      const eligible = toCents(quote.totalUSD) <= toCents(context.availableUSD);
+
+      return {
+        status: 200,
+        body: {
+          data: {
+            elegible: eligible,
+            moneda: 'USD',
+            totalUSD: quote.totalUSD,
+            creditoDisponibleUSD: context.availableUSD,
+            codigo: eligible ? null : 'CREDITO_INSUFICIENTE',
+            mensaje: eligible
+              ? null
+              : 'El crédito disponible no alcanza para confirmar el pedido.',
+          },
+        },
+      };
+    }, { isolation: 'READ COMMITTED', lockWaitSeconds: 2 });
+  } catch (error) {
+    const failure = rejection(error);
+    if (!failure || (failure.status !== 403 &&
+      failure.status !== 409 && failure.status !== 422)) {
+      throw error;
+    }
+
+    return {
+      status: 200,
+      body: {
+        data: {
+          elegible: false,
+          moneda: 'USD',
+          totalUSD: null,
+          creditoDisponibleUSD: null,
+          codigo: failure.code,
+          mensaje: failure.message,
+        },
+      },
+    };
+  }
 }
 
 export async function getAccountOrderResult(

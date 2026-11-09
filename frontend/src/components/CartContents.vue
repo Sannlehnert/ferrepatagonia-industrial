@@ -3,10 +3,12 @@ import { computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import CartLine from '@/components/CartLine.vue'
 import CartSummary from '@/components/CartSummary.vue'
+import { useAccountOrderStore } from '@/stores/accountOrder'
 import { useCartStore } from '@/stores/cart'
 import { useCartPanelStore } from '@/stores/cartPanel'
 
 const cart = useCartStore()
+const order = useAccountOrderStore()
 const panel = useCartPanelStore()
 
 onMounted(() => {
@@ -14,7 +16,10 @@ onMounted(() => {
 })
 
 const busy = computed(() =>
-  cart.loading || cart.operation !== null,
+  cart.loading ||
+  cart.operation !== null ||
+  order.attemptState === 'submitting' ||
+  order.attemptState === 'pending',
 )
 </script>
 
@@ -24,6 +29,16 @@ const busy = computed(() =>
     :aria-busy="busy"
     class="text-sm text-[#13293a]"
   >
+    <p
+      v-if="order.attemptState === 'confirmed' && order.confirmation"
+      role="status"
+      class="my-4 rounded-lg border border-solid border-green-300 bg-green-50 p-3"
+    >
+      Pedido #{{ order.confirmation.pedidoId }} confirmado por
+      USD {{ order.confirmation.totalUSD }}.
+      Vence el {{ order.confirmation.venceEl }}.
+    </p>
+
     <p v-if="busy" role="status" class="my-3">
       {{
         cart.operation

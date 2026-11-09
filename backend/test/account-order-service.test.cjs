@@ -44,6 +44,79 @@ async function countOrders(f) {
   return Number(row.cantidad);
 }
 
+async function countAttempts(f) {
+  const [row] = await session.connection.query(`
+    SELECT COUNT(*) cantidad FROM CONFIRMACION_PEDIDO_CC
+    WHERE id_cliente = ?
+  `, [f.clientId]);
+  return Number(row.cantidad);
+}
+
+test('#262: la prevalidación devuelve total y crédito del servidor sin iniciar una compra', async () => {
+  const f = await createOrderFixture(session);
+
+  const result = await service.getAccountOrderEligibility(f.auth);
+
+  assert.deepEqual(result, {
+    status: 200,
+    body: {
+      data: {
+        elegible: true,
+        moneda: 'USD',
+        totalUSD: '20.00',
+        creditoDisponibleUSD: '1000.00',
+        codigo: null,
+        mensaje: null,
+      },
+    },
+  });
+  assert.equal(await countOrders(f), 0);
+  assert.equal(await countAttempts(f), 0);
+  const [product] = await session.connection.query(
+    'SELECT stock FROM PRODUCTO WHERE id_producto = ?',
+    [f.productId],
+  );
+  assert.equal(product.stock, 5);
+});
+
+test('#262: la prevalidación informa crédito insuficiente y no reserva intento', async () => {
+  const f = await createOrderFixture(session, { limit: '1.00' });
+
+  const result = await service.getAccountOrderEligibility(f.auth);
+
+  assert.deepEqual(result.body.data, {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: '20.00',
+    creditoDisponibleUSD: '1.00',
+    codigo: 'CREDITO_INSUFICIENTE',
+    mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+  });
+  assert.equal(await countOrders(f), 0);
+  assert.equal(await countAttempts(f), 0);
+});
+
+test('#262: la prevalidación rechaza una empresa no aprobada', async () => {
+  const f = await createOrderFixture(session);
+  await session.connection.query(`
+    UPDATE CLIENTE SET estado_aprobacion_empresa = 'PENDIENTE'
+    WHERE id_cliente = ?
+  `, [f.clientId]);
+
+  const result = await service.getAccountOrderEligibility(f.auth);
+
+  assert.deepEqual(result.body.data, {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: null,
+    creditoDisponibleUSD: null,
+    codigo: 'EMPRESA_NO_HABILITADA',
+    mensaje: 'La empresa no está aprobada para esta operación.',
+  });
+  assert.equal(await countOrders(f), 0);
+  assert.equal(await countAttempts(f), 0);
+});
+
 test('#261: repetir y consultar devuelve el mismo pedido histórico', async () => {
   const f = await createOrderFixture(session);
   const key = randomUUID();

@@ -34,6 +34,18 @@ Un saldo desconocido nunca se interpreta como cero.
 
 ## Confirmación HTTP
 
+Antes de ofrecer la modalidad, el frontend consulta la elegibilidad vigente:
+
+```http
+GET /api/pedidos/cuenta-corriente/eligibilidad
+```
+
+La respuesta se calcula con el cliente, carrito, precios y crédito del servidor.
+Es una lectura: no crea intentos, pedidos ni cargos. Una respuesta elegible
+incluye el total y el crédito disponible como cadenas USD; una prevalidación
+negativa por crédito insuficiente también devuelve ambos importes. La
+confirmación vuelve a validar todas las condiciones dentro de su transacción.
+
 ```http
 POST /api/pedidos/cuenta-corriente
 Content-Type: application/json

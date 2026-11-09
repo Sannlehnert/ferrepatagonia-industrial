@@ -153,6 +153,40 @@ test('#261 HTTP: visitante y ADMIN no confirman ni consultan pedidos', async () 
   );
 });
 
+test('#262 HTTP: la prevalidación requiere cliente y no admite cuerpo ni consulta', async () => {
+  const f = await createOrderFixture(session);
+
+  await responseBody(await request({
+    path: '/eligibilidad',
+  }), 401);
+  await responseBody(await request({
+    path: '/eligibilidad',
+    auth: { id: f.adminId, rol: 'ADMIN' },
+  }), 403);
+  await responseBody(await request({
+    path: '/eligibilidad?cliente=1',
+    auth: f.auth,
+  }), 400);
+
+  const result = await responseBody(await request({
+    path: '/eligibilidad',
+    auth: f.auth,
+  }), 200);
+  assert.deepEqual(result.data, {
+    elegible: true,
+    moneda: 'USD',
+    totalUSD: '20.00',
+    creditoDisponibleUSD: '1000.00',
+    codigo: null,
+    mensaje: null,
+  });
+  assert.equal(await countForClient('PEDIDO', f.clientId), 0);
+  assert.equal(
+    await countForClient('CONFIRMACION_PEDIDO_CC', f.clientId),
+    0,
+  );
+});
+
 test('#261 HTTP: rechaza solicitudes inválidas antes de reservar el intento', async () => {
   const f = await createOrderFixture(session);
   const key = randomUUID();

@@ -1,0 +1,204 @@
+<script setup lang="ts">
+import { computed, ref, watch } from 'vue'
+import type { CartSnapshot } from '@/types/cart'
+import { useAccountOrderStore } from '@/stores/accountOrder'
+import { useCartStore } from '@/stores/cart'
+
+const props = defineProps<{
+  snapshot: CartSnapshot
+  stale: boolean
+}>()
+
+const order = useAccountOrderStore()
+const cart = useCartStore()
+const selected = ref(false)
+const eligibilityKey = computed(() => JSON.stringify({
+  id: props.snapshot.id_carrito,
+  total: props.snapshot.totalUSD,
+  stale: props.stale,
+  items: props.snapshot.items.map(item => [
+    item.id_producto,
+    item.cantidad,
+    item.precio?.precioUnitarioUSD,
+    item.precio?.estadoPrecio,
+  ]),
+}))
+
+const showTotal = computed(() =>
+  !props.stale &&
+  props.snapshot.estado_total === 'DEFINIDO' &&
+  !props.snapshot.tiene_incompatibles &&
+  props.snapshot.totalUSD !== null &&
+  /^(0|[1-9]\d{0,9})\.\d{2}$/.test(props.snapshot.totalUSD) &&
+  props.snapshot.totalUSD !== '0.00' &&
+  props.snapshot.items.every(item =>
+    item.disponible &&
+    item.precio?.estadoPrecio === 'DEFINIDO' &&
+    item.precio.precioComprable === true &&
+    item.precio.datosSinteticos === false,
+  ),
+)
+
+const hasServerAmounts = computed(() =>
+  order.eligibility?.totalUSD !== null &&
+  order.eligibility?.totalUSD !== undefined &&
+  order.eligibility?.creditoDisponibleUSD !== null &&
+  order.eligibility?.creditoDisponibleUSD !== undefined,
+)
+
+const busy = computed(() =>
+  cart.loading ||
+  cart.operation !== null ||
+  order.eligibilityLoading ||
+  order.attemptState === 'submitting' ||
+  order.attemptState === 'pending',
+)
+
+const canConfirm = computed(() =>
+  showTotal.value &&
+  order.canUseCredit &&
+  selected.value &&
+  !busy.value &&
+  order.attemptState === 'idle',
+)
+
+watch(
+  eligibilityKey,
+  () => {
+    selected.value = false
+    if (showTotal.value) void order.loadEligibility()
+  },
+  { immediate: true },
+)
+
+async function confirmOrder() {
+  const confirmed = await order.confirm()
+  if (confirmed) void cart.cargarCarrito()
+}
+
+async function retryAfterRejection() {
+  order.prepareRetry()
+  await cart.cargarCarrito()
+  await order.loadEligibility()
+}
+</script>
+
+<template>
+  <section aria-label="Confirmación de pedido" class="mt-5 border-t border-slate-200 pt-4">
+    <p v-if="order.eligibilityLoading" role="status" class="mb-3">
+      Verificando si este pedido puede confirmarse a crédito…
+    </p>
+    <div v-else-if="order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+      <p role="alert" class="mb-2 mt-0">{{ order.eligibilityError }}</p>
+      <button type="button" class="min-h-11 underline" @click="order.loadEligibility()">
+        Volver a consultar elegibilidad
+      </button>
+    </div>
+
+    <p v-if="order.attemptError" role="alert" class="mb-3 rounded-md border border-red-200 bg-red-50 p-3">
+      {{ order.attemptError }}
+    </p>
+    <p v-if="order.attemptState === 'pending'" role="status" class="mb-3">
+      La confirmación todavía no tiene un resultado definitivo. Conservamos el mismo identificador para evitar duplicados.
+      <button type="button" class="ml-1 min-h-11 underline" @click="order.consultResult()">
+        Consultar resultado
+      </button>
+    </p>
+    <button
+      v-if="order.attemptState === 'rejected' && showTotal"
+      type="button"
+      class="mb-3 min-h-11 underline"
+      @click="retryAfterRejection()"
+    >
+      Actualizar carrito y crédito para reintentar
+    </button>
+
+    <template
+      v-if="!order.eligibilityLoading && !order.eligibilityError &&
+        order.canUseCredit && showTotal &&
+        order.attemptState !== 'confirmed'"
+    >
+      <dl class="mb-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div class="flex flex-wrap justify-between gap-2">
+          <dt>Total del pedido</dt>
+          <dd class="m-0 font-semibold">USD {{ order.eligibility?.totalUSD }}</dd>
+        </div>
+        <div class="flex flex-wrap justify-between gap-2">
+          <dt>Crédito disponible</dt>
+          <dd class="m-0 font-semibold">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
+        </div>
+      </dl>
+
+      <fieldset class="mb-3 rounded-md border border-slate-300 p-3">
+        <legend class="px-1 font-medium">Modalidad de pago</legend>
+        <label class="inline-flex min-h-11 cursor-pointer items-center gap-2">
+          <input v-model="selected" type="radio" name="payment-method" value="CUENTA_CORRIENTE">
+          Cuenta corriente
+        </label>
+      </fieldset>
+
+      <button
+        type="button"
+        :disabled="!canConfirm"
+        class="min-h-12 w-full rounded-lg border-0 bg-[#145a8d] px-4 py-2
+          font-[inherit] font-semibold text-white
+          focus-visible:outline-2 focus-visible:outline-[#145a8d]
+          disabled:cursor-not-allowed disabled:opacity-60"
+        @click="confirmOrder()"
+      >
+        {{ order.attemptState === 'submitting' ? 'Confirmando…' : 'Confirmar pedido a cuenta corriente' }}
+      </button>
+    </template>
+
+    <template v-else-if="order.attemptState !== 'confirmed'">
+      <dl
+        v-if="!order.eligibilityLoading && !order.eligibilityError && hasServerAmounts"
+        class="mb-3 grid gap-2 text-sm sm:grid-cols-2"
+      >
+        <div class="flex flex-wrap justify-between gap-2">
+          <dt>Total del pedido</dt>
+          <dd class="m-0 font-semibold">USD {{ order.eligibility?.totalUSD }}</dd>
+        </div>
+        <div class="flex flex-wrap justify-between gap-2">
+          <dt>Crédito disponible</dt>
+          <dd class="m-0 font-semibold">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
+        </div>
+      </dl>
+      <button
+        type="button"
+        disabled
+        class="min-h-12 w-full cursor-not-allowed rounded-lg border-0
+          bg-[#145a8d] px-4 py-2 font-[inherit] font-semibold
+          text-white opacity-60"
+      >
+        Finalizar compra
+      </button>
+      <p
+        class="mb-0 mt-2 text-xs text-slate-600"
+        :role="order.eligibility?.mensaje ? 'alert' : 'status'"
+      >
+        {{ !showTotal
+          ? 'La confirmación requiere un total vigente y verificable del carrito.'
+          : order.eligibilityLoading
+            ? 'Verificando las condiciones de la cuenta corriente.'
+            : order.eligibilityError
+              ? 'No se pudo verificar la elegibilidad del pedido.'
+              : order.eligibility?.mensaje ||
+                'La cuenta corriente no está habilitada para este pedido.' }}
+      </p>
+      <button
+        v-if="order.eligibility && !order.eligibility.elegible && showTotal"
+        type="button"
+        :disabled="busy"
+        class="mt-2 min-h-11 underline disabled:cursor-not-allowed disabled:opacity-60"
+        @click="order.loadEligibility()"
+      >
+        Volver a consultar elegibilidad
+      </button>
+    </template>
+
+    <p v-if="order.storageError" role="alert" class="mb-0 mt-2 text-xs text-amber-800">
+      {{ order.storageError }}
+    </p>
+  </section>
+</template>
