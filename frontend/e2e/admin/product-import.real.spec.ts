@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
+import { readFile } from 'node:fs/promises'
+import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate'
 
 const importApi = '**/api/admin/productos/importar'
 const headers = 'codigo,nombre,id_categoria,precio_base_usd,stock,descripcion,imagen,activo,descuento_especial_pct'
@@ -212,4 +214,57 @@ test('un reporte que devuelve 404 permite dejar de seguir el lote sin reconfirma
   await page.reload()
   await expect(fileInput).toBeEnabled()
   expect(confirmationRequests).toBe(1)
+})
+
+test('previsualiza y confirma un XLSX válido conservando el SKU con ceros', async ({ page }) => {
+  const fixture = await readFile(
+    new URL('../../../docs/234/ejemplos/validos.xlsx', import.meta.url),
+  )
+  const workbook = unzipSync(fixture)
+  const sheetPath = 'xl/worksheets/sheet1.xml'
+  const sheet = strFromU8(workbook[sheetPath]!)
+  const activeCells = /(<x:c r="H[2-5]"[^>]*><x:v>)true(<\/x:v>)/g
+
+  // Mantiene los productos de prueba fuera del catálogo público.
+  expect([...sheet.matchAll(activeCells)]).toHaveLength(4)
+  workbook[sheetPath] = strToU8(sheet.replace(activeCells, '$1false$2'))
+
+  await page.goto('/login')
+  await page.getByLabel('Email', { exact: true }).fill('admin@e2e.test')
+  await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+  await expect(page).toHaveURL(/\/admin\/dashboard$/)
+  await page.goto('/admin/productos/importar')
+
+  await page.getByLabel('Archivo CSV o XLSX').setInputFiles({
+    name: 'validos.xlsx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    buffer: Buffer.from(zipSync(workbook)),
+  })
+
+  await expect(page.getByRole('heading', { name: 'Previsualización' })).toBeVisible()
+  await expect(page.getByText(/4 listas para importar/)).toBeVisible()
+  await expect(page.getByRole('cell', { name: '000123', exact: true })).toBeVisible()
+
+  const confirmation = page.waitForResponse((response) =>
+    response.request().method() === 'POST' &&
+    new URL(response.url()).pathname.endsWith('/importar/confirmar'),
+  )
+
+  await page.getByRole('button', { name: 'Confirmar importación', exact: true }).click()
+
+  const response = await confirmation
+  expect(response.status()).toBe(200)
+  expect(await response.json()).toMatchObject({
+    estado: 'completado',
+    totalProcesados: 4,
+    importados: 4,
+    omitidos: 0,
+    rechazados: 0,
+    pendientes: 0,
+    detalles: expect.arrayContaining([
+      expect.objectContaining({ codigo: '000123', estado: 'importado' }),
+    ]),
+  })
+  await expect(page.getByText(/Completado.*4 importadas.*0 rechazadas/)).toBeVisible()
 })
