@@ -115,13 +115,122 @@ async function sql(database: DisposableDatabase, f: OrderFixture) {
   return { stock: product.stock, items, orders, charges, attempts }
 }
 
-function confirmedOnce(state: Awaited<ReturnType<typeof sql>>, key: string, orderId: number) {
+function confirmedOnce(state: Awaited<ReturnType<typeof sql>>, key: string, orderId: number, total = '20.00', stock = 3) {
   expect(state).toEqual({
-    stock: 3,
+    stock,
     items: [],
-    orders: [{ id_pedido: orderId, total: '20.00', estado: 'CONFIRMADO' }],
-    charges: [{ id_pedido: orderId, monto: '20.00' }],
+    orders: [{ id_pedido: orderId, total, estado: 'CONFIRMADO' }],
+    charges: [{ id_pedido: orderId, monto: total }],
     attempts: [{ clave: key, estado: 'CONFIRMADO', http_status: 201 }],
+  })
+}
+
+recoveryTest.use({ screenshot: 'off', trace: 'off' })
+
+for (const width of [360, 1280]) {
+  recoveryTest.describe(`#263 crédito a ${width}px`, () => {
+    recoveryTest.use({ viewport: { width, height: 800 } })
+
+    recoveryTest('recupera la compra y rechaza otra que excede el disponible', async ({ page, database }) => {
+      const f = await customer(database)
+      const db = database.connection
+      await db.query('UPDATE CUENTA_CORRIENTE SET limite_credito = 15 WHERE id_cuenta_corriente = ?', [f.accountId])
+      await db.query('DELETE FROM ITEM_CARRITO WHERE id_carrito = ?', [f.cartId])
+      await signIn(page, f)
+
+      async function addFromCatalog() {
+        await page.goto('/catalogo?busqueda=' + encodeURIComponent(f.name))
+        const card = page.locator('li').filter({ has: page.getByRole('heading', { name: f.name, exact: true }) })
+        const added = page.waitForResponse(r =>
+          r.url().endsWith(cartEndpoint + '/items') && r.request().method() === 'POST')
+        await card.getByRole('button', { name: 'Agregar', exact: true }).click()
+        expect((await added).status()).toBe(204)
+        const eligibility = page.waitForResponse(r => r.url().endsWith(endpoint + '/eligibilidad'))
+        await page.goto('/carrito')
+        const response = await eligibility
+        expect(response.status()).toBe(200)
+        return (await response.json()).data
+      }
+
+      const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+      const eligibility = await addFromCatalog()
+      expect(eligibility).toMatchObject({ elegible: true, totalUSD: '10.00', creditoDisponibleUSD: '15.00' })
+      await expect(summary).toContainText('USD 10.00')
+      await expect(summary).toContainText('USD 15.00')
+
+      let key = ''
+      let original: { data: { pedidoId: number, cargoId: string } } | undefined
+      await page.route('**' + endpoint, async route => {
+        if (route.request().method() !== 'POST') return route.continue()
+        const response = await route.fetch()
+        expect(response.status()).toBe(201)
+        original = await response.json()
+        key = route.request().headers()['idempotency-key']
+        await route.abort('failed')
+      }, { times: 1 })
+      await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
+      await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
+      await expect(recovery(page)).toBeEnabled()
+      const recovered = resultResponse(page, key)
+      await recovery(page).click()
+      const response = await recovered
+      expect(response.status()).toBe(200)
+      const result = await response.json()
+      expect(original).toBeDefined()
+      expect(result).toEqual(original)
+      const { pedidoId, cargoId } = result.data
+      await expect(receipt(page, pedidoId)).toBeVisible()
+      await expect(emptyCart(page)).toBeVisible()
+      const cart = await page.request.get(cartEndpoint)
+      expect(cart.status()).toBe(200)
+      expect((await cart.json()).items).toEqual([])
+      const committed = await sql(database, f)
+      confirmedOnce(committed, key, pedidoId, '10.00', 4)
+      expect(await db.query(
+        'SELECT CAST(id_movimiento_cuenta AS CHAR) AS id, moneda FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pedido = ?',
+        [pedidoId],
+      )).toEqual([{ id: cargoId, moneda: 'USD' }])
+
+      const account = '/api/cuenta-corriente'
+      const accountResponse = page.waitForResponse(r => r.url().endsWith(account))
+      await page.goto('/mi-cuenta/cuenta-corriente')
+      const read = await accountResponse
+      expect(read.status()).toBe(200)
+      const { data: balance } = await read.json()
+      expect(balance).toMatchObject({ saldo: '10.00', disponible: '5.00', moneda: 'USD' })
+      const accountSummary = page.getByRole('region', { name: 'Resumen de la cuenta' })
+      await expect(accountSummary.getByRole('article').filter({ hasText: 'Saldo actual (USD)' })).toContainText('10,00')
+
+      const denied = await addFromCatalog()
+      expect(denied).toMatchObject({
+        elegible: false, codigo: 'CREDITO_INSUFICIENTE', totalUSD: '10.00', creditoDisponibleUSD: '5.00',
+      })
+      await expect(summary.getByRole('alert')).toContainText('El crédito disponible no alcanza')
+      await expect(summary).toContainText('USD 5.00')
+      await expect(summary.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
+      const before = await sql(database, f)
+      expect(before).toEqual({ ...committed, items: [{ cantidad: 1 }] })
+      const rejectedKey = randomUUID()
+      const rejection = await page.request.post(endpoint, {
+        headers: { Origin: new URL(page.url()).origin, 'Idempotency-Key': rejectedKey },
+        data: { cotizacion: denied.cotizacion },
+      })
+      expect(rejection.status()).toBe(409)
+      expect(await rejection.json()).toMatchObject({ code: 'CREDITO_INSUFICIENTE', estado: 'RECHAZADO' })
+      const after = await sql(database, f)
+      expect(after).toEqual({
+        ...before,
+        attempts: expect.arrayContaining([
+          ...before.attempts, { clave: rejectedKey, estado: 'RECHAZADO', http_status: 409 },
+        ]),
+      })
+      expect(after.attempts).toHaveLength(2)
+      const updated = await page.request.get(account)
+      expect(updated.status()).toBe(200)
+      expect((await updated.json()).data).toMatchObject({
+        saldo: '10.00', disponible: '5.00', revision: balance.revision,
+      })
+    })
   })
 }
 
