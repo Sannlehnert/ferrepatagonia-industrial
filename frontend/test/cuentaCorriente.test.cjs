@@ -83,11 +83,12 @@ test('consulta solo endpoints propios y pagina con el cursor del backend', async
         '@/services/api': { __esModule: true, default: api },
     })
 
-    assert.deepEqual(await service.getCuentaCorriente(), response.data.data)
+    const { signal } = new AbortController()
+    assert.deepEqual(await service.getCuentaCorriente(signal), response.data.data)
     assert.deepEqual(await service.getCuentaCorrienteMovimientos('opaque-cursor'), response.data.data)
     assert.deepEqual(await service.getCuentaCorrienteVencimientos(), response.data.data)
     assert.deepEqual(calls, [
-        ['/cuenta-corriente'],
+        ['/cuenta-corriente', { signal }],
         ['/cuenta-corriente/movimientos', { params: { limite: 25, cursor: 'opaque-cursor' } }],
         ['/cuenta-corriente/vencimientos', { params: { limite: 25 } }],
     ])

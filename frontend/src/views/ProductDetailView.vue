@@ -4,6 +4,7 @@ import ProductPrice from '@/components/ProductPrice.vue'
 import ProductPrices from '@/components/ProductPrices.vue'
 import { getCatalogProduct } from '@/services/catalogService'
 import type { CatalogProduct, CatalogProductDetail } from '@/types/catalog'
+import { getProductImageSource } from '@/utils/productImage'
 import axios from 'axios'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -33,16 +34,14 @@ const returnTarget = computed(() => {
   return { name: 'catalogo' }
 })
 
-const imageSource = computed(() => {
-  const value = product.value?.imagen?.trim()
-  if (!value) return null
-  try {
-    const parsed = new URL(value, window.location.origin)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null
-  } catch {
-    return null
-  }
+const returnLabel = computed(() => {
+  const target = returnTarget.value
+  return typeof target === 'string' && target.split('?')[0] === '/'
+    ? 'Volver al inicio'
+    : 'Volver al catálogo'
 })
+
+const imageSource = computed(() => getProductImageSource(product.value?.imagen))
 
 async function loadProduct() {
   controller?.abort()
@@ -83,7 +82,7 @@ onBeforeUnmount(() => controller?.abort())
     <nav aria-label="Ruta de navegación" class="mb-5 text-sm">
       <RouterLink :to="{ name: 'home' }" class="text-[#145a8d] underline">Inicio</RouterLink>
       <span aria-hidden="true"> / </span>
-      <RouterLink :to="returnTarget" class="text-[#145a8d] underline">Volver al catálogo</RouterLink>
+      <RouterLink :to="returnTarget" class="text-[#145a8d] underline">{{ returnLabel }}</RouterLink>
       <span aria-hidden="true"> / </span>
       <span>Detalle del producto</span>
     </nav>
@@ -97,7 +96,7 @@ onBeforeUnmount(() => controller?.abort())
     <section v-else-if="notFound" role="status" class="rounded-lg border border-slate-200 p-5">
       <p class="m-0">No encontramos ese producto en el catálogo.</p>
       <RouterLink :to="returnTarget" class="mt-3 inline-flex min-h-11 items-center text-[#145a8d] underline">
-        Volver al catálogo
+        {{ returnLabel }}
       </RouterLink>
     </section>
 

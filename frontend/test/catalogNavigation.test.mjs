@@ -29,11 +29,7 @@ test('el layout público incluye el encabezado y el contenido de la ruta', async
 test('el encabezado utiliza el menú público con permisos', async () => {
   const header = await readSource('../src/components/PublicHeader.vue')
 
-  assert.match(header, /import \{ publicMenu \} from/)
-  assert.match(
-    header,
-    /<NavigationMenu\b[^>]*:items="publicMenu"[^>]*:permissions="permissions"/,
-  )
+  assert.match(header, /getNavigableMenu\(publicMenu, getPermissionsForRole\(auth\.rol\)\)/)
 })
 
 test('el detalle público tiene una ruta estable bajo el layout público', async () => {
