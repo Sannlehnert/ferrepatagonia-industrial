@@ -1,4 +1,4 @@
-import { findCatalogPage } from '../repositories/catalog.repository';
+import { findCatalogPage, findCatalogProductById } from '../repositories/catalog.repository';
 import { CatalogPagination } from '../validators/catalog.validator';
 
 export async function listCatalog(pagination: CatalogPagination) {
@@ -18,5 +18,23 @@ export async function listCatalog(pagination: CatalogPagination) {
     })),
     pagination: { page, limit, total, totalPages, hasNext: page < totalPages,
       hasPrevious: page > 1 && page - 1 <= totalPages },
+  };
+}
+
+export async function getCatalogProduct(id: number) {
+  const row = await findCatalogProductById(id);
+  if (!row) return null;
+  return {
+    id: Number(row.id_producto),
+    nombre: row.nombre,
+    codigo: row.codigo,
+    descripcion: row.descripcion,
+    imagen: row.imagen,
+    stock: Number(row.stock),
+    categoria: { id: Number(row.id_categoria), nombre: row.categoria_nombre },
+    // FER-17 is authoritative for all displayed prices.
+    precio: null,
+    estadoPrecio: 'PENDIENTE_DEFINICION' as const,
+    disponible: Number(row.stock) > 0,
   };
 }
