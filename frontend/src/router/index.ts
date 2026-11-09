@@ -124,6 +124,11 @@ const router = createRouter({
           name: 'cuenta-pedidos',
           component: () => import('@/views/cuenta/HistorialPedidos.vue'),
         },
+        {
+          path: 'cuenta-corriente',
+          name: 'cuenta-corriente',
+          component: () => import('@/views/cuenta/CuentaCorrienteView.vue'),
+        },
       ],
     },
   ],
