@@ -1,4 +1,6 @@
 const assert = require("node:assert/strict");
+const { childProfile, connectOwned } = require("./cc260-disposable.cjs");
+const { seedAdminAccounts } = require("./admin-account-fixture.cjs");
 
 // El ejecutor deberá proporcionar una base exclusiva para esta ejecución.
 assert.equal(process.env.E2E_ISOLATED, "1");
@@ -51,7 +53,14 @@ process.once("SIGINT", () => void stop());
 process.once("SIGTERM", () => void stop());
 
 async function main() {
-  await initializeDatabase();
+  const session = await connectOwned(childProfile("E2E"), "E2E");
+  let fixture;
+  try {
+    await initializeDatabase();
+    fixture = await seedAdminAccounts(session, { browser: true });
+  } finally {
+    await session.connection.end();
+  }
 
   if (stopping) return;
 
@@ -68,6 +77,7 @@ async function main() {
     process.send({
       type: "ready",
       port: address.port,
+      adminAccounts: Object.fromEntries(Object.entries(fixture.accounts).map(([key, account]) => [key, account.clientId])),
     });
   });
 }

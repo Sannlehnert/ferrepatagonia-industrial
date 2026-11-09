@@ -47,6 +47,12 @@ export const accountMenu: readonly MenuItem[] = [
 
 export const adminMenu: readonly MenuItem[] = [
     {
+        id: 'admin-accounts',
+        label: 'Cuentas corrientes',
+        routeName: 'admin-accounts',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
+    {
         id: 'admin-dashboard',
         label: 'Dashboard',
         routeName: 'admin-dashboard',

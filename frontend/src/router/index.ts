@@ -32,6 +32,11 @@ const router = createRouter({
       },
       children: [
         {
+          path: 'cuentas-corrientes',
+          name: 'admin-accounts',
+          component: () => import('@/views/admin/AdminAccountsView.vue'),
+        },
+        {
           path: '',
           redirect: { name: 'admin-dashboard' },
         },
