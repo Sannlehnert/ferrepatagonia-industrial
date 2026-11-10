@@ -275,7 +275,15 @@ onBeforeUnmount(() => {
             <div class="mb-3 grid h-[140px] place-items-center rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]" aria-hidden="true"><span>Sin imagen</span></div>
 
             <p class="m-0 min-w-0 max-w-full text-[.75rem] text-[var(--fp-muted)] [overflow-wrap:anywhere]">COD. {{ p.codigo }}</p>
-            <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">{{ p.nombre }}</h3>
+            <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">
+              <RouterLink
+                :to="{ name: 'producto-detalle', params: { id: p.id }, query: { returnTo: route.fullPath } }"
+                :aria-label="`Ver detalle: ${p.nombre}`"
+                class="rounded-sm text-inherit underline-offset-2 hover:text-[var(--fp-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fp-blue)]"
+              >
+                {{ p.nombre }}
+              </RouterLink>
+            </h3>
             <ProductPrice :line="pricing.prices[p.id]" :loading="pricing.loading" :error="pricing.error" :personalized="pricing.personalized" />
 
             <div class="mt-auto flex items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
