@@ -11,6 +11,7 @@ import {
 } from '../../repositories/accountOrderRejection.repository';
 import {
   validateConfirmationKey,
+  validateOrderIdParam,
 } from '../../dtos/orders/account-order.dto';
 import { hasDatabaseError } from '../cart.errors';
 import { PricingError } from '../pricing/money';
@@ -29,6 +30,11 @@ import type {
   AccountOrderResult,
 } from './account-order.types';
 import { issueAccountOrderQuoteToken } from './account-order-quote-token';
+import {
+  findClientOrderDetailById,
+  findClientOrdersByClientId,
+} from '../../repositories/accountOrder.repository';
+
 
 function validateClientAuth(auth: AuthContext): void {
   if (auth.rol !== 'CLIENTE' ||
@@ -102,6 +108,57 @@ function rejection(error: unknown): AccountOrderError | null {
   }
 
   return null;
+}
+
+export async function listClientOrders(
+  auth: AuthContext,
+): Promise<AccountOrderResult> {
+  validateClientAuth(auth);
+  const clientId = await findActiveClient(auth);
+  const items = await findClientOrdersByClientId(clientId);
+
+  return {
+    status: 200,
+    body: {
+      data: { items },
+    },
+  };
+}
+
+export async function getClientOrderDetail(
+  auth: AuthContext,
+  orderIdParam: unknown,
+): Promise<AccountOrderResult> {
+  validateClientAuth(auth);
+
+  const validation = await validateOrderIdParam(orderIdParam);
+  if (!validation.valid) {
+    throw new AccountOrderError(
+      validation.code,
+      400,
+      validation.message,
+    );
+  }
+
+  const clientId = await findActiveClient(auth);
+  const order = await findClientOrderDetailById(clientId, validation.orderId);
+
+  if (!order) {
+    return {
+      status: 404,
+      body: {
+        code: 'PEDIDO_NO_ENCONTRADO',
+        message: 'No se encontró el pedido solicitado.',
+      },
+    };
+  }
+
+  return {
+    status: 200,
+    body: {
+      data: order,
+    },
+  };
 }
 
 export async function getAccountOrderEligibility(
