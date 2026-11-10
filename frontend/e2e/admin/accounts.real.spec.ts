@@ -19,6 +19,11 @@ for (const width of [1280, 360]) {
       expect(ids.debt, 'El runner debe cargar las cuentas en MariaDB').toBeGreaterThan(0)
       await login(page, 'admin@e2e.test')
       await expect(page).toHaveURL(/\/admin\/dashboard$/)
+      const sidebar = page.getByRole('button', { name: 'Menú de administración' })
+      if (width === 360) {
+        await sidebar.click()
+        await expect(sidebar).toHaveAttribute('aria-expanded', 'true')
+      }
       await page.getByRole('link', { name: 'Cuentas corrientes', exact: true }).click()
       const table = page.getByRole('table').first()
       await expect(table.getByRole('row')).toHaveCount(26)
@@ -95,6 +100,10 @@ for (const width of [1280, 360]) {
       }
       await page.getByRole('button', { name: 'Reintentar desde la primera página' }).click()
       await expect(table).toContainText('USD 225,00')
+      if (width === 360) {
+        await expect(sidebar).toHaveAttribute('aria-expanded', 'false')
+        await sidebar.click()
+      }
       await page.getByRole('button', { name: /Cerrar sesión/ }).click()
       await expect(page).toHaveURL(/\/login$/)
       await login(page, 'cc258-long@example.test')

@@ -14,8 +14,8 @@ function pageParams(cursor?: string) {
     }
 }
 
-export async function getCuentaCorriente(): Promise<CuentaCorrienteConsulta> {
-    const response = await api.get<{ data: CuentaCorrienteConsulta }>('/cuenta-corriente')
+export async function getCuentaCorriente(signal?: AbortSignal): Promise<CuentaCorrienteConsulta> {
+    const response = await api.get<{ data: CuentaCorrienteConsulta }>('/cuenta-corriente', { signal })
     return response.data.data
 }
 
