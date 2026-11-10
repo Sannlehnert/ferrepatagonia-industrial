@@ -1,6 +1,14 @@
 # #269 · Tienda y navegación de Ferrepatagonia Industrial
 
-Ampliación UX/UI del Sprint 6 en [PR #89](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/89). Incluye el Home, el encabezado y pie públicos, el acceso a la cuenta, las dos modalidades de registro y el marco administrativo. La comparación parte del HEAD `6f52d58be4445dbe5654068c91dd4d155f17aa62`.
+Implementación del Sprint 6 en el [PR #89](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/89). La comparación visual parte del HEAD `6f52d58be4445dbe5654068c91dd4d155f17aa62`.
+
+## Alcance y aceptación
+
+**Alcance original de #269.** Complementar el Home existente de #220 con accesos reales a catálogo, login, registro y carrito, categorías del backend y productos destacados cuando existan. El criterio de aceptación es un Home funcional y responsive que reutiliza los endpoints y componentes existentes. [Tarea #269 en Taiga](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/269)
+
+**Ampliación implementada, pendiente de aceptación del equipo.** Incluye la nueva composición del Home e identidad gráfica, el navbar responsive y el pie público, la presentación de login y registro particular y empresarial, la navegación y el sidebar ADMIN con Dashboard primero, y la consistencia visual del catálogo, filtros y ficha. La validación técnica de estos cambios se registra por separado de la decisión sobre su alcance.
+
+Si el equipo prefiere limitar #269 al alcance original, la propuesta es conservar la implementación y sus pruebas en la rama actual y trasladar la ampliación a una historia y rama dedicadas mediante commits selectivos. Cualquier separación requiere primero acordar el alcance con el equipo.
 
 ## Auditoría inicial y correcciones
 
@@ -75,14 +83,16 @@ En la revisión de capturas se ajustó el encuadre del monograma móvil, la legi
 - 40 E2E sobre el build final de producción, incluida la prueba de datos reales/DEMO de cuenta corriente. La suite integrada de CI usa Vite en modo de desarrollo para los casos que importan módulos fuente y para los datos de demostración de FER-20.
 - Chromium a 360, 390, 768, 1024, 1280 y 1440 px. El recorrido comprueba ausencia de scroll horizontal, navegación activa, apertura y cierre por teclado y errores relevantes de consola. El 401 esperado de la consulta de sesión anónima se distingue por ruta.
 - Pruebas con visitante, particular, empresa y ADMIN. La suite del Home verifica búsqueda por nombre y código, categorías, ficha, carrito, errores y reintentos. Las pruebas de precio contrastan el bloqueo sin evidencia USD y el estado del producto. Login válido e inválido, visibilidad de contraseña, retorno a la tienda y registro particular y empresa contra la API aislada.
-- El CI de la base de #269 está disponible en [Actions](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42703006436). La pestaña Checks del PR muestra el resultado del HEAD publicado.
+- El HEAD auditado `72eb90092e405e6930d573ce5c5781a84869fae1` pasó type-check, build, 220 unitarias, 124 E2E integradas, 40 E2E de producción y 17 casos FER-19 en la validación local. Su [CI de frontend y backend](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42753863037) está verde. La corrección de auditoría es documental. El resultado de CI de su propio HEAD se consulta en [Checks del PR #89](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/89/checks).
 
 ## Integraciones
 
+- **Corte del 10/11/2026.** `develop` está en `b93b8072cee0b199710699a8fb668ff41844cce4`, con la actualización de importación de #90 desde la base de #89 (`09c92b5`). La tarea #255 de aceptación técnica figura cerrada en Taiga y GitHub no muestra etiquetas remotas. La demo del 11/11 y la habilitación posterior siguen siendo condiciones para actualizar la rama. Cuando el equipo habilite la integración, incorporar el `develop` vigente mediante merge sobre la rama de trabajo, preservar las funciones de ambas ramas y repetir type-check, build, E2E pertinentes y CI del HEAD resultante. [Aceptación de Sprint 5](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/255)
+
 - **#270 / PR #88**. `public-about` y `public-faq` se muestran en menú y pie cuando el router tiene los nombres publicados por #88. En una copia separada, se conservó el pie de #269, que ya crea el grupo Institucional desde `publicMenu`, y se aplicaron las rutas, páginas y pruebas de #88. El ensayo con `develop` en `b93b807` pasó 24 pruebas de Home, páginas institucionales e importación. La prueba de acordeón entra por el enlace de salto al contenido, que es el recorrido de teclado del nuevo encabezado. Actualizar la rama del PR #89 cuando #88 llegue a `develop` y repetir esa comprobación. [PR #88](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/88)
-- **#277**. Pedidos ADMIN abarca API, listado, detalle y seguimiento. Se preserva el destino `admin-orders` y el permiso `orders:view-all`. El cambio compartido se limita al marco y al orden del menú. La rama anunciada por Lucci aún no estaba publicada al inicio de la auditoría. [Taiga #277](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/277)
+- **#277**. Pedidos ADMIN abarca API, listado, detalle y seguimiento. En Taiga figura en curso y la rama anunciada `feature/FER-25-277-admin-orders` aún no figura en el remoto. La rama de #269 conserva el destino `admin-orders` y el permiso `orders:view-all`. Antes del merge de `develop`, verificar los cambios de #277 que se hayan publicado y preservar su navegación de pedidos. [Taiga #277](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/task/277)
 
 ## Pendientes fuera del alcance
 
 - Dashboard conserva sus indicadores de ejemplo, identificados como tales en pantalla. Los módulos de Pedidos ADMIN y Categorías ADMIN siguen sus tareas respectivas.
-- La verificación de integración en la rama del PR se retoma cuando #88 ingrese en `develop`. La aprobación queda a cargo de la revisión independiente de `Luxon743`.
+- El PR permanece en borrador hasta la aceptación del alcance ampliado por el equipo, la habilitación posterior a la demo, la verificación de integración y la revisión independiente de `Luxon743`.
