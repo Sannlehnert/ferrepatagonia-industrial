@@ -263,4 +263,36 @@ describe('Task #273 (S6-24.1) — API protegida de historial y detalle de pedido
     const idorBody = await idorRes.json();
     assert.equal(idorBody.code, 'PEDIDO_NO_ENCONTRADO');
   });
+  test('Pedidos históricos con moneda_total = NULL preservan moneda desconocida y totalUSD: null', async () => {
+    const client = await createTestClient();
+
+    const orderRes = await dataSource.query(`
+      INSERT INTO PEDIDO (
+        id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total
+      ) VALUES (?, 'CONFIRMADO', 'EFECTIVO', '50.00', '0.00', '50.00', NULL)
+    `, [client.clientId]);
+    const orderId = Number(orderRes.insertId);
+    createdOrderIds.push(orderId);
+
+    // 1. Listado
+    const listRes = await fetch(`${baseUrl}/api/pedidos`, {
+      headers: { Cookie: client.cookie },
+    });
+    assert.equal(listRes.status, 200);
+    const listBody = await listRes.json();
+    const orderSummary = listBody.data.items.find(item => item.pedidoId === orderId);
+    assert.ok(orderSummary, 'El pedido histórico debe figurar en el listado.');
+    assert.equal(orderSummary.moneda, null);
+    assert.equal(orderSummary.totalUSD, null);
+
+    // 2. Detalle
+    const detailRes = await fetch(`${baseUrl}/api/pedidos/${orderId}`, {
+      headers: { Cookie: client.cookie },
+    });
+    assert.equal(detailRes.status, 200);
+    const detailBody = await detailRes.json();
+    assert.equal(detailBody.data.pedidoId, orderId);
+    assert.equal(detailBody.data.moneda, null);
+    assert.equal(detailBody.data.totalUSD, null);
+  });
 });

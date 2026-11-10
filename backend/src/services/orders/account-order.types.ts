@@ -20,7 +20,7 @@ export interface ClientOrderSummary {
   fecha: string;
   estado: string;
   modalidadPago: string;
-  moneda: string;
+  moneda: string | null;
   subtotal: string;
   descuento: string;
   total: string;

@@ -176,7 +176,7 @@ function toIsoDateTime(value: Date | string): string {
 
 function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   const pedidoId = Number(row.pedidoId);
-  const moneda = row.moneda ?? 'USD';
+  const moneda = row.moneda !== null && row.moneda !== undefined ? String(row.moneda) : null;
   const total = String(row.total);
 
   return {
@@ -209,7 +209,7 @@ export async function findClientOrdersByClientId(
       DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
       p.estado AS estado,
       p.modalidad_pago AS modalidadPago,
-      COALESCE(p.moneda_total, 'USD') AS moneda,
+      p.moneda_total AS moneda,
       p.subtotal AS subtotal,
       p.descuento AS descuento,
       p.total AS total,
@@ -249,7 +249,7 @@ export async function findClientOrderDetailById(
       DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
       p.estado AS estado,
       p.modalidad_pago AS modalidadPago,
-      COALESCE(p.moneda_total, 'USD') AS moneda,
+      p.moneda_total AS moneda,
       p.subtotal AS subtotal,
       p.descuento AS descuento,
       p.total AS total,
