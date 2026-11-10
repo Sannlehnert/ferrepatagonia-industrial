@@ -3,14 +3,15 @@ import { computed, watch } from 'vue'
 import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { getClientOrderDetail } from '@/services/clientOrderService'
+import { onRealtime } from '@/services/realtime'
 import { orderReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderDetail } from '@/types/clientOrder'
 
 const props = defineProps<{ orderId: number }>()
 const auth = useAuthStore()
-const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}`
-const allowed = () => auth.isAuthenticated && auth.rol === 'CLIENTE'
+const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}:${props.orderId}`
+const allowed = () => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.loggingOut
 
 const { data: detail, loading, error, load } = usePrivateAccountRead<ClientOrderDetail>(
   identity,
@@ -25,9 +26,12 @@ function loadDetail() {
   return load(signal => getClientOrderDetail(props.orderId, signal))
 }
 
-watch([identity, () => props.orderId], () => void loadDetail(), {
+watch([identity, allowed], () => void loadDetail(), {
   immediate: true,
-  flush: 'sync',
+})
+
+onRealtime(change => {
+  if (change.reconnect || change.orders.has(props.orderId)) void loadDetail()
 })
 </script>
 

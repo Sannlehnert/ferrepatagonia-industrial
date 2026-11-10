@@ -331,7 +331,7 @@ export function createAccountOrderStore(
     }
 
     onRealtime(change => {
-      if (!(change.order || change.reconnect) || !sessionKey.value || !pendingKey.value) return
+      if (!(change.orders.size || change.reconnect) || !sessionKey.value || !pendingKey.value) return
       if (activeAttempt) recoverAfterRequest = true
       else void consultResult(false)
     })
