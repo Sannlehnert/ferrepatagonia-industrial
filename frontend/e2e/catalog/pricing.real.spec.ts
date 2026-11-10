@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import type { CatalogResponse } from '../../src/types/catalog'
 
 type PriceResponse = {
   data: {
@@ -10,6 +11,7 @@ type PriceResponse = {
       origenDescuento: string
       precioUnitarioUSD: string | null
       estadoPrecio: string
+      precioComprable: boolean
       evidenciaBaseUSD?: { synthetic: boolean }
     }>
   }
@@ -33,8 +35,37 @@ test('backend real: catálogo y Home bloquean bases sin evidencia USD', async ({
   await expect(page.getByText('Precio pendiente de verificación',{exact:true})).toHaveCount(12)
   await expect(page.getByText(/USD \d/)).toHaveCount(0)
   for(const button of await page.getByRole('button',{name:'Agregar',exact:true}).all()) await expect(button).toBeDisabled()
+
+  const homeCatalog = page.waitForResponse(r =>
+    new URL(r.url()).pathname === '/api/catalogo' && r.request().method() === 'GET')
+  const homePricing = page.waitForResponse(r =>
+    new URL(r.url()).pathname === '/api/precios' && r.request().method() === 'POST')
   await page.goto('/')
-  await expect(page.getByText('Precio pendiente de verificación',{exact:true})).toHaveCount(5)
+
+  const [catalogResponse, pricingResponse] = await Promise.all([homeCatalog, homePricing])
+  expect(catalogResponse.status()).toBe(200)
+  expect(pricingResponse.status()).toBe(200)
+  const { data: { productos: homeProducts } } = await catalogResponse.json() as CatalogResponse
+  const { data: { productos: homePrices } } = await pricingResponse.json() as PriceResponse
+
+  // La suite del Home verifica el tamaño de la grilla. Acá importa el bloqueo de cada artículo servido.
+  expect(homeProducts.length).toBeGreaterThan(0)
+  expect(homePrices).toHaveLength(homeProducts.length)
+  const section = page.getByRole('region', { name: 'Explorá nuestros productos' })
+  const cards = section.getByRole('article')
+  await expect(cards).toHaveCount(homeProducts.length)
+
+  for (const { id, codigo } of homeProducts) {
+    expect(homePrices.find(line => line.productoId === id)).toMatchObject({
+      estadoPrecio: 'BASE_NO_VERIFICADA',
+      precioUnitarioUSD: null,
+      precioComprable: false,
+    })
+    const card = cards.filter({ has: page.getByText(`COD. ${codigo}`, { exact: true }) })
+    await expect(card.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible()
+  }
+  await expect(section.getByText(/USD \d/)).toHaveCount(0)
+  await expect(section.getByRole('button', { name: 'Agregar', exact: true })).toHaveCount(0)
 })
 for (const account of [
   {email:'cliente@e2e.test',endpoint:'/api/precios/mios'},

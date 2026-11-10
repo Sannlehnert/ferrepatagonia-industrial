@@ -16,7 +16,8 @@ const router = createRouter({
     if (savedPosition) return savedPosition
 
     if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      return { el: to.hash, behavior: reducedMotion ? 'instant' : 'smooth' }
     }
 
     return { top: 0 }
@@ -100,6 +101,16 @@ const router = createRouter({
           path: 'producto/:id',
           name: 'producto-detalle',
           component: () => import('@/views/ProductDetailView.vue'),
+        },
+        {
+          path: 'ayuda',
+          name: 'public-faq',
+          component: () => import('@/views/FaqView.vue'),
+        },
+        {
+          path: 'sobre-nosotros',
+          name: 'public-about',
+          component: () => import('@/views/AboutView.vue'),
         },
         {
           path: 'carrito',

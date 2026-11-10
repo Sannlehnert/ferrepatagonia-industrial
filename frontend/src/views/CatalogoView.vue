@@ -208,18 +208,18 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="mx-auto max-w-7xl px-3 py-4 text-slate-900 sm:px-5 sm:py-6">
+  <main class="fp-shell py-6 sm:py-9">
     <p class="m-0 mb-2 text-xs text-slate-500">
       Inicio /
-      <RouterLink v-if="categoriaId" class="text-[#103a5c]" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
+      <RouterLink v-if="categoriaId" class="fp-focus text-[var(--fp-blue)]" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
       <template v-else>Catálogo</template>
       <template v-if="categoriaId"> / {{ nombreCategoria }}</template>
     </p>
 
     <header class="mb-5 flex flex-col items-start justify-between gap-4 min-[801px]:flex-row">
       <div>
-        <h1 class="m-0 text-2xl uppercase text-slate-900">{{ nombreCategoria ?? 'Catálogo' }}</h1>
-        <p class="m-0 mt-1 text-xs text-slate-500">{{ total }} productos</p>
+        <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
+        <p class="fp-section-copy">{{ total }} productos</p>
       </div>
       <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
       <select class="box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" disabled aria-label="Ordenar productos">
@@ -228,7 +228,7 @@ onBeforeUnmount(() => {
     </header>
 
     <div class="grid grid-cols-1 items-start gap-5 min-[801px]:grid-cols-[190px_minmax(0,1fr)]">
-      <aside class="min-h-0 rounded-lg border border-slate-200 p-4 min-[801px]:min-h-[260px]" aria-label="Filtros">
+      <aside class="min-h-0 rounded-[var(--fp-radius-panel)] border border-[var(--fp-line)] bg-white p-4 min-[801px]:min-h-[260px]" aria-label="Filtros">
         <h2 class="m-0 text-base">Filtros</h2>
 
         <CatalogFilters
@@ -243,14 +243,14 @@ onBeforeUnmount(() => {
 
       <section>
         <ProductPrices :products="productos" :catalog-loading="cargando" v-slot="pricing">
-        <p v-if="cargando">Cargando productos...</p>
+        <p v-if="cargando" class="fp-state" role="status">Cargando productos...</p>
 
-        <p v-else-if="error" class="m-0" role="alert">
-          {{ error }}
-          <button type="button" class="ml-2 underline" @click="cargar">Reintentar</button>
-        </p>
+        <div v-else-if="error" class="fp-state" role="alert">
+          <p class="fp-error m-0 mb-2">{{ error }}</p>
+          <button type="button" class="fp-action fp-action--primary fp-focus" @click="cargar">Reintentar</button>
+        </div>
 
-        <div v-else-if="!productos.length" class="py-8 text-slate-500" role="status">
+        <div v-else-if="!productos.length" class="fp-state" role="status">
           <p class="m-0">
             {{
               busqueda || categoriaId
@@ -262,7 +262,7 @@ onBeforeUnmount(() => {
           <button
             v-if="busqueda || categoriaId"
             type="button"
-            class="mt-2 min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 font-semibold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+            class="fp-action fp-action--primary fp-focus mt-2"
             @click="aplicarFiltros({ search: '', categoryId: null })"
           >
             Limpiar filtros
@@ -274,12 +274,12 @@ onBeforeUnmount(() => {
             <!-- CatalogProduct no tiene imagen todavía -->
             <div class="mb-3 grid h-[140px] place-items-center rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]" aria-hidden="true"><span>Sin imagen</span></div>
 
-            <p class="m-0 min-w-0 max-w-full break-all text-[.7rem] text-slate-500">COD. {{ p.codigo }}</p>
-            <h3 class="my-1 break-all text-sm font-semibold text-slate-900">{{ p.nombre }}</h3>
+            <p class="m-0 min-w-0 max-w-full text-[.75rem] text-[var(--fp-muted)] [overflow-wrap:anywhere]">COD. {{ p.codigo }}</p>
+            <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">{{ p.nombre }}</h3>
             <ProductPrice :line="pricing.prices[p.id]" :loading="pricing.loading" :error="pricing.error" :personalized="pricing.personalized" />
 
             <div class="mt-auto flex items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
-              <span aria-label="Disponibilidad de stock" class="text-sm text-green-600" :class="{ 'text-red-700': !p.disponible }">
+              <span aria-label="Disponibilidad de stock" class="text-sm" :class="p.disponible ? 'text-green-700' : 'text-red-700'">
                 {{ p.disponible ? 'Disponible' : 'No disponible' }}
               </span>
               <CatalogCartButton

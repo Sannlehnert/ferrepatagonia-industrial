@@ -46,12 +46,6 @@ export const accountMenu: readonly MenuItem[] = [
 
 export const adminMenu: readonly MenuItem[] = [
     {
-        id: 'admin-accounts',
-        label: 'Cuentas corrientes',
-        routeName: 'admin-accounts',
-        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
-    },
-    {
         id: 'admin-dashboard',
         label: 'Dashboard',
         routeName: 'admin-dashboard',
@@ -70,12 +64,6 @@ export const adminMenu: readonly MenuItem[] = [
         permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
     {
-        id: 'admin-product-import',
-        label: 'Importar productos',
-        routeName: 'admin-product-import',
-        permission: PERMISSIONS.MANAGE_PRODUCTS,
-    },
-    {
         id: 'admin-categories',
         label: 'Categorías',
         routeName: 'admin-categories',
@@ -87,6 +75,18 @@ export const adminMenu: readonly MenuItem[] = [
         label: 'Clientes',
         routeName: 'admin-clients',
         permission: PERMISSIONS.VIEW_CLIENTS,
+    },
+    {
+        id: 'admin-accounts',
+        label: 'Cuentas corrientes',
+        routeName: 'admin-accounts',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
+    {
+        id: 'admin-product-import',
+        label: 'Importar productos',
+        routeName: 'admin-product-import',
+        permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
 ]
 
@@ -112,13 +112,13 @@ export const publicMenu: readonly MenuItem[] = [
     {
         id: 'public-about',
         label: 'Quiénes somos',
-        routeName: null,
+        routeName: 'public-about',
         permission: null,
     },
     {
         id: 'public-faq',
         label: 'Preguntas frecuentes',
-        routeName: null,
+        routeName: 'public-faq',
         permission: null,
     },
 ]
