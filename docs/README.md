@@ -12,6 +12,8 @@
   contratos y validaciones del catálogo.
 - [Productos administrativos](api/admin-productos.md): endpoints, permisos,
   validaciones y errores de administración de productos.
+- [Categorías administrativas #279](279/README.md), con el contrato de alta,
+  edición y desactivación lógica y sus pruebas.
 - [MER vigente](modelo-datos/mer-ferrepatagonia.md) y
   [spike FER-15](spikes/fer-15-modelo-listas-precios.md): modelo y propuesta
   comercial; esta última sigue sujeta a validación del cliente.
