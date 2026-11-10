@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
@@ -32,22 +32,26 @@ const statusInput = ref<AdminOrderFilterStatus | ''>('')
 const dateInput = ref('')
 const validationError = ref('')
 
-// Modal y control de operaciones (P0)
+// Modal y control de operaciones desacoplado por apertura (H-01)
 const showModal = ref(false)
 const selectedOrderId = ref<number | null>(null)
 const nextStatusSelection = ref<AdminOrderOperationalStatus | ''>('')
-const statusSaving = ref(false)
+let currentModalOpeningId = 0
+const savingOpeningId = ref<number | null>(null)
 const statusFeedback = ref<{ text: string; error: boolean } | null>(null)
 
-// Trazabilidad de sesión del modal para evitar respuestas cruzadas (P0)
-let currentModalOpeningId = 0
+// Trazabilidad y contención de foco (H-02)
 let lastTriggerElement: HTMLElement | null = null
 const modalCloseBtn = ref<HTMLButtonElement | null>(null)
+const modalDialogRef = ref<HTMLElement | null>(null)
 
 let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
+
+// isSaving es reactivo y solo aplica a la apertura activa (H-01)
+const isSaving = computed(() => savingOpeningId.value !== null && savingOpeningId.value === currentModalOpeningId)
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
@@ -120,6 +124,67 @@ function clearFilters() {
   void loadList(1)
 }
 
+// Trampa de foco accesible y segura frente a tipos (H-02, TS2532, TS18048)
+function getFocusableElements(): HTMLElement[] {
+  const dialog = modalDialogRef.value
+  if (!dialog) return []
+  const elements = dialog.querySelectorAll<HTMLElement>(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+  )
+  return Array.from(elements).filter(el => el.offsetParent !== null)
+}
+
+function focusFirstModalElement() {
+  const focusables = getFocusableElements()
+  const first = focusables[0]
+  if (first) {
+    first.focus()
+  }
+}
+
+function handleKeydown(e: KeyboardEvent) {
+  if (!showModal.value) return
+
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    closeModal()
+    return
+  }
+
+  if (e.key === 'Tab') {
+    const dialog = modalDialogRef.value
+    if (!dialog) return
+
+    const focusables = getFocusableElements()
+    if (focusables.length === 0) {
+      e.preventDefault()
+      return
+    }
+
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+
+    if (!first || !last) {
+      e.preventDefault()
+      return
+    }
+
+    const active = document.activeElement
+
+    if (e.shiftKey) {
+      if (active === first || !dialog.contains(active)) {
+        e.preventDefault()
+        last.focus()
+      }
+    } else {
+      if (active === last || !dialog.contains(active)) {
+        e.preventDefault()
+        first.focus()
+      }
+    }
+  }
+}
+
 async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
   if (triggerEvent?.currentTarget instanceof HTMLElement) {
     lastTriggerElement = triggerEvent.currentTarget
@@ -134,23 +199,25 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
 
   await detail.load(signal => getAdminOrderDetail(orderId, signal))
 
-  // Si se abrió otro modal o cambió de pedido en el interín, descartar
   if (thisOpening !== currentModalOpeningId || selectedOrderId.value !== orderId) {
     return
   }
 
   const order = detail.data.value
   if (order && order.idPedido === orderId && order.estadosPermitidos.length > 0) {
-    nextStatusSelection.value = order.estadosPermitidos[0]!
+    nextStatusSelection.value = order.estadosPermitidos[0] ?? ''
   }
 
-  void nextTick(() => {
-    modalCloseBtn.value?.focus()
-  })
+  await nextTick()
+  if (modalCloseBtn.value) {
+    modalCloseBtn.value.focus()
+  } else {
+    focusFirstModalElement()
+  }
 }
 
 function closeModal() {
-  currentModalOpeningId++ // Invalida cualquier petición pendiente
+  currentModalOpeningId++
   showModal.value = false
   selectedOrderId.value = null
   detail.reset()
@@ -160,17 +227,11 @@ function closeModal() {
   }
 }
 
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape' && showModal.value) {
-    closeModal()
-  }
-}
-
 const canSubmitStatusChange = computed(() => {
   const order = selectedOrder.value
   if (
     !order ||
-    statusSaving.value ||
+    isSaving.value ||
     !nextStatusSelection.value ||
     selectedOrderId.value !== order.idPedido
   ) {
@@ -185,7 +246,6 @@ async function submitStatusChange() {
   const targetOpening = currentModalOpeningId
   const targetStatus = nextStatusSelection.value
 
-  // Validación de seguridad P0: ID seleccionado debe coincidir con el detalle
   if (
     !targetId ||
     !order ||
@@ -196,18 +256,21 @@ async function submitStatusChange() {
     return
   }
 
-  statusSaving.value = true
+  savingOpeningId.value = targetOpening
   statusFeedback.value = null
 
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
 
-    // Descartar si se cerró o cambió el modal mientras el PATCH respondía (P0)
     if (!allowed() || targetOpening !== currentModalOpeningId || selectedOrderId.value !== targetId) {
       return
     }
 
     await detail.load(async () => updated)
+    if (targetOpening !== currentModalOpeningId || selectedOrderId.value !== targetId) {
+      return
+    }
+
     nextStatusSelection.value = updated.estadosPermitidos[0] ?? ''
     statusFeedback.value = {
       text: `Estado actualizado a ${formatAdminOrderStatus(updated.estado)}.`,
@@ -222,17 +285,16 @@ async function submitStatusChange() {
     const { message, status } = resolveErrorMessage(error, 'mutation')
     statusFeedback.value = { text: message, error: true }
 
-    // En conflicto 409, recargar el detalle real del pedido
     if (status === 409) {
       await detail.load(signal => getAdminOrderDetail(targetId, signal))
       const fresh = detail.data.value
-      if (fresh) {
+      if (fresh && targetOpening === currentModalOpeningId) {
         nextStatusSelection.value = fresh.estadosPermitidos[0] ?? ''
       }
     }
   } finally {
-    if (targetOpening === currentModalOpeningId) {
-      statusSaving.value = false
+    if (savingOpeningId.value === targetOpening) {
+      savingOpeningId.value = null
     }
   }
 }
@@ -256,6 +318,7 @@ watch(
   () => [identity(), auth.loggingOut, auth.loggingIn],
   () => {
     currentModalOpeningId++
+    savingOpeningId.value = null
     list.reset()
     detail.reset()
     showModal.value = false
@@ -271,7 +334,12 @@ watch(
 )
 
 onMounted(() => {
+  window.addEventListener('keydown', handleKeydown)
   if (allowed()) void loadList(1)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -280,7 +348,6 @@ onMounted(() => {
     v-if="allowed()"
     class="min-w-0 text-[#0b2438]"
     aria-labelledby="admin-orders-title"
-    @keydown="handleKeydown"
   >
     <header class="mb-6">
       <h1 id="admin-orders-title" class="m-0 mb-1 text-[28px] font-semibold text-[#0B2438]">Pedidos</h1>
@@ -449,7 +516,7 @@ onMounted(() => {
       </nav>
     </template>
 
-    <!-- Modal con control de desborde y accesibilidad (P0, P2) -->
+    <!-- Modal con Trampa de Foco Accesible (H-02) -->
     <div
       v-if="showModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-[#0B2438]/70 p-2 sm:p-4 backdrop-blur-xs"
@@ -457,7 +524,11 @@ onMounted(() => {
       aria-modal="true"
       :aria-label="`Detalle del Pedido ${selectedOrderId}`"
     >
-      <div class="flex max-h-[90dvh] w-full max-w-[calc(100vw-1rem)] sm:max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl">
+      <div
+        ref="modalDialogRef"
+        class="flex max-h-[90dvh] w-full max-w-[calc(100vw-1rem)] sm:max-w-2xl flex-col rounded-2xl border border-slate-200 bg-white shadow-2xl"
+        tabindex="-1"
+      >
         <!-- Header -->
         <div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
           <h2 class="text-lg sm:text-xl font-bold text-[#0B2438]">
@@ -532,7 +603,7 @@ onMounted(() => {
                     v-model="nextStatusSelection"
                     aria-label="Seleccionar nuevo estado de pedido"
                     class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-[#0B2438]"
-                    :disabled="statusSaving"
+                    :disabled="isSaving"
                   >
                     <option
                       v-for="nextState in selectedOrder.estadosPermitidos"
@@ -548,7 +619,7 @@ onMounted(() => {
                     class="h-10 rounded-lg bg-[#145A8D] px-4 text-sm font-bold text-white hover:bg-[#103A5C] disabled:opacity-50"
                     @click="submitStatusChange"
                   >
-                    {{ statusSaving ? 'Guardando…' : 'Guardar Estado' }}
+                    {{ isSaving ? 'Guardando…' : 'Guardar Estado' }}
                   </button>
                 </div>
               </template>
@@ -565,7 +636,7 @@ onMounted(() => {
               </p>
             </div>
 
-            <!-- Líneas de Artículos (adaptadas para pantallas pequeñas) -->
+            <!-- Líneas de Artículos -->
             <h3 class="mb-2 text-sm font-bold uppercase tracking-wider text-slate-700">Artículos</h3>
             <div class="overflow-x-auto rounded-lg border border-slate-200 text-xs">
               <table class="w-full min-w-[280px] text-left">
