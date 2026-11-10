@@ -305,7 +305,7 @@ onMounted(() => {
 
             <div
                 v-else
-                class="overflow-hidden rounded-xl border border-[#E2E8F0] bg-white shadow-sm"
+                class="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-sm"
                 role="region"
                 aria-label="Listado de pedidos"
                 tabindex="0"

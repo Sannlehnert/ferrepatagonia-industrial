@@ -34,13 +34,15 @@ describe('Task #277 — Frontend Pedidos ADMIN: ruteo, servicio y pantalla', () 
     assert.match(serviceSource, /ENTREGADO:\s*'Entregado'/);
   });
 
-  test('AdminOrdersView valida rol ADMIN, usa usePrivateAccountRead y muestra detalle y seguimiento', () => {
+  test('AdminOrdersView valida rol ADMIN, usa usePrivateAccountRead, modal Figma y responsive scroll', () => {
     assert.match(viewSource, /auth\.rol === 'ADMIN' && !auth\.loggingOut && !auth\.loggingIn/);
     assert.match(viewSource, /usePrivateAccountRead/);
     assert.match(viewSource, /selectedOrder\.estadosPermitidos/);
     assert.match(viewSource, /updateAdminOrderStatus/);
-    assert.match(viewSource, /Detalle del pedido #/);
-    assert.match(viewSource, /Datos del cliente/);
-    assert.match(viewSource, /Líneas del pedido/);
+    assert.match(viewSource, /openOrderDetailModal/);
+    assert.match(viewSource, /Pedido #/);
+    assert.match(viewSource, /Seguimiento de Estado/);
+    assert.match(viewSource, /Artículos/);
+    assert.match(viewSource, /overflow-x-auto/);
   });
 });
