@@ -1,5 +1,3 @@
-import type { IncomingMessage } from 'node:http';
-
 export interface ConfirmedAccountOrder {
   pedidoId: number;
   estado: 'CONFIRMADO';
@@ -8,15 +6,6 @@ export interface ConfirmedAccountOrder {
   totalUSD: string;
   cargoId: string;
   venceEl: string;
-}
-
-export type NotifyAccountOrderConfirmed = (
-  clientId: number,
-  order: Pick<ConfirmedAccountOrder, 'pedidoId' | 'estado'>,
-) => Promise<void>;
-
-export interface OrderConfirmationRequest extends IncomingMessage {
-  notifyAccountOrderConfirmed?: NotifyAccountOrderConfirmed;
 }
 
 export interface PendingAccountOrder {

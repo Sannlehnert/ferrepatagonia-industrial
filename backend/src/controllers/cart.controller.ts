@@ -6,6 +6,7 @@ import { getAuthenticatedClientCart, mutateAuthenticatedClientCart } from '../se
 import type { CartMutation } from '../services/cart.service';
 import { CartError } from '../services/cart.errors';
 import { PricingError } from '../services/pricing/money';
+import type { RealtimeRequest } from '../realtime/committed-change';
 
 const MAX_INT = 2147483647;
 const positiveInt = (value: unknown): value is number =>
@@ -55,7 +56,9 @@ export function handleCart(type?: CartMutation['type']): RequestHandler {
             }, async auth => {
                 if (Object.keys(req.query).length) invalidRequest();
                 if (type) {
-                    await mutateAuthenticatedClientCart(auth, parseCommand(req, type), signal);
+                    await mutateAuthenticatedClientCart(
+                        auth, parseCommand(req, type), signal, (req as RealtimeRequest).notifyCommittedChange,
+                    );
                     if (!signal.aborted) res.status(204).end();
                 } else {
                     if (hasBody(req)) invalidRequest();

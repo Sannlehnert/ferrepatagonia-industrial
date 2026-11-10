@@ -71,7 +71,7 @@ for (const [name, policy, path, method, target, key, valid] of scenarios) {
     if(name==='Registro') {assert.equal(args[0].password,' password ');assert.equal(args[0].email,'a@b.test');assert.equal(args[0].docCliente,null);}
     if(name==='CreateProduct') {assert.ok(args[0] instanceof policies[policy].type);assert.equal(args[0].precio,1.239);}
     if(name==='UpdateProduct') {assert.ok(args[1] instanceof policies[policy].type);assert.deepEqual(Object.keys(args[1]),['nombre']);}
-    if(name==='Stock') assert.deepEqual(args,[1,0]);
+    if(name==='Stock') assert.deepEqual(args,[1,0,undefined]);
   });
 }
 

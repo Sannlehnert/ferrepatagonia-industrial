@@ -6,13 +6,26 @@ import { authCookieName } from '../config/auth-cookie.config';
 import { dataSource } from '../config/database.config';
 import type { HttpSecurityConfig } from '../config/http-security.config';
 import { restoreUsuario } from '../services/auth.services';
-import type { NotifyAccountOrderConfirmed } from '../services/orders/account-order.types';
+import type { CommittedChange, NotifyCommittedChange } from './committed-change';
 import { verifyToken } from '../services/token.service';
 import { allowsSocketTransport, type TrustProxy } from './socket-transport';
 
 const clientRoom = (clientId: number) => `orders:client:${clientId}`;
 const adminRoom = 'orders:admin';
-const event = 'pedido.confirmado.v1';
+const catalogRoom = 'catalog:authenticated';
+const orderEvent = 'pedido.confirmado.v1';
+const maxPendingChanges = 128;
+
+async function visibleProducts(productIds: readonly number[]): Promise<number[]> {
+  const ids = [...new Set(productIds)];
+  const rows = await dataSource.query<{ id: number }[]>(`
+    SELECT p.id_producto AS id
+    FROM PRODUCTO p JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
+    WHERE p.activo = 1 AND c.activo = 1 AND p.id_producto IN (${ids.map(() => '?').join(', ')})
+    ORDER BY p.id_producto
+  `, ids);
+  return rows.map(row => row.id);
+}
 
 function claims(req: IncomingMessage) {
   const token: unknown = (req as Request).cookies?.[authCookieName];
@@ -70,32 +83,73 @@ export function attachOrderSockets(
     }
     next();
   });
-  io.on('connection', socket => { void socket.join(socket.data.room); });
+  io.on('connection', socket => { void socket.join([socket.data.room, catalogRoom]); });
 
-  const publish: NotifyAccountOrderConfirmed = async (clientId, order) => {
-    const room = clientRoom(clientId);
-    const payload = {
+  async function deliver(change: CommittedChange) {
+    const room = change.kind === 'stock' ? undefined : clientRoom(change.clientId);
+    const rooms = io.sockets.adapter.rooms;
+    const catalog = change.kind === 'cart' ? undefined : rooms.get(catalogRoom);
+    let productosIds: number[] = [];
+    if (catalog?.size && change.kind !== 'cart' && change.productIds.length) {
+      try { productosIds = await visibleProducts(change.productIds); }
+      catch { console.error('No se pudo verificar la visibilidad de los productos notificados.'); }
+    }
+    const recipients = new Set([
+      ...(room ? rooms.get(room) ?? [] : []),
+      ...(productosIds.length ? catalog ?? [] : []),
+    ]);
+    const orderPayload = change.kind === 'order' ? {
       version: 1,
-      idEvento: `pedido.confirmado.v1:${order.pedidoId}`,
-      pedidoId: order.pedidoId,
-      estado: order.estado,
+      idEvento: `${orderEvent}:${change.order.pedidoId}`,
+      pedidoId: change.order.pedidoId,
+      estado: change.order.estado,
       notificadoEn: new Date().toISOString(),
-    };
-    for (const id of [...(io.sockets.adapter.rooms.get(room) ?? [])]) {
+    } : undefined;
+
+    for (const id of recipients) {
       const socket = io.sockets.sockets.get(id);
       if (!socket) continue;
       try {
         // Re-read current ownership and authorization immediately before sending.
         const access = await authorizeSocket(socket.request);
-        if (!access || access.room !== room || !claims(socket.request)) {
+        if (!access || access.room !== socket.data.room || !claims(socket.request)) {
           socket.disconnect(true);
-        } else if (access.canReceiveOrders && socket.connected) {
-          socket.emit(event, payload);
+          continue;
+        }
+        if (!socket.connected) continue;
+        if (productosIds.length && socket.rooms.has(catalogRoom)) {
+          socket.emit('stock.actualizado.v1', { version: 1, productosIds });
+        }
+        if (access.room === room) {
+          socket.emit('carrito.actualizado.v1', { version: 1 });
+          if (orderPayload && access.canReceiveOrders) socket.emit(orderEvent, orderPayload);
         }
       } catch {
         console.error('No se pudo notificar a una conexión autorizada.');
       }
     }
+  }
+
+  // One bounded, in-process worker. REST never waits for reads or socket delivery.
+  const pending: CommittedChange[] = [];
+  let draining: Promise<void> | undefined;
+  const publish: NotifyCommittedChange = change => {
+    if (!io.sockets.sockets.size || pending.length >= maxPendingChanges) return;
+    pending.push(change);
+    draining ??= new Promise<void>(resolve => {
+      setImmediate(async () => {
+        try {
+          while (pending.length) {
+            const next = pending.shift()!;
+            try { await deliver(next); }
+            catch { console.error('No se pudo publicar un cambio confirmado.'); }
+          }
+        } finally {
+          draining = undefined;
+          resolve();
+        }
+      });
+    });
   };
-  return { io, publish };
+  return { io, publish, waitForNotifications: () => draining ?? Promise.resolve() };
 }

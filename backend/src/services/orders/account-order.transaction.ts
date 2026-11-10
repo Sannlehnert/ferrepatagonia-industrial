@@ -31,7 +31,7 @@ export async function executePendingAccountOrder(
   clientId: number,
   key: string,
   quoteToken: unknown,
-): Promise<{ status: 201; body: { data: ConfirmedAccountOrder } }> {
+): Promise<{ status: 201; body: { data: ConfirmedAccountOrder }; productIds: number[] }> {
   const context = await lockAccountOrderContext(
     manager,
     auth,
@@ -88,5 +88,5 @@ export async function executePendingAccountOrder(
     chargeId,
   );
 
-  return { status: 201, body };
+  return { status: 201, body, productIds: cart.items.map(item => item.productId) };
 }

@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { inTransaction } from '../config/database.config';
+import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
 import {
     createCart, findCartId, findCartItem, findCartItems, lockCartClient, lockCartProduct, removeCartItem, saveCartItem
 } from '../repositories/cart.repository';
@@ -113,12 +114,13 @@ export function getAuthenticatedClientCart(auth: AuthContext, signal: AbortSigna
     });
 }
 
-export function mutateAuthenticatedClientCart(auth: AuthContext, command: CartMutation, signal: AbortSignal): Promise<void> {
-    return withClientCart(auth, signal, async (manager, clientId, cartId) => {
+export async function mutateAuthenticatedClientCart(
+    auth: AuthContext, command: CartMutation, signal: AbortSignal, notify?: NotifyCommittedChange,
+): Promise<void> {
+    const changedClient = await withClientCart(auth, signal, async (manager, clientId, cartId) => {
         const { productoId } = command;
         if (command.type === 'remove') {
-            if (cartId !== null) await removeCartItem(manager, cartId, productoId);
-            return;
+            return cartId !== null && await removeCartItem(manager, cartId, productoId) ? clientId : null;
         }
 
         const existing = cartId === null ? undefined : await findCartItem(manager, cartId, productoId);
@@ -142,6 +144,7 @@ export function mutateAuthenticatedClientCart(auth: AuthContext, command: CartMu
         if (!line.precioComprable) throw new CartError(line.estadoPrecio, 422, 'El producto no tiene un precio comprable.');
 
         const idCarrito = cartId ?? await createCart(manager, clientId);
-        await saveCartItem(manager, idCarrito, productoId, cantidad, existing);
+        return await saveCartItem(manager, idCarrito, productoId, cantidad, existing) ? clientId : null;
     });
+    if (changedClient !== null) notifyAfterCommit(notify, { kind: 'cart', clientId: changedClient });
 }

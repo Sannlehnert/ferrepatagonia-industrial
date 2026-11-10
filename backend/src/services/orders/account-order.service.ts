@@ -1,4 +1,5 @@
 import { dataSource, inTransaction } from '../../config/database.config';
+import { notifyAfterCommit, type CommittedChange, type NotifyCommittedChange } from '../../realtime/committed-change';
 import { DatabaseOutcomeUnknownError } from '../../config/database-policy';
 import type { AuthContext } from '../../types/auth';
 import {
@@ -27,8 +28,6 @@ import { toCents } from '../../repositories/cuentaCorriente.repository';
 import type {
   AccountOrderEligibilityResult,
   AccountOrderResult,
-  ConfirmedAccountOrder,
-  NotifyAccountOrderConfirmed,
 } from './account-order.types';
 import { issueAccountOrderQuoteToken } from './account-order-quote-token';
 
@@ -185,7 +184,7 @@ export async function confirmAccountOrder(
   auth: AuthContext,
   value: unknown,
   quoteToken: unknown,
-  notify?: NotifyAccountOrderConfirmed,
+  notify?: NotifyCommittedChange,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -201,7 +200,7 @@ export async function confirmAccountOrder(
   }
 
   let workFailure: { error: unknown } | undefined;
-  let committed: { result: AccountOrderResult; fresh?: ConfirmedAccountOrder };
+  let committed: { result: AccountOrderResult; change?: CommittedChange };
 
   try {
     committed = await inTransaction(async manager => {
@@ -212,10 +211,11 @@ export async function confirmAccountOrder(
           return { result: presentStoredAccountOrder(attempt) };
         }
 
-        const result = await executePendingAccountOrder(
+        const { productIds, ...result } = await executePendingAccountOrder(
           manager, auth, clientId, key, quoteToken,
         );
-        return { result, fresh: result.body.data };
+        const { pedidoId, estado } = result.body.data;
+        return { result, change: { kind: 'order', clientId, order: { pedidoId, estado }, productIds } };
       } catch (error) {
         workFailure = { error };
         throw error;
@@ -259,13 +259,6 @@ export async function confirmAccountOrder(
 
   // Recovery and historical responses never reach this branch with a fresh order.
   // The transaction wrapper has acknowledged COMMIT and released its connection.
-  if (committed.fresh && notify) {
-    try {
-      const { pedidoId, estado } = committed.fresh;
-      await notify(clientId, { pedidoId, estado });
-    } catch {
-      console.error('No se pudo publicar la notificación de pedido confirmado.');
-    }
-  }
+  if (committed.change) notifyAfterCommit(notify, committed.change);
   return committed.result;
 }
