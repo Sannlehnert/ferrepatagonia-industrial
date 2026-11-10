@@ -51,7 +51,11 @@ const topics = [
         <p class="m-0 border-l-2 border-[#f59e0b] pl-3 text-xs font-bold tracking-widest uppercase">
           Centro de ayuda
         </p>
-        <h1 id="faq-title" class="mt-4 mb-0 text-3xl leading-tight font-extrabold sm:text-5xl">
+        <h1 
+          id="faq-title" 
+          tabindex="-1"
+          class="mt-4 mb-0 text-3xl leading-tight font-extrabold outline-none sm:text-5xl"
+        >
           Preguntas frecuentes
         </h1>
         <p class="mt-4 mb-0 max-w-2xl text-base leading-relaxed text-slate-200 sm:text-lg">

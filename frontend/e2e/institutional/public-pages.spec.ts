@@ -94,8 +94,11 @@ test('los acordeones se pueden abrir y cerrar con el teclado', async ({ page }) 
 
   await expect(question).toBeVisible()
   await expect(answer).toBeHidden()
-  await page.getByRole('link', { name: 'Categorías', exact: true }).focus()
+
+  // Enfocamos el título de la vista en lugar del navbar
+  await page.getByRole('heading', { level: 1, name: faq.title }).focus()
   await page.keyboard.press('Tab')
+
   await expect(question).toBeFocused()
   await expect(question).toHaveCSS('outline-style', 'solid')
   await page.keyboard.press('Enter')
