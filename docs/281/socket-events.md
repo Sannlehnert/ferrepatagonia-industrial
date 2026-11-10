@@ -1,8 +1,11 @@
 # #281 · Contrato de eventos v1 — PROVISIONAL
 
-El requerimiento académico comunicado es implementar Socket.IO. La
-sincronización de carrito y stock es una propuesta del equipo pendiente de
-aprobación registrada. No se comunicó un contrato docente de eventos.
+Robert, profesor de Programación Backend, pidió que Socket.IO estuviera
+implementado. No hay confirmación de que haya definido eventos ni un contrato
+específico. El equipo propuso los tres eventos de este documento y su
+aceptación explícita sigue pendiente. Si la cátedra solicita validar también
+los nombres y los eventos, esa validación se registrará como una dependencia
+académica separada.
 
 ## `carrito.actualizado.v1`
 

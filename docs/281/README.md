@@ -13,10 +13,13 @@ figura en curso. La ampliación se entrega en el
 [PR #92](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/92),
 fuera de la candidata congelada el 09/11 para la demo del 11/11.
 
-El requerimiento comunicado por Mati es implementar Socket.IO. La
-sincronización de carrito y disponibilidad es la propuesta funcional del
-equipo. La aprobación del equipo queda pendiente de registro. No se informaron
-nombres de eventos, payloads ni requerimientos académicos adicionales.
+Robert, profesor de Programación Backend, pidió que Socket.IO estuviera
+implementado. El equipo propuso `pedido.confirmado.v1`,
+`carrito.actualizado.v1` y `stock.actualizado.v1`. El contrato sigue pendiente
+de aceptación explícita del equipo. No hay confirmación de que Robert haya
+definido eventos o un contrato específico. Si la cátedra solicita validar
+también los nombres y los eventos, esa validación será una dependencia
+académica separada.
 
 ## Montaje y seguridad
 
@@ -138,6 +141,13 @@ para las integraciones.
 
 El [CI anterior del PR #92](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42751319391)
 aprobó frontend y backend en `47ff5079ff4efa25439e31009cb1e5b8223cecff`.
-La ampliación requiere una [corrida del nuevo HEAD](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/92/checks)
-y una revisión nueva. Mantener Taiga abierta hasta que quede registrado el
-acuerdo sobre el contrato, la revisión, el merge y su evidencia.
+El [CI de la ampliación](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42755102261)
+aprobó frontend y backend en `600008d1129a399d6a508f6d3cb4cdd2a23151c9`.
+El cierre de auditoría incorpora `origin/develop` en
+`b93b8072cee0b199710699a8fb668ff41844cce4` por merge. Pasaron type-check, build,
+`git diff --check`, 19 integraciones de Socket.IO, 53 pruebas de carrito,
+71 de pedidos y 235 del runner de productos ADMIN, incluida la regresión de
+stock. La descripción del PR #92 registra la evidencia de CI del HEAD
+publicado para este cierre. Mantener Taiga
+abierta hasta registrar la aceptación del contrato, la revisión, el merge
+autorizado y su evidencia.
