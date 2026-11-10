@@ -18,8 +18,14 @@ function port(name: string, fallback: number): number {
 }
 
 const httpSecurity = loadHttpSecurity(process.env);
+const legacyOrderOffset = process.env.LEGACY_ORDER_UTC_OFFSET ?? '+00:00';
+if (!/^[+-](?:(?:0\d|1[0-3]):[0-5]\d|14:00)$/.test(legacyOrderOffset)) {
+  throw new Error('LEGACY_ORDER_UTC_OFFSET debe indicar el desplazamiento histórico respecto de UTC.');
+}
+
 export const env = {
   httpSecurity,
+  legacyOrderOffset,
   jwtSecret: validateJwtSecret(required('JWT_SECRET'), httpSecurity.mode),
   port: port('PORT', 3000),
   db: {

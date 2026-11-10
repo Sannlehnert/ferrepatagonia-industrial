@@ -1,5 +1,6 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const os = require('node:os');
 const { spawn, spawnSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const assert = require('node:assert/strict');
@@ -9,13 +10,14 @@ const backend = path.resolve(__dirname, '../..');
 async function run(mode = process.argv[2] || 'all') {
   assert.ok([
     'all', 'baseline', 'cleanup-success',
-    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets',
+    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets', 'receipts',
   ].includes(mode));
   const acceptance = mode === 'orders-acceptance';
   const sockets = mode === 'orders-sockets';
   const orders = sockets || acceptance || mode === 'orders';
+  const receipts = mode === 'receipts';
   const p = newProfile();
-  let session, child, interrupted = false;
+  let session, child, storage, interrupted = false;
   const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
   process.on('SIGINT', signal); process.on('SIGTERM', signal);
   try {
@@ -39,8 +41,13 @@ async function run(mode = process.argv[2] || 'all') {
       if (result.status !== 0) throw Error(`SQL ${path.basename(file)}: ${result.stderr}`);
     };
     apply(path.join(backend, '../database/schema.sql'));
+    if (receipts) {
+      for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-275-payment-receipts.sql'));
+      storage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-test-'));
+    }
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
       if (orders) {
+      for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-273-order-instant.sql'));
         apply(path.join(
           backend,
           '../database/migrate-fer-20-order-confirmation.sql',
@@ -48,7 +55,7 @@ async function run(mode = process.argv[2] || 'all') {
       }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
-    const files = sockets
+    const files = receipts ? ['test/payment-receipts.test.cjs'] : sockets
       ? ['test/order-sockets.integration.test.cjs']
       : acceptance
       ? ['test/account-order-http.test.cjs', 'test/account-order-transaction.test.cjs']
@@ -65,6 +72,7 @@ async function run(mode = process.argv[2] || 'all') {
           'test/account-order-http.test.cjs',
           'test/account-order-process.test.cjs',
           'test/client-orders.test.cjs',
+          'test/order-history-load.test.cjs',
         ]
       : mode === 'baseline'
         ? ['test/cc260.regression.test.cjs']
@@ -81,7 +89,7 @@ async function run(mode = process.argv[2] || 'all') {
         { cwd: backend, stdio: 'inherit', windowsHide: true, env: { ...process.env, NODE_ENV: 'test', TZ: 'UTC',
           DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'), JWT_SECRET: randomUUID(),
           DB_HOST: p.host, DB_PORT: String(p.port), DB_NAME: p.database, DB_USER: 'root', DB_PASSWORD: p.password,
-          CC260_TEST_PROFILE: JSON.stringify(p) } });
+          CC260_TEST_PROFILE: JSON.stringify(p), ...(storage ? { RECEIPT_STORAGE_DIR: storage } : {}) } });
       const timeout = setTimeout(() => { interrupted = true; child.kill('SIGTERM'); }, 240000);
       child.on('error', e => { clearTimeout(timeout); reject(e); });
       child.on('exit', code => { clearTimeout(timeout); child = null; resolve(code); });
@@ -90,7 +98,10 @@ async function run(mode = process.argv[2] || 'all') {
     assert.equal(interrupted, false);
   } finally {
     process.off('SIGINT', signal); process.off('SIGTERM', signal);
-    try { if (session) await session.connection.end(); }
+    try {
+      try { if (session) await session.connection.end(); }
+      finally { if (storage) fs.rmSync(storage, { recursive: true, force: true }); }
+    }
     finally {
       if (p.id) {
         const info = JSON.parse(docker('inspect', p.id))[0];

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import PaymentReceipts from '@/components/PaymentReceipts.vue'
+import { accountReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import { useCuentaCorrienteStore } from '@/stores/cuentaCorriente'
 import type { CuentaCorrienteVencimiento } from '@/types/cuentaCorriente'
@@ -257,5 +259,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                 </template>
             </section>
         </template>
+        <PaymentReceipts v-if="resumen && auth.user?.tipo_cliente === 'EMPRESA' && !demoDataBlocked"
+            :path="accountReceiptsPath" mode="cuenta" />
     </section>
 </template>

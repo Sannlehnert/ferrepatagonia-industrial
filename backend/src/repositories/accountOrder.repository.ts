@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
-import { dataSource } from '../config/database.config';
+import type { ReadQuery } from '../config/database.config';
+import { env } from '../config/env.config';
 import {
   bounded,
   decimal,
@@ -93,8 +94,8 @@ export async function persistAccountOrder(
     INSERT INTO PEDIDO (
       id_cliente, estado, modalidad_pago,
       subtotal, descuento, total,
-      moneda_total, evidencia_total_usd
-    ) VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', ?, ?, ?, 'USD', ?)
+      moneda_total, evidencia_total_usd, fecha_utc
+    ) VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', ?, ?, ?, 'USD', ?, UTC_TIMESTAMP(3))
   `, [
     clientId,
     format(prepared.gross),
@@ -141,7 +142,7 @@ export async function persistAccountOrder(
 
 interface OrderSummaryRow {
   pedidoId: number;
-  fecha: Date | string;
+  fechaUtc: string;
   estado: string;
   modalidadPago: string;
   moneda: string | null;
@@ -166,13 +167,7 @@ interface OrderLineRow {
   subtotal: string;
 }
 
-function toIsoDateTime(value: Date | string): string {
-  if (value instanceof Date) {
-    return value.toISOString();
-  }
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
-}
+const orderInstant = "COALESCE(p.fecha_utc, CONVERT_TZ(p.fecha, ?, '+00:00'))";
 
 function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   const pedidoId = Number(row.pedidoId);
@@ -182,7 +177,7 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   return {
     pedidoId,
     numero: `PED-${String(pedidoId).padStart(6, '0')}`,
-    fecha: String(row.fecha),
+    fecha: new Date(row.fechaUtc.replace(' ', 'T').slice(0, 23) + 'Z').toISOString(),
     estado: row.estado,
     modalidadPago: row.modalidadPago,
     moneda,
@@ -202,11 +197,12 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
 
 export async function findClientOrdersByClientId(
   clientId: number,
+  query: ReadQuery,
 ): Promise<ClientOrderSummary[]> {
-  const rows = await dataSource.query<OrderSummaryRow[]>(`
+  const rows = await query<OrderSummaryRow[]>(`
     SELECT
       p.id_pedido AS pedidoId,
-      DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
+      CAST(${orderInstant} AS CHAR) AS fechaUtc,
       p.estado AS estado,
       p.modalidad_pago AS modalidadPago,
       p.moneda_total AS moneda,
@@ -233,8 +229,8 @@ export async function findClientOrdersByClientId(
       AND m.tipo_movimiento = 'CARGO'
       AND m.estado = 'ACREDITADO'
     WHERE p.id_cliente = ?
-    ORDER BY p.fecha DESC, p.id_pedido DESC
-  `, [clientId]);
+    ORDER BY fechaUtc DESC, p.id_pedido DESC
+  `, [env.legacyOrderOffset, clientId]);
 
   return rows.map(mapOrderSummary);
 }
@@ -242,11 +238,12 @@ export async function findClientOrdersByClientId(
 export async function findClientOrderDetailById(
   clientId: number,
   orderId: number,
+  query: ReadQuery,
 ): Promise<ClientOrderDetail | null> {
-  const [headerRow] = await dataSource.query<OrderSummaryRow[]>(`
+  const [headerRow] = await query<OrderSummaryRow[]>(`
     SELECT
       p.id_pedido AS pedidoId,
-      DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
+      CAST(${orderInstant} AS CHAR) AS fechaUtc,
       p.estado AS estado,
       p.modalidad_pago AS modalidadPago,
       p.moneda_total AS moneda,
@@ -274,13 +271,13 @@ export async function findClientOrderDetailById(
       AND m.estado = 'ACREDITADO'
     WHERE p.id_pedido = ?
       AND p.id_cliente = ?
-  `, [orderId, clientId]);
+  `, [env.legacyOrderOffset, orderId, clientId]);
 
   if (!headerRow) {
     return null;
   }
 
-  const lineRows = await dataSource.query<OrderLineRow[]>(`
+  const lineRows = await query<OrderLineRow[]>(`
     SELECT
       dp.id_detalle_pedido AS detalleId,
       dp.id_producto AS productoId,

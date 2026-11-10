@@ -1,4 +1,5 @@
 import bcrypt from 'bcrypt';
+import type { QueryRunner } from 'typeorm';
 import type { AuthContext, SessionUser } from '../types/auth';
 import { findUsuarioById } from '../repositories/usuario.repository';
 import { signToken } from './token.service';
@@ -33,8 +34,8 @@ export const loginUsuario = async (email: string, password: string) => {
     return { token, user: userPublic };
 };
 
-export const restoreUsuario = async (auth: AuthContext): Promise<SessionUser | null> => {
-    const user = await findUsuarioById(auth.id);
+export const restoreUsuario = async (auth: AuthContext, runner?: QueryRunner): Promise<SessionUser | null> => {
+    const user = await (runner ? findUsuarioById(auth.id, runner) : findUsuarioById(auth.id));
     if (!user || !user.activo || user.rol !== auth.rol) {
         return null;
     }
