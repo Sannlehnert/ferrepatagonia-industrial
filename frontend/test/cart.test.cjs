@@ -43,6 +43,7 @@ function runtime(t, { read = async () => snapshot(), mutate, api = {}, restore }
   t.after(() => disposePinia(pinia))
   const reads = []
   const writes = []
+  let notify
   const http = { ...api }
   const cache = new Map()
   function load(file) {
@@ -54,6 +55,7 @@ function runtime(t, { read = async () => snapshot(), mutate, api = {}, restore }
     const mod = { exports: {} }
     new Function('require', 'module', 'exports', outputText)(name => {
       if (name === '@/services/api') return { __esModule: true, default: http }
+      if (name === '@/services/realtime') return { onRealtime: listener => { notify = listener } }
       return name.startsWith('@/') ? load(name.slice(2)) : require(name)
     }, mod, mod.exports)
     cache.set(file, mod.exports)
@@ -73,8 +75,29 @@ function runtime(t, { read = async () => snapshot(), mutate, api = {}, restore }
     },
   }
   const cart = (api.get && !mutate ? useCartStore : createCartStore(transport))(pinia)
-  return { auth, cart, reads, writes, http }
+  return { auth, cart, reads, writes, http, notify: change => notify(change) }
 }
+
+test('an invalidation during a cart read discards the old response and groups further notices', async t => {
+  const stale = deferred()
+  const latest = deferred()
+  const responses = [Promise.resolve(snapshot(1, 1)), stale.promise, latest.promise]
+  const { cart, reads, notify } = runtime(t, { restore: user(7), read: () => responses.shift() })
+  await tick()
+  const notice = { cart: true, products: new Set(), reconnect: false }
+  notify(notice)
+  notify(notice)
+  notify(notice)
+  assert.equal(reads.length, 2)
+  stale.resolve(snapshot(1, 2))
+  await tick()
+  assert.equal(cart.items[0].cantidad, 1)
+  assert.equal(reads.length, 3)
+  latest.resolve(snapshot(1, 3))
+  await tick()
+  assert.equal(cart.items[0].cantidad, 3)
+  assert.equal(cart.needsSync, false)
+})
 
 test('starts empty and restores a confirmed session without exposing unconfirmed data', async t => {
   const response = deferred()

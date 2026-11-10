@@ -1,11 +1,9 @@
-# #281 · Contrato de eventos v1 — PROVISIONAL
+# #281 · Contrato de eventos v1
 
 Robert, profesor de Programación Backend, pidió que Socket.IO estuviera
-implementado. No hay confirmación de que haya definido eventos ni un contrato
-específico. El equipo propuso los tres eventos de este documento y su
-aceptación explícita sigue pendiente. Si la cátedra solicita validar también
-los nombres y los eventos, esa validación se registrará como una dependencia
-académica separada.
+implementado. Los nombres y las cargas de este documento corresponden al
+contrato implementado por decisión del equipo. Una eventual validación de
+nombres y eventos por la cátedra se registra por separado.
 
 ## `carrito.actualizado.v1`
 
@@ -19,7 +17,8 @@ académica separada.
   inventario.
 - Se entrega solo a las sesiones activas del titular según su vínculo vigente.
   La cuenta corriente puede estar deshabilitada.
-- El consumidor reconcilia mediante `GET /api/carrito`.
+- Vue reconcilia mediante `GET /api/carrito` para actualizar la página y el
+  drawer del carrito.
 
 ## `stock.actualizado.v1`
 
@@ -34,7 +33,8 @@ académica separada.
 - Se entrega a conexiones autenticadas de `CLIENTE` o `ADMIN` activos con
   acceso al catálogo. No requiere cuenta corriente habilitada ni incluye
   cantidades, precios, datos de pedidos o de clientes.
-- El consumidor reconcilia por `GET /api/catalogo` o `GET /api/catalogo/:id`.
+- Vue reconcilia el catálogo, la ficha, Home y la disponibilidad de los ítems
+  del carrito con REST. Los visitantes anónimos acceden solo por REST.
 
 ## `pedido.confirmado.v1`
 
@@ -58,6 +58,9 @@ académica separada.
   se limita a los cinco campos del ejemplo. La sala administrativa queda
   reservada. El disparador es el COMMIT acreditado de una nueva confirmación
   de [#261](../261/README.md).
+- Vue valida el payload y deduplica por `idEvento`. Si conoce la clave del
+  intento, consulta el comprobante por REST. En otras pestañas del titular el
+  carrito y el stock se reconcilian con sus avisos.
 
 ## Entrega
 

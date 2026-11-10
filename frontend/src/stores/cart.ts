@@ -3,6 +3,7 @@ import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { cartErrorMessage, cartService } from '@/services/cartService'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
+import { onRealtime } from '@/services/realtime'
 import type { CartMutation, CartSnapshot, CartTransport } from '@/types/cart'
 
 function validCartInteger(value: number) {
@@ -122,6 +123,12 @@ export function createCartStore(transport: CartTransport) {
       void cargarCarrito()
     }
 
+    onRealtime(change => {
+      const affected = change.products.size > 0 && (loading.value || operation.value !== null ||
+        items.value.some(item => change.products.has(item.id_producto)))
+      if (change.cart || change.reconnect || affected) invalidarCarrito()
+    })
+
     function reconciliarPedidoConfirmado() {
       const key = sessionKey.value
       if (!key || disposed) return
@@ -187,7 +194,7 @@ export function createCartStore(transport: CartTransport) {
     return {
       cart, items, loading, operation, loadError, operationError, needsSync,
       pricesNeedValidation, stockNeedsValidation,
-      cargarCarrito, invalidarCarrito, reconciliarPedidoConfirmado, limpiarEstado,
+      cargarCarrito, reconciliarPedidoConfirmado, limpiarEstado,
       agregarProducto: (productoId: number, cantidad: number) => mutate({ type: 'add', productoId, cantidad }),
       actualizarCantidad: (productoId: number, cantidad: number) => mutate({ type: 'update', productoId, cantidad }),
       quitarProducto: (productoId: number) => mutate({ type: 'remove', productoId }),

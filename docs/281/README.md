@@ -14,12 +14,11 @@ figura en curso. La ampliación se entrega en el
 fuera de la candidata congelada el 09/11 para la demo del 11/11.
 
 Robert, profesor de Programación Backend, pidió que Socket.IO estuviera
-implementado. El equipo propuso `pedido.confirmado.v1`,
-`carrito.actualizado.v1` y `stock.actualizado.v1`. El contrato sigue pendiente
-de aceptación explícita del equipo. No hay confirmación de que Robert haya
-definido eventos o un contrato específico. Si la cátedra solicita validar
-también los nombres y los eventos, esa validación será una dependencia
-académica separada.
+implementado. El equipo decidió usar `pedido.confirmado.v1`,
+`carrito.actualizado.v1` y `stock.actualizado.v1` para sincronizar las tres
+operaciones. El contrato v1 documenta la implementación del equipo. La
+validación de nombres y eventos por la cátedra queda como dependencia
+separada si se solicita.
 
 ## Montaje y seguridad
 
@@ -46,10 +45,9 @@ Socket.IO y HTTP antes de cerrar MariaDB.
 - Cada reconexión vuelve a autenticar. Antes de enviar se vuelven a comprobar el
   JWT, el usuario, su rol, el vínculo y la habilitación comercial. Una sesión
   inactiva o cuyo vínculo cambió se desconecta al intentar notificarla. Un
-  fallo de consulta impide la entrega. El logout REST vigente limpia la cookie,
-  y un socket abierto conserva la credencial del handshake hasta que expire o
-  se desconecte. La revocación individual e inmediata del JWT requiere una
-  política de sesiones del sistema.
+  fallo de consulta impide la entrega. El logout REST limpia la cookie y el
+  consumidor Vue desconecta el socket y limpia los listeners. Las pestañas
+  del mismo perfil coordinan cambios de sesión mediante BroadcastChannel.
 
 ## Persistencia y notificaciones
 
@@ -75,31 +73,63 @@ catálogo. Si se necesita tiempo real para visitantes anónimos, se evaluará un
 canal público separado, limitado a información pública y protegido por origen
 y controles de recursos.
 
-## Integración Vue propuesta
+## Consumidor Vue
 
-1. Crear un socket de mismo origen por sesión verificada. Usar la generación de
-   sesión que ya maneja `stores/cart.ts` para cancelar consultas, quitar
-   listeners y desconectar al cambiar de usuario o cerrar sesión. Ignorar
-   callbacks y respuestas pertenecientes a otra generación.
-2. Ante `carrito.actualizado.v1`, invalidar el snapshot y coordinar una lectura
-   por `cartService.get`. La mutación local ya ejecuta su propia lectura.
-   Agrupar ráfagas, reutilizar esa lectura cuando cubra la invalidación y
-   programar una lectura adicional solo si un aviso más nuevo dejó la
-   respuesta en vuelo obsoleta. `CartContents.vue` consume la misma store.
-3. Ante `stock.actualizado.v1`, cruzar los IDs con los productos visibles de
-   `CatalogoView.vue`, `ProductDetailView.vue` y `HomeRecommended.vue`. Agrupar
-   avisos por vista, volver a consultar su REST existente y conservar filtros,
-   página y búsqueda. El detalle y las listas ya tienen mecanismos de
-   cancelación. Si el carrito muestra uno de esos productos, su disponibilidad
-   también puede requerir una lectura, sin modificar cantidades.
-4. Ante `pedido.confirmado.v1`, deduplicar por `idEvento` dentro de la sesión.
-   Reconciliar por REST los intentos conocidos y coordinar la invalidación del
-   carrito con el aviso privado para compartir una lectura. Tras desconectar,
-   marcar snapshots como potencialmente obsoletos y, al reconectar, revalidar
-   las vistas activas y los intentos pendientes. La reconexión no reenvía
-   escrituras.
+`App.vue` inicia una conexión de mismo origen por sesión verificada y
+pestaña. Vite reenvía `/socket.io/` al puerto 3000 con polling y upgrade
+WebSocket. En desarrollo se usa `http://localhost:5173` como origen tanto en
+el navegador como en `APP_PUBLIC_ORIGIN`. La cookie HttpOnly viaja con el
+handshake. El servicio agrupa avisos próximos y retira los listeners de la
+sesión anterior al cambiar de identidad.
 
-La actualización en pantalla depende de esa tarea frontend.
+- El carrito completo y el drawer usan la misma store y consultan
+  `GET /api/carrito`. Una escritura local conserva su lectura de
+  reconciliación. Si llega una invalidación durante esa lectura, la store
+  descarta la respuesta obsoleta y consulta el estado actual.
+- Catálogo, ficha, recomendados de Home y carrito cruzan los IDs recibidos
+  con los productos visibles y consultan REST. El catálogo conserva búsqueda,
+  filtros y página. Los avisos de stock están disponibles para sesiones
+  autenticadas.
+- La store de pedidos valida el aviso, deduplica por `idEvento` y consulta
+  por GET el intento conocido. El comprobante se arma con los datos REST.
+  En otra pestaña sin esa clave se actualizan el carrito y el stock. Al
+  reconectar se verifica la sesión y se consultan las vistas activas y los
+  intentos pendientes. Las escrituras se originan en acciones del usuario.
+
+## Demostración en dos navegadores
+
+Desde la raíz, con Docker activo y Node compatible con el proyecto, ejecutar:
+
+```sh
+npm ci --prefix backend
+npm ci --prefix frontend
+npm run build --prefix backend
+node frontend/node_modules/@playwright/test/cli.js install chromium
+node backend/test/helpers/run-e2e.cjs --ui --ui-host=127.0.0.1 socket.real.spec.ts
+```
+
+El runner inicia MariaDB descartable, Express y Vite. Mantener la terminal
+abierta y usar el URL que imprime como **Frontend E2E** en dos perfiles de
+navegador independientes. Abrir un tercer perfil para ADMIN. Las credenciales
+existen únicamente en el fixture descartable.
+
+| Sesión | Correo | Contraseña |
+| --- | --- | --- |
+| Cliente A y B | `cc258-empty@example.test` | `E2eLocal-214!` |
+| Administración | `admin@e2e.test` | `E2eLocal-214!` |
+
+1. En B, abrir `/carrito`. En A, abrir `/producto/24` y agregar **Producto
+   E2E 24**. En el drawer de A cambiar la cantidad a 2 y luego eliminar el
+   producto. B refleja cada cambio sin recargar.
+2. En B, abrir `/producto/24`. En ADMIN, ir a `/admin/productos`, buscar
+   `E2E-24`, elegir **Editar Producto E2E 24**, fijar **Stock** en 8 y pulsar
+   **Guardar Cambios**. B pasa a mostrar **8 unidades disponibles**.
+3. En A, agregar una unidad de **Producto E2E 24**. Abrir `/carrito`,
+   elegir **Cuenta corriente** y pulsar **Confirmar pedido a cuenta corriente**.
+   A muestra el comprobante y el carrito vacío. B muestra **7 unidades
+   disponibles**. Si B deja el drawer abierto desde antes de la compra,
+   también puede observar cómo se vacía en la misma pantalla.
+4. Cerrar el runner con Ctrl+C para eliminar el contenedor descartable.
 
 ## Pruebas
 
@@ -147,7 +177,19 @@ El cierre de auditoría incorpora `origin/develop` en
 `b93b8072cee0b199710699a8fb668ff41844cce4` por merge. Pasaron type-check, build,
 `git diff --check`, 19 integraciones de Socket.IO, 53 pruebas de carrito,
 71 de pedidos y 235 del runner de productos ADMIN, incluida la regresión de
-stock. La descripción del PR #92 registra la evidencia de CI del HEAD
-publicado para este cierre. Mantener Taiga
-abierta hasta registrar la aceptación del contrato, la revisión, el merge
-autorizado y su evidencia.
+stock. [CI del corte de auditoría](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/42758234796)
+
+Para la integración Vue, la rama incorporó el `develop`
+`79813ef5e3b33f5a1e491a06cf94cbc50d157955`, con Home #269 y FAQ #270.
+Pasaron type-check y build de ambos paquetes, 207 unitarias de frontend,
+19 integraciones Socket.IO y las regresiones de carrito (53), pedidos (71)
+y productos ADMIN (235). La suite Chromium integrada pasó 138 casos con
+MariaDB descartable. Tres casos pertenecen al perfil de compilación de
+producción de CI. Los cuatro casos dedicados a Socket.IO pasaron también
+con el frontend compilado. Cubren carrito
+entre navegadores, aislamiento y cambio de cuenta, stock en Home, catálogo
+y ficha, confirmación con respuesta HTTP perdida, desconexión y recuperación.
+[Checks del PR #92](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/92/checks)
+
+Taiga #281 queda abierta hasta registrar la revisión, el merge autorizado y
+la evidencia de la entrega.

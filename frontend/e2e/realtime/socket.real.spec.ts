@@ -132,7 +132,10 @@ test('carrito entre navegadores, aislamiento de otro cliente y logout', async ({
     await expect(sibling).toHaveURL(/\/login|\/$/)
     await login(sibling, 'cliente-nuevo@e2e.test', 'E2eLocal-214!')
     await expect.poll(() => sharedCookieSocket.upgraded).toBe(2)
+    await page.keyboard.press('Escape')
+    await expect(drawer).toBeHidden()
     await page.getByRole('button', { name: 'Agregar', exact: true }).click()
+    await expect(quantity(page, f.name)).toHaveValue('1')
     await expect(sharedCookieTab.getByText(f.name, { exact: true })).toHaveCount(0)
     expect(sharedCookieSocket.events.filter(event => event.includes('carrito.actualizado.v1'))).toEqual([])
   } finally {
@@ -153,9 +156,10 @@ test('stock ADMIN y compra real recuperada por evento con un solo cargo', async 
     await login(admin, f.admin, f.password, true)
     const socket = observeSocket(page)
     await page.goto('/carrito')
+    await expect(quantity(page, f.name)).toHaveValue('2')
     await sibling.goto('/carrito')
-    await detail.goto('/producto/' + f.productId)
     await expect(quantity(sibling, f.name)).toHaveValue('2')
+    await detail.goto('/producto/' + f.productId)
     await expect(detail.getByText('5 unidades disponibles')).toBeVisible()
     await setStock(admin, f.productId, 6)
     await expect(detail.getByText('6 unidades disponibles')).toBeVisible()
@@ -206,17 +210,18 @@ test('Home y catálogo con filtros reflejan disponibilidad sin navegar', async (
     const listSocket = observeSocket(page)
     await home.goto('/')
     await page.goto('/catalogo?categoria=1&busqueda=E2E-01')
-    const badge = (target: Page) => target.locator('li')
+    const card = (target: Page) => target.locator('li')
       .filter({ has: target.getByRole('heading', { name: 'Producto E2E 01', exact: true }) })
-      .getByLabel('Disponibilidad de stock')
-    await expect(badge(home)).toHaveText('No disponible')
-    await expect(badge(page)).toHaveText('No disponible')
+    const homeStock = card(home).getByText(/^(Sin stock|Disponible)$/)
+    const catalogStock = card(page).getByLabel('Disponibilidad de stock')
+    await expect(homeStock).toHaveText('Sin stock')
+    await expect(catalogStock).toHaveText('No disponible')
     await expect.poll(() => homeSocket.upgraded).toBe(1)
     await expect.poll(() => listSocket.upgraded).toBe(1)
     try {
       await setStock(admin, 1, 2)
-      await expect(badge(home)).toHaveText('Disponible')
-      await expect(badge(page)).toHaveText('Disponible')
+      await expect(homeStock).toHaveText('Disponible')
+      await expect(catalogStock).toHaveText('Disponible')
       await expect(page).toHaveURL(/\/catalogo\?categoria=1&busqueda=E2E-01$/)
     } finally { await setStock(admin, 1, 0) }
   } finally { await adminContext.close() }
@@ -230,13 +235,17 @@ test('REST funciona sin transporte y la reconexión revalida el carrito y la coo
     let wire: WebSocketRoute | undefined
     let upgrades = 0
     let writes = 0
+    await login(page, f.client, f.password)
+    await login(sibling, f.client, f.password)
     await page.route(sockets, route => online ? route.continue() : route.abort())
     await page.routeWebSocket(sockets, ws => {
       if (!online) return ws.close()
-      wire = ws
       const server = ws.connectToServer()
       ws.onMessage(message => {
-        if (message === '5') upgrades++
+        if (message === '5') {
+          wire = ws
+          upgrades++
+        }
         server.send(message)
       })
     })
@@ -244,12 +253,11 @@ test('REST funciona sin transporte y la reconexión revalida el carrito y la coo
       if (/^\/api\/(carrito|pedidos)\b/.test(new URL(request.url()).pathname) &&
           request.method() !== 'GET') writes++
     })
-    await login(page, f.client, f.password)
-    await login(sibling, f.client, f.password)
     await page.goto('/carrito')
-    await sibling.goto('/carrito')
     await expect(quantity(page, f.name)).toHaveValue('2')
     await expect.poll(() => wire !== undefined && upgrades > 0).toBe(true)
+    await sibling.goto('/carrito')
+    await expect(quantity(sibling, f.name)).toHaveValue('2')
     online = false
     await wire!.close({ code: 1011 })
     await setQuantity(page, f.name, 3)

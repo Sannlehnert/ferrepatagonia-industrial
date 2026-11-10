@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '@/stores/auth'
-import { useCartStore } from '@/stores/cart'
-import { onRealtime, startRealtime } from '@/services/realtime'
+import { startRealtime } from '@/services/realtime'
 const auth = useAuthStore()
-const cart = useCartStore()
-onRealtime(change => {
-  if (auth.rol !== 'CLIENTE') return
-  const affected = change.products.size > 0 && (cart.loading || cart.operation !== null ||
-    cart.items.some(item => change.products.has(item.id_producto)))
-  if (change.cart || change.reconnect || affected) cart.invalidarCarrito()
-})
 startRealtime(auth)
 const retrySession = () => window.location.reload()
 </script>
