@@ -1,4 +1,4 @@
-import { dataSource, inTransaction } from '../../config/database.config';
+import { dataSource, inTransaction, withCancellableRead, type ReadQuery } from '../../config/database.config';
 import { notifyAfterCommit, type CommittedChange, type NotifyCommittedChange } from '../../realtime/committed-change';
 import { DatabaseOutcomeUnknownError } from '../../config/database-policy';
 import type { AuthContext } from '../../types/auth';
@@ -48,8 +48,8 @@ function validateClientAuth(auth: AuthContext): void {
   }
 }
 
-async function findActiveClient(auth: AuthContext): Promise<number> {
-  const [client] = await dataSource.query<{ clientId: number }[]>(`
+async function findActiveClient(auth: AuthContext, query: ReadQuery = dataSource.query.bind(dataSource)): Promise<number> {
+  const [client] = await query<{ clientId: number }[]>(`
     SELECT c.id_cliente AS clientId
     FROM USUARIO u
     INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente
@@ -113,10 +113,12 @@ function rejection(error: unknown): AccountOrderError | null {
 
 export async function listClientOrders(
   auth: AuthContext,
+  signal: AbortSignal,
 ): Promise<AccountOrderResult> {
   validateClientAuth(auth);
-  const clientId = await findActiveClient(auth);
-  const items = await findClientOrdersByClientId(clientId);
+  const items = await withCancellableRead(signal, async query =>
+    findClientOrdersByClientId(await findActiveClient(auth, query), query),
+  );
 
   return {
     status: 200,
@@ -129,6 +131,7 @@ export async function listClientOrders(
 export async function getClientOrderDetail(
   auth: AuthContext,
   orderIdParam: unknown,
+  signal: AbortSignal,
 ): Promise<AccountOrderResult> {
   validateClientAuth(auth);
 
@@ -141,8 +144,9 @@ export async function getClientOrderDetail(
     );
   }
 
-  const clientId = await findActiveClient(auth);
-  const order = await findClientOrderDetailById(clientId, validation.orderId);
+  const order = await withCancellableRead(signal, async query =>
+    findClientOrderDetailById(await findActiveClient(auth, query), validation.orderId, query),
+  );
 
   if (!order) {
     return {

@@ -113,6 +113,7 @@ CREATE TABLE PEDIDO (
     id_pedido INT NOT NULL AUTO_INCREMENT,
     id_cliente INT NOT NULL,
     fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_utc DATETIME(3) NULL,
     estado VARCHAR(50) NOT NULL,
     modalidad_pago VARCHAR(50) NOT NULL,
     subtotal DECIMAL(12,2) NOT NULL,

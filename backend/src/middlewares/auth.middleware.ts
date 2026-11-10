@@ -1,17 +1,19 @@
 import type { Request, RequestHandler, Response } from 'express';
-import { authPassport } from '../config/passport.config';
+import { authPassport, authReadSignal } from '../config/passport.config';
 import type { Role, SessionUser } from '../types/auth';
 
-export async function authenticateRequest(req: Request, res: Response): Promise<boolean> {
+export async function authenticateRequest(req: Request, res: Response, signal?: AbortSignal): Promise<boolean> {
   delete req.auth;
   delete req.authUser;
+  if (signal) authReadSignal.set(req, signal);
   const { error, user } = await new Promise<{ error: unknown; user: SessionUser | false }>((resolve, reject) => {
     authPassport.authenticate('jwt', { session: false }, (error: unknown, user: SessionUser | false) => {
       resolve({ error, user });
     })(req, res, reject);
-  });
+  }).finally(() => authReadSignal.delete(req));
   if (res.destroyed) return false;
   if (error) {
+    if (signal) throw error;
     res.status(500).json({ message: 'Error interno del servidor.' });
     return false;
   }

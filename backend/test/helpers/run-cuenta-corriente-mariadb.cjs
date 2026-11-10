@@ -41,6 +41,7 @@ async function run(mode = process.argv[2] || 'all') {
     apply(path.join(backend, '../database/schema.sql'));
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
       if (orders) {
+      for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-273-order-instant.sql'));
         apply(path.join(
           backend,
           '../database/migrate-fer-20-order-confirmation.sql',
@@ -65,6 +66,7 @@ async function run(mode = process.argv[2] || 'all') {
           'test/account-order-http.test.cjs',
           'test/account-order-process.test.cjs',
           'test/client-orders.test.cjs',
+          'test/order-history-load.test.cjs',
         ]
       : mode === 'baseline'
         ? ['test/cc260.regression.test.cjs']
