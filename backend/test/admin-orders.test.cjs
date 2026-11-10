@@ -1,8 +1,16 @@
 const path = require('node:path');
 require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
-if (!process.env.JWT_SECRET) {
-  process.env.JWT_SECRET = '2bba238be4f1de0646384a41af287f48a9735015cdfd0347887226526104cf37';
-}
+
+// Valores de prueba unitaria para CI (mismo patrón que database.test.cjs)
+Object.assign(process.env, {
+  JWT_SECRET: process.env.JWT_SECRET || '2bba238be4f1de0646384a41af287f48a9735015cdfd0347887226526104cf37',
+  DB_HOST: process.env.DB_HOST || '127.0.0.1',
+  DB_PORT: process.env.DB_PORT || '1',
+  DB_NAME: process.env.DB_NAME || 'unit',
+  DB_USER: process.env.DB_USER || 'unit',
+  DB_PASSWORD: process.env.DB_PASSWORD || 'unit',
+});
+
 require('./helpers/test-env.cjs');
 
 const assert = require('node:assert/strict');
