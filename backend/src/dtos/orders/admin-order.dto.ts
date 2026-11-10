@@ -31,6 +31,7 @@ export interface AdminOrderListFilters {
   estado?: AdminOrderFilterStatus;
   modalidadPago?: string;
   clienteId?: number;
+  fecha?: string; // YYYY-MM-DD (P1)
   q?: string;
 }
 
@@ -41,6 +42,7 @@ const ALLOWED_QUERY_KEYS = new Set([
   'estado',
   'modalidadPago',
   'clienteId',
+  'fecha',
   'q',
 ]);
 
@@ -158,12 +160,25 @@ export function parseAdminOrderListQuery(
     }
   }
 
+  let fecha: string | undefined;
+  if (query.fecha !== undefined && query.fecha !== '') {
+    if (typeof query.fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(query.fecha)) {
+      throw new AdminOrderError(
+        'PARAMETRO_INVALIDO',
+        400,
+        'La fecha debe tener el formato YYYY-MM-DD.',
+      );
+    }
+    fecha = query.fecha;
+  }
+
   return {
     page,
     limit,
     ...(estado !== undefined ? { estado } : {}),
     ...(modalidadPago !== undefined ? { modalidadPago } : {}),
     ...(clienteId !== undefined ? { clienteId } : {}),
+    ...(fecha !== undefined ? { fecha } : {}),
     ...(q !== undefined ? { q } : {}),
   };
 }

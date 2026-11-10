@@ -28,7 +28,11 @@ export function formatAdminOrderPaymentMode(mode: string): string {
   return PAYMENT_MODE_LABELS[mode] ?? mode
 }
 
-export function formatAdminOrderMoney(amount: string, currency = 'USD'): string {
+// FIX P1: Preservar moneda desconocida/nula sin asumir USD
+export function formatAdminOrderMoney(amount: string, currency?: string | null): string {
+  if (!currency) {
+    return amount
+  }
   return `${currency} ${amount}`
 }
 
@@ -43,6 +47,7 @@ export async function getAdminOrders(
   if (filters.estado) params.estado = filters.estado
   if (filters.modalidadPago) params.modalidadPago = filters.modalidadPago
   if (filters.clienteId !== undefined) params.clienteId = filters.clienteId
+  if (filters.fecha) params.fecha = filters.fecha
   if (filters.q) params.q = filters.q
 
   const response = await api.get<{ data: AdminOrderListResponse }>(
