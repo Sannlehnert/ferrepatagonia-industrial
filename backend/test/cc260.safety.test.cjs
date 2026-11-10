@@ -40,3 +40,23 @@ test('seed rechaza sesión arbitraria antes de tocar SQL', async () => {
   await assert.rejects(assertOwned({ connection: { query() { calls++; } }, profile: p }), /sesión ajena/);
   assert.equal(calls, 0);
 });
+
+test('el perfil de pedidos rechaza un destino distinto aun con ALLOW_DEV_DB', () => {
+  const keys = {
+    CC260_TEST_PROFILE: JSON.stringify(p), DB_HOST: p.host, DB_PORT: String(p.port),
+    DB_NAME: 'ferrepatagonia_dev', DB_USER: 'root', DB_PASSWORD: p.password, ALLOW_DEV_DB: 'true',
+  };
+  const previous = Object.keys(keys).map(key => [key, process.env[key]]);
+  try {
+    Object.assign(process.env, keys);
+    assert.throws(childProfile, /ferrepatagonia_dev/);
+    process.env.DB_NAME = p.database;
+    process.env.DB_PORT = '3307';
+    assert.throws(childProfile, /3307/);
+  } finally {
+    for (const [key, value] of previous) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});

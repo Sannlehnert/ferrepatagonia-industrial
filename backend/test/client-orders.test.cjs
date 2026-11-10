@@ -1,27 +1,8 @@
-const path = require('node:path');
 const assert = require('node:assert/strict');
 const { describe, test, before, after } = require('node:test');
 const { once } = require('node:events');
 
-function assertOwnershipGuardBeforeConnect() {
-  assert.equal(
-    process.env.NODE_ENV,
-    'test',
-    'Guardia H01: NODE_ENV debe ser exactamente "test".'
-  );
-
-  const isDisposable = Boolean(process.env.CC260_TEST_PROFILE) || process.env.ALLOW_DEV_DB === 'true';
-  assert.ok(
-    isDisposable,
-    'Guardia H01: se requiere base descartable (ejecutar vía npm run test:orders:isolated o con ALLOW_DEV_DB=true).'
-  );
-
-  assert.equal(process.env.DB_HOST, '127.0.0.1', 'Guardia H01: DB_HOST debe ser loopback.');
-  if (process.env.ALLOW_DEV_DB !== 'true') {
-    assert.notEqual(process.env.DB_PORT, '3306', 'Guardia H01: DB_PORT no debe ser 3306.');
-    assert.notEqual(process.env.DB_PORT, '3307', 'Guardia H01: DB_PORT no debe ser 3307 (dev).');
-  }
-}
+const { childProfile, connectOwned } = require('./helpers/cc260-disposable.cjs');
 
 const { app } = require('../dist/app');
 const db = require('../dist/config/database.config');
@@ -75,7 +56,9 @@ describe('Task #273 (S6-24.1) — API protegida de historial y detalle de pedido
   }
 
   before(async () => {
-    assertOwnershipGuardBeforeConnect();
+    assert.equal(process.env.NODE_ENV, 'test');
+    const ownership = await connectOwned(childProfile());
+    await ownership.connection.end();
 
     if (!dataSource.isInitialized) {
       await dataSource.initialize();

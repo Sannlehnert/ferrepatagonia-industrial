@@ -43,6 +43,7 @@ async function mount(t, page, handler = query => response(query.page)) {
   const module = { exports: {} }
   new Function('require', 'module', 'exports', code)(name => {
     if (name === '@/services/catalogService') return service
+    if (name === '@/services/realtime') return { refreshOnStock() {} }
     if ([
       '@/components/CatalogFilters.vue',
       '@/components/ProductPrices.vue',

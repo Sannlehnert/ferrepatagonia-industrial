@@ -4,7 +4,15 @@ import type { CartSnapshot, CartTransport } from '@/types/cart'
 
 export const cartService: CartTransport = {
   async get(signal) {
-    const { data } = await api.get<CartSnapshot>('/carrito', { signal })
+    const read = () => api.get<CartSnapshot>('/carrito', { signal })
+    const { data } = await read().catch(async error => {
+      if (!axios.isAxiosError<{ code?: string }>(error) ||
+          error.response?.status !== 409 || error.response.data?.code !== 'CONFLICTO_CARRITO') throw error
+      // Las pestañas pueden reconciliar el mismo aviso al mismo tiempo.
+      await new Promise(resolve => setTimeout(resolve, 150))
+      signal.throwIfAborted()
+      return read()
+    })
     if (!Array.isArray(data?.items) || !Number.isSafeInteger(data.id_carrito) ||
         data.moneda !== 'USD' || data.regla !== 'FER17-v1' || data.ivaIncluido !== true ||
         (data.totalUSD !== null && typeof data.totalUSD !== 'string')) {

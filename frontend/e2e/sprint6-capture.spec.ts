@@ -95,7 +95,8 @@ for (const width of [360, 390, 768, 1024, 1280, 1440]) {
       await expect(adminNav.getByRole('link').first()).toBeFocused()
     }
     await expect(adminNav.getByRole('link')).toHaveText([
-      'Dashboard', 'Pedidos', 'Productos', 'Categorías', 'Clientes', 'Cuentas corrientes', 'Importar productos',
+      'Dashboard', 'Pedidos', 'Productos', 'Comprobantes de pago', 'Categorías', 'Clientes',
+      'Cuentas corrientes', 'Importar productos',
     ])
     await expect(adminNav.getByRole('link').first()).toHaveAttribute('aria-current', 'page')
     if (width === 390) await capture(page, 'sidebar-390', false)

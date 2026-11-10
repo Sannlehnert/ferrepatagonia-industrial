@@ -9,13 +9,14 @@ assert.equal(process.env.DB_HOST, "127.0.0.1");
 assert.match(process.env.DB_NAME || "", /^e2e_test_[a-f0-9]{32}$/);
 assert.ok(process.send, "Este servidor debe iniciarse desde el ejecutor E2E.");
 
-const { app } = require("../../dist/app");
+const { createBackendServer } = require("../../dist/http-server");
 const {
   initializeDatabase,
   destroyDatabase,
 } = require("../../dist/config/database.config");
 
 let server;
+let backend;
 let stopping = false;
 
 async function stop(exitCode = 0) {
@@ -28,10 +29,7 @@ async function stop(exitCode = 0) {
 
   try {
     if (server?.listening) {
-      await new Promise((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-        server.closeAllConnections();
-      });
+      await backend.close();
     }
   } catch {
     exitCode = 1;
@@ -61,7 +59,7 @@ async function main() {
     await initializeDatabase();
     if (process.env.E2E_FER19) {
       fer19Fixture = await seedDemo(session, { browser: true });
-    } else {
+    } else if (process.env.E2E_RECEIPTS !== "1") {
       fixture = await seedAdminAccounts(session, { browser: true });
     }
   } finally {
@@ -74,7 +72,8 @@ async function main() {
   // outside NODE_ENV=test after the guarded fixture has been seeded.
   if (process.env.E2E_FER19 === "production") process.env.NODE_ENV = "development";
 
-  server = app.listen(0, "127.0.0.1");
+  backend = createBackendServer();
+  server = backend.server.listen(0, "127.0.0.1");
 
   server.once("error", () => {
     console.error("No se pudo iniciar la API aislada.");

@@ -1,4 +1,5 @@
-import { dataSource, inTransaction } from '../../config/database.config';
+import { dataSource, inTransaction, withCancellableRead, type ReadQuery } from '../../config/database.config';
+import { notifyAfterCommit, type CommittedChange, type NotifyCommittedChange } from '../../realtime/committed-change';
 import { DatabaseOutcomeUnknownError } from '../../config/database-policy';
 import type { AuthContext } from '../../types/auth';
 import {
@@ -47,8 +48,8 @@ function validateClientAuth(auth: AuthContext): void {
   }
 }
 
-async function findActiveClient(auth: AuthContext): Promise<number> {
-  const [client] = await dataSource.query<{ clientId: number }[]>(`
+async function findActiveClient(auth: AuthContext, query: ReadQuery = dataSource.query.bind(dataSource)): Promise<number> {
+  const [client] = await query<{ clientId: number }[]>(`
     SELECT c.id_cliente AS clientId
     FROM USUARIO u
     INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente
@@ -112,10 +113,12 @@ function rejection(error: unknown): AccountOrderError | null {
 
 export async function listClientOrders(
   auth: AuthContext,
+  signal: AbortSignal,
 ): Promise<AccountOrderResult> {
   validateClientAuth(auth);
-  const clientId = await findActiveClient(auth);
-  const items = await findClientOrdersByClientId(clientId);
+  const items = await withCancellableRead(signal, async query =>
+    findClientOrdersByClientId(await findActiveClient(auth, query), query),
+  );
 
   return {
     status: 200,
@@ -128,6 +131,7 @@ export async function listClientOrders(
 export async function getClientOrderDetail(
   auth: AuthContext,
   orderIdParam: unknown,
+  signal: AbortSignal,
 ): Promise<AccountOrderResult> {
   validateClientAuth(auth);
 
@@ -140,8 +144,9 @@ export async function getClientOrderDetail(
     );
   }
 
-  const clientId = await findActiveClient(auth);
-  const order = await findClientOrderDetailById(clientId, validation.orderId);
+  const order = await withCancellableRead(signal, async query =>
+    findClientOrderDetailById(await findActiveClient(auth, query), validation.orderId, query),
+  );
 
   if (!order) {
     return {
@@ -240,6 +245,7 @@ export async function confirmAccountOrder(
   auth: AuthContext,
   value: unknown,
   quoteToken: unknown,
+  notify?: NotifyCommittedChange,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -255,19 +261,22 @@ export async function confirmAccountOrder(
   }
 
   let workFailure: { error: unknown } | undefined;
+  let committed: { result: AccountOrderResult; change?: CommittedChange };
 
   try {
-    return await inTransaction(async manager => {
+    committed = await inTransaction(async manager => {
       try {
         const attempt = await lockAccountOrderAttempt(manager, clientId, key);
 
         if (attempt && attempt.state !== 'PENDIENTE') {
-          return presentStoredAccountOrder(attempt);
+          return { result: presentStoredAccountOrder(attempt) };
         }
 
-        return await executePendingAccountOrder(
+        const { productIds, ...result } = await executePendingAccountOrder(
           manager, auth, clientId, key, quoteToken,
         );
+        const { pedidoId, estado } = result.body.data;
+        return { result, change: { kind: 'order', clientId, order: { pedidoId, estado }, productIds } };
       } catch (error) {
         workFailure = { error };
         throw error;
@@ -308,4 +317,9 @@ export async function confirmAccountOrder(
       },
     };
   }
+
+  // Recovery and historical responses never reach this branch with a fresh order.
+  // The transaction wrapper has acknowledged COMMIT and released its connection.
+  if (committed.change) notifyAfterCommit(notify, committed.change);
+  return committed.result;
 }

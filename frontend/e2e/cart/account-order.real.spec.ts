@@ -9,6 +9,8 @@ async function signIn(page: import('@playwright/test').Page) {
 }
 
 test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda compra', async ({ page, context }) => {
+  // Conserva una cotización desactualizada y ejercita la recuperación manual con el transporte caído.
+  await context.route('**/socket.io/**', route => route.abort())
   let dropPostResponse = false
   let failCartRead = false
   await page.route('**/api/pedidos/cuenta-corriente', async route => {

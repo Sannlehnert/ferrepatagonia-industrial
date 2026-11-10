@@ -16,6 +16,7 @@ import { adminAccountPrivacy } from './middlewares/adminAccountPrivacy.middlewar
 import { cuentaCorrienteRouter } from './routes/cuentaCorriente.routes';
 import { accountOrderPrivateResponses } from './middlewares/account-order-http.middleware';
 import { accountOrderRouter, clientOrderRouter } from './routes/accountOrder.routes';
+import { receiptRouter } from './routes/paymentReceipt.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
@@ -26,6 +27,7 @@ app.use(
 );
 
 app.use(adminAccountPrivacy);
+app.use(/^\/api\/(?:cuenta-corriente|admin)\/comprobantes(?=\/|$)/i, accountOrderPrivateResponses);
 app.use('/api', httpSecurity(env.httpSecurity));
 
 app.use(cookieParser());
@@ -33,6 +35,7 @@ app.use(authPassport.initialize());
 
 // Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
 app.use('/api/auth', authRouter);
+app.use('/api', receiptRouter);
 app.use(express.json());
 app.use('/api', healthRouter);
 app.use('/api', catalogRouter);

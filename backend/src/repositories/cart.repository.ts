@@ -62,18 +62,25 @@ export async function findCartItem(manager: EntityManager, cartId: number, produ
 }
 
 export async function saveCartItem(manager: EntityManager, cartId: number, productId: number,
-    quantity: number, existing?: { id_item_carrito: number; cantidad: number }): Promise<void> {
+    quantity: number, existing?: { id_item_carrito: number; cantidad: number }): Promise<boolean> {
     if (!existing) {
         await manager.query('INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, ?, ?)',
             [cartId, productId, quantity]);
-    } else if (existing.cantidad !== quantity) {
+        return true;
+    }
+    if (existing.cantidad !== quantity) {
         await manager.query('UPDATE ITEM_CARRITO SET cantidad = ? WHERE id_carrito = ? AND id_item_carrito = ?',
             [quantity, cartId, existing.id_item_carrito]);
+        return true;
     }
+    return false;
 }
 
-export async function removeCartItem(manager: EntityManager, cartId: number, productId: number): Promise<void> {
-    await manager.query('DELETE FROM ITEM_CARRITO WHERE id_carrito = ? AND id_producto = ?', [cartId, productId]);
+export async function removeCartItem(manager: EntityManager, cartId: number, productId: number): Promise<boolean> {
+    const result = await manager.query(
+        'DELETE FROM ITEM_CARRITO WHERE id_carrito = ? AND id_producto = ?', [cartId, productId],
+    );
+    return result.affectedRows > 0;
 }
 
 export const findCartItems = async (manager: EntityManager, idCarrito: number): Promise<CartItemRecord[]> => {

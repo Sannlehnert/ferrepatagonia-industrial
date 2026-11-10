@@ -1,5 +1,6 @@
 import { dataSource, inTransaction } from '../config/database.config';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
+import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
 
 export interface ProductRecord {
     id_producto: number;
@@ -75,7 +76,7 @@ export const create = async (data: CreateProductDTO): Promise<number> => {
     return Number(result.identifiers[0].id_producto);
 };
 
-export const update = async (id: number, data: UpdateProductDTO): Promise<boolean> => {
+export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange): Promise<boolean> => {
     // Never spread HTTP input into an entity; ignored keys stay ignored.
     const values: Record<string, string | number | null> = {};
     for (const field of ['id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo'] as const) {
@@ -85,8 +86,21 @@ export const update = async (id: number, data: UpdateProductDTO): Promise<boolea
             : field === 'activo' ? Number(value) : field === 'precio' ? String(value) : value as string | number | null;
     }
     if (!Object.keys(values).length) return false;
-    return ((await inTransaction(manager => manager.getRepository(ProductoSchema).update({ id_producto: id }, values))).affected ?? 0) > 0;
+    const { updated, stockChanged } = await inTransaction(async manager => {
+        // Compare under the same row lock as the update, including a PUT with other fields.
+        const [before] = notify && data.stock !== undefined
+            ? await manager.query<{ stock: number }[]>(
+                'SELECT stock FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
+            )
+            : [];
+        const result = await manager.getRepository(ProductoSchema).update({ id_producto: id }, values);
+        const updated = (result.affected ?? 0) > 0;
+        return { updated, stockChanged: updated && before !== undefined && before.stock !== data.stock };
+    });
+    if (stockChanged) notifyAfterCommit(notify, { kind: 'stock', productIds: [id] });
+    return updated;
 };
 
 export const deactivate = async (id: number): Promise<boolean> => update(id, { activo: false });
-export const updateStock = async (id: number, stock: number): Promise<boolean> => update(id, { stock });
+export const updateStock = async (id: number, stock: number, notify?: NotifyCommittedChange): Promise<boolean> =>
+    update(id, { stock }, notify);

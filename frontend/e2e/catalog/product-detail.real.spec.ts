@@ -1,5 +1,30 @@
 import { expect, test } from '@playwright/test'
 
+test('catálogo abre el detalle y conserva búsqueda, categoría y página al volver', async ({ page }) => {
+  await page.goto('/catalogo?categoria=1&busqueda=Producto%20E2E&page=2')
+
+  const productLink = page.getByRole('link', { name: 'Producto E2E 13', exact: true })
+  await expect(productLink).toBeVisible()
+  await productLink.click()
+
+  await expect(page).toHaveURL(/\/producto\/13\?returnTo=/)
+  await expect(page.getByRole('heading', { name: 'Producto E2E 13', exact: true })).toBeVisible()
+
+  const returnLink = page.getByRole('link', { name: 'Volver al catálogo' }).first()
+  await expect(returnLink).toHaveAttribute(
+    'href',
+    '/catalogo?categoria=1&busqueda=Producto%20E2E&page=2',
+  )
+  await returnLink.click()
+
+  await expect(page).toHaveURL('/catalogo?categoria=1&busqueda=Producto%20E2E&page=2')
+  const filters = page.getByRole('form', { name: 'Buscar y filtrar productos' })
+  await expect(filters.getByRole('searchbox', { name: 'Nombre o código' })).toHaveValue('Producto E2E')
+  await expect(filters.getByRole('combobox', { name: 'Categoría', exact: true })).toHaveValue('1')
+  await expect(page.getByRole('navigation', { name: 'Paginación del catálogo' }))
+    .toContainText('Página 2 de 2')
+})
+
 test('detalle público usa catálogo, FER-17 y carrito reales', async ({ page }) => {
   const apiDetail = await page.request.get('/api/catalogo/24')
   expect(apiDetail.status()).toBe(200)
