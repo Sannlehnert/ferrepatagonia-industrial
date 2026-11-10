@@ -16,7 +16,7 @@ const credentials = {
   },
 };
 
-async function seedFixtures(connection, { includeAccountOrderFixture = true } = {}) {
+async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false } = {}) {
   const [current] = await connection.query("SELECT DATABASE() AS databaseName");
 
   assert.match(current.databaseName, /^e2e_test_[a-f0-9]{32}$/);
@@ -114,6 +114,23 @@ async function seedFixtures(connection, { includeAccountOrderFixture = true } = 
     }
 
     const hash = await bcrypt.hash(credentials.admin.password, 10);
+    if (includeReceiptFixture) {
+      await connection.query(
+        "INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total) VALUES " +
+        "(1, 'CONFIRMADO', 'TRANSFERENCIA', 42, 0, 42, 'USD'), (4, 'CONFIRMADO', 'CUENTA_CORRIENTE', 84, 0, 84, 'USD')",
+      );
+      await connection.query(`
+        INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE (
+          id_cuenta_corriente, tipo_movimiento, origen, id_pedido, monto, moneda,
+          fecha_base_civil, plazo_aplicado, vence_el, huella_registro, evidencia_origen, monto_original, moneda_original
+        )
+        SELECT cc.id_cuenta_corriente, 'CARGO', 'PEDIDO', p.id_pedido, p.total, 'USD',
+               UTC_DATE(), 30, UTC_DATE() + INTERVAL 30 DAY, SHA2('TEST-ONLY #275', 256),
+               JSON_OBJECT('fixture', '#275'), p.total, 'USD'
+        FROM PEDIDO p INNER JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = p.id_cliente
+        WHERE p.id_cliente = 4
+      `);
+    }
 
     await connection.query(
       `

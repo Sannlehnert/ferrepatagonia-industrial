@@ -462,3 +462,33 @@ CREATE TABLE IF NOT EXISTS DETALLE_PEDIDO_CC_PRECIO (
 ) ENGINE=InnoDB
   DEFAULT CHARSET=utf8mb4
   COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE IF NOT EXISTS COMPROBANTE_PAGO (
+    id_comprobante CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    id_cliente INT NOT NULL,
+    id_usuario_carga INT NOT NULL,
+    id_pedido INT NULL,
+    id_cuenta_corriente INT NULL,
+    pedido_clave INT AS (IFNULL(id_pedido, 0)) PERSISTENT,
+    tipo_mime VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    bytes INT UNSIGNED NOT NULL,
+    sha256 BINARY(32) NOT NULL,
+    fecha_utc DATETIME(3) NOT NULL,
+    id_admin_revision INT NULL,
+    revision_utc DATETIME(3) NULL,
+    PRIMARY KEY (id_comprobante),
+    UNIQUE KEY uq_comprobante_contenido (id_cliente, pedido_clave, sha256),
+    KEY idx_comprobante_pedido (id_pedido, fecha_utc),
+    KEY idx_comprobante_cuenta (id_cuenta_corriente, fecha_utc),
+    KEY idx_comprobante_fecha (fecha_utc, id_comprobante),
+    CONSTRAINT fk_comprobante_cliente FOREIGN KEY (id_cliente) REFERENCES CLIENTE (id_cliente),
+    CONSTRAINT fk_comprobante_usuario FOREIGN KEY (id_usuario_carga) REFERENCES USUARIO (id_usuario),
+    CONSTRAINT fk_comprobante_pedido FOREIGN KEY (id_pedido) REFERENCES PEDIDO (id_pedido),
+    CONSTRAINT fk_comprobante_cuenta FOREIGN KEY (id_cuenta_corriente) REFERENCES CUENTA_CORRIENTE (id_cuenta_corriente),
+    CONSTRAINT fk_comprobante_admin FOREIGN KEY (id_admin_revision) REFERENCES USUARIO (id_usuario),
+    CONSTRAINT chk_comprobante_destino CHECK (id_pedido IS NOT NULL OR id_cuenta_corriente IS NOT NULL),
+    CONSTRAINT chk_comprobante_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
+    CONSTRAINT chk_comprobante_bytes CHECK (bytes BETWEEN 1 AND 5242880),
+    CONSTRAINT chk_comprobante_revision CHECK ((id_admin_revision IS NULL) = (revision_utc IS NULL))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
