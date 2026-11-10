@@ -278,7 +278,6 @@ onBeforeUnmount(() => {
             <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">
               <RouterLink
                 :to="{ name: 'producto-detalle', params: { id: p.id }, query: { returnTo: route.fullPath } }"
-                :aria-label="`Ver detalle: ${p.nombre}`"
                 class="rounded-sm text-inherit underline-offset-2 hover:text-[var(--fp-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fp-blue)]"
               >
                 {{ p.nombre }}

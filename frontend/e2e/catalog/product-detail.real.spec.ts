@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test('catálogo abre el detalle y conserva búsqueda, categoría y página al volver', async ({ page }) => {
   await page.goto('/catalogo?categoria=1&busqueda=Producto%20E2E&page=2')
 
-  const productLink = page.getByRole('link', { name: 'Ver detalle: Producto E2E 13' })
+  const productLink = page.getByRole('link', { name: 'Producto E2E 13', exact: true })
   await expect(productLink).toBeVisible()
   await productLink.click()
 
