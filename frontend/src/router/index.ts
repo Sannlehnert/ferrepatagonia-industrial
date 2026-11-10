@@ -69,12 +69,7 @@ const router = createRouter({
         {
           path: 'categorias',
           name: 'admin-categories',
-          component: () =>
-            import('@/views/admin/AdminSectionPlaceholderView.vue'),
-          props: {
-            title: 'Categorías',
-            description: 'Organización de las categorías del catálogo.',
-          },
+          component: () => import('@/views/admin/AdminCategoriesView.vue'),
         },
         {
           path: 'clientes',
