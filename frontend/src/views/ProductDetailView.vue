@@ -5,6 +5,7 @@ import ProductPrices from '@/components/ProductPrices.vue'
 import { getCatalogProduct } from '@/services/catalogService'
 import { refreshOnStock } from '@/services/realtime'
 import type { CatalogProduct, CatalogProductDetail } from '@/types/catalog'
+import { getProductImageSource } from '@/utils/productImage'
 import axios from 'axios'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -34,16 +35,14 @@ const returnTarget = computed(() => {
   return { name: 'catalogo' }
 })
 
-const imageSource = computed(() => {
-  const value = product.value?.imagen?.trim()
-  if (!value) return null
-  try {
-    const parsed = new URL(value, window.location.origin)
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href : null
-  } catch {
-    return null
-  }
+const returnLabel = computed(() => {
+  const target = returnTarget.value
+  return typeof target === 'string' && target.split('?')[0] === '/'
+    ? 'Volver al inicio'
+    : 'Volver al catálogo'
 })
+
+const imageSource = computed(() => getProductImageSource(product.value?.imagen))
 
 async function loadProduct() {
   controller?.abort()
@@ -81,31 +80,31 @@ onBeforeUnmount(() => controller?.abort())
 </script>
 
 <template>
-  <main class="mx-auto max-w-7xl px-4 py-6 text-slate-900 sm:px-6 lg:py-10">
+  <main class="fp-shell py-6 lg:py-10">
     <nav aria-label="Ruta de navegación" class="mb-5 text-sm">
-      <RouterLink :to="{ name: 'home' }" class="text-[#145a8d] underline">Inicio</RouterLink>
+      <RouterLink :to="{ name: 'home' }" class="fp-focus text-[var(--fp-blue)] underline">Inicio</RouterLink>
       <span aria-hidden="true"> / </span>
-      <RouterLink :to="returnTarget" class="text-[#145a8d] underline">Volver al catálogo</RouterLink>
+      <RouterLink :to="returnTarget" class="fp-focus text-[var(--fp-blue)] underline">{{ returnLabel }}</RouterLink>
       <span aria-hidden="true"> / </span>
       <span>Detalle del producto</span>
     </nav>
 
-    <h1 class="mb-6 mt-0 text-2xl font-bold text-[#103a5c] sm:text-3xl">
+    <h1 class="fp-section-title detail-title">
       {{ product?.nombre ?? 'Detalle del producto' }}
     </h1>
 
-    <p v-if="loading" role="status">Cargando detalle del producto…</p>
+    <p v-if="loading" class="fp-state" role="status">Cargando detalle del producto…</p>
 
-    <section v-else-if="notFound" role="status" class="rounded-lg border border-slate-200 p-5">
-      <p class="m-0">No encontramos ese producto en el catálogo.</p>
-      <RouterLink :to="returnTarget" class="mt-3 inline-flex min-h-11 items-center text-[#145a8d] underline">
-        Volver al catálogo
+    <section v-else-if="notFound" class="fp-state">
+      <p class="m-0" role="status">No encontramos ese producto en el catálogo.</p>
+      <RouterLink :to="returnTarget" class="fp-action fp-action--plain fp-focus mt-3">
+        {{ returnLabel }}
       </RouterLink>
     </section>
 
-    <section v-else-if="error" role="alert" class="rounded-lg border border-amber-300 bg-amber-50 p-5">
-      <p class="m-0">No se pudo cargar el detalle del producto.</p>
-      <button type="button" class="mt-3 min-h-11 rounded-md bg-[#145a8d] px-4 font-semibold text-white" @click="loadProduct">
+    <section v-else-if="error" class="fp-state">
+      <p class="fp-error m-0" role="alert">No se pudo cargar el detalle del producto.</p>
+      <button type="button" class="fp-action fp-action--primary fp-focus mt-3" @click="loadProduct">
         Reintentar
       </button>
     </section>
@@ -159,3 +158,7 @@ onBeforeUnmount(() => controller?.abort())
     </ProductPrices>
   </main>
 </template>
+
+<style scoped>
+.detail-title { margin-bottom: 1.5rem; overflow-wrap: anywhere; }
+</style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import PublicHeader from '@/components/PublicHeader.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
@@ -10,6 +10,13 @@ import { useCartPanelStore } from '@/stores/cartPanel'
 const auth = useAuthStore()
 const panel = useCartPanelStore()
 const route = useRoute()
+const content = ref<HTMLElement | null>(null)
+
+function focusContent() {
+  const anchor = route.hash ? document.getElementById(route.hash.slice(1)) : null
+  const destination = anchor && content.value?.contains(anchor) ? anchor : content.value
+  destination?.focus({ preventScroll: true })
+}
 
 watch(() => route.fullPath, () => panel.close())
 
@@ -20,10 +27,11 @@ watch(
 </script>
 
 <template>
-  <div class="flex min-h-screen flex-col bg-[#f8fafc]">
-    <PublicHeader />
+  <div class="fp-public flex min-h-screen flex-col bg-[#f8fafc]">
+    <a href="#contenido-principal" class="fp-skip fp-focus" @click.prevent="content?.focus()">Ir al contenido principal</a>
+    <PublicHeader @navigate="focusContent" />
 
-    <div class="min-w-0 flex-1">
+    <div id="contenido-principal" ref="content" tabindex="-1" class="min-w-0 flex-1">
       <RouterView />
     </div>
 

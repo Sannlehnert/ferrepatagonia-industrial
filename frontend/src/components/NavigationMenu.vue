@@ -31,7 +31,7 @@ const linkClasses = computed(() => {
 
     switch (props.variant) {
         case 'admin':
-            return `${base} text-white hover:bg-[#103a5c] focus-visible:outline-white [&.router-link-active]:bg-[#145a8d] [&.router-link-active]:font-bold`
+            return `${base} border-s-2 border-transparent text-white hover:bg-[var(--fp-steel)] focus-visible:outline-[var(--fp-amber-light)] [&.router-link-active]:border-[var(--fp-amber-light)] [&.router-link-active]:bg-[var(--fp-steel)] [&.router-link-active]:font-bold`
         case 'account':
             return `${base} text-[#103a5c] hover:bg-slate-100 focus-visible:outline-[#145a8d] [&.router-link-active]:bg-[#e6eff6] [&.router-link-active]:font-semibold`
         case 'public':
