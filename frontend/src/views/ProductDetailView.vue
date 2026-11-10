@@ -3,6 +3,7 @@ import CatalogCartButton from '@/components/CatalogCartButton.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
 import ProductPrices from '@/components/ProductPrices.vue'
 import { getCatalogProduct } from '@/services/catalogService'
+import { refreshOnStock } from '@/services/realtime'
 import type { CatalogProduct, CatalogProductDetail } from '@/types/catalog'
 import { getProductImageSource } from '@/utils/productImage'
 import axios from 'axios'
@@ -73,6 +74,7 @@ async function loadProduct() {
 }
 
 watch(id, () => void loadProduct())
+refreshOnStock(ids => id.value !== null && ids.has(id.value), () => void loadProduct())
 onMounted(() => void loadProduct())
 onBeforeUnmount(() => controller?.abort())
 </script>

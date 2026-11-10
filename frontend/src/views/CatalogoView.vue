@@ -6,6 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import CatalogFilters from '@/components/CatalogFilters.vue'
 import { getCatalog, getCatalogCategories } from '@/services/catalogService'
+import { refreshOnStock } from '@/services/realtime'
 import {
   MAX_PAGINA_CATALOGO,
   normalizarQueryPagina,
@@ -196,6 +197,7 @@ async function cargar() {
 
 // Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
 watch([categoriaId, () => route.query.page, busqueda], cargar)
+refreshOnStock(ids => cargando.value || productos.value.some(product => ids.has(product.id)), () => void cargar())
 onMounted(() => {
   void cargar()
   void cargarCategorias()
