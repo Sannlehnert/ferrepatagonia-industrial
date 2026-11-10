@@ -14,14 +14,14 @@ import { PricingService } from './services/pricing/pricing.service';
 import { createPricingRouter } from './routes/pricing.routes';
 import { adminAccountPrivacy } from './middlewares/adminAccountPrivacy.middleware';
 import { cuentaCorrienteRouter } from './routes/cuentaCorriente.routes';
-import {accountOrderPrivateResponses} from './middlewares/account-order-http.middleware';
-import {accountOrderRouter} from './routes/accountOrder.routes';
+import { accountOrderPrivateResponses } from './middlewares/account-order-http.middleware';
+import { accountOrderRouter, clientOrderRouter } from './routes/accountOrder.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
 
 app.use(
-  '/api/pedidos/cuenta-corriente',
+  '/api/pedidos',
   accountOrderPrivateResponses,
 );
 
@@ -42,6 +42,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/carrito', cartRouter);
 app.use('/api/cuenta-corriente', cuentaCorrienteRouter);
 app.use('/api/pedidos/cuenta-corriente', accountOrderRouter);
+app.use('/api/pedidos', clientOrderRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: 'Ruta no encontrada' });

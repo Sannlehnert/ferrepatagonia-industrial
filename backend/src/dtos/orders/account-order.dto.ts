@@ -23,6 +23,30 @@ const confirmationKeyPolicy: DtoPolicy<ConfirmationKey> = {
   }),
 };
 
+class OrderIdParams {
+  @Rule(value =>
+    typeof value === 'number' &&
+    Number.isInteger(value) &&
+    value >= 1 &&
+    value <= 2147483647
+      ? null
+      : 'Indicá un identificador de pedido válido.',
+  )
+  id!: number;
+}
+
+const orderIdPolicy: DtoPolicy<OrderIdParams> = {
+  type: OrderIdParams,
+  fields: ['id'],
+  objectError: 'Solicitud inválida.',
+  unknownError: 'La solicitud contiene campos no permitidos.',
+  prepare: input => ({
+    id: typeof input.id === 'string' && /^[1-9]\d{0,9}$/.test(input.id)
+      ? Number(input.id)
+      : input.id,
+  }),
+};
+
 export async function validateConfirmationKey(value: unknown) {
   const result = await validateDtoInput(
     confirmationKeyPolicy,
@@ -40,6 +64,26 @@ export async function validateConfirmationKey(value: unknown) {
   return {
     valid: true as const,
     key: result.data.clave,
+  };
+}
+
+export async function validateOrderIdParam(value: unknown) {
+  const result = await validateDtoInput(
+    orderIdPolicy,
+    { id: value },
+  );
+
+  if (!result.valid) {
+    return {
+      valid: false as const,
+      code: 'PEDIDO_ID_INVALIDO',
+      message: result.message,
+    };
+  }
+
+  return {
+    valid: true as const,
+    orderId: result.data.id,
   };
 }
 

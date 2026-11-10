@@ -64,6 +64,7 @@ async function run(mode = process.argv[2] || 'all') {
           'test/account-order-service.test.cjs',
           'test/account-order-http.test.cjs',
           'test/account-order-process.test.cjs',
+          'test/client-orders.test.cjs',
         ]
       : mode === 'baseline'
         ? ['test/cc260.regression.test.cjs']
