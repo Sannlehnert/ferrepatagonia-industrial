@@ -18,20 +18,26 @@ export const useAuthStore = defineStore('auth', {
     rol: (s) => s.user?.rol ?? null,
   },
   actions: {
-    async fetchSession() {
+    async fetchSession(background = false) {
       const version = this.sessionVersion
       try {
         const { data } = await api.get<{ user: UsuarioSesion }>('/auth/me')
-        if (version !== this.sessionVersion) return
-        if (this.user?.id !== data.user.id) this.sessionVersion = advanceSessionGeneration()
+        if (version !== this.sessionVersion) return false
+        if (this.user?.id !== data.user.id || this.user?.rol !== data.user.rol) {
+          this.sessionVersion = advanceSessionGeneration()
+        }
         this.user = data.user
         this.sessionError = ''
         this.sessionChecked = true
+        return true
       } catch (error) {
-        if (version !== this.sessionVersion) return
-        if (axios.isAxiosError(error) && error.response?.status === 401) this.clear()
+        if (version !== this.sessionVersion) return false
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          this.clear()
+          return false
+        }
         else {
-          this.sessionError = 'No se pudo verificar la sesión. Reintentá antes de continuar.'
+          if (!background) this.sessionError = 'No se pudo verificar la sesión. Reintentá antes de continuar.'
           throw error
         }
       }
