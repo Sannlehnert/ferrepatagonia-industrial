@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, watch } from 'vue'
+import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { getClientOrderDetail } from '@/services/clientOrderService'
+import { orderReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderDetail } from '@/types/clientOrder'
 
@@ -13,6 +15,10 @@ const allowed = () => auth.isAuthenticated && auth.rol === 'CLIENTE'
 const { data: detail, loading, error, load } = usePrivateAccountRead<ClientOrderDetail>(
   identity,
   allowed,
+)
+const showsReceipts = computed(() =>
+  (auth.user?.tipo_cliente === 'PARTICULAR' && detail.value?.modalidadPago === 'TRANSFERENCIA') ||
+  (auth.user?.tipo_cliente === 'EMPRESA' && detail.value?.modalidadPago === 'CUENTA_CORRIENTE'),
 )
 
 function loadDetail() {
@@ -54,6 +60,7 @@ watch([identity, () => props.orderId], () => void loadDetail(), {
           <p class="m-0">Subtotal de la línea {{ item.subtotal }} {{ detail.moneda ?? '' }}</p>
         </li>
       </ul>
+      <PaymentReceipts v-if="showsReceipts" :path="orderReceiptsPath(orderId)" mode="pedido" />
     </template>
   </div>
 </template>

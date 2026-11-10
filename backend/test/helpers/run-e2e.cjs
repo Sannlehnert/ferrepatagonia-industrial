@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { fork, spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { newProfile } = require('./cc260-disposable.cjs');
 const { openDatabase, prepareDatabase, removeDatabase } = require('./admin-account-db.cjs');
@@ -13,11 +14,13 @@ const frontend = path.join(root, 'frontend');
 const profile = newProfile('E2E');
 const args = process.argv.slice(2);
 const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
-const testArgs = args.filter(arg => arg !== '--fer19' && arg !== '--fer19-production');
+const receipts = args.includes('--receipts');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts'].includes(arg));
 
 const services = [];
 let connection;
 let testProcess;
+let receiptStorage;
 let containerCreationAttempted = false;
 let interrupted = false;
 function startService(file, cwd, env) {
@@ -113,7 +116,8 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: false });
+  if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: receipts, includeReceiptFixture: receipts });
+  if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);
@@ -144,6 +148,8 @@ async function main() {
     E2E_ISOLATED: '1',
     JWT_SECRET: randomUUID(),
     E2E_FER19: fer19,
+    E2E_RECEIPTS: receipts ? '1' : '',
+    RECEIPT_STORAGE_DIR: receiptStorage ?? '',
     DB_HOST: profile.host,
     DB_PORT: String(profile.port),
     DB_NAME: profile.database,
@@ -169,6 +175,7 @@ async function main() {
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
     E2E_FER19: fer19,
+    E2E_RECEIPTS: receipts ? '1' : '',
   };
   if (fer19 === 'production') browserEnv.E2E_PRODUCTION_BUILD = '1';
   else if (fer19) browserEnv.E2E_PRODUCTION_BUILD = '0';
@@ -244,6 +251,11 @@ async function cleanup() {
       console.error(`No se pudo confirmar la limpieza de ${profile.container}`);
       failed = true;
     }
+  }
+
+  if (receiptStorage) {
+    try { fs.rmSync(receiptStorage, { recursive: true, force: true }); }
+    catch { failed = true; }
   }
 
   if (failed) process.exitCode = 1;

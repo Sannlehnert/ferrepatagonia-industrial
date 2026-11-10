@@ -1,4 +1,5 @@
 import { dataSource } from '../config/database.config';
+import type { QueryRunner } from 'typeorm';
 import { UsuarioSchema } from '../entities/active.schemas';
 import type { Role } from '../types/auth';
 interface UsuarioSessionRow {
@@ -11,8 +12,10 @@ function sessionQuery() {
     .addSelect('u.rol', 'rol').addSelect('u.activo', 'activo')
     .addSelect('c.nombre_razon_social', 'nombre_razon_social').addSelect('c.tipo_cliente', 'tipo_cliente');
 }
-export async function findUsuarioById(id: number): Promise<UsuarioSessionRow | null> {
-  return await sessionQuery().where('u.id_usuario = :id', { id }).getRawOne<UsuarioSessionRow>() ?? null;
+export async function findUsuarioById(id: number, runner?: QueryRunner): Promise<UsuarioSessionRow | null> {
+  const query = sessionQuery().where('u.id_usuario = :id', { id });
+  if (runner) query.setQueryRunner(runner);
+  return await query.getRawOne<UsuarioSessionRow>() ?? null;
 }
 export async function findUsuarioByEmail(email: string) {
   return sessionQuery().addSelect('u.password_hash', 'password_hash')

@@ -7,6 +7,7 @@ import {
   validateConfirmationBody,
 } from '../dtos/orders/account-order.dto';
 import { cartAdmission } from '../services/cart.admission';
+import { orderHistoryAdmission } from '../services/orders/order-history-admission';
 import { CartError } from '../services/cart.errors';
 import {
   AccountOrderError,
@@ -143,26 +144,27 @@ export function handleClientOrderRead(
   operation: OrderReadOperation,
 ): RequestHandler {
   return async (req, res) => {
+    const cancellation = new AbortController();
+    const disconnect = () => cancellation.abort();
+    res.once('close', disconnect);
+    if (res.destroyed) disconnect();
+
     try {
-      if (!await authenticateRequest(req, res)) {
-        return;
-      }
+      await orderHistoryAdmission.run(cancellation.signal, async () => {
+        if (!await authenticateRequest(req, res, cancellation.signal)) return;
+        if (!authorizeRequest(req, res, ['CLIENTE'])) return;
+        validateRequest(req, operation);
 
-      if (!authorizeRequest(req, res, ['CLIENTE'])) {
-        return;
-      }
-
-      validateRequest(req, operation);
-
-      const result = operation === 'list'
-        ? await listClientOrders(req.auth!)
-        : await getClientOrderDetail(req.auth!, req.params.id);
-
-      res.status(result.status).json(result.body);
+        const result = operation === 'list'
+          ? await listClientOrders(req.auth!, cancellation.signal)
+          : await getClientOrderDetail(req.auth!, req.params.id, cancellation.signal);
+        if (!cancellation.signal.aborted) res.status(result.status).json(result.body);
+      });
     } catch (error) {
-      if (res.headersSent) return;
+      if (cancellation.signal.aborted || res.headersSent) return;
 
       if (error instanceof AccountOrderError) {
+        if (error.status === 503) res.setHeader('Retry-After', '1');
         res.status(error.status).json({
           code: error.code,
           message: error.message,
@@ -174,6 +176,8 @@ export function handleClientOrderRead(
         code: 'CONSULTA_PEDIDOS_NO_DISPONIBLE',
         message: 'El historial de pedidos no está disponible temporalmente. Reintentá en unos instantes.',
       });
+    } finally {
+      res.removeListener('close', disconnect);
     }
   };
 }

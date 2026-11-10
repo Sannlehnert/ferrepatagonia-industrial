@@ -59,7 +59,7 @@ async function main() {
     await initializeDatabase();
     if (process.env.E2E_FER19) {
       fer19Fixture = await seedDemo(session, { browser: true });
-    } else {
+    } else if (process.env.E2E_RECEIPTS !== "1") {
       fixture = await seedAdminAccounts(session, { browser: true });
     }
   } finally {
