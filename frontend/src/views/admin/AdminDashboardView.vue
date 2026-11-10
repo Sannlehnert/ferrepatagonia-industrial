@@ -16,21 +16,51 @@ const metrics: readonly DashboardMetric[] = [
 </script>
 
 <template>
-    <section aria-labelledby="admin-dashboard-title">
-        <header class="mb-6">
-            <h1 id="admin-dashboard-title" class="m-0 mb-3 text-[28px] font-semibold">Dashboard</h1>
-            <p class="m-0 leading-6 text-slate-600">Vista de estructura con datos de ejemplo. No representa actividad real.</p>
+    <section class="dashboard" aria-labelledby="admin-dashboard-title">
+        <header class="dashboard-head">
+            <p class="fp-kicker">Administración</p>
+            <h1 id="admin-dashboard-title" class="fp-section-title">Dashboard</h1>
+            <p class="dashboard-note">Vista de estructura con datos de ejemplo. No representa actividad real.</p>
         </header>
 
-        <dl class="m-0 grid max-w-[900px] grid-cols-1 gap-6 min-[501px]:grid-cols-2 min-[1001px]:grid-cols-3">
+        <dl class="dashboard-metrics">
             <div
                 v-for="metric in metrics"
                 :key="metric.id"
-                class="rounded-lg border border-slate-200 bg-slate-50 p-6"
+                class="dashboard-metric"
             >
-            <dt class="text-sm leading-6">{{ metric.label }}</dt>
-            <dd class="m-0 mt-3 text-[28px] font-bold text-[#145a8d]">{{ metric.value }}</dd>
+                <dt>{{ metric.label }}</dt>
+                <dd>{{ metric.value }}</dd>
             </div>
         </dl>
     </section>
 </template>
+
+<style scoped>
+.dashboard { max-width: 1100px; }
+.dashboard-head { padding-block: .65rem 1.3rem; border-bottom: 1px solid var(--fp-line); }
+.dashboard-note { max-width: 62ch; margin: .8rem 0 0; color: var(--fp-muted); }
+.dashboard-metrics {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: .9rem;
+    margin: 1.15rem 0 0;
+}
+.dashboard-metric {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--fp-line);
+    border-top: 3px solid var(--fp-blue);
+    border-radius: var(--fp-radius);
+    background: var(--fp-bg);
+    padding: 1.05rem;
+}
+dt { color: var(--fp-muted); font-size: .875rem; font-weight: 700; }
+dd { margin: auto 0 0; padding-top: .6rem; color: var(--fp-navy); font-size: 2rem; font-weight: 800; line-height: 1; }
+@media (min-width: 500px) {
+    .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1000px) {
+    .dashboard-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+</style>

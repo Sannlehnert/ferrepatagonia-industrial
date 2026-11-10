@@ -1,14 +1,27 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { RouterView, useRouter } from 'vue-router'
+import { computed, nextTick, ref, watch } from 'vue'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import AdminMenu from '@/components/AdminMenu.vue'
+import CommerceIcon from '@/components/CommerceIcon.vue'
+import PublicBrand from '@/components/PublicBrand.vue'
+import { useNavigationDisclosure } from '@/composables/useNavigationDisclosure'
 import { getPermissionsForRole, isRole } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 const saliendo = ref(false)
 const logoutError = ref('')
+const content = ref<HTMLElement | null>(null)
+const { expanded, trigger, panel, close, toggle, escape } = useNavigationDisclosure()
+
+watch(() => route.fullPath, async () => {
+    if (!expanded.value) return
+    close()
+    await nextTick()
+    content.value?.focus()
+})
 
 async function cerrarSesion() {
     if (saliendo.value) return
@@ -32,32 +45,92 @@ const permissions = computed(() => {
 </script>
 
 <template>
-    <div class="grid min-h-screen grid-cols-[220px_minmax(0,1fr)] bg-white text-[#0b2438] [@media(max-width:700px)]:grid-cols-1">
-        <aside class="flex flex-col bg-[#0b2438] text-white" aria-label="Panel administrativo">
-            <div class="flex flex-col gap-1 border-b border-[#33556f] px-5 py-8 [@media(max-width:700px)]:py-5">
-                <strong class="text-sm">FERREPATAGONIA</strong>
-                <span class="text-[10px] tracking-[3px] text-[#b7c6d4]">INDUSTRIAL</span>
-            </div>
-
-            <div class="flex-1 px-5 py-6 text-sm [@media(max-width:700px)]:py-5">
-                <AdminMenu :permissions="permissions" />
-            </div>
-
-            <div class="border-t border-[#33556f] p-5">
-                <p v-if="logoutError" role="alert" class="text-sm">{{ logoutError }}</p>
+    <div class="admin-frame">
+        <a href="#admin-content" class="fp-skip fp-focus" @click.prevent="content?.focus()">Ir al contenido principal</a>
+        <aside class="admin-sidebar fp-dark" aria-label="Panel administrativo" @keydown.esc="escape">
+            <div class="admin-top">
+                <PublicBrand inverse />
                 <button
+                    ref="trigger"
                     type="button"
-                    class="box-border min-h-11 w-full cursor-pointer rounded-md border-0 bg-transparent px-3 py-2 text-left text-sm text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white disabled:cursor-wait disabled:opacity-60"
-                    :disabled="saliendo"
-                    @click="cerrarSesion"
+                    class="admin-toggle fp-action fp-action--dark fp-focus"
+                    aria-label="Menú de administración"
+                    aria-controls="admin-sidebar-body"
+                    :aria-expanded="expanded"
+                    @click="toggle"
                 >
-                    {{ saliendo ? 'Saliendo...' : 'Cerrar sesión' }}
+                    <CommerceIcon :name="expanded ? 'close' : 'menu'" />
                 </button>
+            </div>
+
+            <div id="admin-sidebar-body" ref="panel" class="admin-sidebar-body" :class="{ 'is-open': expanded }">
+                <div class="admin-nav">
+                    <p class="fp-kicker">Administración</p>
+                    <AdminMenu :permissions="permissions" />
+                </div>
+                <div class="admin-actions">
+                    <RouterLink :to="{ name: 'home' }" class="admin-action fp-focus">
+                        <CommerceIcon name="back" /> Volver a la tienda
+                    </RouterLink>
+                    <p v-if="logoutError" role="alert" class="admin-logout-error">{{ logoutError }}</p>
+                    <button type="button" class="admin-action fp-focus" :disabled="saliendo" @click="cerrarSesion">
+                        <CommerceIcon name="exit" /> {{ saliendo ? 'Saliendo...' : 'Cerrar sesión' }}
+                    </button>
+                </div>
             </div>
         </aside>
 
-        <main class="min-w-0 p-8 [@media(max-width:700px)]:px-4 [@media(max-width:700px)]:py-6">
+        <main id="admin-content" ref="content" class="admin-main" tabindex="-1">
             <RouterView />
         </main>
     </div>
 </template>
+
+<style scoped>
+.admin-frame { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 100vh; color: var(--fp-navy); }
+.admin-sidebar { display: flex; flex-direction: column; background: var(--fp-navy); color: white; }
+.admin-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .65rem;
+    padding: .7rem 1rem;
+    border-bottom: 1px solid #36536a;
+    --fp-brand-width: 184px;
+}
+.admin-toggle { width: 44px; padding: 0; background: transparent; }
+.admin-sidebar-body { display: none; flex: 1; flex-direction: column; }
+.admin-sidebar-body.is-open { display: flex; }
+.admin-nav { flex: 1; padding: 1rem; font-size: .9rem; }
+.admin-nav .fp-kicker { margin: .4rem .6rem .75rem; }
+.admin-actions { display: grid; gap: .2rem; border-top: 1px solid #36536a; padding: .75rem 1rem; }
+.admin-action {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    width: 100%;
+    min-height: 44px;
+    padding: .5rem .7rem;
+    border: 0;
+    border-radius: var(--fp-radius);
+    background: transparent;
+    color: var(--fp-ink-soft);
+    font: inherit;
+    font-size: .875rem;
+    text-decoration: none;
+    text-align: start;
+    cursor: pointer;
+}
+.admin-action:hover { background: var(--fp-steel); color: white; }
+.admin-action:disabled { cursor: wait; opacity: .65; }
+.admin-logout-error { margin: 0; color: #ffb9b9; font-size: .875rem; }
+.admin-main { min-width: 0; padding: clamp(16px, 3vw, 44px); }
+@media (min-width: 800px) {
+    .admin-frame { grid-template-columns: 246px minmax(0, 1fr); grid-template-rows: 1fr; }
+    .admin-sidebar { position: sticky; top: 0; align-self: start; height: 100vh; overflow-y: auto; }
+    .admin-top { padding: 1.3rem 1rem; }
+    .admin-toggle { display: none; }
+    .admin-sidebar-body { display: flex; }
+}
+</style>
