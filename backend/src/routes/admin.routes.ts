@@ -30,5 +30,4 @@ adminRouter.put('/clientes/:id/lista-precio',
 adminRouter.use('/pedidos', adminOrderRouter);
 adminRouter.use('/productos/importar', productImportRouter);
 adminRouter.use('/productos', adminProductRouter);
-adminRouter.use('/productos', adminProductRouter);
 adminRouter.use('/categorias', adminCategoryRouter);
