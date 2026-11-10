@@ -74,7 +74,7 @@ async function enviar() {
     registration
     title="Crear cuenta"
     intro="Elegí cómo querés comprar y completá tus datos."
-    panel-title="Tu perfil, según cómo comprás."
+    panel-title="Tu cuenta industrial."
     panel-copy="Registrate a título personal o a nombre de una empresa. Desde tu cuenta vas a poder consultar tus pedidos."
   >
     <form ref="formElement" class="register-form" novalidate :aria-busy="enviando" @submit.prevent="enviar">
@@ -189,6 +189,7 @@ async function enviar() {
   .register-actions .fp-action { width: 100%; }
 }
 @media (min-width: 740px) {
+  .register-form { gap: 1rem; }
   .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .field-span { grid-column: 1 / -1; }
 }

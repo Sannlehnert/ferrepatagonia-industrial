@@ -84,7 +84,9 @@ defineProps<{
 @media (min-width: 740px) {
   .auth-header { padding-block: .85rem; }
   .auth-panel { grid-template-columns: minmax(0, .9fr) minmax(0, 1fr); }
+  .auth-shell--registration { padding-top: 1rem; }
   .auth-shell--registration .auth-panel { grid-template-columns: minmax(0, .68fr) minmax(0, 1.32fr); }
+  .auth-shell--registration .auth-content { padding: clamp(24px, 3vw, 40px); }
   .auth-editorial {
     isolation: isolate;
     position: relative;
@@ -109,5 +111,6 @@ defineProps<{
     mask-image: linear-gradient(145deg, transparent 30%, #000 85%);
   }
   .auth-shell--registration .auth-editorial { align-items: flex-start; }
+  .auth-shell--registration .auth-editorial-title { font-size: clamp(1.8rem, 3.5vw, 3.15rem); }
 }
 </style>

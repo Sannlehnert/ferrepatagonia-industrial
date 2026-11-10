@@ -174,6 +174,25 @@ test('Home usa la imagen del detalle y conserva la tarjeta si falla', async ({ p
   await expect(products(page).getByRole('link', { name: 'Ver producto: Producto E2E 02' })).toBeVisible()
 })
 
+test('Home conserva el nombre completo y el acceso a la ficha a 360 px', async ({ page }) => {
+  const name = 'Herramienta industrial para taller ' + 'MODELO'.repeat(14)
+  await page.setViewportSize({ width: 360, height: 800 })
+  await page.route('**/api/catalogo?*', async route => {
+    const response = await route.fetch()
+    const json = await response.json()
+    json.data.productos[0].nombre = name
+    await route.fulfill({ response, json })
+  }, { times: 1 })
+  await page.goto('/')
+  const article = products(page).getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) })
+  await expect(article.getByRole('heading')).toBeVisible()
+  const link = article.getByRole('link', { name: 'Ver producto: ' + name })
+  await expect(link).toBeVisible()
+  expect(await page.locator('html').evaluate(element => element.scrollWidth)).toBe(360)
+  await link.click()
+  await expect(page).toHaveURL(/\/producto\/1\?returnTo=/)
+})
+
 for (const width of [360, 390, 768, 1024, 1280, 1440]) {
   test('Home responsive y navegación con teclado a ' + width + ' px', async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })

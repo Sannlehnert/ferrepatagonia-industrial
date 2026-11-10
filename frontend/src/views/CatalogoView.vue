@@ -250,8 +250,8 @@ onBeforeUnmount(() => {
           <button type="button" class="fp-action fp-action--primary fp-focus" @click="cargar">Reintentar</button>
         </div>
 
-        <div v-else-if="!productos.length" class="fp-state">
-          <p class="m-0" role="status">
+        <div v-else-if="!productos.length" class="fp-state" role="status">
+          <p class="m-0">
             {{
               busqueda || categoriaId
                 ? 'No encontramos productos con esos filtros.'

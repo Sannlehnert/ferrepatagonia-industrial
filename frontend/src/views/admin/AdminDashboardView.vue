@@ -42,11 +42,25 @@ const metrics: readonly DashboardMetric[] = [
 .dashboard-note { max-width: 62ch; margin: .8rem 0 0; color: var(--fp-muted); }
 .dashboard-metrics {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: .9rem;
     margin: 1.15rem 0 0;
 }
-.dashboard-metric { border: 1px solid var(--fp-line); border-top: 3px solid var(--fp-blue); border-radius: var(--fp-radius); background: var(--fp-bg); padding: 1.05rem; }
+.dashboard-metric {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--fp-line);
+    border-top: 3px solid var(--fp-blue);
+    border-radius: var(--fp-radius);
+    background: var(--fp-bg);
+    padding: 1.05rem;
+}
 dt { color: var(--fp-muted); font-size: .875rem; font-weight: 700; }
-dd { margin: .6rem 0 0; color: var(--fp-navy); font-size: 2rem; font-weight: 800; line-height: 1; }
+dd { margin: auto 0 0; padding-top: .6rem; color: var(--fp-navy); font-size: 2rem; font-weight: 800; line-height: 1; }
+@media (min-width: 500px) {
+    .dashboard-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (min-width: 1000px) {
+    .dashboard-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 </style>
