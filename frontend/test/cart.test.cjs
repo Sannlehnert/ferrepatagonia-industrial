@@ -99,6 +99,27 @@ test('an invalidation during a cart read discards the old response and groups fu
   assert.equal(cart.needsSync, false)
 })
 
+test('a cart read retries a temporary admission conflict without replaying a mutation', async t => {
+  let calls = 0
+  const retried = deferred()
+  const { cart } = runtime(t, {
+    restore: user(7),
+    api: {
+      async get(url) {
+        assert.equal(url, '/carrito')
+        if (++calls === 1) throw httpError(409, 'CONFLICTO_CARRITO')
+        retried.resolve()
+        return { data: snapshot(1, 3) }
+      },
+    },
+  })
+  await retried.promise
+  await tick()
+  assert.equal(calls, 2)
+  assert.equal(cart.items[0].cantidad, 3)
+  assert.equal(cart.needsSync, false)
+})
+
 test('starts empty and restores a confirmed session without exposing unconfirmed data', async t => {
   const response = deferred()
   const { auth, cart, reads } = runtime(t, { read: () => response.promise })

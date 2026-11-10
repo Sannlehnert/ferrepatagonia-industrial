@@ -85,7 +85,8 @@ sesión anterior al cambiar de identidad.
 - El carrito completo y el drawer usan la misma store y consultan
   `GET /api/carrito`. Una escritura local conserva su lectura de
   reconciliación. Si llega una invalidación durante esa lectura, la store
-  descarta la respuesta obsoleta y consulta el estado actual.
+  descarta la respuesta obsoleta y consulta el estado actual. Ante un
+  conflicto temporal entre pestañas se reintenta una vez el GET.
 - Catálogo, ficha, recomendados de Home y carrito cruzan los IDs recibidos
   con los productos visibles y consultan REST. El catálogo conserva búsqueda,
   filtros y página. Los avisos de stock están disponibles para sesiones
@@ -181,7 +182,7 @@ stock. [CI del corte de auditoría](https://github.com/Sannlehnert/ferrepatagoni
 
 Para la integración Vue, la rama incorporó el `develop`
 `79813ef5e3b33f5a1e491a06cf94cbc50d157955`, con Home #269 y FAQ #270.
-Pasaron type-check y build de ambos paquetes, 207 unitarias de frontend,
+Pasaron type-check y build de ambos paquetes, 208 unitarias de frontend,
 19 integraciones Socket.IO y las regresiones de carrito (53), pedidos (71)
 y productos ADMIN (235). La suite Chromium integrada pasó 138 casos con
 MariaDB descartable. Tres casos pertenecen al perfil de compilación de
