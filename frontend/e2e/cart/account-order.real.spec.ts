@@ -132,12 +132,13 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
 
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
   await signIn(page)
   await page.goto('/mi-cuenta/pedidos')
   await expect(page.getByRole('heading', { name: orderNumber, exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
-  await page.goto('/login')
+  await expect(page).toHaveURL(/\/login$/)
   await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
