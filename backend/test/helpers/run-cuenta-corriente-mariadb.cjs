@@ -9,10 +9,11 @@ const backend = path.resolve(__dirname, '../..');
 async function run(mode = process.argv[2] || 'all') {
   assert.ok([
     'all', 'baseline', 'cleanup-success',
-    'cleanup-failure', 'migration', 'orders', 'orders-acceptance',
+    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets',
   ].includes(mode));
   const acceptance = mode === 'orders-acceptance';
-  const orders = acceptance || mode === 'orders';
+  const sockets = mode === 'orders-sockets';
+  const orders = sockets || acceptance || mode === 'orders';
   const p = newProfile();
   let session, child, interrupted = false;
   const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
@@ -47,7 +48,9 @@ async function run(mode = process.argv[2] || 'all') {
       }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
-    const files = acceptance
+    const files = sockets
+      ? ['test/order-sockets.integration.test.cjs']
+      : acceptance
       ? ['test/account-order-http.test.cjs', 'test/account-order-transaction.test.cjs']
       : orders
       ? [
@@ -61,6 +64,7 @@ async function run(mode = process.argv[2] || 'all') {
           'test/account-order-service.test.cjs',
           'test/account-order-http.test.cjs',
           'test/account-order-process.test.cjs',
+          'test/client-orders.test.cjs',
         ]
       : mode === 'baseline'
         ? ['test/cc260.regression.test.cjs']

@@ -7,6 +7,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import axios from 'axios'
 import { getCatalog } from '@/services/catalogService'
+import { refreshOnStock } from '@/services/realtime'
 import type { CatalogProduct } from '@/types/catalog'
 
 const products = ref<CatalogProduct[]>([])
@@ -36,6 +37,7 @@ async function loadProducts() {
 onMounted(() => {
   void loadProducts()
 })
+refreshOnStock(ids => loading.value || products.value.some(product => ids.has(product.id)), () => void loadProducts())
 
 onBeforeUnmount(() => {
   controller?.abort()
