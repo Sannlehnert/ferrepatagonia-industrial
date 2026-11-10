@@ -7,7 +7,7 @@ const express = require('express');
 const { validateDto } = require('../src/middlewares/validate-dto.middleware.ts');
 const policies = require('../src/dtos/policies.ts');
 
-test('tsx: all seven decorated DTOs validate, transform and reject without emitted design metadata', async () => {
+test('tsx: decorated DTOs validate, transform and reject without emitted design metadata', async () => {
   const app = express(); app.use(express.json());
   const cases = [
     ['loginPolicy', {email:'a',password:' pass '}, {email:[],password:'x'}],
@@ -17,6 +17,9 @@ test('tsx: all seven decorated DTOs validate, transform and reject without emitt
     ['createProductPolicy',{nombre:'x',codigo:'x',id_categoria:1,precio:1.239,stock:0},{nombre:null}],
     ['updateProductPolicy',{descripcion:null},{activo:null}],
     ['stockPolicy',{stock:0},{stock:'0'}],
+    ['categoryIdPolicy',{id:'2147483647'},{id:'2147483648'}],
+    ['createCategoryPolicy',{nombre:'  Herramientas  eléctricas  ',descripcion:null},{nombre:'   '}],
+    ['updateCategoryPolicy',{descripcion:null},{}],
   ];
   for(const [key] of cases) app.post('/'+key,validateDto('body',policies[key]),(_req,res)=>{
     assert.ok(res.locals.dto.body instanceof policies[key].type);
@@ -30,6 +33,9 @@ test('tsx: all seven decorated DTOs validate, transform and reject without emitt
       const result=await response.json();
       if(status===200 && key==='catalogPolicy') assert.equal(result.page,2);
       if(status===200 && key==='productIdPolicy') assert.equal(result.id,1);
+      if(status===200 && key==='categoryIdPolicy') assert.equal(result.id,2147483647);
+      if(status===200 && key==='createCategoryPolicy') assert.deepEqual(result,{nombre:'Herramientas  eléctricas',descripcion:null});
+      if(status===200 && key==='updateCategoryPolicy') assert.deepEqual(result,{descripcion:null});
       if(status===200 && key==='loginPolicy') assert.equal(result.password,' pass ');
     }
   } finally {await new Promise(r=>server.close(r));}

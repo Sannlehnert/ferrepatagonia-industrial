@@ -44,22 +44,29 @@ async function main() {
       return require('node:crypto').createHash('sha256').update(definitions.sort().join('\n')).digest('hex');
     };
     const schemaBefore = await fingerprint();
-    const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', 'test/category.integration.test.cjs'], {
+    const testOptions = {
       cwd: backend, stdio: 'inherit', env: { ...process.env,
         DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
         JWT_SECRET: randomUUID(), DB_HOST: '127.0.0.1', DB_PORT: String(port),
         DB_NAME: database, DB_USER: 'root', DB_PASSWORD: password,
         CATEGORIES_TEST_DATABASE: database,
       },
-    });
+    };
+    // La regresión pública exige que la base esté vacía al comenzar.
+    for (const file of ['test/category.integration.test.cjs', 'test/admin-category.integration.test.cjs']) {
+      const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', file], testOptions);
+      if (result.error) throw result.error;
+      if (result.status !== 0) process.exitCode = 1;
+    }
     const schemaAfter = await fingerprint();
     console.log(JSON.stringify({ schemaBefore, schemaAfter, unchanged: schemaBefore === schemaAfter }));
     require('node:assert/strict').equal(schemaAfter, schemaBefore, 'DDL must remain unchanged');
-    if (result.error) throw result.error;
-    process.exitCode = result.status === 0 ? 0 : 1;
   } finally {
-    if (connection) await connection.end();
-    if (started) docker('rm', '-f', '-v', container);
+    try {
+      if (connection) await connection.end();
+    } finally {
+      if (started) docker('rm', '-f', '-v', container);
+    }
   }
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });
