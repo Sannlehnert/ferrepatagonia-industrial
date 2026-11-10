@@ -7,10 +7,6 @@ import {
   reserveAccountOrderAttempt,
 } from '../../repositories/accountOrderAttempt.repository';
 import {
-  findClientOrderDetailById,
-  findClientOrdersByClientId,
-} from '../../repositories/accountOrder.repository';
-import {
   persistAccountOrderRejection,
 } from '../../repositories/accountOrderRejection.repository';
 import {
@@ -34,6 +30,11 @@ import type {
   AccountOrderResult,
 } from './account-order.types';
 import { issueAccountOrderQuoteToken } from './account-order-quote-token';
+import {
+  findClientOrderDetailById,
+  findClientOrdersByClientId,
+} from '../../repositories/accountOrder.repository';
+
 
 function validateClientAuth(auth: AuthContext): void {
   if (auth.rol !== 'CLIENTE' ||
@@ -112,7 +113,8 @@ function rejection(error: unknown): AccountOrderError | null {
 export async function listClientOrders(
   auth: AuthContext,
 ): Promise<AccountOrderResult> {
-  const clientId = await identifyClient(auth);
+  validateClientAuth(auth);
+  const clientId = await findActiveClient(auth);
   const items = await findClientOrdersByClientId(clientId);
 
   return {
@@ -127,14 +129,7 @@ export async function getClientOrderDetail(
   auth: AuthContext,
   orderIdParam: unknown,
 ): Promise<AccountOrderResult> {
-  if (auth.rol !== 'CLIENTE' ||
-    !Number.isInteger(auth.id) || auth.id < 1 ||
-    auth.id > 2147483647) {
-    throw new AccountOrderError(
-      'NO_AUTORIZADO', 403,
-      'Esta operación requiere una cuenta de cliente.',
-    );
-  }
+  validateClientAuth(auth);
 
   const validation = await validateOrderIdParam(orderIdParam);
   if (!validation.valid) {
@@ -145,7 +140,7 @@ export async function getClientOrderDetail(
     );
   }
 
-  const clientId = await identifyClient(auth);
+  const clientId = await findActiveClient(auth);
   const order = await findClientOrderDetailById(clientId, validation.orderId);
 
   if (!order) {
@@ -164,6 +159,65 @@ export async function getClientOrderDetail(
       data: order,
     },
   };
+}
+
+export async function getAccountOrderEligibility(
+  auth: AuthContext,
+): Promise<AccountOrderEligibilityResult> {
+  validateClientAuth(auth);
+  const clientId = await findActiveClient(auth);
+
+  try {
+    return await inTransaction(async manager => {
+      const context = await lockAccountOrderContext(
+        manager, auth, clientId,
+      );
+      const cart = await lockAccountOrderCart(
+        manager, auth.id, clientId,
+      );
+      const quote = await quoteAccountOrderCart(manager, auth, cart);
+      const eligible = toCents(quote.totalUSD) <= toCents(context.availableUSD);
+      const quoteToken = issueAccountOrderQuoteToken(auth, clientId, cart.cartId, quote);
+
+      return {
+        status: 200,
+        body: {
+          data: {
+            elegible: eligible,
+            moneda: 'USD',
+            totalUSD: quote.totalUSD,
+            creditoDisponibleUSD: context.availableUSD,
+            codigo: eligible ? null : 'CREDITO_INSUFICIENTE',
+            mensaje: eligible
+              ? null
+              : 'El crédito disponible no alcanza para confirmar el pedido.',
+            cotizacion: quoteToken,
+          },
+        },
+      };
+    }, { isolation: 'READ COMMITTED', lockWaitSeconds: 2 });
+  } catch (error) {
+    const failure = rejection(error);
+    if (!failure || (failure.status !== 403 &&
+      failure.status !== 409 && failure.status !== 422)) {
+      throw error;
+    }
+
+    return {
+      status: 200,
+      body: {
+        data: {
+          elegible: false,
+          moneda: 'USD',
+          totalUSD: null,
+          creditoDisponibleUSD: null,
+          codigo: failure.code,
+          mensaje: failure.message,
+          cotizacion: null,
+        },
+      },
+    };
+  }
 }
 
 export async function getAccountOrderResult(
@@ -220,6 +274,8 @@ export async function confirmAccountOrder(
       }
     }, { isolation: 'READ COMMITTED', lockWaitSeconds: 2 });
   } catch (error) {
+    // Solo esta coincidencia acredita un fallo del trabajo
+    // que inTransaction devolvió después de confirmar el rollback.
     if (!workFailure || workFailure.error !== error ||
       error instanceof DatabaseOutcomeUnknownError) {
       return recover(clientId, key);

@@ -19,7 +19,8 @@ import {
   listClientOrders,
 } from '../services/orders/account-order.service';
 
-type OrderMutationOperation = 'confirm' | 'recover';
+type Operation = 'confirm' | 'recover' | 'eligibility';
+type OrderMutationOperation = 'confirm' | 'recover' | 'eligibility';
 type OrderReadOperation = 'list' | 'detail';
 
 function validateRequest(req: Request, operation: OrderMutationOperation | OrderReadOperation): void {
@@ -53,13 +54,15 @@ function validateRequest(req: Request, operation: OrderMutationOperation | Order
       400,
       operation === 'eligibility'
         ? 'La consulta de elegibilidad no admite un cuerpo.'
-        : 'La consulta del resultado no admite un cuerpo.',
+        : operation === 'recover'
+          ? 'La consulta del resultado no admite un cuerpo.'
+          : 'La consulta no admite un cuerpo.',
     );
   }
 }
 
 export function handleAccountOrder(
-  operation: OrderMutationOperation,
+  operation: Operation,
 ): RequestHandler {
   return async (req, res) => {
     const cancellation = new AbortController();
