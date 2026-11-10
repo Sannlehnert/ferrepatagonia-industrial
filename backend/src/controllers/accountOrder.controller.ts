@@ -15,11 +15,15 @@ import {
   confirmAccountOrder,
   getAccountOrderEligibility,
   getAccountOrderResult,
+  getClientOrderDetail,
+  listClientOrders,
 } from '../services/orders/account-order.service';
 
 type Operation = 'confirm' | 'recover' | 'eligibility';
+type OrderMutationOperation = 'confirm' | 'recover' | 'eligibility';
+type OrderReadOperation = 'list' | 'detail';
 
-function validateRequest(req: Request, operation: Operation): void {
+function validateRequest(req: Request, operation: OrderMutationOperation | OrderReadOperation): void {
   if (Object.keys(req.query).length > 0) {
     throw new AccountOrderError(
       'SOLICITUD_INVALIDA',
@@ -50,7 +54,9 @@ function validateRequest(req: Request, operation: Operation): void {
       400,
       operation === 'eligibility'
         ? 'La consulta de elegibilidad no admite un cuerpo.'
-        : 'La consulta del resultado no admite un cuerpo.',
+        : operation === 'recover'
+          ? 'La consulta del resultado no admite un cuerpo.'
+          : 'La consulta no admite un cuerpo.',
     );
   }
 }
@@ -127,6 +133,45 @@ export function handleAccountOrder(
       });
     } finally {
       res.removeListener('close', disconnect);
+    }
+  };
+}
+
+export function handleClientOrderRead(
+  operation: OrderReadOperation,
+): RequestHandler {
+  return async (req, res) => {
+    try {
+      if (!await authenticateRequest(req, res)) {
+        return;
+      }
+
+      if (!authorizeRequest(req, res, ['CLIENTE'])) {
+        return;
+      }
+
+      validateRequest(req, operation);
+
+      const result = operation === 'list'
+        ? await listClientOrders(req.auth!)
+        : await getClientOrderDetail(req.auth!, req.params.id);
+
+      res.status(result.status).json(result.body);
+    } catch (error) {
+      if (res.headersSent) return;
+
+      if (error instanceof AccountOrderError) {
+        res.status(error.status).json({
+          code: error.code,
+          message: error.message,
+        });
+        return;
+      }
+
+      res.status(503).json({
+        code: 'CONSULTA_PEDIDOS_NO_DISPONIBLE',
+        message: 'El historial de pedidos no está disponible temporalmente. Reintentá en unos instantes.',
+      });
     }
   };
 }

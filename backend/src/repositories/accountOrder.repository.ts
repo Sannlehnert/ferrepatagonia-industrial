@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
+import { dataSource } from '../config/database.config';
 import {
   bounded,
   decimal,
@@ -10,6 +11,11 @@ import type {
   AccountOrderQuote,
 } from '../services/orders/account-order.pricing';
 import { AccountOrderError } from '../services/orders/account-order.errors';
+import type {
+  ClientOrderDetail,
+  ClientOrderLine,
+  ClientOrderSummary,
+} from '../services/orders/account-order.types';
 
 function invalidAmount(): never {
   throw new AccountOrderError(
@@ -131,4 +137,179 @@ export async function persistAccountOrder(
   }
 
   return orderId;
+}
+
+interface OrderSummaryRow {
+  pedidoId: number;
+  fecha: Date | string;
+  estado: string;
+  modalidadPago: string;
+  moneda: string | null;
+  subtotal: string;
+  descuento: string;
+  total: string;
+  observaciones: string | null;
+  cantidadLineas: number | string;
+  cantidadUnidades: number | string;
+  cargoId: number | string | null;
+  venceEl: string | null;
+}
+
+interface OrderLineRow {
+  detalleId: number;
+  productoId: number;
+  codigo: string;
+  nombre: string;
+  cantidad: number;
+  precioUnitario: string;
+  descuento: string;
+  subtotal: string;
+}
+
+function toIsoDateTime(value: Date | string): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
+}
+
+function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
+  const pedidoId = Number(row.pedidoId);
+  const moneda = row.moneda !== null && row.moneda !== undefined ? String(row.moneda) : null;
+  const total = String(row.total);
+
+  return {
+    pedidoId,
+    numero: `PED-${String(pedidoId).padStart(6, '0')}`,
+    fecha: String(row.fecha),
+    estado: row.estado,
+    modalidadPago: row.modalidadPago,
+    moneda,
+    subtotal: String(row.subtotal),
+    descuento: String(row.descuento),
+    total,
+    totalUSD: moneda === 'USD' ? total : null,
+    observaciones: row.observaciones ?? null,
+    cantidadLineas: Number(row.cantidadLineas ?? 0),
+    cantidadUnidades: Number(row.cantidadUnidades ?? 0),
+    cargoId: row.cargoId !== null && row.cargoId !== undefined
+      ? String(row.cargoId)
+      : null,
+    venceEl: row.venceEl ?? null,
+  };
+}
+
+export async function findClientOrdersByClientId(
+  clientId: number,
+): Promise<ClientOrderSummary[]> {
+  const rows = await dataSource.query<OrderSummaryRow[]>(`
+    SELECT
+      p.id_pedido AS pedidoId,
+      DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
+      p.estado AS estado,
+      p.modalidad_pago AS modalidadPago,
+      p.moneda_total AS moneda,
+      p.subtotal AS subtotal,
+      p.descuento AS descuento,
+      p.total AS total,
+      p.observaciones AS observaciones,
+      COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
+      COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
+      m.id_movimiento_cuenta AS cargoId,
+      DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
+    FROM PEDIDO p
+    LEFT JOIN (
+      SELECT
+        id_pedido,
+        COUNT(id_detalle_pedido) AS cantidadLineas,
+        COALESCE(SUM(cantidad), 0) AS cantidadUnidades
+      FROM DETALLE_PEDIDO
+      GROUP BY id_pedido
+    ) dp_stat
+      ON dp_stat.id_pedido = p.id_pedido
+    LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
+      ON m.id_pedido = p.id_pedido
+      AND m.tipo_movimiento = 'CARGO'
+      AND m.estado = 'ACREDITADO'
+    WHERE p.id_cliente = ?
+    ORDER BY p.fecha DESC, p.id_pedido DESC
+  `, [clientId]);
+
+  return rows.map(mapOrderSummary);
+}
+
+export async function findClientOrderDetailById(
+  clientId: number,
+  orderId: number,
+): Promise<ClientOrderDetail | null> {
+  const [headerRow] = await dataSource.query<OrderSummaryRow[]>(`
+    SELECT
+      p.id_pedido AS pedidoId,
+      DATE_FORMAT(p.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha,
+      p.estado AS estado,
+      p.modalidad_pago AS modalidadPago,
+      p.moneda_total AS moneda,
+      p.subtotal AS subtotal,
+      p.descuento AS descuento,
+      p.total AS total,
+      p.observaciones AS observaciones,
+      COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
+      COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
+      m.id_movimiento_cuenta AS cargoId,
+      DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
+    FROM PEDIDO p
+    LEFT JOIN (
+      SELECT
+        id_pedido,
+        COUNT(id_detalle_pedido) AS cantidadLineas,
+        COALESCE(SUM(cantidad), 0) AS cantidadUnidades
+      FROM DETALLE_PEDIDO
+      GROUP BY id_pedido
+    ) dp_stat
+      ON dp_stat.id_pedido = p.id_pedido
+    LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
+      ON m.id_pedido = p.id_pedido
+      AND m.tipo_movimiento = 'CARGO'
+      AND m.estado = 'ACREDITADO'
+    WHERE p.id_pedido = ?
+      AND p.id_cliente = ?
+  `, [orderId, clientId]);
+
+  if (!headerRow) {
+    return null;
+  }
+
+  const lineRows = await dataSource.query<OrderLineRow[]>(`
+    SELECT
+      dp.id_detalle_pedido AS detalleId,
+      dp.id_producto AS productoId,
+      pr.codigo AS codigo,
+      pr.nombre AS nombre,
+      dp.cantidad AS cantidad,
+      dp.precio_unitario AS precioUnitario,
+      dp.descuento AS descuento,
+      dp.subtotal AS subtotal
+    FROM DETALLE_PEDIDO dp
+    INNER JOIN PRODUCTO pr
+      ON pr.id_producto = dp.id_producto
+    WHERE dp.id_pedido = ?
+    ORDER BY dp.id_detalle_pedido ASC
+  `, [orderId]);
+
+  const items: ClientOrderLine[] = lineRows.map(line => ({
+    detalleId: Number(line.detalleId),
+    productoId: Number(line.productoId),
+    codigo: line.codigo,
+    nombre: line.nombre,
+    cantidad: Number(line.cantidad),
+    precioUnitario: String(line.precioUnitario),
+    descuento: String(line.descuento),
+    subtotal: String(line.subtotal),
+  }));
+
+  return {
+    ...mapOrderSummary(headerRow),
+    items,
+  };
 }

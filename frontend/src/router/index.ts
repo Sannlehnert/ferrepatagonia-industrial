@@ -98,6 +98,16 @@ const router = createRouter({
           component: () => import('@/views/ProductDetailView.vue'),
         },
         {
+          path: 'ayuda',
+          name: 'public-faq',
+          component: () => import('@/views/FaqView.vue'),
+        },
+        {
+          path: 'sobre-nosotros',
+          name: 'public-about',
+          component: () => import('@/views/AboutView.vue'),
+        },
+        {
           path: 'carrito',
           name: 'carrito',
           component: () => import('@/views/CartView.vue'),

@@ -14,6 +14,39 @@ export interface PendingAccountOrder {
   message: string;
 }
 
+export interface ClientOrderSummary {
+  pedidoId: number;
+  numero: string;
+  fecha: string;
+  estado: string;
+  modalidadPago: string;
+  moneda: string | null;
+  subtotal: string;
+  descuento: string;
+  total: string;
+  totalUSD: string | null;
+  observaciones: string | null;
+  cantidadLineas: number;
+  cantidadUnidades: number;
+  cargoId: string | null;
+  venceEl: string | null;
+}
+
+export interface ClientOrderLine {
+  detalleId: number;
+  productoId: number;
+  codigo: string;
+  nombre: string;
+  cantidad: number;
+  precioUnitario: string;
+  descuento: string;
+  subtotal: string;
+}
+
+export interface ClientOrderDetail extends ClientOrderSummary {
+  items: ClientOrderLine[];
+}
+
 export interface AccountOrderFailure {
   code: string;
   message: string;
@@ -23,6 +56,8 @@ export interface AccountOrderFailure {
 export type AccountOrderResponse =
   | { data: ConfirmedAccountOrder }
   | { data: PendingAccountOrder }
+  | { data: { items: ClientOrderSummary[] } }
+  | { data: ClientOrderDetail }
   | AccountOrderFailure;
 
 export type AccountOrderHttpStatus =
