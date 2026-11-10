@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="420" viewBox="0 0 680 420" fill="none">
+  <defs>
+    <pattern id="grid" width="28" height="28" patternUnits="userSpaceOnUse">
+      <path d="M28 0H0v28" stroke="#345975" stroke-width="1"/>
+    </pattern>
+    <radialGradient id="fade">
+      <stop offset=".43" stop-color="white"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </radialGradient>
+    <mask id="field"><ellipse cx="359" cy="210" rx="320" ry="207" fill="url(#fade)"/></mask>
+    <linearGradient id="steel" x1="0" y1="0" x2="1" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#9bc6e3"/><stop offset=".5" stop-color="#305e7d"/><stop offset="1" stop-color="#15374f"/>
+    </linearGradient>
+    <linearGradient id="face" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#7daac8"/><stop offset="1" stop-color="#2c536e"/>
+    </linearGradient>
+    <pattern id="hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+      <path d="M0 0v5" stroke="#c5e1f2" stroke-opacity=".35"/>
+    </pattern>
+  </defs>
+  <g mask="url(#field)">
+    <path d="M0 0h680v420H0z" fill="url(#grid)"/>
+    <path d="M85 210h545M358 23v374" stroke="#7fabc9" stroke-dasharray="3 8"/>
+    <circle cx="358" cy="210" r="164" stroke="#4f7894"/>
+    <circle cx="358" cy="210" r="193" stroke="#355e7b" stroke-dasharray="3 8"/>
+  </g>
+  <g transform="translate(355 210) rotate(-17)">
+    <path d="M-152 76 124-94m-267 191 276-170M-133 94l-13-20m271-151-13-20" stroke="#6592b2" stroke-width="1.2" stroke-dasharray="4 5"/>
+    <path d="M-194-70h25m-12-13v26M152 77h25m-12-13v26" stroke="#efaa43" stroke-width="1.4"/>
+    <path d="m-122 42 4 15 33 20 35-8L139-43l13-27-14-25-31-1-190 113Z" fill="#081c2b" opacity=".7" transform="translate(9 13)"/>
+    <path d="m-117 15 183-104 22 11 26-17 28 13 12 20-10 25L-38 71l-27 4-17-10-18 4-25-14-8-20Z" fill="url(#steel)" stroke="#a5cbe4" stroke-width="1.5"/>
+    <path d="m-117 15 25 12 24-9 178-104-20-11-23 6-184 106Z" fill="#79a8c8" stroke="#bbd8eb" stroke-width="1.2"/>
+    <path d="m-92 27-8 42 18-4 14-47m28 53 9-26 185-107M-31 45l-37-27m182-113-4 9 32 4" stroke="#bed8e9" stroke-opacity=".72" stroke-width="1.2"/>
+    <path d="M-43 34 113-58l17 8-160 93-13-9Z" fill="#193a52" stroke="#92b8d3" stroke-width="1"/>
+    <path d="M-33 35 114-51" stroke="#a8c9dd" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="m-86-57 27-4 24 14 13 24-8 27-24 18-29 3-26-16-12-24 7-24 28-18Z" fill="url(#face)" stroke="#b0d2e9" stroke-width="1.6"/>
+    <path d="m-88-46 25-5 21 12 11 19-8 21-19 13-22 1-22-12-9-18 7-21 16-10Z" fill="url(#hatch)" stroke="#d2e8f5"/>
+    <path d="m-87-37 19-5 17 9 8 16-7 15-13 9-16 1-16-8-7-15 6-14 9-8Z" fill="#0e293f" stroke="#b5d6e9" stroke-width="1.5"/>
+    <path d="m-95-3 16 8 17-2 13-10M-62-39l14 9 5 13" stroke="#638eab" stroke-width="1.4"/>
+    <path d="M-126 76v22m-12-11h24M136-112v22m-11-11h22" stroke="#7babc9" stroke-width="1.25"/>
+  </g>
+  <path d="M125 81h38l50 39m282 166 44 33h48" stroke="#8eb3cc" stroke-width="1.3"/>
+  <circle cx="213" cy="120" r="3.5" fill="#f3ad43"/>
+  <circle cx="495" cy="286" r="3.5" fill="#f3ad43"/>
+  <path d="M112 70v22m-10-11h20m475 227v22m-10-11h20" stroke="#698da7" stroke-width="1.2"/>
+</svg>
