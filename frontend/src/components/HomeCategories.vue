@@ -40,7 +40,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section id="categorias" class="fp-section categories" aria-labelledby="home-categories-title">
+  <section id="categorias" tabindex="-1" class="fp-section categories" aria-labelledby="home-categories-title">
     <div class="fp-shell">
       <div class="fp-section-head">
         <div>
@@ -59,12 +59,12 @@ onBeforeUnmount(() => {
       </div>
       <p v-else-if="categories.length === 0" class="fp-state" role="status">Todavía no hay categorías disponibles.</p>
       <ul v-else class="category-grid">
-        <li v-for="category in categories" :key="category.id">
+        <li v-for="(category, index) in categories" :key="category.id">
           <RouterLink
             :to="{ name: 'catalogo', query: { categoria: String(category.id) } }"
             class="category-card fp-focus"
           >
-            <span class="category-icon"><CommerceIcon name="grid" /></span>
+            <span class="category-index" aria-hidden="true">{{ String(index + 1).padStart(2, '0') }}</span>
             <strong>{{ category.nombre }}</strong>
             <CommerceIcon name="arrow" class="category-arrow" />
           </RouterLink>
@@ -78,48 +78,36 @@ onBeforeUnmount(() => {
 .categories { background: var(--fp-bg); }
 .category-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: .65rem;
+  grid-template-columns: minmax(0, 1fr);
   list-style: none;
   margin: 0;
   padding: 0;
+  border-top: 1px solid var(--fp-control-line);
 }
 .category-card {
   box-sizing: border-box;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   align-content: center;
-  gap: .55rem;
+  gap: .85rem;
   height: 100%;
-  min-height: 96px;
-  padding: .8rem;
-  border: 1px solid var(--fp-line);
-  border-radius: 9px;
-  background: white;
+  min-height: 62px;
+  padding: .75rem .5rem;
+  border-bottom: 1px solid var(--fp-control-line);
   color: var(--fp-navy);
   text-decoration: none;
-  transition: border-color .16s, box-shadow .16s;
+  transition: background-color .16s;
 }
-.category-card:hover { border-color: #76a2c1; box-shadow: 0 3px 12px #0b243813; }
-.category-card strong { grid-row: 2; font-size: .88rem; overflow-wrap: anywhere; }
-.category-icon {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 6px;
-  background: #eaf2f9;
-  color: var(--fp-blue);
-}
-.category-icon svg { width: 17px; height: 17px; }
-.category-arrow { grid-column: 2; grid-row: 2; width: 15px; color: var(--fp-blue); }
+.category-card:hover { background: #e6eff6; }
+.category-card strong { font-size: 1rem; overflow-wrap: anywhere; }
+.category-index { color: var(--fp-blue); font: 700 .78rem/1.4 ui-monospace, Consolas, monospace; }
+.category-arrow { width: 19px; color: var(--fp-blue); }
 .fp-state p { margin: 0 0 .65rem; }
 
 @media (min-width: 680px) {
-  .category-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: .85rem; }
-  .category-card { grid-template-columns: auto minmax(0, 1fr) auto; gap: .8rem; min-height: 76px; padding: 1rem; }
-  .category-card strong, .category-arrow { grid-area: auto; }
-  .category-card strong { font-size: .95rem; }
+  .category-grid { grid-template-columns: repeat(auto-fit, minmax(min(100%, 275px), 1fr)); column-gap: 1.4rem; }
+  .category-card { min-height: 78px; }
+  .category-card strong { font-size: 1.12rem; }
 }
 </style>

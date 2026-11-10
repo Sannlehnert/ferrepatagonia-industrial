@@ -79,8 +79,9 @@ function clearFilters() {
                 v-model="search"
                 type="search"
                 placeholder="Buscá un producto"
-                class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#145a8d]"
+                class="fp-input fp-focus"
                 :aria-invalid="validationError ? 'true' : undefined"
+                :aria-describedby="validationError ? 'catalog-search-error' : undefined"
             />
         </label>
 
@@ -88,7 +89,7 @@ function clearFilters() {
             <span class="text-sm font-medium">Categoría</span>
             <select
                 v-model="categoryId"
-                class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:bg-slate-100"
+                class="fp-input fp-focus"
                 :disabled="categoriesLoading || Boolean(categoriesError)"
             >
                 <option :value="null">Todas las categorías</option>
@@ -116,13 +117,13 @@ function clearFilters() {
         </label>
 
         <div class="flex flex-wrap gap-2">
-            <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="submit">Buscar</button>
-            <button class="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-[#103a5c] hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="button" @click="clearFilters">
+            <button class="fp-action fp-action--primary fp-focus" type="submit">Buscar</button>
+            <button class="fp-action fp-action--plain fp-focus" type="button" @click="clearFilters">
                 Limpiar filtros
             </button>
         </div>
 
-        <p v-if="validationError" class="m-0 basis-full text-sm text-red-800" role="alert">
+        <p v-if="validationError" id="catalog-search-error" class="fp-error m-0 basis-full text-sm" role="alert">
             {{ validationError }}
         </p>
 
@@ -139,7 +140,7 @@ function clearFilters() {
             class="basis-full text-sm text-slate-700"
         >
             <p class="m-0 mb-2" role="alert">{{ categoriesError }}</p>
-            <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-3 py-2 text-sm font-semibold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" type="button" @click="emit('retryCategories')">
+            <button class="fp-action fp-action--primary fp-focus" type="button" @click="emit('retryCategories')">
                 Reintentar categorías
             </button>
         </div>

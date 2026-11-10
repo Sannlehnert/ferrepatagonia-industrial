@@ -36,18 +36,16 @@ watch(() => props.productId, async (id, _previous, onCleanup) => {
   aspect-ratio: 1.7;
   border-bottom: 1px solid var(--fp-line);
   color: #527a97;
-  background-color: #edf4f9;
-  background-image: radial-gradient(#bccfdd 1px, transparent 1px);
-  background-size: 12px 12px;
+  background: repeating-linear-gradient(135deg, #edf3f8 0 9px, var(--fp-bg) 9px 18px);
 }
 .product-media svg {
   box-sizing: content-box;
   width: 32px;
   height: 32px;
-  padding: 12px;
-  border: 1px solid #cbdce9;
-  border-radius: 50%;
-  background: #f6f9fc;
+  padding: 11px;
+  border: 1px solid var(--fp-line);
+  border-radius: var(--fp-radius);
+  background: white;
 }
 .product-media img {
   box-sizing: border-box;

@@ -75,25 +75,24 @@ const business = computed(() => {
     <HomeCategories />
     <HomeRecommended />
 
-    <section id="empresas" class="fp-section" aria-labelledby="business-title">
-      <div class="fp-shell">
-        <div class="business-panel fp-dark">
-          <span class="business-icon"><CommerceIcon name="building" /></span>
-          <div>
+    <section id="empresas" tabindex="-1" class="fp-section business" aria-labelledby="business-title">
+      <div class="fp-shell business-panel">
+          <div class="business-lead">
             <p class="fp-kicker">Atención comercial</p>
             <h2 id="business-title" class="fp-section-title">Ferrepatagonia para empresas</h2>
+          </div>
+          <div class="business-detail">
             <p class="business-copy">{{ business.description }}</p>
+            <div class="business-actions">
+              <RouterLink :to="{ name: business.route }" class="fp-action fp-action--primary fp-focus">
+                {{ auth.isAuthenticated ? business.label : 'Ingresar como empresa' }}
+                <CommerceIcon name="arrow" />
+              </RouterLink>
+              <RouterLink v-if="!auth.isAuthenticated" :to="{ name: 'registro', query: { tipo: 'empresa' } }" class="business-register fp-focus">
+                Registrá tu empresa
+              </RouterLink>
+            </div>
           </div>
-          <div class="business-actions">
-            <RouterLink :to="{ name: business.route }" class="fp-action fp-action--dark fp-focus">
-              {{ auth.isAuthenticated ? business.label : 'Ingresar como empresa' }}
-              <CommerceIcon name="arrow" />
-            </RouterLink>
-            <RouterLink v-if="!auth.isAuthenticated" :to="{ name: 'registro' }" class="business-register fp-focus">
-              Registrá tu empresa
-            </RouterLink>
-          </div>
-        </div>
       </div>
     </section>
   </main>
@@ -101,42 +100,29 @@ const business = computed(() => {
 
 <style scoped>
 .home { background: var(--fp-bg); }
+.business { background: #f7eddb; border-top: 1px solid #ead9ba; }
 .business-panel {
   display: grid;
-  gap: .9rem;
+  gap: 1.25rem;
   align-items: center;
-  padding: clamp(22px, 3.6vw, 46px);
-  border: 1px solid #2e526d;
-  border-left: 4px solid #2b7bbb;
-  border-radius: 12px;
-  color: white;
-  background: #10334d;
 }
-.business-icon {
-  display: grid;
-  place-items: center;
-  width: 48px;
-  height: 48px;
-  border: 1px solid #51758e;
-  border-radius: 8px;
-  color: #b9d9ef;
+.business-lead .fp-section-title { max-width: 15ch; }
+.business-detail {
+  border-inline-start: 2px solid #ba761c;
+  padding-inline-start: clamp(16px, 3vw, 44px);
 }
-.business-icon svg { width: 27px; height: 27px; }
-.business-copy { max-width: 65ch; margin: .65rem 0 0; color: #d4e4f0; font-size: .95rem; }
-.business-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem 1rem; }
+.business-copy { max-width: 51ch; margin: 0; color: var(--fp-navy); font-size: clamp(.94rem, 1.6vw, 1.08rem); }
+.business-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem 1rem; margin-top: 1rem; }
 .business-register {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
-  color: #d7edff;
+  color: var(--fp-blue-strong);
   font-size: .86rem;
+  font-weight: 700;
   text-underline-offset: .22em;
 }
-.business-register:hover { color: white; }
-
 @media (min-width: 760px) {
-  .business-panel { grid-template-columns: auto minmax(0, 1fr) auto; gap: 1.5rem; }
-  .business-icon { align-self: start; }
-  .business-actions { flex-direction: column; align-items: stretch; }
+  .business-panel { grid-template-columns: minmax(0, .94fr) minmax(0, 1fr); gap: 2rem; }
 }
 </style>

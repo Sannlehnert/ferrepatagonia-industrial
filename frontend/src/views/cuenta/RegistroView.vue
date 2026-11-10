@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { reactive, ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { reactive, ref, computed, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import AuthFrame from '@/components/AuthFrame.vue'
+import AuthField from '@/components/AuthField.vue'
 import { useAuthStore } from '@/stores/auth'
 import { registrar } from '@/services/registroService'
 import { validarRegistro, armarPayload, type CampoRegistro } from '@/utils/registro'
@@ -9,9 +11,11 @@ import type { RegistroForm } from '@/types/registro'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
+const formElement = ref<HTMLFormElement | null>(null)
 
 const form = reactive<RegistroForm>({
-  tipoCliente: 'PARTICULAR',
+  tipoCliente: route.query.tipo === 'empresa' ? 'EMPRESA' : 'PARTICULAR',
   nombre: '', apellido: '', razonSocial: '', cuit: '',
   email: '', telefono: '', direccion: '', password: '', confirmar: '',
 })
@@ -26,10 +30,18 @@ const errores = computed(() => validarRegistro(form))
 const verError = (c: CampoRegistro) =>
   intentado.value || tocados[c] ? errores.value[c] : undefined
 
+async function focusFirstError() {
+  await nextTick()
+  formElement.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+}
+
 async function enviar() {
   intentado.value = true
   errorEmail.value = errorGeneral.value = null
-  if (Object.keys(errores.value).length) return
+  if (Object.keys(errores.value).length) {
+    await focusFirstError()
+    return
+  }
 
   enviando.value = true
   let registrado = false
@@ -44,7 +56,10 @@ async function enviar() {
       return
     }
     const status = axios.isAxiosError(e) ? e.response?.status : undefined
-    if (status === 409) errorEmail.value = 'Ese email ya está registrado.'
+    if (status === 409) {
+      errorEmail.value = 'Ese email ya está registrado.'
+      await focusFirstError()
+    }
     else if (status === 400 && axios.isAxiosError(e))
       errorGeneral.value = e.response?.data?.message ?? 'Revisá los datos ingresados.'
     else errorGeneral.value = 'No se pudo completar el registro. Intentá de nuevo.'
@@ -55,70 +70,126 @@ async function enviar() {
 </script>
 
 <template>
-  <section class="mx-auto my-8 max-w-[420px] px-4">
-    <h2 class="m-0 mb-5 text-2xl font-semibold text-[#0b2438]">Crear cuenta</h2>
-
-    <form class="flex flex-col gap-4" novalidate @submit.prevent="enviar">
-      <fieldset class="flex gap-6 border-0 p-0">
-        <label class="flex items-center gap-2 text-sm"><input type="radio" value="PARTICULAR" v-model="form.tipoCliente" /> Particular</label>
-        <label class="flex items-center gap-2 text-sm"><input type="radio" value="EMPRESA" v-model="form.tipoCliente" /> Empresa</label>
+  <AuthFrame
+    registration
+    title="Crear cuenta"
+    intro="Elegí cómo querés comprar y completá tus datos."
+    panel-title="Tu perfil, según cómo comprás."
+    panel-copy="Registrate a título personal o a nombre de una empresa. Desde tu cuenta vas a poder consultar tus pedidos."
+  >
+    <form ref="formElement" class="register-form" novalidate :aria-busy="enviando" @submit.prevent="enviar">
+      <fieldset class="register-group customer-group">
+        <legend>Tipo de cuenta</legend>
+        <div class="customer-options">
+          <label class="customer-option">
+            <input v-model="form.tipoCliente" type="radio" name="tipoCliente" value="PARTICULAR" class="fp-focus" />
+            <span>Particular</span>
+          </label>
+          <label class="customer-option">
+            <input v-model="form.tipoCliente" type="radio" name="tipoCliente" value="EMPRESA" class="fp-focus" />
+            <span>Empresa</span>
+          </label>
+        </div>
+        <p v-if="form.tipoCliente === 'EMPRESA'" class="company-note">
+          <strong>Aprobación empresarial</strong>
+          Tu cuenta queda pendiente de evaluación. Las condiciones comerciales y la cuenta corriente requieren habilitación.
+        </p>
       </fieldset>
 
-      <template v-if="form.tipoCliente === 'PARTICULAR'">
-        <label class="flex flex-col gap-1 text-sm">Nombre
-          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.nombre" @blur="tocados.nombre = true" autocomplete="given-name" />
-          <small v-if="verError('nombre')" class="text-sm text-[#842029]">{{ verError('nombre') }}</small>
-        </label>
-        <label class="flex flex-col gap-1 text-sm">Apellido
-          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.apellido" @blur="tocados.apellido = true" autocomplete="family-name" />
-          <small v-if="verError('apellido')" class="text-sm text-[#842029]">{{ verError('apellido') }}</small>
-        </label>
-      </template>
+      <fieldset class="register-group">
+        <legend>{{ form.tipoCliente === 'PARTICULAR' ? 'Datos personales' : 'Datos de la empresa' }}</legend>
+        <div v-if="form.tipoCliente === 'PARTICULAR'" class="field-grid">
+          <AuthField id="register-name" v-model="form.nombre" label="Nombre" name="nombre" autocomplete="given-name" required :error="verError('nombre')" @blur="tocados.nombre = true" />
+          <AuthField id="register-surname" v-model="form.apellido" label="Apellido" name="apellido" autocomplete="family-name" required :error="verError('apellido')" @blur="tocados.apellido = true" />
+        </div>
+        <div v-else class="field-grid">
+          <AuthField id="register-company" v-model="form.razonSocial" label="Razón social" name="razonSocial" autocomplete="organization" required :error="verError('razonSocial')" @blur="tocados.razonSocial = true" />
+          <AuthField id="register-tax" v-model="form.cuit" label="CUIT" name="cuit" inputmode="numeric" placeholder="30-12345678-9" required :error="verError('cuit')" @blur="tocados.cuit = true" />
+        </div>
+      </fieldset>
 
-      <template v-else>
-        <label class="flex flex-col gap-1 text-sm">Razón social
-          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.razonSocial" @blur="tocados.razonSocial = true" autocomplete="organization" />
-          <small v-if="verError('razonSocial')" class="text-sm text-[#842029]">{{ verError('razonSocial') }}</small>
-        </label>
-        <label class="flex flex-col gap-1 text-sm">CUIT
-          <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.cuit" @blur="tocados.cuit = true" inputmode="numeric" placeholder="30-12345678-9" />
-          <small v-if="verError('cuit')" class="text-sm text-[#842029]">{{ verError('cuit') }}</small>
-        </label>
-        <p class="m-0 text-sm text-slate-600">
-          Registrarte como empresa no habilita cuenta corriente ni descuentos:
-          tu cuenta queda pendiente de aprobación.
-        </p>
-      </template>
+      <fieldset class="register-group">
+        <legend>Contacto</legend>
+        <div class="field-grid">
+          <AuthField
+            id="register-email"
+            v-model="form.email"
+            label="Email"
+            name="email"
+            type="email"
+            autocomplete="email"
+            required
+            :error="verError('email') ?? errorEmail"
+            @blur="tocados.email = true"
+            @input="errorEmail = null"
+          />
+          <AuthField id="register-phone" v-model="form.telefono" label="Teléfono" name="telefono" type="tel" autocomplete="tel" required :error="verError('telefono')" @blur="tocados.telefono = true" />
+          <div class="field-span">
+            <AuthField id="register-address" v-model="form.direccion" label="Dirección (opcional)" name="direccion" autocomplete="street-address" :error="verError('direccion')" @blur="tocados.direccion = true" />
+          </div>
+        </div>
+      </fieldset>
 
-      <label class="flex flex-col gap-1 text-sm">Email
-        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.email" type="email" @blur="tocados.email = true" @input="errorEmail = null" autocomplete="email" />
-        <small v-if="verError('email') || errorEmail" class="text-sm text-[#842029]">{{ verError('email') ?? errorEmail }}</small>
-      </label>
+      <fieldset class="register-group">
+        <legend>Contraseña de acceso</legend>
+        <div class="field-grid">
+          <AuthField id="register-password" v-model="form.password" label="Contraseña" name="password" type="password" autocomplete="new-password" required :error="verError('password')" @blur="tocados.password = true" />
+          <AuthField id="register-confirm" v-model="form.confirmar" label="Repetir contraseña" name="confirmar" type="password" autocomplete="new-password" required :error="verError('confirmar')" @blur="tocados.confirmar = true" />
+        </div>
+      </fieldset>
 
-      <label class="flex flex-col gap-1 text-sm">Teléfono
-        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.telefono" type="tel" @blur="tocados.telefono = true" autocomplete="tel" />
-        <small v-if="verError('telefono')" class="text-sm text-[#842029]">{{ verError('telefono') }}</small>
-      </label>
-
-      <label class="flex flex-col gap-1 text-sm">Dirección (opcional)
-        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.direccion" @blur="tocados.direccion = true" autocomplete="street-address" />
-        <small v-if="verError('direccion')" class="text-sm text-[#842029]">{{ verError('direccion') }}</small>
-      </label>
-
-      <label class="flex flex-col gap-1 text-sm">Contraseña
-        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.password" type="password" @blur="tocados.password = true" autocomplete="new-password" />
-        <small v-if="verError('password')" class="text-sm text-[#842029]">{{ verError('password') }}</small>
-      </label>
-
-      <label class="flex flex-col gap-1 text-sm">Repetir contraseña
-        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="form.confirmar" type="password" @blur="tocados.confirmar = true" autocomplete="new-password" />
-        <small v-if="verError('confirmar')" class="text-sm text-[#842029]">{{ verError('confirmar') }}</small>
-      </label>
-
-      <p v-if="errorGeneral" class="m-0 text-sm text-[#842029]" role="alert">{{ errorGeneral }}</p>
-
-      <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 font-semibold text-white hover:bg-[#103a5c] disabled:cursor-wait disabled:opacity-60" :disabled="enviando">{{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}</button>
-      <p class="m-0 text-sm">¿Ya tenés cuenta? <RouterLink class="text-[#145a8d] underline" :to="{ name: 'login' }">Iniciá sesión</RouterLink></p>
+      <p v-if="errorGeneral" class="fp-error fp-error-panel" role="alert">{{ errorGeneral }}</p>
+      <div class="register-actions">
+        <button class="fp-action fp-action--primary fp-focus" :disabled="enviando">
+          {{ enviando ? 'Creando cuenta...' : 'Crear cuenta' }}
+        </button>
+        <p>¿Ya tenés cuenta? <RouterLink class="fp-focus" :to="{ name: 'login' }">Iniciá sesión</RouterLink></p>
+      </div>
     </form>
-  </section>
+  </AuthFrame>
 </template>
+
+<style scoped>
+.register-form { display: grid; gap: 1.25rem; }
+.register-group { min-inline-size: 0; margin: 0; padding: 0; border: 0; }
+.register-group legend {
+  box-sizing: border-box;
+  width: 100%;
+  margin-bottom: .7rem;
+  padding: 0 0 .45rem;
+  border-bottom: 1px solid var(--fp-line);
+  color: var(--fp-navy);
+  font-size: 1rem;
+  font-weight: 800;
+}
+.customer-group legend { padding: 0; border: 0; }
+.customer-options, .field-grid { display: grid; gap: .75rem; }
+.customer-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.customer-option {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  min-height: 48px;
+  padding: .55rem .65rem;
+  border: 1px solid var(--fp-control-line);
+  border-radius: var(--fp-radius);
+  font-size: .9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.customer-option:has(:checked) { border-color: var(--fp-blue); background: #eaf3fa; box-shadow: inset 0 0 0 1px var(--fp-blue); }
+.customer-option input { margin: 0; accent-color: var(--fp-blue); }
+.company-note { margin: .7rem 0 0; border-inline-start: 3px solid var(--fp-amber); padding: .6rem .75rem; background: #fbf3e6; font-size: .88rem; }
+.company-note strong { display: block; margin-bottom: .15rem; }
+.register-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem 1rem; }
+.register-actions p { margin: 0; font-size: .91rem; }
+.register-actions a { color: var(--fp-blue); font-weight: 700; text-underline-offset: .2em; }
+@media (max-width: 739px) {
+  .register-actions .fp-action { width: 100%; }
+}
+@media (min-width: 740px) {
+  .field-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field-span { grid-column: 1 / -1; }
+}
+</style>

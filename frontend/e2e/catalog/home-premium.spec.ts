@@ -31,7 +31,7 @@ test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ pa
   await expect(header(page).getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/registro')
   await expect(header(page).getByRole('button', { name: 'Carrito', exact: true })).toHaveCount(0)
   await expect(header(page).getByRole('link', { name: 'Panel de administración' })).toHaveCount(0)
-  await expect(business(page).getByRole('link', { name: 'Registrá tu empresa' })).toHaveAttribute('href', '/registro')
+  await expect(business(page).getByRole('link', { name: 'Registrá tu empresa' })).toHaveAttribute('href', '/registro?tipo=empresa')
   await expect(business(page)).toContainText('sujetas a evaluación y habilitación')
 
   await header(page).getByRole('link', { name: 'Categorías' }).click()
@@ -174,14 +174,14 @@ test('Home usa la imagen del detalle y conserva la tarjeta si falla', async ({ p
   await expect(products(page).getByRole('link', { name: 'Ver producto: Producto E2E 02' })).toBeVisible()
 })
 
-for (const width of [360, 390, 768, 1280, 1440]) {
+for (const width of [360, 390, 768, 1024, 1280, 1440]) {
   test('Home responsive y navegación con teclado a ' + width + ' px', async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
     await page.emulateMedia({ reducedMotion: 'reduce' })
     await page.goto('/')
     const heading = page.getByRole('heading', { level: 1 })
     await expect(heading).toBeVisible()
-    await expect(heading).toHaveText('Equipamiento industrial para cada desafío.')
+    await expect(heading).toHaveText('Equipá tu trabajo industrial.')
     await expect(products(page).getByRole('link', { name: /^Ver producto:/ })).toHaveCount(4)
     expect(await page.locator('html').evaluate(element => element.scrollWidth)).toBe(width)
 

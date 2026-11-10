@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import CommerceIcon from './CommerceIcon.vue'
-import heroArt from '@/assets/home/industrial-blueprint.svg'
+import heroArt from '@/assets/brand/contours.svg'
 
 defineProps<{ businessRoute: string; businessLabel: string }>()
 </script>
@@ -9,9 +9,9 @@ defineProps<{ businessRoute: string; businessLabel: string }>()
   <section class="hero fp-dark" aria-labelledby="home-title">
     <div class="fp-shell hero-inner">
       <div class="hero-content">
-        <p class="fp-kicker">Suministros industriales</p>
-        <h1 id="home-title">Equipamiento industrial para cada desafío.</h1>
-        <p class="hero-copy">Encontrá herramientas, insumos y productos para tu actividad en un solo lugar.</p>
+        <p class="fp-kicker">Ferretería industrial</p>
+        <h1 id="home-title">Equipá tu trabajo <em>industrial.</em></h1>
+        <p class="hero-copy">Herramientas e insumos para talleres, obras y empresas. Buscá por nombre o código y consultá la disponibilidad en el catálogo.</p>
         <div class="hero-actions">
           <RouterLink :to="{ name: 'catalogo' }" class="fp-action fp-action--amber fp-focus">
             Explorar catálogo <CommerceIcon name="arrow" />
@@ -22,7 +22,7 @@ defineProps<{ businessRoute: string; businessLabel: string }>()
         </div>
       </div>
       <div class="hero-art" aria-hidden="true">
-        <img :src="heroArt" alt="" width="680" height="420" fetchpriority="high" />
+        <img :src="heroArt" alt="" width="820" height="540" fetchpriority="high" />
       </div>
     </div>
   </section>
@@ -32,54 +32,29 @@ defineProps<{ businessRoute: string; businessLabel: string }>()
 .hero {
   overflow: hidden;
   color: white;
-  background: #0b2438;
-  border-bottom: 4px solid #145a8d;
+  background: radial-gradient(ellipse at 75% 45%, var(--fp-steel), var(--fp-navy) 75%);
+  border-bottom: 4px solid var(--fp-amber);
 }
-.hero-inner { display: grid; }
-.hero-content {
-  position: relative;
-  z-index: 1;
-  padding-block: clamp(34px, 4.2vw, 58px) .75rem;
-}
+.hero-inner { position: relative; isolation: isolate; display: grid; }
+.hero-content { position: relative; z-index: 1; padding-block: clamp(28px, 4.4vw, 70px) 0; }
 h1 {
-  max-width: 13ch;
-  margin: .9rem 0 .75rem;
-  font-size: clamp(2.15rem, 5.4vw, 4.25rem);
-  line-height: .99;
-  letter-spacing: -.055em;
-  text-wrap: balance;
+  margin: .8rem 0 0;
+  font-size: clamp(2.7rem, 6vw, 5.6rem);
+  line-height: .94;
+  letter-spacing: -.068em;
+  font-weight: 800;
 }
-.hero-copy {
-  max-width: 38ch;
-  margin: 1.1rem 0 1.45rem;
-  color: #d2e3ef;
-  font-size: clamp(.98rem, 1.4vw, 1.13rem);
-}
-.hero-actions { display: flex; flex-wrap: wrap; gap: .6rem; }
-.hero-art {
-  display: grid;
-  justify-items: end;
-  align-items: center;
-  min-width: 0;
-}
-.hero-art img {
-  display: block;
-  width: min(100%, 640px);
-  height: clamp(120px, 35vw, 200px);
-  object-fit: cover;
-  object-position: center 49%;
-}
-@media (max-width: 679px) {
-  .hero-actions .fp-action { padding-inline: .7rem; }
-}
+h1 em { display: block; color: var(--fp-amber-light); font-style: normal; }
+.hero-copy { max-width: 44ch; margin: 1.1rem 0 1.45rem; color: var(--fp-ink-soft); font-size: clamp(.95rem, 1.4vw, 1.125rem); }
+.hero-actions { display: flex; flex-wrap: wrap; gap: .55rem; }
+.hero-art { position: relative; min-height: 115px; pointer-events: none; }
+.hero-art img { position: absolute; right: -16px; bottom: -18px; width: clamp(225px, 54vw, 290px); height: auto; }
+.hero-actions .fp-action { padding-inline: .7rem; }
+
 @media (min-width: 680px) {
-  .hero-inner { grid-template-columns: 1fr .93fr; }
-  .hero-content { padding-bottom: clamp(38px, 4.2vw, 58px); }
-  .hero-art img {
-    height: auto;
-    width: 117%;
-    max-width: 680px;
-    margin-right: -1.8rem;
-  }
+  .hero-inner { grid-template-columns: minmax(0, 1.13fr) minmax(0, 1fr); }
+  .hero-content { padding-block-end: clamp(36px, 5vw, 74px); }
+  .hero-art img { width: clamp(510px, 63vw, 840px); right: calc(-1 * var(--fp-gutter)); bottom: 50%; transform: translateY(50%); }
+  .hero-actions .fp-action { padding-inline: 1.15rem; }
 }
 </style>

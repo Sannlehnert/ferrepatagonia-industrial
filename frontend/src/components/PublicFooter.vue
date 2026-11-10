@@ -1,10 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import PublicBrand from './PublicBrand.vue'
+import { getNavigableMenu, publicMenu } from '@/config/menu'
+import { getPermissionsForRole } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const year = new Date().getFullYear()
+const institutional = computed(() => getNavigableMenu(publicMenu, getPermissionsForRole(auth.rol))
+  .filter(link => (link.id === 'public-about' || link.id === 'public-faq') && router.hasRoute(link.routeName)))
 const accountLinks = computed(() => {
   if (auth.rol === 'ADMIN') return [{ label: 'Panel de administración', route: 'admin-dashboard' }]
   if (auth.rol === 'CLIENTE') {
@@ -47,10 +53,19 @@ const accountLinks = computed(() => {
         </nav>
 
         <nav aria-labelledby="footer-access-title">
-          <h2 id="footer-access-title">Accesos útiles</h2>
+          <h2 id="footer-access-title">Tienda</h2>
           <ul>
             <li><RouterLink :to="{ name: 'home', hash: '#empresas' }" aria-current-value="false" class="fp-focus">Área empresas</RouterLink></li>
             <li><RouterLink :to="{ name: 'home' }" class="fp-focus">Inicio</RouterLink></li>
+          </ul>
+        </nav>
+
+        <nav v-if="institutional.length" aria-labelledby="footer-institutional-title">
+          <h2 id="footer-institutional-title">Institucional</h2>
+          <ul>
+            <li v-for="link in institutional" :key="link.id">
+              <RouterLink :to="{ name: link.routeName }" class="fp-focus">{{ link.label }}</RouterLink>
+            </li>
           </ul>
         </nav>
       </div>
@@ -60,7 +75,7 @@ const accountLinks = computed(() => {
 </template>
 
 <style scoped>
-.store-footer { background: var(--fp-navy); color: white; }
+.store-footer { border-top: 3px solid var(--fp-blue); background: var(--fp-navy); color: white; }
 .footer-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -68,7 +83,7 @@ const accountLinks = computed(() => {
   padding-block: clamp(32px, 5vw, 60px);
 }
 .footer-brand { grid-column: 1 / -1; }
-.footer-brand p { max-width: 31ch; margin: .75rem 0 0; color: #c9dae8; font-size: .88rem; }
+.footer-brand p { max-width: 36ch; margin: .75rem 0 0; color: var(--fp-ink-soft); font-size: .88rem; }
 h2 { margin: 0 0 .35rem; font-size: .77rem; letter-spacing: .1em; text-transform: uppercase; }
 ul { list-style: none; margin: 0; padding: 0; }
 nav a {
@@ -88,8 +103,12 @@ nav a:hover { color: white; text-decoration: underline; }
   color: #c9dae8;
   font-size: .78rem;
 }
-@media (min-width: 680px) {
+@media (min-width: 680px) and (max-width: 899px) {
+  .footer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 900px) {
   .footer-grid { grid-template-columns: 1.75fr repeat(3, 1fr); }
+  .footer-grid:has(nav:nth-of-type(4)) { grid-template-columns: 1.6fr repeat(4, 1fr); }
   .footer-brand { grid-column: auto; }
 }
 </style>

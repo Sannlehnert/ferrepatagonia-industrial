@@ -73,15 +73,16 @@ onBeforeUnmount(() => {
               <div class="product-content">
                 <p class="product-code">COD. {{ product.codigo }}</p>
                 <h3>{{ product.nombre }}</h3>
+                <p class="product-stock" :class="{ available: product.disponible }">
+                  {{ product.disponible ? 'Disponible' : 'Sin stock' }}
+                </p>
                 <ProductPrice
+                  class="product-price"
                   :line="pricing.prices[product.id]"
                   :loading="pricing.loading"
                   :error="pricing.error"
                   :personalized="pricing.personalized"
                 />
-                <p class="product-stock" :class="{ available: product.disponible }">
-                  {{ product.disponible ? 'Disponible' : 'Sin stock' }}
-                </p>
                 <RouterLink
                   :to="{ name: 'producto-detalle', params: { id: product.id }, query: { returnTo: '/' } }"
                   :aria-label="'Ver producto: ' + product.nombre"
@@ -109,32 +110,34 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 .product-card {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   height: 100%;
   overflow-wrap: anywhere;
   border: 1px solid var(--fp-line);
-  border-radius: 10px;
+  border-radius: var(--fp-radius-panel);
   background: white;
   transition: border-color .16s, box-shadow .16s;
 }
-.product-card > :first-child { border-radius: 9px 9px 0 0; }
-.product-card:hover { border-color: #76a2c1; box-shadow: 0 3px 15px #0b243813; }
+.product-card > :first-child { border-radius: calc(var(--fp-radius-panel) - 1px) calc(var(--fp-radius-panel) - 1px) 0 0; }
+.product-card:focus-within, .product-card:hover { border-color: var(--fp-control-line); box-shadow: var(--fp-shadow); }
 .product-content { display: flex; flex: 1; flex-direction: column; padding: clamp(.65rem, 1.6vw, 1.05rem); }
-.product-code { margin: 0 0 .3rem; color: var(--fp-muted); font-size: .7rem; font-weight: 700; letter-spacing: .065em; }
+.product-code { margin: 0 0 .35rem; color: var(--fp-muted); font: 700 .75rem/1.35 ui-monospace, Consolas, monospace; }
 h3 { margin: 0; font-size: clamp(.94rem, 1.5vw, 1.1rem); line-height: 1.3; }
 .product-stock {
   display: flex;
   align-items: center;
   gap: .4rem;
-  margin: auto 0 0;
-  padding-block: .3rem .5rem;
+  margin: .6rem 0 0;
+  padding-bottom: .45rem;
   color: var(--fp-muted);
   font-size: .78rem;
   font-weight: 700;
 }
 .product-stock.available { color: #146343; }
-.product-stock::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.product-stock::before { content: ""; width: 6px; height: 6px; flex: none; border-radius: 50%; background: currentColor; }
+.product-price { margin: auto 0 .7rem; padding-top: .3rem; }
 .product-link {
   display: flex;
   align-items: center;
@@ -152,7 +155,7 @@ h3 { margin: 0; font-size: clamp(.94rem, 1.5vw, 1.1rem); line-height: 1.3; }
 .fp-state p { margin: 0 0 .65rem; }
 
 
-@media (min-width: 680px) {
+@media (min-width: 900px) {
   .product-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .95rem; }
 }
 </style>

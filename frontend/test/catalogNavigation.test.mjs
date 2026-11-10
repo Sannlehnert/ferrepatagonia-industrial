@@ -22,7 +22,7 @@ test('el catálogo está disponible en el menú público sin permisos', async ()
 test('el layout público incluye el encabezado y el contenido de la ruta', async () => {
   const layout = await readSource('../src/layouts/PublicLayout.vue')
 
-  assert.match(layout, /<PublicHeader\s*\/>/)
+  assert.match(layout, /<PublicHeader\s+@navigate="focusContent"\s*\/>/)
   assert.match(layout, /<RouterView\s*\/>/)
 })
 
