@@ -3,6 +3,7 @@ import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 import { getClientes } from '../controllers/clientes.controller';
 import { adminProductRouter } from './adminProduct.routes';
 import { productImportRouter } from './productImport.routes';
+import { adminOrderRouter } from './adminOrder.routes';
 import { getAdminPriceLists, getClientPriceLists, putClientPriceList, saveAdminPriceList } from '../controllers/clientPriceList.controller';
 import { clientIdPolicy, priceListAssignmentPolicy, priceListIdPolicy } from '../dtos/clients/price-list-assignment.dto';
 import { priceListPolicy } from '../dtos/clients/price-list.dto';
@@ -25,5 +26,6 @@ adminRouter.put('/listas-precio/:id', validateDto('params', priceListIdPolicy), 
 adminRouter.get('/clientes/listas-precio', getClientPriceLists);
 adminRouter.put('/clientes/:id/lista-precio',
     validateDto('params', clientIdPolicy), validateDto('body', priceListAssignmentPolicy), putClientPriceList);
+adminRouter.use('/pedidos', adminOrderRouter);
 adminRouter.use('/productos/importar', productImportRouter);
 adminRouter.use('/productos', adminProductRouter);
