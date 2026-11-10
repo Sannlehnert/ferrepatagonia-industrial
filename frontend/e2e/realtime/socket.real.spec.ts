@@ -49,10 +49,20 @@ test.setTimeout(60_000)
 
 async function login(page: Page, email: string, password: string, admin = false) {
   await page.goto('/login')
+  await submitLogin(page, email, password)
+  await expect(page).toHaveURL(admin ? /\/admin(?:\/|$)/ : /\/mi-cuenta\/datos$/)
+}
+
+async function submitLogin(page: Page, email: string, password: string) {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill(password)
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(admin ? /\/admin(?:\/|$)/ : /\/mi-cuenta\/datos$/)
+}
+
+async function confirmOrder(page: Page) {
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
+  await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
 }
 
 function observeSocket(page: Page) {
@@ -144,11 +154,13 @@ test('carrito entre navegadores, aislamiento de otro cliente y logout', async ({
   }
 })
 
-test('stock ADMIN y compra real recuperada por evento con un solo cargo', async ({ browser, page, fixture: f }) => {
-  const second = await browser.newContext()
+test('compra real actualiza stock, historial y comprobante con un solo cargo', async ({ browser, baseURL, page, fixture: f }) => {
   const administration = await browser.newContext()
+  const secondBrowser = await browser.browserType().launch()
   try {
+    const second = await secondBrowser.newContext({ baseURL })
     const sibling = await second.newPage()
+    const history = await second.newPage()
     const detail = await second.newPage()
     const admin = await administration.newPage()
     await login(page, f.client, f.password)
@@ -159,6 +171,10 @@ test('stock ADMIN y compra real recuperada por evento con un solo cargo', async 
     await expect(quantity(page, f.name)).toHaveValue('2')
     await sibling.goto('/carrito')
     await expect(quantity(sibling, f.name)).toHaveValue('2')
+    const historySocket = observeSocket(history)
+    await history.goto('/mi-cuenta/pedidos')
+    await expect(history.getByText('Todavía no tenés pedidos.')).toBeVisible()
+    await expect.poll(() => historySocket.upgraded).toBe(1)
     await detail.goto('/producto/' + f.productId)
     await expect(detail.getByText('5 unidades disponibles')).toBeVisible()
     await setStock(admin, f.productId, 6)
@@ -174,12 +190,17 @@ test('stock ADMIN y compra real recuperada por evento con un solo cargo', async 
       committed = response.status()
       await route.abort('failed')
     })
-    const summary = page.getByRole('region', { name: 'Resumen del carrito' })
-    await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
-    await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
+    await confirmOrder(page)
     await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' })).toContainText('USD 20.00')
     await expect(empty(sibling)).toBeVisible()
     await expect(detail.getByText('4 unidades disponibles')).toBeVisible()
+    const entry = history.getByRole('listitem').filter({
+      has: history.getByRole('heading', { name: /^PED-\d+$/ }),
+    })
+    await expect(entry).toHaveCount(1)
+    await expect(entry).toContainText('CONFIRMADO')
+    await entry.getByRole('button', { name: /^Ver detalle/ }).click()
+    await expect(entry.getByText(f.name, { exact: true })).toBeVisible()
     expect(socket.events.some(event => event.includes('pedido.confirmado.v1'))).toBe(true)
     expect(posts).toBe(1)
     expect(committed).toBe(201)
@@ -194,7 +215,7 @@ test('stock ADMIN y compra real recuperada por evento con un solo cargo', async 
       expect([Number(row.orders), Number(row.charges)]).toEqual([1, 1])
     } finally { await session.connection.end() }
   } finally {
-    await second.close()
+    await secondBrowser.close()
     await administration.close()
   }
 })
@@ -280,4 +301,124 @@ test('REST funciona sin transporte y la reconexión revalida el carrito y la coo
     await expect(quantity(page, f.name)).toHaveCount(0)
     expect(writes).toBe(1)
   } finally { await other.close() }
+})
+
+test('historial invalida solo las lecturas activas y descarta respuestas de otra sesión', async ({ page, fixture: f }) => {
+  await login(page, f.client, f.password)
+  await page.goto('/carrito')
+  await confirmOrder(page)
+  await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' })).toBeVisible()
+  const response = await page.request.get('/api/pedidos')
+  expect(response.status()).toBe(200)
+  const [{ pedidoId, numero }] = (await response.json()).data.items
+
+  let wire: WebSocketRoute | undefined
+  let upgrades = 0
+  await page.routeWebSocket(sockets, ws => {
+    const server = ws.connectToServer()
+    ws.onMessage(message => {
+      if (message === '5') {
+        wire = ws
+        upgrades++
+      }
+      server.send(message)
+    })
+  })
+  const confirmation = (id: number) => '42' + JSON.stringify(['pedido.confirmado.v1', {
+    version: 1, pedidoId: id, idEvento: 'pedido.confirmado.v1:' + id,
+    estado: 'CONFIRMADO', notificadoEn: new Date().toISOString(),
+  }])
+
+  let listReads = 0
+  let detailReads = 0
+  let holdList = false
+  const listStarted = Promise.withResolvers<void>()
+  const releaseList = Promise.withResolvers<void>()
+  const listSettled = Promise.withResolvers<void>()
+  const detailStarted = Promise.withResolvers<void>()
+  const releaseDetail = Promise.withResolvers<void>()
+  const detailSettled = Promise.withResolvers<void>()
+  await page.route('**/api/pedidos', async route => {
+    listReads++
+    if (!holdList) return route.continue()
+    holdList = false
+    const stale = await route.fetch()
+    listStarted.resolve()
+    await releaseList.promise
+    await route.fulfill({ response: stale, json: { data: { items: [] } } }).catch(() => {})
+    listSettled.resolve()
+  })
+  const detailPath = /\/api\/pedidos\/\d+$/
+  await page.route(detailPath, route => {
+    detailReads++
+    return route.continue()
+  })
+
+  try {
+    await page.goto('/mi-cuenta/pedidos')
+    const heading = page.getByRole('heading', { name: numero, exact: true })
+    await expect(heading).toBeVisible()
+    await expect.poll(() => upgrades).toBe(1)
+    const historyLink = page.getByRole('link', { name: 'Historial de pedidos', exact: true })
+    const dataLink = page.getByRole('link', { name: 'Mis datos', exact: true })
+    for (let i = 0; i < 2; i++) {
+      await dataLink.click()
+      await expect(heading).toHaveCount(0)
+      await historyLink.click()
+      await expect(heading).toBeVisible()
+    }
+    const item = page.getByText(f.name, { exact: true })
+    await page.getByRole('button', { name: `Ver detalle de ${numero}` }).click()
+    await expect(item).toBeVisible()
+    expect([listReads, detailReads, upgrades]).toEqual([3, 1, 1])
+
+    holdList = true
+    wire!.send(confirmation(pedidoId + 1))
+    await listStarted.promise
+    await expect(item).toBeVisible()
+    expect(detailReads).toBe(1)
+
+    const listRefresh = page.waitForResponse(r => new URL(r.url()).pathname === '/api/pedidos')
+    wire!.send(confirmation(pedidoId))
+    await listRefresh
+    await expect.poll(() => detailReads).toBe(2)
+    await expect(item).toBeVisible()
+    releaseList.resolve()
+    await listSettled.promise
+    await expect(heading).toHaveCount(1)
+    expect(listReads).toBe(5)
+
+    const nextListRefresh = page.waitForResponse(r => new URL(r.url()).pathname === '/api/pedidos')
+    wire!.send(confirmation(pedidoId))
+    wire!.send(confirmation(pedidoId + 2))
+    await nextListRefresh
+    expect([listReads, detailReads]).toEqual([6, 2])
+
+    await page.route(detailPath, async route => {
+      detailReads++
+      const stale = await route.fetch()
+      detailStarted.resolve()
+      await releaseDetail.promise
+      await route.fulfill({ response: stale }).catch(() => {})
+      detailSettled.resolve()
+    }, { times: 1 })
+    await wire!.close({ code: 1011 })
+    await detailStarted.promise
+    await expect.poll(() => upgrades).toBe(2)
+    expect([listReads, detailReads]).toEqual([7, 3])
+
+    await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+    await expect(page).toHaveURL(/\/login$/)
+    await submitLogin(page, 'cliente-nuevo@e2e.test', 'E2eLocal-214!')
+    await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+    await historyLink.click()
+    await expect(page.getByText('Todavía no tenés pedidos.')).toBeVisible()
+    releaseDetail.resolve()
+    await detailSettled.promise
+    await expect(heading).toHaveCount(0)
+    await expect(item).toHaveCount(0)
+  } finally {
+    releaseList.resolve()
+    releaseDetail.resolve()
+  }
 })

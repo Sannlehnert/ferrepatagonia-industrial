@@ -3,9 +3,9 @@ import { onScopeDispose, watch } from 'vue'
 import type { useAuthStore } from '@/stores/auth'
 
 type AuthStore = ReturnType<typeof useAuthStore>
-type Invalidation = { cart: boolean; products: Set<number>; order: boolean; reconnect: boolean }
+type Invalidation = { cart: boolean; products: Set<number>; orders: Set<number>; reconnect: boolean }
 const listeners = new Set<(change: Invalidation) => void>()
-const empty = (): Invalidation => ({ cart: false, products: new Set(), order: false, reconnect: false })
+const empty = (): Invalidation => ({ cart: false, products: new Set(), orders: new Set(), reconnect: false })
 const isId = (id: unknown): id is number =>
   typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && id <= 2147483647
 
@@ -115,7 +115,7 @@ export function startRealtime(auth: AuthStore) {
           payload.idEvento !== `pedido.confirmado.v1:${payload.pedidoId}` || seen.has(payload.idEvento)) return
       seen.add(payload.idEvento)
       if (seen.size > 256) seen.delete(seen.values().next().value!)
-      batch.order = true
+      batch.orders.add(payload.pedidoId)
       batch.cart = true
       schedule()
     })

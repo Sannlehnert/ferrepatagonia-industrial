@@ -6,16 +6,17 @@ export function usePrivateAccountRead<T>(session: () => string, allowed: () => b
   const error = shallowRef<unknown>(null)
   let sequence = 0
   let controller: AbortController | undefined
-  function reset() {
+  function reset(keepData = false) {
     sequence++
     controller?.abort()
-    data.value = null
+    if (!keepData) data.value = null
     error.value = null
     loading.value = false
   }
-  async function load(read: (signal: AbortSignal) => Promise<T>) {
-    reset()
-    if (!allowed()) return
+  async function load(read: (signal: AbortSignal) => Promise<T>, { keepData = false } = {}) {
+    const canRead = allowed()
+    reset(keepData && canRead)
+    if (!canRead) return
     const current = sequence, identity = session()
     controller = new AbortController()
     const signal = controller.signal
@@ -25,7 +26,10 @@ export function usePrivateAccountRead<T>(session: () => string, allowed: () => b
       const result = await read(signal)
       if (valid()) data.value = result
     } catch (cause) {
-      if (valid()) error.value = cause
+      if (valid()) {
+        data.value = null
+        error.value = cause
+      }
     } finally {
       if (valid()) loading.value = false
     }

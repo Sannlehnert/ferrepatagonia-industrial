@@ -38,6 +38,11 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminAccountsView.vue'),
         },
         {
+          path: 'comprobantes',
+          name: 'admin-receipts',
+          component: () => import('@/views/admin/AdminPaymentReceiptsView.vue'),
+        },
+        {
           path: '',
           redirect: { name: 'admin-dashboard' },
         },

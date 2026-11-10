@@ -64,6 +64,12 @@ export const adminMenu: readonly MenuItem[] = [
         permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
     {
+        id: 'admin-receipts',
+        label: 'Comprobantes de pago',
+        routeName: 'admin-receipts',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
+    {
         id: 'admin-categories',
         label: 'Categorías',
         routeName: 'admin-categories',

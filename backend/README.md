@@ -658,3 +658,7 @@ la eliminación de cookie como un navegador. No usar una base de producción.
 El precio es provisional: `precio: null`, `estadoPrecio: "PENDIENTE_DEFINICION"`;
 la política comercial y moneda quedan pendientes de FER-15.
 Consultar el [contrato REST, decisiones y pruebas](../docs/api/catalogo.md).
+
+## Comprobantes de pago (#275)
+
+Consultar el [contrato REST y la configuración del almacenamiento privado](../docs/275-payment-receipts.md).
