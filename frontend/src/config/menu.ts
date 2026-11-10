@@ -112,13 +112,13 @@ export const publicMenu: readonly MenuItem[] = [
     {
         id: 'public-about',
         label: 'Quiénes somos',
-        routeName: null,
+        routeName: 'public-about',
         permission: null,
     },
     {
         id: 'public-faq',
         label: 'Preguntas frecuentes',
-        routeName: null,
+        routeName: 'public-faq',
         permission: null,
     },
 ]
