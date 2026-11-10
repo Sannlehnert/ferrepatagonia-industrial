@@ -126,6 +126,10 @@ function confirmedOnce(state: Awaited<ReturnType<typeof sql>>, key: string, orde
 }
 
 recoveryTest.use({ screenshot: 'off', trace: 'off' })
+recoveryTest.beforeEach(async ({ page }) => {
+  // Esta suite verifica la recuperación por REST cuando el transporte en tiempo real no está disponible.
+  await page.route('**/socket.io/**', route => route.abort())
+})
 
 for (const width of [360, 1280]) {
   recoveryTest.describe(`#263 crédito a ${width}px`, () => {

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 import { getClientes } from '../controllers/clientes.controller';
 import { adminProductRouter } from './adminProduct.routes';
+import { adminCategoryRouter } from './adminCategory.routes';
 import { productImportRouter } from './productImport.routes';
 import { adminOrderRouter } from './adminOrder.routes';
 import { getAdminPriceLists, getClientPriceLists, putClientPriceList, saveAdminPriceList } from '../controllers/clientPriceList.controller';
@@ -29,3 +30,5 @@ adminRouter.put('/clientes/:id/lista-precio',
 adminRouter.use('/pedidos', adminOrderRouter);
 adminRouter.use('/productos/importar', productImportRouter);
 adminRouter.use('/productos', adminProductRouter);
+adminRouter.use('/productos', adminProductRouter);
+adminRouter.use('/categorias', adminCategoryRouter);

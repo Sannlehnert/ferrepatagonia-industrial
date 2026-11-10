@@ -1,5 +1,6 @@
 import { mutationErrorMessage } from '../config/database-policy';
 import { Request, Response } from 'express';
+import type { RealtimeRequest } from '../realtime/committed-change';
 import {
     listAdminProducts,
     getAdminProductById,
@@ -50,7 +51,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     try {
         const { id } = res.locals.dto.params;
 
-        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body);
+        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body, (req as RealtimeRequest).notifyCommittedChange);
         return res.status(200).json(updatedProduct);
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
@@ -78,7 +79,7 @@ export const updateProductStock = async (req: Request, res: Response) => {
     try {
         const { id } = res.locals.dto.params;
 
-        const product = await updateAdminProductStock(id, res.locals.dto.body.stock);
+        const product = await updateAdminProductStock(id, res.locals.dto.body.stock, (req as RealtimeRequest).notifyCommittedChange);
         return res.status(200).json({ message: 'Stock actualizado exitosamente', product });
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });

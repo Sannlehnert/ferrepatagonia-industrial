@@ -3,6 +3,7 @@ import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import axios from 'axios'
 import { accountOrderErrorMessage, accountOrderService } from '@/services/accountOrderService'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
+import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
 import type {
@@ -63,6 +64,7 @@ export function createAccountOrderStore(
     let activeAttempt: AbortController | undefined
     let revision = 0
     let disposed = false
+    let recoverAfterRequest = false
 
     function current(userId: number, version: number) {
       return !disposed &&
@@ -78,6 +80,7 @@ export function createAccountOrderStore(
       activeAttempt?.abort()
       activeEligibility = undefined
       activeAttempt = undefined
+      recoverAfterRequest = false
       eligibility.value = null
       eligibilityLoading.value = false
       eligibilityError.value = ''
@@ -176,6 +179,7 @@ export function createAccountOrderStore(
       userId: number,
       requestId: number,
       version: number,
+      reconcileCart = true,
     ) {
       if (!isCurrent(requestId, userId, version)) return false
       attemptError.value = ''
@@ -204,7 +208,7 @@ export function createAccountOrderStore(
       } catch {
         storageError.value = 'El pedido está confirmado, pero no se pudo limpiar el intento guardado.'
       }
-      cart.reconciliarPedidoConfirmado()
+      if (reconcileCart) cart.reconciliarPedidoConfirmado()
       return true
     }
 
@@ -261,11 +265,11 @@ export function createAccountOrderStore(
         handleAttemptError(error, userId)
         return false
       } finally {
-        if (activeAttempt === controller) activeAttempt = undefined
+        finishRequest(controller)
       }
     }
 
-    async function consultResult() {
+    async function consultResult(reconcileCart = true) {
       const userId = auth.user?.id
       const version = currentSessionGeneration()
       const key = pendingKey.value
@@ -278,14 +282,14 @@ export function createAccountOrderStore(
       const controller = activeAttempt = new AbortController()
       try {
         const result = await transport.recover(key, controller.signal)
-        return finishAttempt(result, userId, requestId, version)
+        return finishAttempt(result, userId, requestId, version, reconcileCart)
       } catch (error: unknown) {
         if (isCurrent(requestId, userId, version)) {
           handleAttemptError(error, userId)
         }
         return false
       } finally {
-        if (activeAttempt === controller) activeAttempt = undefined
+        finishRequest(controller)
       }
     }
 
@@ -308,7 +312,7 @@ export function createAccountOrderStore(
         }
         return false
       } finally {
-        if (activeAttempt === controller) activeAttempt = undefined
+        finishRequest(controller)
       }
     }
 
@@ -317,6 +321,20 @@ export function createAccountOrderStore(
       attemptState.value = 'idle'
       attemptError.value = ''
     }
+
+    function finishRequest(controller: AbortController) {
+      if (activeAttempt !== controller) return
+      activeAttempt = undefined
+      if (!recoverAfterRequest) return
+      recoverAfterRequest = false
+      if (pendingKey.value) void consultResult(false)
+    }
+
+    onRealtime(change => {
+      if (!(change.order || change.reconnect) || !sessionKey.value || !pendingKey.value) return
+      if (activeAttempt) recoverAfterRequest = true
+      else void consultResult(false)
+    })
 
     watch(sessionKey, key => {
       const userId = key === null ? null : auth.user!.id

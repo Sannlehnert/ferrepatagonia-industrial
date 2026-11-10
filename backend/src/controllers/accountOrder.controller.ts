@@ -18,6 +18,7 @@ import {
   getClientOrderDetail,
   listClientOrders,
 } from '../services/orders/account-order.service';
+import type { RealtimeRequest } from '../realtime/committed-change';
 
 type Operation = 'confirm' | 'recover' | 'eligibility';
 type OrderMutationOperation = 'confirm' | 'recover' | 'eligibility';
@@ -96,6 +97,7 @@ export function handleAccountOrder(
               auth,
               req.get('Idempotency-Key'),
               (req.body as { cotizacion: string }).cotizacion,
+              (req as RealtimeRequest).notifyCommittedChange,
             )
             : operation === 'recover'
               ? await getAccountOrderResult(

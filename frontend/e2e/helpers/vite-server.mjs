@@ -51,6 +51,7 @@ async function main() {
       target: apiURL.origin,
       changeOrigin: true,
     },
+    "/socket.io/": { target: apiURL.origin, ws: true },
   };
   const shared = {
     root: frontend,

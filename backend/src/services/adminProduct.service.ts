@@ -3,6 +3,7 @@ import {findAllAdmin,findById,categoryExists,create,update,updateStock,CreatePro
 import { validateDtoInput } from '../dtos/validation';
 import { createProductPolicy, updateProductPolicy, stockPolicy } from '../dtos/policies';
 import { roundSqlDecimal2 } from '../dtos/rules';
+import type { NotifyCommittedChange } from '../realtime/committed-change';
 
 export class ValidationError extends Error {
     statusCode: number;
@@ -84,7 +85,7 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
     }
 };
 
-export const updateAdminProduct = async (id: number, payload: UpdateProductDTO) => {
+export const updateAdminProduct = async (id: number, payload: UpdateProductDTO, notify?: NotifyCommittedChange) => {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new ValidationError('El cuerpo de la solicitud es obligatorio y debe ser un objeto JSON válido.');
     }
@@ -101,7 +102,7 @@ export const updateAdminProduct = async (id: number, payload: UpdateProductDTO) 
         ...(payload.precio !== undefined && payload.precio !== null ? { precio: roundSqlDecimal2(payload.precio) } : {})
     };
 
-    await update(id, normalizedPayload);
+    await update(id, normalizedPayload, notify);
     return await findById(id);
 };
 
@@ -115,12 +116,12 @@ export const deactivateAdminProduct = async (id: number) => {
     return await findById(id);
 };
 
-export const updateAdminProductStock = async (id: number, stock: unknown) => {
+export const updateAdminProductStock = async (id: number, stock: unknown, notify?: NotifyCommittedChange) => {
     const existing = await findById(id);
     if (!existing) throw new ValidationError('Producto no encontrado.', 404);
 
     const result = await validateDtoInput(stockPolicy, { stock });
     if (!result.valid) throw new ValidationError(result.message);
-    await updateStock(id, result.data.stock);
+    await updateStock(id, result.data.stock, notify);
     return await findById(id);
 };

@@ -5,6 +5,7 @@ const {once}=require('node:events');
 Object.assign(process.env,{JWT_SECRET:'unit',DB_HOST:'127.0.0.1',DB_PORT:'1',DB_NAME:'unit',DB_USER:'unit',DB_PASSWORD:'unit'});
 const { app }=require('../dist/app');
 const products=require('../dist/services/adminProduct.service');
+const categories=require('../dist/services/category.service');
 const register=require('../dist/services/register.service');
 const auth=require('../dist/services/auth.services');
 const {DatabaseOutcomeUnknownError}=require('../dist/config/database-policy');
@@ -21,6 +22,9 @@ for(const [method,path,target,key,body] of [
  ['PUT','/api/admin/productos/1',products,'updateAdminProduct',{nombre:'Producto'}],
  ['PATCH','/api/admin/productos/1/stock',products,'updateAdminProductStock',{stock:9}],
  ['PATCH','/api/admin/productos/1/desactivar',products,'deactivateAdminProduct',{}],
+ ['POST','/api/admin/categorias',categories,'createAdminCategory',{nombre:'Categoría'}],
+ ['PUT','/api/admin/categorias/1',categories,'updateAdminCategory',{descripcion:null}],
+ ['PATCH','/api/admin/categorias/1/desactivar',categories,'deactivateAdminCategory',undefined],
  ['POST','/api/auth/register',register,'registerClient',{tipoCliente:'PARTICULAR',nombreRazonSocial:'Prueba',email:'test@example.test',password:'Clave segura 123'}],
 ])test('uncertain HTTP result: '+path,async t=>{
  t.mock.method(target,key,async()=>{throw new DatabaseOutcomeUnknownError();});
