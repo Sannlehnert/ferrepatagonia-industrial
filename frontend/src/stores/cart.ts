@@ -3,6 +3,7 @@ import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { cartErrorMessage, cartService } from '@/services/cartService'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
+import { onRealtime } from '@/services/realtime'
 import type { CartMutation, CartSnapshot, CartTransport } from '@/types/cart'
 
 function validCartInteger(value: number) {
@@ -25,6 +26,7 @@ export function createCartStore(transport: CartTransport) {
     let active: AbortController | undefined
     let reading = false
     let revision = 0
+    let invalidation = 0
     let disposed = false
 
     const sessionKey = computed(() => {
@@ -34,8 +36,8 @@ export function createCartStore(transport: CartTransport) {
     })
 
     // La verificación puede ejecutarse con sessionChecked todavía en true.
-    const unsubscribe = auth.$onAction(({ name, after, onError }) => {
-      if (name !== 'fetchSession') return
+    const unsubscribe = auth.$onAction(({ name, args, after, onError }) => {
+      if (name !== 'fetchSession' || args[0] === true) return
       checksPending.value++
       const settled = () => { checksPending.value-- }
       after(settled)
@@ -80,11 +82,16 @@ export function createCartStore(transport: CartTransport) {
       loadError.value = ''
       needsSync.value = true
       try {
-        const result = await transport.get(request.signal)
-        if (!request.isCurrent()) return false
-        cart.value = result
-        needsSync.value = false
-        return true
+        while (request.isCurrent()) {
+          const requested = invalidation
+          const result = await transport.get(request.signal)
+          if (!request.isCurrent()) return false
+          if (requested !== invalidation) continue
+          cart.value = result
+          needsSync.value = false
+          return true
+        }
+        return false
       } catch (cause) {
         if (request.isCurrent()) loadError.value = cartErrorMessage(cause)
         return false
@@ -108,6 +115,19 @@ export function createCartStore(transport: CartTransport) {
       if (!key || active || disposed) return false
       return readCart(key)
     }
+
+    function invalidarCarrito() {
+      if (!sessionKey.value || disposed) return
+      invalidation++
+      needsSync.value = true
+      void cargarCarrito()
+    }
+
+    onRealtime(change => {
+      const affected = change.products.size > 0 && (loading.value || operation.value !== null ||
+        items.value.some(item => change.products.has(item.id_producto)))
+      if (change.cart || change.reconnect || affected) invalidarCarrito()
+    })
 
     function reconciliarPedidoConfirmado() {
       const key = sessionKey.value

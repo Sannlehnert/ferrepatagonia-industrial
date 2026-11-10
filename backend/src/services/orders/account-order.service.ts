@@ -1,4 +1,5 @@
 import { dataSource, inTransaction } from '../../config/database.config';
+import { notifyAfterCommit, type CommittedChange, type NotifyCommittedChange } from '../../realtime/committed-change';
 import { DatabaseOutcomeUnknownError } from '../../config/database-policy';
 import type { AuthContext } from '../../types/auth';
 import {
@@ -240,6 +241,7 @@ export async function confirmAccountOrder(
   auth: AuthContext,
   value: unknown,
   quoteToken: unknown,
+  notify?: NotifyCommittedChange,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -255,19 +257,22 @@ export async function confirmAccountOrder(
   }
 
   let workFailure: { error: unknown } | undefined;
+  let committed: { result: AccountOrderResult; change?: CommittedChange };
 
   try {
-    return await inTransaction(async manager => {
+    committed = await inTransaction(async manager => {
       try {
         const attempt = await lockAccountOrderAttempt(manager, clientId, key);
 
         if (attempt && attempt.state !== 'PENDIENTE') {
-          return presentStoredAccountOrder(attempt);
+          return { result: presentStoredAccountOrder(attempt) };
         }
 
-        return await executePendingAccountOrder(
+        const { productIds, ...result } = await executePendingAccountOrder(
           manager, auth, clientId, key, quoteToken,
         );
+        const { pedidoId, estado } = result.body.data;
+        return { result, change: { kind: 'order', clientId, order: { pedidoId, estado }, productIds } };
       } catch (error) {
         workFailure = { error };
         throw error;
@@ -308,4 +313,9 @@ export async function confirmAccountOrder(
       },
     };
   }
+
+  // Recovery and historical responses never reach this branch with a fresh order.
+  // The transaction wrapper has acknowledged COMMIT and released its connection.
+  if (committed.change) notifyAfterCommit(notify, committed.change);
+  return committed.result;
 }

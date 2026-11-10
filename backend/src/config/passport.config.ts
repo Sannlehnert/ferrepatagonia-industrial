@@ -1,7 +1,8 @@
 import { Passport } from 'passport';
 import { Strategy } from 'passport-jwt';
 import { env } from './env.config';
-import { readAuthClaims } from '../services/token.service';
+import { readAuthClaims, sessionJwtAlgorithm } from '../services/token.service';
+import { authCookieName } from './auth-cookie.config';
 import { restoreUsuario } from '../services/auth.services';
 import type { AuthContext } from '../types/auth';
 
@@ -9,11 +10,11 @@ import type { AuthContext } from '../types/auth';
 export const authPassport = new Passport();
 export const sessionJwtStrategy = new Strategy({
   jwtFromRequest: req => {
-    const token: unknown = req.cookies?.jwt_token;
+    const token: unknown = req.cookies?.[authCookieName];
     return typeof token === 'string' && token.length > 0 ? token : null;
   },
   secretOrKey: env.jwtSecret,
-  algorithms: ['HS256'],
+  algorithms: [sessionJwtAlgorithm],
   ignoreExpiration: false,
 }, (payload: unknown, done) => {
   let auth: AuthContext;
