@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import AuthFrame from '@/components/AuthFrame.vue'
+import AuthField from '@/components/AuthField.vue'
 import { useAuthStore } from '@/stores/auth'
 import { esEmailValido } from '@/utils/registro'
 import { destinoTrasLogin } from '@/utils/rutas'
@@ -16,6 +18,7 @@ const verPassword = ref(false)
 const intentado = ref(false)
 const enviando = ref(false)
 const error = ref<string | null>(null)
+const formElement = ref<HTMLFormElement | null>(null)
 
 const errEmail = computed(() => {
   if (!email.value.trim()) return 'Ingresá tu email.'
@@ -38,7 +41,11 @@ function mensajeError(e: unknown): string {
 async function enviar() {
   intentado.value = true
   error.value = null
-  if (errEmail.value || errPassword.value) return
+  if (errEmail.value || errPassword.value) {
+    await nextTick()
+    formElement.value?.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus()
+    return
+  }
 
   enviando.value = true
   try {
@@ -56,34 +63,48 @@ async function enviar() {
 </script>
 
 <template>
-  <section class="mx-auto my-8 max-w-[380px] px-4">
-    <h2 class="m-0 mb-5 text-2xl font-semibold text-[#0b2438]">Iniciar sesión</h2>
+  <AuthFrame
+    title="Iniciar sesión"
+    intro="Ingresá con el email y la contraseña de tu cuenta."
+    panel-title="Compras y pedidos, en un solo lugar."
+    panel-copy="Consultá tus pedidos y las condiciones comerciales disponibles para tu cuenta."
+  >
+    <form ref="formElement" class="login-form" novalidate :aria-busy="enviando" @submit.prevent="enviar">
+      <AuthField id="login-email" v-model="email" label="Email" type="email" name="email" autocomplete="username" required :error="intentado ? errEmail : null" />
+      <AuthField
+        id="login-password"
+        v-model="password"
+        label="Contraseña"
+        name="password"
+        :type="verPassword ? 'text' : 'password'"
+        autocomplete="current-password"
+        required
+        :error="intentado ? errPassword : null"
+      >
+        <button
+          type="button"
+          class="fp-action fp-action--plain fp-focus password-toggle"
+          aria-controls="login-password"
+          :aria-label="verPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'"
+          @click="verPassword = !verPassword"
+        >
+          {{ verPassword ? 'Ocultar' : 'Mostrar' }}
+        </button>
+      </AuthField>
 
-    <form class="flex flex-col gap-4" novalidate @submit.prevent="enviar">
-      <label class="flex flex-col gap-1 text-sm">Email
-        <input class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]" v-model="email" type="email" autocomplete="email" />
-        <small v-if="intentado && errEmail" class="text-sm text-[#842029]">{{ errEmail }}</small>
-      </label>
-
-      <label class="flex flex-col gap-1 text-sm">Contraseña
-        <span class="flex gap-2">
-          <input
-            v-model="password"
-            :type="verPassword ? 'text' : 'password'"
-            autocomplete="current-password"
-            class="box-border min-h-11 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
-          />
-          <button class="min-h-11 rounded-md border border-slate-300 bg-white px-3 hover:bg-slate-100" type="button" @click="verPassword = !verPassword">
-            {{ verPassword ? 'Ocultar' : 'Mostrar' }}
-          </button>
-        </span>
-        <small v-if="intentado && errPassword" class="text-sm text-[#842029]">{{ errPassword }}</small>
-      </label>
-
-      <p v-if="error" class="m-0 text-sm text-[#842029]" role="alert">{{ error }}</p>
-
-      <button class="min-h-11 rounded-md border-0 bg-[#145a8d] px-4 py-2 font-semibold text-white hover:bg-[#103a5c] disabled:cursor-wait disabled:opacity-60" :disabled="enviando">{{ enviando ? 'Ingresando...' : 'Ingresar' }}</button>
-      <p class="m-0 text-sm">¿No tenés cuenta? <RouterLink class="text-[#145a8d] underline" :to="{ name: 'registro' }">Creá una</RouterLink></p>
+      <p v-if="error" class="fp-error fp-error-panel" role="alert">{{ error }}</p>
+      <button class="fp-action fp-action--primary fp-focus" :disabled="enviando">
+        {{ enviando ? 'Ingresando...' : 'Ingresar' }}
+      </button>
+      <p class="auth-switch">¿No tenés cuenta? <RouterLink class="fp-focus" :to="{ name: 'registro' }">Creá una</RouterLink></p>
     </form>
-  </section>
+  </AuthFrame>
 </template>
+
+<style scoped>
+.login-form { display: grid; gap: 1.1rem; }
+.password-toggle { border-color: var(--fp-control-line); background: white; }
+.password-toggle:hover { background: var(--fp-bg); }
+.auth-switch { margin: 0; font-size: .91rem; }
+.auth-switch a { color: var(--fp-blue); font-weight: 700; text-underline-offset: .2em; }
+</style>

@@ -96,7 +96,7 @@ test('contrato interceptado: Home y Catálogo comparten precio, descuento y prom
   await setup(page);await page.goto('/')
   await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
   await expect(page.getByText(/Descuento 5.00%/)).toContainText('Promoción especial')
-  await page.getByRole('link',{name:'Ver en catálogo'}).click()
+  await page.getByRole('link',{name:'Ver catálogo completo'}).click()
   await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
   await expect(page.getByText(/Descuento 5.00%/)).toContainText('Promoción especial')
 })
