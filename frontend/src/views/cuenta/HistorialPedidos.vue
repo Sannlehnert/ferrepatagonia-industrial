@@ -3,12 +3,13 @@ import { ref, watch } from 'vue'
 import ClientOrderDetail from '@/components/ClientOrderDetail.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
+import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderSummary } from '@/types/clientOrder'
 
 const auth = useAuthStore()
 const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}`
-const allowed = () => auth.isAuthenticated && auth.rol === 'CLIENTE'
+const allowed = () => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.loggingOut
 
 const { data: orders, loading, error, load } = usePrivateAccountRead<ClientOrderSummary[]>(
   identity,
@@ -30,16 +31,23 @@ function toggleOrder(orderId: number) {
   expandedOrderId.value = expandedOrderId.value === orderId ? null : orderId
 }
 
-watch(identity, () => {
+watch([identity, allowed], () => {
   expandedOrderId.value = null
   void loadOrders()
-}, { immediate: true, flush: 'sync' })
+}, { immediate: true })
+
+onRealtime(change => {
+  if (change.reconnect || change.orders.size > 0) {
+    // Keep the selected detail mounted while replacing the list from REST.
+    void load(listClientOrders, { keepData: true })
+  }
+})
 </script>
 
 <template>
   <h3 class="m-0 mb-4 text-lg font-semibold text-[#0b2438]">Mis pedidos</h3>
 
-  <p v-if="loading" role="status">Cargando tus pedidos…</p>
+  <p v-if="loading && !orders" role="status">Cargando tus pedidos…</p>
 
   <div v-else-if="error" class="space-y-3">
     <p role="alert">No se pudieron cargar tus pedidos.</p>
