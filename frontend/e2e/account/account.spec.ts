@@ -3,7 +3,10 @@ for (const role of ['cliente', 'admin', 'visitor']) {
     test(`account routes and real identity: ${role}`, async ({ page }) => {
         const missing: string[] = [];
         page.on('request', request => {
-            if (/\/api\/(cliente\/me|pedidos)(?:\?|$)/.test(request.url())) missing.push(request.url());
+            const path = new URL(request.url()).pathname;
+            if (path === '/api/cliente/me' || (role !== 'cliente' && path === '/api/pedidos')) {
+                missing.push(request.url());
+            }
         });
         let session: { nombre: string; email: string } | undefined;
         if (role !== 'visitor') {
@@ -20,16 +23,15 @@ for (const role of ['cliente', 'admin', 'visitor']) {
             await expect(page.locator('dd')).toHaveText([session!.nombre, session!.email]);
             await expect(page.getByText('Teléfono', { exact: true })).toHaveCount(0);
             await page.getByRole('link', { name: 'Historial de pedidos', exact: true }).click();
-            await expect(page.getByRole('status')).toContainText('no está disponible');
-            await expect(page.getByText('Todavía no hiciste ningún pedido.')).toHaveCount(0);
+            await expect(page.getByRole('status')).toHaveText('Todavía no tenés pedidos.');
             await page.reload();
-            await expect(page.getByRole('status')).toContainText('no está disponible');
+            await expect(page.getByRole('status')).toHaveText('Todavía no tenés pedidos.');
         } else {
             await expect(page).toHaveURL(role === 'admin' ? /\/acceso-denegado$/ : /\/login\?redirect=/);
             await expect(page.locator('dd')).toHaveCount(0);
         }
         await page.goto('/mi-cuenta/pedidos');
-        if (role === 'cliente') await expect(page.getByRole('status')).toContainText('no está disponible');
+        if (role === 'cliente') await expect(page.getByRole('status')).toHaveText('Todavía no tenés pedidos.');
         else await expect(page).toHaveURL(role === 'admin' ? /\/acceso-denegado$/ : /\/login\?redirect=/);
         expect(missing).toEqual([]);
     });

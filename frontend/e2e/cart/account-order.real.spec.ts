@@ -102,4 +102,48 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   expect(cartResponse.status()).toBe(200)
   expect((await cartResponse.json()).items).toEqual([])
   await secondTab.close()
+  await page.route('**/api/pedidos', route =>
+    route.fulfill({ status: 503, json: { message: 'Historial no disponible.' } }),
+    { times: 1 },
+  )
+
+  await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByRole('alert')).toContainText('No se pudieron cargar tus pedidos.')
+  await page.getByRole('button', { name: 'Reintentar', exact: true }).click()
+
+  const order = page.getByRole('listitem').filter({
+    has: page.getByRole('heading', { name: /^PED-\d+$/ }),
+    hasText: '124.00 USD',
+  })
+
+  await expect(order).toHaveCount(1)
+  await expect(order).toContainText('CONFIRMADO')
+  const orderNumber = await order.getByRole('heading').innerText()
+
+  await page.route(/\/api\/pedidos\/\d+$/, route =>
+    route.fulfill({ status: 503, json: { message: 'Detalle no disponible.' } }),
+    { times: 1 },
+  )
+
+  await order.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
+  await expect(order.getByRole('alert')).toContainText('No se pudo cargar el detalle del pedido.')
+  await order.getByRole('button', { name: 'Reintentar detalle', exact: true }).click()
+  await expect(order.getByText('Producto E2E 24', { exact: true })).toBeVisible()
+  await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await signIn(page)
+  await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByRole('heading', { name: orderNumber, exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+  await expect(page).toHaveURL(/\/login$/)
+  await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')
+  await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
+  await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByText('Todavía no tenés pedidos.', { exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: orderNumber, exact: true })).toHaveCount(0)
 })

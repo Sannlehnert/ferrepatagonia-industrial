@@ -14,10 +14,6 @@ test('account uses only session identity and escapes displayed values',async()=>
  const html=await renderToString(createSSRApp(view('DatosClientes',{user:{nombre:'<Cliente>',email:'cliente@example.test'}})));
  assert.match(html,/&lt;Cliente&gt;/);assert.match(html,/cliente@example.test/);assert.doesNotMatch(html,/Teléfono|Dirección/);
 });
-test('orders explicitly unavailable rather than an invented empty history',async()=>{
- const html=await renderToString(createSSRApp(view('HistorialPedidos')));
- assert.match(html,/no está disponible/);assert.doesNotMatch(html,/Todavía no hiciste|<table|<select/);
-});
 function config(name, dependencies={}) {
  const m={exports:{}};
  const source=readFileSync(resolve(__dirname,'../src/config',name+'.ts'),'utf8');
