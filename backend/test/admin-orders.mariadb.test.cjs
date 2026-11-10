@@ -65,7 +65,31 @@ describe('Task #277 — Integración MariaDB: Permisos, Transición y Preservaci
     let adminCookie;
     let clientCookie;
 
+    function assertDisposableDatabaseGuard() {
+        const profile = process.env.CC260_TEST_PROFILE;
+        const dbName = process.env.DB_NAME || '';
+        const host = process.env.DB_HOST || '127.0.0.1';
+
+        if (!profile || profile === 'undefined' || profile.trim() === '') {
+            throw new Error('ABORT: Falta acreditación de perfil descartable en CC260_TEST_PROFILE.');
+        }
+
+        if (dbName === 'ferrepatagonia_dev' || dbName === 'ferrepatagonia' || dbName === 'mysql') {
+            throw new Error(`ABORT: Base de datos "${dbName}" pertenece a un entorno protegido o de desarrollo.`);
+        }
+
+        if (!dbName.startsWith('test_') && !dbName.startsWith('cc260_') && !dbName.startsWith('admin_orders_')) {
+            throw new Error(`ABORT: Base de datos "${dbName}" carece de prefijo descartable válido.`);
+        }
+
+        if (host !== '127.0.0.1' && host !== 'localhost') {
+            throw new Error(`ABORT: Host "${host}" no corresponde a una interfaz loopback local.`);
+        }
+    }
+
     before(async () => {
+        assertDisposableDatabaseGuard();
+
         if (!dataSource.isInitialized) {
             if (typeof dbConfig.initializeDatabase === 'function') {
                 await dbConfig.initializeDatabase();
