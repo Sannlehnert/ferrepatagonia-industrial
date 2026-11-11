@@ -8,6 +8,18 @@ export async function findActiveCategories(): Promise<CategoryRow[]> {
     .orderBy('c.nombre', 'ASC').addOrderBy('c.id_categoria', 'ASC').getRawMany<CategoryRow>();
 }
 
+export function findAdminCategories(): Promise<Categoria[]> {
+  return dataSource.getRepository(CategoriaSchema).find({
+    select: {
+      id_categoria: true,
+      nombre: true,
+      descripcion: true,
+      activo: true,
+    },
+    order: { nombre: 'ASC', id_categoria: 'ASC' },
+  });
+}
+
 type CategoryFields = Pick<Categoria, 'nombre' | 'descripcion'>;
 
 export function insertCategory({ nombre, descripcion }: CategoryFields): Promise<Categoria> {
