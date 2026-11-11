@@ -124,7 +124,7 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
         ) ENGINE=InnoDB`);
         await connection.query(`CREATE TEMPORARY TABLE PRODUCTO (
           id_producto INT PRIMARY KEY, id_categoria INT, nombre VARCHAR(255),
-          codigo VARCHAR(255), stock INT, activo TINYINT
+          codigo VARCHAR(255), imagen VARCHAR(2048), stock INT, activo TINYINT
         ) ENGINE=InnoDB`);
         t.mock.method(connection, 'release', () => {});
         t.mock.method(pool, 'getConnection', async () => connection);

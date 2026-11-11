@@ -26,6 +26,9 @@ export const updateProductPolicy: DtoPolicy<UpdateProduct> = { type: UpdateProdu
   fields: productFields, unknownError, objectError,
   check: input => productFields.some(key => input[key] !== undefined) ? null
     : 'Debe proporcionar al menos un campo válido para actualizar.' };
+export const updateProductWithImagePolicy: DtoPolicy<UpdateProduct> = {
+  ...updateProductPolicy, check: undefined,
+};
 export const stockPolicy: DtoPolicy<Stock> = { type: Stock, fields: ['stock'],
   unknownError, objectError: 'El campo stock es requerido' };
 export const categoryIdPolicy: DtoPolicy<CategoryIdParams> = { type: CategoryIdParams,

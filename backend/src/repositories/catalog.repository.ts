@@ -5,6 +5,7 @@ type CatalogRow = {
   id_producto: number;
   nombre: string;
   codigo: string;
+  imagen: string | null;
   id_categoria: number;
   categoria_nombre: string;
   disponible: number;
@@ -64,7 +65,7 @@ export async function findCatalogPage({ limit, offset, categoria, busqueda }: Ca
       WHERE ${where}
     `, timeout: 5000 }, parameters);
     const rows = await connection.query<CatalogRow[]>({ sql: `
-      SELECT p.id_producto, p.nombre, p.codigo, c.id_categoria,
+      SELECT p.id_producto, p.nombre, p.codigo, p.imagen, c.id_categoria,
              c.nombre AS categoria_nombre, (p.stock > 0) AS disponible
       FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
       WHERE ${where}

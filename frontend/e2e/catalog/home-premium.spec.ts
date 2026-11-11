@@ -152,15 +152,15 @@ test('Home separa carga, error, reintento y vacío de catálogo y categorías', 
   await expect(products(page).getByRole('link', { name: 'Ver catálogo completo' })).toHaveAttribute('href', '/catalogo')
 })
 
-test('Home usa la imagen del detalle y conserva la tarjeta si falla', async ({ page }) => {
-  for (const id of [1, 2]) {
-    await page.route('**/api/catalogo/' + id, async route => {
-      const response = await route.fetch()
-      const json = await response.json()
-      json.data.producto.imagen = '/foto-e2e-' + id + '.svg'
-      await route.fulfill({ response, json })
-    })
-  }
+test('Home usa la imagen del listado y conserva la tarjeta si falla', async ({ page }) => {
+  await page.route('**/api/catalogo?*', async route => {
+    const response = await route.fetch()
+    const json = await response.json()
+    for (const product of json.data.productos) {
+      if ([1, 2].includes(product.id)) product.imagen = '/foto-e2e-' + product.id + '.svg'
+    }
+    await route.fulfill({ response, json })
+  })
   await page.route('**/foto-e2e-1.svg', route => route.fulfill({
     contentType: 'image/svg+xml',
     body: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" fill="#145a8d"/></svg>',
