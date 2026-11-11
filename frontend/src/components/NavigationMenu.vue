@@ -7,6 +7,7 @@ import {
     type MenuItem,
 } from '@/config/menu'
 import type { Permission } from '@/config/permissions'
+import { useAuthStore } from '@/stores/auth'
 
 const props = withDefaults(
     defineProps<{
@@ -24,11 +25,34 @@ const props = withDefaults(
 
 const route = useRoute()
 
-const visibleItems = computed(() => {
-    if (props.variant === 'account') {
-        return filterMenuByPermissions(props.items, props.permissions)
+const isParticular = computed(() => {
+    let u: Record<string, any> | null | undefined
+    try {
+        const auth = useAuthStore()
+        u = auth?.user as Record<string, any> | null | undefined
+    } catch {
+        u = null
     }
-    return getNavigableMenu(props.items, props.permissions)
+    const tipo = u?.tipoCliente ?? u?.tipo_cliente ?? u?.cliente?.tipoCliente ?? u?.cliente?.tipo_cliente
+    return tipo === 'PARTICULAR'
+})
+
+const visibleItems = computed(() => {
+    let items = props.variant === 'account'
+        ? filterMenuByPermissions(props.items, props.permissions)
+        : getNavigableMenu(props.items, props.permissions)
+
+    if (props.variant === 'account' && isParticular.value) {
+        items = items.filter(
+            item =>
+                item.id !== 'account-credit' &&
+                item.id !== 'account-credit-orders' &&
+                item.label !== 'Cuenta corriente' &&
+                item.label !== 'Pedidos con cuenta corriente',
+        )
+    }
+
+    return items
 })
 
 function getItemRoute(item: MenuItem) {

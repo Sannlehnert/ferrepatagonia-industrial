@@ -16,16 +16,24 @@ const route = useRoute()
 const isLoggingOut = ref(false)
 const logoutError = ref('')
 
-const permissions = computed(() =>
-  getPermissionsForUser(
-    auth.user
-      ? {
-          rol: auth.user.rol,
-          tipoCliente: auth.user.tipo_cliente,
-        }
-      : null,
-  ),
-)
+const permissions = computed(() => {
+  const u = auth.user as Record<string, any> | null | undefined
+  if (!u) return getPermissionsForUser(null)
+  return getPermissionsForUser({
+    rol: u.rol,
+    tipoCliente: u.tipoCliente ?? u.tipo_cliente ?? u.cliente?.tipoCliente ?? null,
+    estadoAprobacionEmpresa: u.estadoAprobacionEmpresa,
+    cuentaCorrienteHabilitada: u.cuentaCorrienteHabilitada,
+  })
+})
+
+function handleGoBack() {
+  if (typeof window !== 'undefined' && window.history.state?.back) {
+    router.back()
+  } else {
+    void router.push('/catalogo')
+  }
+}
 
 watch(() => route.fullPath, () => panel.close())
 watch(
@@ -50,16 +58,35 @@ async function logout() {
 
 <template>
   <div class="fp-public flex min-h-screen flex-col bg-[#F8FAFC]">
-    <div class="w-full bg-white shadow-xs">
+    <!-- Cabecera estándar Desktop (>= 768px) -->
+    <div class="hidden md:block w-full bg-white shadow-xs">
       <PublicHeader />
     </div>
+
+    <!-- Cabecera móvil Mi Cuenta (< 768px) -->
+    <header class="md:hidden bg-[#0B2438] text-white px-4 py-3 flex items-center justify-between border-b border-[#35556F]">
+      <button
+        type="button"
+        class="min-h-[44px] min-w-[44px] inline-flex items-center text-sm font-medium hover:text-slate-300 bg-transparent border-0 text-white cursor-pointer p-0"
+        aria-label="Volver"
+        @click="handleGoBack"
+      >
+        ← Volver
+      </button>
+      <RouterLink
+        to="/mi-cuenta"
+        class="text-base font-bold text-white no-underline hover:text-slate-200"
+      >
+        Mi Cuenta
+      </RouterLink>
+    </header>
 
     <div class="flex-1 w-full max-w-full flex flex-col md:flex-row min-w-0 overflow-hidden sm:overflow-visible">
       <aside
         class="bg-[#0B2438] text-white w-full max-w-full md:w-64 md:min-h-[calc(100vh-theme(spacing.16))] p-4 md:p-6 flex flex-col justify-between shrink-0 min-w-0 box-border overflow-hidden md:overflow-visible"
       >
         <div class="min-w-0">
-          <h2 class="text-xl font-bold mb-4 md:mb-6 text-white">
+          <h2 class="hidden md:block text-xl font-bold mb-4 md:mb-6 text-white">
             <RouterLink to="/mi-cuenta" class="hover:text-slate-200 no-underline text-inherit focus-visible:outline-2 focus-visible:outline-white rounded">
               Mi Cuenta
             </RouterLink>

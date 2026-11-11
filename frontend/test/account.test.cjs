@@ -75,3 +75,32 @@ test('NavigationMenu evaluates exact route and search query exclusively for acco
  assert.match(menuSource, /text-\[#A7B6C4\]/);
 });
 
+test('NavigationMenu and MiCuentaDashboardView segregate PARTICULAR from EMPRESA roles', () => {
+ const menuSource = readFileSync(resolve(__dirname, '../src/components/NavigationMenu.vue'), 'utf8');
+ assert.match(menuSource, /account-credit/);
+ assert.match(menuSource, /PARTICULAR/);
+
+ const dashboardSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaDashboardView.vue'), 'utf8');
+ assert.match(dashboardSource, /isParticular\s*\?\s*'md:grid-cols-2'\s*:\s*'md:grid-cols-3'/);
+ assert.match(dashboardSource, /v-if="!isParticular"/);
+});
+
+test('MiCuentaLayout and CartView provide mobile header and intelligent back navigation', () => {
+ const layoutSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaLayout.vue'), 'utf8');
+ assert.match(layoutSource, /hidden\s+md:block\s+w-full\s+bg-white\s+shadow-xs/);
+ assert.match(layoutSource, /bg-\[#0B2438\]\s+text-white\s+px-4\s+py-3\s+flex\s+items-center\s+justify-between/);
+ assert.match(layoutSource, /← Volver/);
+ assert.match(layoutSource, /router\.back\(\)/);
+ assert.match(layoutSource, /router\.push\('\/catalogo'\)/);
+
+ const cartSource = readFileSync(resolve(__dirname, '../src/views/CartView.vue'), 'utf8');
+ assert.match(cartSource, /md:hidden[\s\S]*?← Volver/);
+ assert.match(cartSource, /min-h-\[44px\]\s+inline-flex\s+items-center\s+gap-1\.5\s+text-sm\s+font-medium\s+text-\[#103A5C\]\s+hover:text-\[#145A8D\]\s+mb-2/);
+ assert.match(cartSource, /router\.back\(\)/);
+
+ const headerSource = readFileSync(resolve(__dirname, '../src/components/PublicHeader.vue'), 'utf8');
+ assert.match(headerSource, /window\.innerWidth\s*<\s*768/);
+ assert.match(headerSource, /router\.push\('\/carrito'\)/);
+ assert.match(headerSource, /route:\s*'cuenta-dashboard'/);
+});
+

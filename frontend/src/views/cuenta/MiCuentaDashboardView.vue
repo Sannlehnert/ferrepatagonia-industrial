@@ -49,6 +49,12 @@ const ultimoPedidoFecha = computed(() => {
   const month = String(d.getMonth() + 1).padStart(2, '0')
   return `${day}/${month}`
 })
+
+const isParticular = computed(() => {
+  const u = auth.user as Record<string, any> | null | undefined
+  const tipo = u?.tipoCliente ?? u?.tipo_cliente ?? u?.cliente?.tipoCliente ?? u?.cliente?.tipo_cliente
+  return tipo === 'PARTICULAR'
+})
 </script>
 
 <template>
@@ -71,7 +77,10 @@ const ultimoPedidoFecha = computed(() => {
     </div>
 
     <!-- 3 Metrics Cards Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div
+      class="grid grid-cols-1 gap-6 mb-8"
+      :class="isParticular ? 'md:grid-cols-2' : 'md:grid-cols-3'"
+    >
       <!-- Card 1: Pedidos Realizados -->
       <RouterLink
         :to="{ name: 'cuenta-pedidos' }"
@@ -95,6 +104,7 @@ const ultimoPedidoFecha = computed(() => {
 
       <!-- Card 2: Pedidos con Cuenta Corriente -->
       <RouterLink
+        v-if="!isParticular"
         :to="{ name: 'cuenta-pedidos', query: { filtro: 'cuenta-corriente' } }"
         class="rounded-[10px] border border-[#E2E8F0] p-6 shadow-sm bg-white flex flex-col justify-between hover:border-[#0EA5E9] hover:shadow-md transition-all cursor-pointer no-underline text-inherit group focus-visible:outline-2 focus-visible:outline-[#145A8D]"
       >
