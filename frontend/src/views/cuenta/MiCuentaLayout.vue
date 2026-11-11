@@ -54,9 +54,9 @@ async function logout() {
       <PublicHeader />
     </div>
 
-    <div class="flex-1 w-full flex flex-col md:flex-row min-w-0">
+    <div class="flex-1 w-full max-w-full flex flex-col md:flex-row min-w-0 overflow-hidden sm:overflow-visible">
       <aside
-        class="bg-[#0B2438] text-white w-full md:w-64 md:min-h-[calc(100vh-theme(spacing.16))] p-4 md:p-6 flex flex-col justify-between shrink-0"
+        class="bg-[#0B2438] text-white w-full max-w-full md:w-64 md:min-h-[calc(100vh-theme(spacing.16))] p-4 md:p-6 flex flex-col justify-between shrink-0 min-w-0 box-border overflow-hidden md:overflow-visible"
       >
         <div class="min-w-0">
           <h2 class="text-xl font-bold mb-4 md:mb-6 text-white">
@@ -85,7 +85,7 @@ async function logout() {
         </div>
       </aside>
 
-      <main class="min-w-0 flex-1 p-4 sm:p-6 md:p-8">
+      <main class="min-w-0 flex-1 overflow-hidden sm:overflow-visible p-4 sm:p-6 md:p-8 max-w-full box-border">
         <RouterView />
       </main>
     </div>

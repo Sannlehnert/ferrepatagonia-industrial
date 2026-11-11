@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ClientOrderDetail from '@/components/ClientOrderDetail.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
@@ -34,6 +34,32 @@ const expandedOrderId = ref<number | null>(null)
 function toggleOrder(orderId: number) {
   expandedOrderId.value = expandedOrderId.value === orderId ? null : orderId
 }
+
+function toggleOrderDetail(orderId: number) {
+  toggleOrder(orderId)
+}
+
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+
+function updateIsMobile() {
+  if (typeof window !== 'undefined') {
+    isMobile.value = window.innerWidth < 768
+  }
+}
+
+onMounted(() => {
+  updateIsMobile()
+  window.addEventListener('resize', updateIsMobile)
+  const mql = window.matchMedia('(max-width: 767px)')
+  const handler = (e: MediaQueryListEvent) => {
+    isMobile.value = e.matches
+  }
+  mql.addEventListener('change', handler)
+  onUnmounted(() => {
+    window.removeEventListener('resize', updateIsMobile)
+    mql.removeEventListener('change', handler)
+  })
+})
 
 watch([identity, allowed], () => {
   expandedOrderId.value = null
@@ -310,7 +336,7 @@ async function submitModalReceipt() {
     <!-- Content with Orders -->
     <div v-else class="space-y-6">
       <!-- Desktop Table (>= 768px) -->
-      <div class="hidden md:block rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm">
+      <div v-if="!isMobile" class="rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm" role="list">
         <table class="w-full min-w-[640px] border-collapse text-left">
           <thead class="bg-slate-50 border-b border-[#E2E8F0]">
             <tr>
@@ -322,107 +348,115 @@ async function submitModalReceipt() {
               <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right">Detalle</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-[#E2E8F0]">
-            <template v-for="order in filteredOrders" :key="order.pedidoId">
-              <tr class="hover:bg-slate-50/50 transition-colors">
-                <!-- Fecha -->
-                <td class="py-4 px-6 text-sm text-slate-600">
-                  <time :datetime="order.fecha">{{ dateFormat.format(new Date(order.fecha)) }}</time>
-                  <span class="block text-xs text-slate-400 font-mono">{{ order.numero }}</span>
-                </td>
+          <tbody
+            v-for="order in filteredOrders"
+            :key="order.pedidoId"
+            role="listitem"
+            class="divide-y divide-[#E2E8F0] border-b border-[#E2E8F0] last:border-b-0"
+          >
+            <tr class="hover:bg-slate-50/50 transition-colors">
+              <!-- Fecha -->
+              <td class="py-4 px-6 text-sm text-slate-600">
+                <time :datetime="order.fecha">{{ dateFormat.format(new Date(order.fecha)) }}</time>
+                <h3 role="heading" class="m-0 block text-xs font-bold text-[#0B2438] font-mono">
+                  {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
+                </h3>
+              </td>
 
-                <!-- Monto Total -->
-                <td class="py-4 px-6 text-sm font-bold text-[#0B2438]">
-                  {{ order.moneda === 'USD' ? 'USD ' : '$' }}{{ order.total }}
-                </td>
+              <!-- Monto Total -->
+              <td class="py-4 px-6 text-sm font-bold text-[#0B2438]">
+                {{ order.total }} {{ order.moneda || 'USD' }}
+              </td>
 
-                <!-- Método de Pago -->
-                <td class="py-4 px-6 text-sm">
+              <!-- Método de Pago -->
+              <td class="py-4 px-6 text-sm">
+                <span
+                  :class="order.modalidadPago === 'CUENTA_CORRIENTE'
+                    ? 'text-[#0EA5E9] font-medium'
+                    : 'text-slate-700'"
+                >
+                  {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
+                </span>
+              </td>
+
+              <!-- Estado Pedido -->
+              <td class="py-4 px-6 text-sm">
+                <span
+                  class="inline-block rounded-full px-3 py-1 text-xs font-semibold"
+                  :class="getOrderStatusBadgeClasses(order.estado)"
+                >
+                  {{ order.estado.replaceAll('_', ' ') }}
+                </span>
+              </td>
+
+              <!-- Comprobante -->
+              <td class="py-4 px-6 text-sm">
+                <div class="flex items-center gap-2">
+                  <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  </svg>
                   <span
-                    :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                      ? 'text-[#0EA5E9] font-medium'
-                      : 'text-slate-700'"
+                    class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                    :class="getReceiptBadgeClasses(getReceiptStatus(order))"
                   >
-                    {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
+                    {{ getReceiptStatus(order) }}
                   </span>
-                </td>
-
-                <!-- Estado Pedido -->
-                <td class="py-4 px-6 text-sm">
-                  <span
-                    class="inline-block rounded-full px-3 py-1 text-xs font-semibold"
-                    :class="getOrderStatusBadgeClasses(order.estado)"
-                  >
-                    {{ order.estado.replaceAll('_', ' ') }}
-                  </span>
-                </td>
-
-                <!-- Comprobante -->
-                <td class="py-4 px-6 text-sm">
-                  <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <span
-                      class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                      :class="getReceiptBadgeClasses(getReceiptStatus(order))"
-                    >
-                      {{ getReceiptStatus(order) }}
-                    </span>
-                    <button
-                      type="button"
-                      class="text-[#145A8D] font-semibold underline cursor-pointer text-xs ml-1 hover:text-[#103A5C]"
-                      @click="toggleOrder(order.pedidoId)"
-                    >
-                      ver
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center justify-center min-h-[32px] min-w-[32px] text-slate-500 hover:text-[#103A5C] hover:bg-slate-100 rounded-[8px] transition cursor-pointer p-1"
-                      title="Subir o editar comprobante"
-                      aria-label="Subir o editar comprobante"
-                      @click="openReceiptModal(order)"
-                    >
-                      ✏️
-                    </button>
-                  </div>
-                </td>
-
-                <!-- Detalle Action Button -->
-                <td class="py-4 px-6 text-sm text-right">
                   <button
                     type="button"
-                    class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
-                    :aria-expanded="expandedOrderId === order.pedidoId"
-                    :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
+                    class="text-[#145A8D] font-semibold underline cursor-pointer text-xs ml-1 hover:text-[#103A5C]"
                     @click="toggleOrder(order.pedidoId)"
                   >
-                    {{ expandedOrderId === order.pedidoId ? 'Ocultar detalle' : 'Ver detalle' }}
+                    ver
                   </button>
-                </td>
-              </tr>
+                  <button
+                    type="button"
+                    class="inline-flex items-center justify-center min-h-[32px] min-w-[32px] text-slate-500 hover:text-[#103A5C] hover:bg-slate-100 rounded-[8px] transition cursor-pointer p-1"
+                    title="Subir o editar comprobante"
+                    aria-label="Subir o editar comprobante"
+                    @click="openReceiptModal(order)"
+                  >
+                    ✏️
+                  </button>
+                </div>
+              </td>
 
-              <!-- Expanded Detail Row -->
-              <tr v-if="expandedOrderId === order.pedidoId">
-                <td colspan="6" class="p-4 sm:p-6 bg-slate-50/50 border-t border-[#E2E8F0]">
-                  <ClientOrderDetail :order-id="order.pedidoId" />
-                </td>
-              </tr>
-            </template>
+              <!-- Detalle Action Button -->
+              <td class="py-4 px-6 text-sm text-right">
+                <button
+                  type="button"
+                  class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+                  :aria-expanded="expandedOrderId === order.pedidoId"
+                  :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
+                  @click="toggleOrder(order.pedidoId)"
+                >
+                  {{ expandedOrderId === order.pedidoId ? 'Ocultar detalle' : 'Ver detalle' }}
+                </button>
+              </td>
+            </tr>
+
+            <!-- Expanded Detail Row -->
+            <tr v-if="expandedOrderId === order.pedidoId">
+              <td colspan="6" class="p-4 sm:p-6 bg-slate-50/50 border-t border-[#E2E8F0]">
+                <ClientOrderDetail :order-id="order.pedidoId" />
+              </td>
+            </tr>
           </tbody>
         </table>
       </div>
 
       <!-- Mobile Order Cards (< 768px) -->
-      <div class="md:hidden space-y-4">
+      <div v-else role="list" class="space-y-4">
         <div
           v-for="order in filteredOrders"
           :key="order.pedidoId"
+          role="listitem"
           class="rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
         >
           <div class="flex items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
             <div>
-              <span class="font-bold text-[#0B2438] text-base">{{ order.numero }}</span>
+              <h3 role="heading" class="m-0 font-bold text-[#0B2438] text-base">
+                {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
+              </h3>
               <span class="block text-xs text-slate-500">{{ dateFormat.format(new Date(order.fecha)) }}</span>
             </div>
             <span
@@ -437,7 +471,7 @@ async function submitModalReceipt() {
             <div>
               <span class="text-xs text-slate-500 block">Monto Total:</span>
               <span class="font-bold text-[#0B2438] text-base">
-                {{ order.moneda === 'USD' ? 'USD ' : '$' }}{{ order.total }}
+                {{ order.total }} {{ order.moneda || 'USD' }}
               </span>
             </div>
             <div>
