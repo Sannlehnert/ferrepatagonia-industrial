@@ -163,11 +163,19 @@ for (const width of [320, 360, 390, 768, 1024, 1280]) {
       await info.attach(`${name} ${width} px`, { path, contentType: 'image/png' })
     }
 
+    await assertPageFits(page)
+    const mobileMenu = page.getByRole('button', { name: 'Menú de navegación de cuenta' })
+    if (width < 768) {
+      await expect(mobileMenu).toBeVisible()
+      await mobileMenu.press('Enter')
+      await expect(mobileMenu).toHaveAttribute('aria-expanded', 'true')
+    }
     const accountNav = page.getByRole('link', { name: 'Historial de pedidos', exact: true })
     await expect(accountNav).toBeVisible()
     await assertPageFits(page)
     await accountNav.press('Enter')
     await expect(page).toHaveURL('/mi-cuenta/pedidos')
+    if (width < 768) await expect(mobileMenu).toHaveAttribute('aria-expanded', 'false')
     const orderNumber = /^PED-\d+$/
     await expect(page.getByRole('heading', { name: orderNumber })).toBeVisible()
     const toggle = page.getByRole('button', { name: /^Ver detalle de PED-/ })
@@ -183,10 +191,12 @@ for (const width of [320, 360, 390, 768, 1024, 1280]) {
     const quantity = page.getByRole('spinbutton', { name: 'Cantidad de ' + product })
     await expect(quantity).toHaveValue('2')
     await assertControlFits(quantity)
-    const radio = page.getByRole('radio', { name: 'Cuenta corriente' })
+    const checkout = page.getByRole('region', { name: 'Confirmación de pedido' })
+    await assertControlFits(checkout)
+    const radio = checkout.getByRole('radio', { name: 'Cuenta corriente' })
     await expect(radio).toBeVisible()
     await radio.press('Space')
-    const confirm = page.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' })
+    const confirm = checkout.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' })
     await expect(confirm).toBeEnabled()
     await assertControlFits(confirm)
     await assertPageFits(page)
