@@ -15,7 +15,12 @@ const profile = newProfile('E2E');
 const args = process.argv.slice(2);
 const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
 const receipts = args.includes('--receipts');
-const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts'].includes(arg));
+const demoCatalog = args.includes('--demo-catalog');
+const demoInteractive = args.includes('--demo-interactiva');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--demo-catalog', '--demo-interactiva'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
+assert.ok(!demoInteractive || (demoCatalog && process.stdin.isTTY && testArgs.length === 0),
+  'Para la demo interactiva usá --demo-catalog --demo-interactiva en una terminal, sin otros argumentos.');
 
 const services = [];
 let connection;
@@ -24,6 +29,7 @@ let receiptStorage;
 let productImageStorage;
 let containerCreationAttempted = false;
 let interrupted = false;
+let demoPrompt;
 function startService(file, cwd, env) {
   const child = fork(file, [], {
     cwd,
@@ -96,6 +102,7 @@ async function stopChild(child) {
 
 function onInterrupt() {
   interrupted = true;
+  demoPrompt?.close();
   if (testProcess) testProcess.kill();
 }
 
@@ -117,7 +124,11 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: receipts, includeReceiptFixture: receipts });
+  if (!fer19) await seedFixtures(connection, {
+    includeAccountOrderFixture: receipts || demoCatalog,
+    includeReceiptFixture: receipts,
+    includeCatalogProducts: !demoCatalog,
+  });
   if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
@@ -148,6 +159,7 @@ async function main() {
     AUTH_REGISTER_WINDOW_MS: '60000',
     DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
     E2E_ISOLATED: '1',
+    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
     JWT_SECRET: randomUUID(),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
@@ -174,6 +186,7 @@ async function main() {
     ...process.env,
     NODE_ENV: 'test',
     E2E_ISOLATED: '1',
+    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
     E2E_WEB_PORT: String(plannedWebPort),
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
@@ -209,6 +222,7 @@ async function main() {
       cwd: frontend,
       env: {
         ...browserEnv, E2E_BASE_URL: baseURL,
+        E2E_DEMO_INTERACTIVE: demoInteractive ? '1' : '',
         // Only the Playwright worker needs access to test controls, never Vite.
         ...(fer19 ? {
           FER19_E2E_FIXTURE: JSON.stringify(fer19Fixture),
@@ -224,6 +238,16 @@ async function main() {
     testProcess.once('exit', code => resolve(code));
   });
 
+  if (demoInteractive && result === 0 && !interrupted) {
+    const { account } = require('./e2e-fixtures.cjs').credentials;
+    console.log(`Demo académica local: ${baseURL}\nUsuario de prueba: ${account.email}\nClave de prueba: ${account.password}`);
+    console.log('Buscá FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM. Abrí la ficha en dos sesiones con el mismo usuario de prueba.');
+    demoPrompt = require('node:readline').createInterface({ input: process.stdin, output: process.stdout });
+    await new Promise(resolve => {
+      demoPrompt.once('close', resolve);
+      demoPrompt.question('Presioná Enter al terminar para borrar la base y las imágenes temporales.\n', () => demoPrompt.close());
+    });
+  }
   process.exitCode = result === 0 && !interrupted ? 0 : 1;
 }
 

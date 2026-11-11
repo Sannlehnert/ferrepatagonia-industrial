@@ -69,6 +69,7 @@ onRealtime(change => {
       class="rounded-lg border border-slate-200 bg-white p-4"
     >
       <h4 class="m-0 mb-3 font-semibold text-[#0b2438]">{{ order.numero }}</h4>
+      <p v-if="order.simulado" class="mt-0 text-sm font-semibold">Pedido simulado académico</p>
 
       <dl class="m-0 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
         <div>

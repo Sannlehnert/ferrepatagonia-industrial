@@ -178,6 +178,11 @@ jobs:
             - name: Run integrated E2E suite
               run: node backend/test/helpers/run-e2e.cjs
 
+            - name: Verify the academic catalog in disposable MariaDB
+              run: |
+                  node --test data/demo-catalog/generar.test.cjs
+                  E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog
+
             - name: Verify private payment receipts in the browser
               run: node backend/test/helpers/run-e2e.cjs --receipts
 

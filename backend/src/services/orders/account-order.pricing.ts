@@ -14,6 +14,7 @@ import {
 import { PricingError } from '../pricing/money';
 import type { PriceLine } from '../pricing/pricing.types';
 import { AccountOrderError } from './account-order.errors';
+import { isAcademicPrice, verifyAcademicOrder, type AcademicCheckout } from './academic-checkout';
 
 export interface AccountOrderQuote {
   regla: 'FER17-v1';
@@ -22,6 +23,7 @@ export interface AccountOrderQuote {
   aplicadoEn: string;
   totalUSD: string;
   lines: PriceLine[];
+  simulado?: true;
 }
 
 // Se usa después de bloquear el carrito y sus productos,
@@ -30,6 +32,7 @@ export async function quoteAccountOrderCart(
   manager: EntityManager,
   auth: AuthContext,
   cart: LockedOrderCart,
+  academic?: { policy: AcademicCheckout; origin: string },
 ): Promise<AccountOrderQuote> {
   if (auth.rol !== 'CLIENTE') {
     throw new AccountOrderError(
@@ -38,6 +41,8 @@ export async function quoteAccountOrderCart(
       'Esta operación requiere una cuenta de cliente.',
     );
   }
+
+  if (academic) await verifyAcademicOrder(manager, academic.policy, academic.origin);
 
   await lockAccountOrderPriceInputs(
     manager,
@@ -86,12 +91,15 @@ export async function quoteAccountOrderCart(
           );
         }
 
-        if (line.evidenciaBaseUSD.synthetic) {
+        if (line.evidenciaBaseUSD.synthetic && (!academic || !isAcademicPrice(line))) {
           throw new AccountOrderError(
             'PRECIO_SINTETICO',
             422,
             'Los precios de demostración no permiten confirmar pedidos.',
           );
+        }
+        if (academic && !isAcademicPrice(line)) {
+          throw new AccountOrderError('PRECIO_ACADEMICO_REQUERIDO', 422, 'El checkout académico solo acepta precios simulados de #286.');
         }
 
         lines.push(line);
@@ -113,6 +121,7 @@ export async function quoteAccountOrderCart(
       aplicadoEn: at.toISOString(),
       totalUSD: sumAmounts(lines.map(line => line.subtotalUSD!)),
       lines,
+      ...(academic ? { simulado: true as const } : {}),
     };
   } catch (error) {
     if (!(error instanceof PricingError)) throw error;

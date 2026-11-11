@@ -13,6 +13,7 @@ import type {
   AccountOrderQuote,
 } from '../services/orders/account-order.pricing';
 import { AccountOrderError } from '../services/orders/account-order.errors';
+import { academicOrderNote, academicOrderReference, isAcademicPrice, verifyAcademicOrder, type AcademicCheckout } from '../services/orders/academic-checkout';
 import type {
   ClientOrderDetail,
   ClientOrderLine,
@@ -27,7 +28,7 @@ function invalidAmount(): never {
   );
 }
 
-function prepare(quote: AccountOrderQuote) {
+function prepare(quote: AccountOrderQuote, simulated: boolean) {
   if (quote.regla !== 'FER17-v1' ||
     quote.moneda !== 'USD' ||
     quote.ivaIncluido !== true ||
@@ -44,7 +45,7 @@ function prepare(quote: AccountOrderQuote) {
       line.cantidad > 2147483647 ||
       !line.precioComprable ||
       !line.evidenciaBaseUSD ||
-      line.evidenciaBaseUSD.synthetic ||
+      (simulated ? !isAcademicPrice(line) : line.evidenciaBaseUSD.synthetic) ||
       line.precioBaseUSD === null ||
       line.precioUnitarioUSD === null ||
       line.subtotalUSD === null) {
@@ -81,12 +82,16 @@ export async function persistAccountOrder(
   manager: EntityManager,
   clientId: number,
   quote: AccountOrderQuote,
+  academic?: { policy: AcademicCheckout; origin: string },
 ): Promise<number> {
   if (!manager.queryRunner?.isTransactionActive) {
     throw new Error('Guardar el pedido requiere una transacción activa.');
   }
 
-  const prepared = prepare(quote);
+  if (academic) await verifyAcademicOrder(manager, academic.policy, academic.origin);
+  const simulated = academic !== undefined;
+  if (simulated !== (quote.simulado === true)) invalidAmount();
+  const prepared = prepare(quote, simulated);
   const fingerprint = createHash('sha256')
     .update(JSON.stringify({ clientId, quote }))
     .digest('hex');
@@ -95,14 +100,15 @@ export async function persistAccountOrder(
     INSERT INTO PEDIDO (
       id_cliente, estado, modalidad_pago,
       subtotal, descuento, total,
-      moneda_total, evidencia_total_usd, fecha_utc
-    ) VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', ?, ?, ?, 'USD', ?, UTC_TIMESTAMP(3))
+      moneda_total, evidencia_total_usd, observaciones, fecha_utc
+    ) VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', ?, ?, ?, 'USD', ?, ?, UTC_TIMESTAMP(3))
   `, [
     clientId,
     format(prepared.gross),
     format(prepared.gross - prepared.net),
     format(prepared.net),
-    `FER17-v1:SHA256:${fingerprint}`,
+    (simulated ? academicOrderReference : 'FER17-v1:SHA256:') + fingerprint,
+    simulated ? academicOrderNote : null,
   ]);
 
   const orderId = Number(order.insertId);
@@ -133,6 +139,7 @@ export async function persistAccountOrder(
         moneda: quote.moneda,
         ivaIncluido: quote.ivaIncluido,
         aplicadoEn: quote.aplicadoEn,
+        ...(simulated ? { simulado: true } : {}),
         producto: item.line,
       }),
     ]);
@@ -142,6 +149,7 @@ export async function persistAccountOrder(
 }
 
 interface OrderSummaryRow {
+  evidencia: string | null;
   pedidoId: number;
   fechaUtc: string;
   estado: string;
@@ -175,6 +183,7 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
 
   return {
     pedidoId,
+    ...(row.evidencia?.startsWith(academicOrderReference) ? { simulado: true as const } : {}),
     numero: `PED-${String(pedidoId).padStart(6, '0')}`,
     fecha: serializeOrderInstant(row.fechaUtc),
     estado: row.estado,
@@ -209,6 +218,7 @@ export async function findClientOrdersByClientId(
       p.descuento AS descuento,
       p.total AS total,
       p.observaciones AS observaciones,
+      p.evidencia_total_usd AS evidencia,
       COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
       COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
       m.id_movimiento_cuenta AS cargoId,
@@ -250,6 +260,7 @@ export async function findClientOrderDetailById(
       p.descuento AS descuento,
       p.total AS total,
       p.observaciones AS observaciones,
+      p.evidencia_total_usd AS evidencia,
       COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
       COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
       m.id_movimiento_cuenta AS cargoId,

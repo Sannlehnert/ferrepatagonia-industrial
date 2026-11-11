@@ -27,6 +27,7 @@ function parseEligibility(value: unknown): AccountOrderEligibility {
     !isRecord(value) ||
     typeof value.elegible !== 'boolean' ||
     value.moneda !== 'USD' ||
+    (value.simulado !== undefined && value.simulado !== true) ||
     (value.totalUSD !== null && !isMoney(value.totalUSD)) ||
     (value.creditoDisponibleUSD !== null && !isMoney(value.creditoDisponibleUSD)) ||
     (value.codigo !== null && typeof value.codigo !== 'string') ||
@@ -51,6 +52,7 @@ function parseEligibility(value: unknown): AccountOrderEligibility {
     codigo: value.codigo,
     mensaje: value.mensaje,
     cotizacion: value.cotizacion,
+    ...(value.simulado === true ? { simulado: true as const } : {}),
   }
 }
 
@@ -79,6 +81,7 @@ function parseAttempt(value: unknown, status: number): AccountOrderAttempt {
     Number.isSafeInteger(data.pedidoId) &&
     data.modalidadPago === 'CUENTA_CORRIENTE' &&
     data.moneda === 'USD' &&
+    (data.simulado === undefined || data.simulado === true) &&
     isMoney(data.totalUSD) &&
     data.totalUSD !== '0.00' &&
     typeof data.cargoId === 'string' &&
@@ -95,6 +98,7 @@ function parseAttempt(value: unknown, status: number): AccountOrderAttempt {
         totalUSD: data.totalUSD,
         cargoId: data.cargoId,
         venceEl: data.venceEl,
+        ...(data.simulado === true ? { simulado: true as const } : {}),
       },
     }
   }

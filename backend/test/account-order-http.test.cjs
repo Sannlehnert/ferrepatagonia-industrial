@@ -168,6 +168,25 @@ async function commercialState(f) {
   };
 }
 
+test('#286: el checkout normal rechaza evidencia académica aunque el cliente solicite ese modo', async () => {
+  const f = await createOrderFixture(session);
+  const cotizacion = await quoteFor(f.auth);
+  await session.connection.query(
+    'UPDATE PRECIO_USD_EVIDENCIA SET sintetica = 1, evidencia = ? WHERE id_producto = ?',
+    [`SINTETICO ACADEMICO #286 SHA256:${'a'.repeat(64)}`, f.productId],
+  );
+  const initial = await commercialState(f);
+  const headers = { 'X-Academic-Checkout': 'true' };
+  const eligibility = await responseBody(await request({ path: '/eligibilidad', auth: f.auth, headers }), 200);
+  assert.equal(eligibility.data.elegible, false);
+  assert.equal(eligibility.data.codigo, 'PRECIO_SINTETICO');
+  assert.equal(eligibility.data.cotizacion, null);
+  assert.equal(eligibility.data.simulado, undefined);
+  const rejected = await responseBody(await confirm(f, randomUUID(), cotizacion, headers), 422);
+  assert.equal(rejected.code, 'PRECIO_SINTETICO');
+  assert.deepEqual(await commercialState(f), initial);
+});
+
 async function assertCredit(f, saldo, disponible) {
   const summary = await account(f);
   assert.equal(summary.saldo, saldo);

@@ -48,10 +48,7 @@ export async function changeAdminOrderStatusService(
       );
     }
 
-    if (
-      current.estado.startsWith('DEMO_') ||
-      current.modalidadPago.startsWith('DEMO_')
-    ) {
+    if (current.origen === 'DEMO') {
       throw new AdminOrderError(
         'TRANSICION_ESTADO_NO_AUTORIZADA',
         409,

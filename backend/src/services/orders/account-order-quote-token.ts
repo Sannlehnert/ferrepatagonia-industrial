@@ -29,7 +29,7 @@ function fingerprint(cartId: number, quote: AccountOrderQuote): string {
     evidenciaBaseUSD: line.evidenciaBaseUSD,
   })).sort((a, b) => a.productoId - b.productoId);
   return createHmac('sha256', env.jwtSecret)
-    .update(JSON.stringify({ cartId, totalUSD: quote.totalUSD, lines }))
+    .update(JSON.stringify({ cartId, totalUSD: quote.totalUSD, lines, simulado: quote.simulado }))
     .digest('hex');
 }
 

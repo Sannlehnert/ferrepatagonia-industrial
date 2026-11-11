@@ -1,0 +1,19 @@
+{
+  "entorno": "MariaDB 11.4 descartable E2E",
+  "fer": "FER16-v2",
+  "iniciales": 0,
+  "previsualizados": 904,
+  "validos": 904,
+  "errores": [],
+  "importados": 904,
+  "rechazados": 0,
+  "omitidos": 0,
+  "pendientes": 0,
+  "mismoTokenMismoReporte": true,
+  "reimportacion": {
+    "importados": 0,
+    "yaExistentesEnPreview": 904,
+    "confirmacionHttp": 400
+  },
+  "sha256CsvSinOrigen": "d102bb2d131e8bcbe662566e106bf276153dd27678c7dff775c2c0d5444d8003"
+}

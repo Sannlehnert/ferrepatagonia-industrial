@@ -31,6 +31,7 @@ import type {
   AccountOrderResult,
 } from './account-order.types';
 import { issueAccountOrderQuoteToken } from './account-order-quote-token';
+import type { AcademicCheckout } from './academic-checkout';
 import {
   findClientOrderDetailById,
   findClientOrdersByClientId,
@@ -168,6 +169,7 @@ export async function getClientOrderDetail(
 
 export async function getAccountOrderEligibility(
   auth: AuthContext,
+  academicCheckout?: AcademicCheckout,
 ): Promise<AccountOrderEligibilityResult> {
   validateClientAuth(auth);
   const clientId = await findActiveClient(auth);
@@ -180,7 +182,8 @@ export async function getAccountOrderEligibility(
       const cart = await lockAccountOrderCart(
         manager, auth.id, clientId,
       );
-      const quote = await quoteAccountOrderCart(manager, auth, cart);
+      const quote = await quoteAccountOrderCart(manager, auth, cart,
+        academicCheckout && { policy: academicCheckout, origin: context.origin });
       const eligible = toCents(quote.totalUSD) <= toCents(context.availableUSD);
       const quoteToken = issueAccountOrderQuoteToken(auth, clientId, cart.cartId, quote);
 
@@ -197,6 +200,7 @@ export async function getAccountOrderEligibility(
               ? null
               : 'El crédito disponible no alcanza para confirmar el pedido.',
             cotizacion: quoteToken,
+            ...(quote.simulado ? { simulado: true as const } : {}),
           },
         },
       };
@@ -246,6 +250,7 @@ export async function confirmAccountOrder(
   value: unknown,
   quoteToken: unknown,
   notify?: NotifyCommittedChange,
+  academicCheckout?: AcademicCheckout,
 ): Promise<AccountOrderResult> {
   const { clientId, key } = await identify(auth, value);
   const existing = await findAccountOrderAttempt(clientId, key);
@@ -273,7 +278,7 @@ export async function confirmAccountOrder(
         }
 
         const { productIds, ...result } = await executePendingAccountOrder(
-          manager, auth, clientId, key, quoteToken,
+          manager, auth, clientId, key, quoteToken, academicCheckout,
         );
         const { pedidoId, estado } = result.body.data;
         return { result, change: { kind: 'order', clientId, order: { pedidoId, estado }, productIds } };

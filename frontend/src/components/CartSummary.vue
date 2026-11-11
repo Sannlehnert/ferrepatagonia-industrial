@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import type { CartSnapshot } from '@/types/cart'
 import AccountOrderCheckout from '@/components/AccountOrderCheckout.vue'
+import { precioCarritoComprable } from '@/services/cartService'
 
 const props = defineProps<{
   snapshot: CartSnapshot
@@ -14,10 +15,7 @@ const showTotal = computed(() =>
   !props.snapshot.tiene_incompatibles &&
   props.snapshot.totalUSD !== null &&
   props.snapshot.items.every(item =>
-    item.disponible &&
-    item.precio?.estadoPrecio === 'DEFINIDO' &&
-    item.precio.precioComprable === true &&
-    item.precio.datosSinteticos === false,
+    item.disponible && precioCarritoComprable(item.precio),
   ),
 )
 
