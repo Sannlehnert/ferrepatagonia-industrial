@@ -42,47 +42,243 @@
   "imagenes": [
     {
       "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
-      "ruta": "/demo-catalog/llave-ajustable.webp",
-      "urlLocal": "http://127.0.0.1:57166/demo-catalog/llave-ajustable.webp",
+      "ruta": "/api/product-images/b053581e-ad38-44b1-9731-324d1203000b.webp",
+      "archivo": "/demo-catalog/llave-ajustable.webp",
       "http": 200,
       "mime": "image/webp"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-30-CM",
-      "ruta": "/demo-catalog/cono-naranja-30-cm.webp",
-      "urlLocal": "http://127.0.0.1:57166/demo-catalog/cono-naranja-30-cm.webp",
+      "ruta": "/api/product-images/14a8850d-a32b-4ecd-8eb0-c470049f2771.webp",
+      "archivo": "/demo-catalog/cono-naranja-30-cm.webp",
       "http": 200,
       "mime": "image/webp"
     },
     {
       "sku": "FP-DEMO-CAS-CASCO-BLANCO-BARBOQUEJO",
-      "ruta": "/demo-catalog/casco-blanco-barboquejo.webp",
-      "urlLocal": "http://127.0.0.1:57166/demo-catalog/casco-blanco-barboquejo.webp",
+      "ruta": "/api/product-images/a59b1f94-0f0e-43e1-991f-67bf24661cd6.webp",
+      "archivo": "/demo-catalog/casco-blanco-barboquejo.webp",
       "http": 200,
       "mime": "image/webp"
     },
     {
       "sku": "FP-DEMO-TOR-HEX-ACABADO-DORADO",
-      "ruta": "/demo-catalog/tornillo-hexagonal.webp",
-      "urlLocal": "http://127.0.0.1:57166/demo-catalog/tornillo-hexagonal.webp",
+      "ruta": "/api/product-images/32ace75c-2032-449d-b240-fb55a311e758.webp",
+      "archivo": "/demo-catalog/tornillo-hexagonal.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-2-MM",
+      "ruta": "/api/product-images/1a481109-fdab-4e17-879d-738afe6512ef.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-2-5-MM",
+      "ruta": "/api/product-images/ef537643-922c-435a-b60b-ab1dd90bc4d2.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-3-MM",
+      "ruta": "/api/product-images/dc72eb2f-662e-443d-878e-6a5110b4b00c.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-3-5-MM",
+      "ruta": "/api/product-images/c7a37d07-0946-4824-a13d-c5a90cfba7dd.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-4-MM",
+      "ruta": "/api/product-images/a2a528c1-eb0c-4870-b095-3b69a09f26ed.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-4-5-MM",
+      "ruta": "/api/product-images/c1a9066e-27e2-431d-af88-361cd4f782e3.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-5-MM",
+      "ruta": "/api/product-images/cb1f8083-4c02-4302-8249-668ff5d7cba5.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-6-MM",
+      "ruta": "/api/product-images/37800ae9-adec-4403-9054-9ec051f80f20.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-8-MM",
+      "ruta": "/api/product-images/1f9745a9-4559-4178-a8ad-77c5a91ea76a.webp",
+      "archivo": "/demo-catalog/destornillador-plano.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M3",
+      "ruta": "/api/product-images/01f9604b-cf82-48e3-a246-b37d329a5e26.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M4",
+      "ruta": "/api/product-images/311e3fb9-777b-4c48-9bea-4c66904798d9.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M5",
+      "ruta": "/api/product-images/b265d662-d16d-4316-8f36-230d578634c6.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M6",
+      "ruta": "/api/product-images/7f963410-e956-4776-b634-830097b8a579.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M8",
+      "ruta": "/api/product-images/2b50e781-72c8-4c22-935e-216bd9d6795d.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M10",
+      "ruta": "/api/product-images/e0df3691-974d-4fab-ab0a-bbb2e60a2103.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M12",
+      "ruta": "/api/product-images/99bc76be-d9ed-40a2-8256-1968343d4fc9.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M14",
+      "ruta": "/api/product-images/4fb1b8f0-bc7b-455b-82f3-1e4fa88b0cc3.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M16",
+      "ruta": "/api/product-images/6bc9605d-1f67-481a-8480-f20b42636aec.webp",
+      "archivo": "/demo-catalog/arandela-plana.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-80-MM",
+      "ruta": "/api/product-images/ae8b3939-aa61-413e-bf92-3ec096207cf0.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-100-MM",
+      "ruta": "/api/product-images/f9eda689-34b0-4456-b28e-656fb10ce72b.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-120-MM",
+      "ruta": "/api/product-images/3f8c48a3-9726-4ae4-9cb9-a1b7b6c70760.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-150-MM",
+      "ruta": "/api/product-images/675cd7df-d941-4168-a036-97d4133e8789.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-180-MM",
+      "ruta": "/api/product-images/597341cb-f50c-4b6c-b0e8-a7afb6dd4428.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-200-MM",
+      "ruta": "/api/product-images/55dd230c-6b57-4ff8-84ab-f048d37e5435.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-250-MM",
+      "ruta": "/api/product-images/6c08ada1-0455-4167-88a2-e479ca871261.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-300-MM",
+      "ruta": "/api/product-images/949bbf36-5c98-4e0b-8b79-42248042ded0.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-370-MM",
+      "ruta": "/api/product-images/ff719817-2411-4b7c-8ab2-b4de36bef631.webp",
+      "archivo": "/demo-catalog/precinto-negro.webp",
       "http": 200,
       "mime": "image/webp"
     }
   ],
-  "conImagenVerificada": 4,
-  "pendientesDeImagen": 900,
+  "conImagenVerificada": 31,
+  "pendientesDeImagen": 873,
   "vistasConFotoVerificada": [
     "Home",
+    "catálogo",
     "detalle"
   ],
+  "fotosVerificadasEnHome": 4,
   "anchoMovilPx": 360,
   "socket": {
     "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
     "navegadores": 2,
-    "origenCambio": "ADMIN stock",
-    "evento": "stock.actualizado.v1",
+    "origenCambio": "compra confirmada",
+    "eventos": [
+      "stock.actualizado.v1",
+      "pedido.confirmado.v1"
+    ],
     "refrescoRest": true,
     "reconexion": true,
-    "stockFinal": 24
+    "stockInicial": 24,
+    "stockPostCompra": 23,
+    "pruebaReconectarConCambioAdmin": true
   }
 }

@@ -58,6 +58,7 @@ export function presentStoredAccountOrder(
       typeof data?.totalUSD !== 'string' ||
       !/^(0|[1-9]\d{0,9})\.\d{2}$/.test(data.totalUSD) ||
       data.totalUSD === '0.00' ||
+      (data.simulado !== undefined && data.simulado !== true) ||
       !validDate(data?.venceEl)) {
       invalidResult();
     }
@@ -73,6 +74,7 @@ export function presentStoredAccountOrder(
           totalUSD: data.totalUSD,
           cargoId: String(attempt.chargeId),
           venceEl: data.venceEl,
+          ...(data.simulado === true ? { simulado: true as const } : {}),
         },
       },
     };

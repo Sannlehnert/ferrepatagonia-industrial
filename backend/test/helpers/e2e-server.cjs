@@ -55,11 +55,15 @@ async function main() {
   const session = await connectOwned(childProfile("E2E"), "E2E");
   let fixture;
   let fer19Fixture;
+  let academicCheckout;
   try {
     await initializeDatabase();
     if (process.env.E2E_FER19) {
       fer19Fixture = await seedDemo(session, { browser: true });
-    } else if (process.env.E2E_RECEIPTS !== "1" && process.env.E2E_DEMO_CATALOG !== "1") {
+    } else if (process.env.E2E_DEMO_CATALOG === '1') {
+      const { issueAcademicCheckout } = require('../../dist/services/orders/academic-checkout');
+      academicCheckout = await issueAcademicCheckout(session.profile);
+    } else if (process.env.E2E_RECEIPTS !== "1") {
       fixture = await seedAdminAccounts(session, { browser: true });
     }
   } finally {
@@ -72,7 +76,7 @@ async function main() {
   // outside NODE_ENV=test after the guarded fixture has been seeded.
   if (process.env.E2E_FER19 === "production") process.env.NODE_ENV = "development";
 
-  backend = createBackendServer();
+  backend = createBackendServer(academicCheckout);
   server = backend.server.listen(0, "127.0.0.1");
 
   server.once("error", () => {

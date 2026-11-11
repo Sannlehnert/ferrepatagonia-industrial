@@ -18,7 +18,7 @@ const labels: Record<PriceState, string> = {
     <p v-else-if="error" class="m-0 text-slate-600">Precio no disponible</p>
     <template v-else-if="precioComprable(line)">
       <p class="m-0 text-base font-semibold">USD {{ line!.precioUnitarioUSD }}</p>
-      <p class="m-0 text-xs text-slate-500">{{ personalized ? 'Tu precio' : 'Precio público' }} · IVA incluido</p>
+      <p class="m-0 text-xs text-slate-500">{{ line?.compraAcademica ? 'Precio simulado académico' : personalized ? 'Tu precio' : 'Precio público' }} · IVA incluido</p>
       <p v-if="line!.descuentoAplicado !== '0.00'" class="m-0 text-xs text-green-700">
         Descuento {{ line!.descuentoAplicado }}%
         <span v-if="['ESPECIAL_PUBLICO', 'AMBOS'].includes(line!.origenDescuento)"> · Promoción especial</span>

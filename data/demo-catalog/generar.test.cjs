@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { readFileSync, existsSync } = require('node:fs');
 const { join } = require('node:path');
 const { test } = require('node:test');
+const { parse } = require('../../backend/node_modules/papaparse');
 const { categoriasRequeridas, columnas, csv, familias, generar } = require('./generar.cjs');
 
 const { data: { categorias } } = require('./categorias-e2e.json');
@@ -23,17 +24,24 @@ test('el CSV versionado se regenera byte a byte con las categorías observadas',
   }
 });
 
-test('vincula fotos atribuidas al origen indicado y exige nombres de categoría inequívocos', () => {
-  const rows = generar(categorias, 'https://academico.example');
-  const fotos = rows.filter(row => row.imagen);
-  const fuentes = readFileSync(join(__dirname, 'image-sources.csv'), 'utf8').trim().split(/\r?\n/).slice(1);
-  assert.equal(fotos.length, fuentes.length);
-  for (const row of fotos) {
-    const image = new URL(row.imagen);
-    assert.equal(image.origin, 'https://academico.example');
-    assert.ok(fuentes.some(fuente => fuente.startsWith(`${row.codigo},`) && fuente.includes(image.pathname)));
-    assert.ok(existsSync(join(__dirname, '../../frontend/public', image.pathname)));
+test('cada foto tiene un SKU existente, archivo local y atribución', () => {
+  const skus = new Set(generar(categorias).map(row => row.codigo));
+  const { data, errors } = parse(readFileSync(join(__dirname, 'image-sources.csv'), 'utf8'), { header: true, skipEmptyLines: true });
+  assert.deepEqual(errors, []);
+  assert.equal(new Set(data.map(row => row.sku)).size, data.length);
+  assert.ok(data.length >= 4);
+  for (const fuente of data) {
+    assert.ok(skus.has(fuente.sku));
+    assert.match(fuente.ruta_final, /^\/demo-catalog\/[a-z0-9-]+\.webp$/);
+    assert.ok(existsSync(join(__dirname, '../../frontend/public', fuente.ruta_final)));
+    assert.ok(fuente.autor && fuente.licencia && fuente.modificaciones);
+    for (const enlace of [fuente.fuente, fuente.url_original, fuente.referencia_licencia]) {
+      assert.equal(new URL(enlace).protocol, 'https:');
+    }
   }
+});
+
+test('el generador exige nombres de categoría inequívocos', () => {
   const [primera] = categoriasRequeridas;
   assert.throws(() => generar(categorias.filter(c => c.nombre !== primera)), /categoría activa/);
   assert.throws(() => generar([...categorias, categorias.find(c => c.nombre === primera)]), /nombre único/);

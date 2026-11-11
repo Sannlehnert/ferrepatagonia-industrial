@@ -1,5 +1,5 @@
-import { createHash } from 'node:crypto'
-import { writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { readFile, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { expect, test, type APIRequestContext, type APIResponse, type Browser, type Locator, type Page, type WebSocketRoute } from '@playwright/test'
 
@@ -7,7 +7,9 @@ const require = createRequire(import.meta.url)
 const { categoriasRequeridas, csv, familias, generar } = require('../../../data/demo-catalog/generar.cjs')
 const { connectOwned } = require('../../../backend/test/helpers/cc260-disposable.cjs')
 const { credentials } = require('../../../backend/test/helpers/e2e-fixtures.cjs')
+const { parse } = require('../../../backend/node_modules/papaparse')
 const importar = '/api/admin/productos/importar'
+const pedidos = '/api/pedidos/cuenta-corriente'
 
 type Categoria = { id: number; nombre: string }
 type Fila = {
@@ -52,25 +54,23 @@ async function verificarImagen(locator: Locator) {
   })).toBeGreaterThan(0)
 }
 
-async function verificarStockEnDosNavegadores(page: Page, browser: Browser, origen: string, producto: Producto) {
+async function compraEnNavegador(page: Page, browser: Browser, origen: string, producto: Producto,
+  actualizar: (stock: number) => Promise<unknown>) {
   const otro = await browser.browserType().launch()
   const detalle = `/api/catalogo/${producto.id}`
   let disponible = true
   let conexiones = 0
   let socket: WebSocketRoute | undefined
   let eventosStock = 0
+  let eventosPedido = 0
   const rutaSocket = '**/socket.io/**'
   try {
-    const administracion = await otro.newContext({ baseURL: origen, extraHTTPHeaders: { Origin: origen } })
-    await respuesta(await administracion.request.post('/api/auth/login', { data: credentials.admin }))
-    const adminPage = await administracion.newPage()
-    await adminPage.goto('/admin/productos')
-    const actualizar = async (stock: number) => {
-      await respuesta(await adminPage.request.patch(`/api/admin/productos/${producto.id}/stock`, { data: { stock } }))
-    }
+    const otraSesion = await otro.newContext({ baseURL: origen, extraHTTPHeaders: { Origin: origen } })
+    await respuesta(await otraSesion.request.post('/api/auth/login', { data: credentials.account }))
+    const observador = await otraSesion.newPage()
     await respuesta(await page.request.post('/api/auth/login', { data: credentials.account, headers: { Origin: origen } }))
-    await page.route(rutaSocket, route => disponible ? route.continue() : route.abort())
-    await page.routeWebSocket(rutaSocket, ws => {
+    await observador.route(rutaSocket, route => disponible ? route.continue() : route.abort())
+    await observador.routeWebSocket(rutaSocket, ws => {
       if (!disponible) return ws.close()
       const server = ws.connectToServer()
       ws.onMessage(message => {
@@ -84,34 +84,55 @@ async function verificarStockEnDosNavegadores(page: Page, browser: Browser, orig
         if (typeof message === 'string' && message.startsWith('42')) {
           const [evento, payload] = JSON.parse(message.slice(2))
           if (evento === 'stock.actualizado.v1' && payload.productosIds.includes(producto.id)) eventosStock++
+          if (evento === 'pedido.confirmado.v1') eventosPedido++
         }
         ws.send(message)
       })
     })
-    await page.goto(`/producto/${producto.id}`)
-    const mostrar = (stock: number) => expect(page.getByText(`${stock} unidades disponibles`)).toBeVisible()
-    const refresco = () => page.waitForResponse(response =>
+    await observador.goto(`/producto/${producto.id}`)
+    const mostrar = (stock: number) => expect(observador.getByText(`${stock} unidades disponibles`)).toBeVisible()
+    const refresco = () => observador.waitForResponse(response =>
       new URL(response.url()).pathname === detalle && response.status() === 200)
     await mostrar(producto.stock)
-    await expect(page.getByRole('button', { name: 'Agregar', exact: true })).toBeDisabled()
     await expect.poll(() => conexiones).toBe(1)
+    await page.goto(`/producto/${producto.id}`)
+    await expect(page.getByText(/Precio simulado académico/)).toBeVisible()
+    const agregado = page.waitForResponse(response => new URL(response.url()).pathname === '/api/carrito/items' &&
+      response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Agregar', exact: true }).click()
+    expect((await agregado).status()).toBe(204)
+    await page.goto('/carrito')
+    await expect(page.getByText(/Pedido simulado académico/)).toBeVisible()
+    await page.getByRole('radio', { name: 'Cuenta corriente' }).check()
     const cambio = refresco()
-    await actualizar(producto.stock - 1)
+    const confirmada = page.waitForResponse(response => new URL(response.url()).pathname === pedidos &&
+      response.request().method() === 'POST')
+    await page.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
+    const response = await confirmada
+    expect(response.status()).toBe(201)
+    const compra = await response.json()
+    const clave = (await response.request().allHeaders())['idempotency-key']!
+    const solicitud = response.request().postDataJSON()
+    await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' })).toContainText('Pedido simulado')
     expect((await (await cambio).json()).data.producto.stock).toBe(producto.stock - 1)
     await mostrar(producto.stock - 1)
     expect(eventosStock).toBeGreaterThan(0)
+    await expect.poll(() => eventosPedido).toBe(1)
 
     disponible = false
     await socket!.close({ code: 1011 })
-    await actualizar(producto.stock)
+    await actualizar(producto.stock - 2)
     await mostrar(producto.stock - 1)
     const recuperacion = refresco()
     disponible = true
     await expect.poll(() => conexiones, { timeout: 15_000 }).toBeGreaterThan(1)
-    expect((await (await recuperacion).json()).data.producto.stock).toBe(producto.stock)
-    await mostrar(producto.stock)
-    return { sku: producto.codigo, navegadores: 2, origenCambio: 'ADMIN stock', evento: 'stock.actualizado.v1',
-      refrescoRest: true, reconexion: true, stockFinal: producto.stock }
+    expect((await (await recuperacion).json()).data.producto.stock).toBe(producto.stock - 2)
+    await mostrar(producto.stock - 2)
+    await actualizar(producto.stock - 1)
+    await mostrar(producto.stock - 1)
+    return { compra, clave, solicitud, socket: { sku: producto.codigo, navegadores: 2, origenCambio: 'compra confirmada',
+      eventos: ['stock.actualizado.v1', 'pedido.confirmado.v1'], refrescoRest: true, reconexion: true,
+      stockInicial: producto.stock, stockPostCompra: producto.stock - 1, pruebaReconectarConCambioAdmin: true } }
   } finally {
     await otro.close()
   }
@@ -120,6 +141,7 @@ async function verificarStockEnDosNavegadores(page: Page, browser: Browser, orig
 async function auditarPrecios(api: APIRequestContext, path: string, filas: Producto[], lista: number, sintetico: boolean) {
   let cotizables = 0
   let lotes = 0
+  let comprablesAcademico = 0
   for (let i = 0; i < filas.length; i += 100) {
     const lote = filas.slice(i, i + 100)
     const { data } = await respuesta(await api.post(path, {
@@ -144,12 +166,16 @@ async function auditarPrecios(api: APIRequestContext, path: string, filas: Produ
         evidenciaBaseUSD: { synthetic: true }, descuentoAplicado: descuento.toFixed(2),
         precioUnitarioUSD: (unitario / 100).toFixed(2), subtotalUSD: (unitario * 2 / 100).toFixed(2),
       })
+      if (path.endsWith('/mios')) {
+        expect(line.compraAcademica).toBe(true)
+        comprablesAcademico++
+      } else expect(line.compraAcademica).toBeUndefined()
       total += unitario * 2
       cotizables++
     }
     expect(data.totalUSD).toBe(sintetico ? (total / 100).toFixed(2) : null)
   }
-  return { lotes, verificados: filas.length, cotizables }
+  return { lotes, verificados: filas.length, cotizables, comprablesAcademico }
 }
 
 test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerciales', async ({ page, baseURL, browser, playwright }, testInfo) => {
@@ -177,7 +203,7 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     }
     const activas = await categorias()
     const usadas = activas.filter(c => categoriasRequeridas.includes(c.nombre))
-    const filas: Fila[] = generar(activas, baseURL)
+    const filas: Fila[] = generar(activas)
     const archivo = csv(filas)
     const plantilla = csv(generar(activas))
     const hash = createHash('sha256').update(plantilla).digest('hex')
@@ -219,6 +245,23 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
         descripcion: fila.descripcion, imagen: fila.imagen || null, precio: fila.precio_base_usd,
         stock: fila.stock, activo: 1, categoriaActiva: 1, descuento: fila.descuento_especial_pct || null })
     }
+    const fotos = parse(await readFile(new URL('../../../data/demo-catalog/image-sources.csv', import.meta.url), 'utf8'),
+      { header: true, skipEmptyLines: true })
+    expect(fotos.errors).toEqual([])
+    const fuentes = new Map<string, string>(fotos.data.map((fila: { sku: string; ruta_final: string }) => [fila.sku, fila.ruta_final]))
+    expect(fuentes.size).toBe(fotos.data.length)
+    for (const [sku, ruta] of fuentes) {
+      const producto = dbFilas.find(p => p.codigo === sku)!
+      expect(producto).toBeDefined()
+      expect(ruta).toMatch(/^\/demo-catalog\/[a-z0-9-]+\.webp$/)
+      const bytes = await readFile(new URL(`../../public${ruta}`, import.meta.url))
+      const actual = await respuesta(await admin.put(`/api/admin/productos/${producto.id}/con-imagen`, {
+        multipart: { producto: '{}', imagen: { name: ruta.split('/').at(-1)!, mimeType: 'image/webp', buffer: bytes } },
+      }))
+      expect(actual.imagen).toMatch(/^\/api\/product-images\/[a-f0-9-]+\.webp$/)
+      expect(actual).toMatchObject({ codigo: sku, stock: producto.stock })
+      producto.imagen = actual.imagen
+    }
 
     const catalogo = async (params: Record<string, string>) =>
       (await respuesta(await publico.get('/api/catalogo', { params }))).data
@@ -227,8 +270,9 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     for (let n = 1; n <= paginas; n++) {
       const data = await catalogo({ page: String(n), limit: '100' })
       expect(data.pagination).toMatchObject({ total: filas.length, totalPages: paginas, hasNext: n < paginas })
-      ids.push(...data.productos.map(({ id, disponible }: { id: number; disponible: boolean }) => {
+      ids.push(...data.productos.map(({ id, disponible, imagen }: { id: number; disponible: boolean; imagen: string | null }) => {
         expect(disponible).toBe(true)
+        expect(imagen ?? null).toBe(dbFilas.find(p => p.id === id)!.imagen)
         return id
       }))
     }
@@ -259,31 +303,6 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     expect(evidencia.affectedRows).toBe(filas.length)
     const publicoUSD = await auditarPrecios(publico, '/api/precios', dbFilas, 0, true)
     const empresaUSD = await auditarPrecios(empresa, '/api/precios/mios', dbFilas, 10, true)
-    const intentos = []
-    for (const categoria of usadas.slice(0, 5)) {
-      const producto = dbFilas.find(p => p.id_categoria === categoria.id)!
-      const item = { productoId: producto.id, cantidad: 2 }
-      const exceso = await empresa.post('/api/carrito/items', { data: { ...item, cantidad: producto.stock + 1 } })
-      expect(await respuesta(exceso, 422)).toMatchObject({ code: 'STOCK_INSUFICIENTE' })
-      expect((await empresa.post('/api/carrito/items', { data: item })).status()).toBe(204)
-      const carrito = await respuesta(await empresa.get('/api/carrito'))
-      expect(carrito.items).toHaveLength(1)
-      expect(carrito.items[0]).toMatchObject({ id_producto: producto.id, cantidad: 2,
-        precio: { datosSinteticos: true, estadoPrecio: 'DEFINIDO' } })
-      const { data } = await respuesta(await empresa.get('/api/pedidos/cuenta-corriente/eligibilidad'))
-      expect(data).toMatchObject({ elegible: false, codigo: 'PRECIO_SINTETICO', cotizacion: null })
-      expect(Number((await db.query('SELECT stock FROM PRODUCTO WHERE id_producto = ?', [producto.id]))[0].stock)).toBe(producto.stock)
-      intentos.push({ sku: producto.codigo, categoria: categoria.nombre, estado: data.codigo, stock: producto.stock })
-      expect((await empresa.delete(`/api/carrito/items/${producto.id}`)).status()).toBe(204)
-    }
-    expect((await respuesta(await empresa.get('/api/pedidos'))).data.items).toEqual([])
-    expect((await respuesta(await admin.get('/api/admin/pedidos'))).data.items).toEqual([])
-    const [efectos] = await db.query(`SELECT (SELECT COUNT(*) FROM PEDIDO) AS pedidos,
-      (SELECT COUNT(*) FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE tipo_movimiento = 'CARGO') AS cargos`)
-    expect([Number(efectos.pedidos), Number(efectos.cargos)]).toEqual([0, 0])
-    await reporte('pricing-report.json', { moneda: 'USD', sinEvidencia, publicoUSD, empresaUSD,
-      descuentoListaEmpresaPct: 10, evidenciaSintetica: true, intentos, pedidos: 0, cargos: 0 })
-
     await page.setViewportSize({ width: 360, height: 800 })
     await page.goto('/')
     const imagenes = []
@@ -291,8 +310,8 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       const recurso = await publico.get(producto.imagen)
       expect(recurso.status()).toBe(200)
       expect(recurso.headers()['content-type']).toBe('image/webp')
-      await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
-      imagenes.push({ sku: producto.codigo, ruta: new URL(producto.imagen).pathname, urlLocal: producto.imagen,
+      if (dbFilas.slice(0, 4).includes(producto)) await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
+      imagenes.push({ sku: producto.codigo, ruta: producto.imagen, archivo: fuentes.get(producto.codigo),
         http: 200, mime: 'image/webp' })
     }
     for (const producto of dbFilas.filter(p => p.imagen)) {
@@ -300,19 +319,112 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await expect(page.getByRole('form', { name: 'Buscar y filtrar productos' })).toBeVisible()
       const enlace = page.getByRole('link', { name: producto.nombre, exact: true })
       await expect(enlace).toBeVisible()
+      await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
       await enlace.focus()
       await page.keyboard.press('Enter')
-      await expect(page.getByRole('heading', { name: producto.nombre, exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: producto.nombre, level: 1, exact: true })).toBeVisible()
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
     }
-    const socket = await verificarStockEnDosNavegadores(page, browser, baseURL!, dbFilas[0])
+    const principal = dbFilas[0]!
+    const seleccion = [principal, ...usadas.filter(c => c.id !== principal.id_categoria).slice(0, 4)
+      .map(c => dbFilas.find(p => p.id_categoria === c.id)!)]
+    const stock = async (producto: Producto) => Number((await db.query('SELECT stock FROM PRODUCTO WHERE id_producto = ?', [producto.id]))[0].stock)
+    const setStock = (producto: Producto, cantidad: number) => admin.patch(`/api/admin/productos/${producto.id}/stock`,
+      { data: { stock: cantidad } }).then(response => respuesta(response))
+    const agregar = (producto: Producto, cantidad: number) => empresa.post('/api/carrito/items', { data: { productoId: producto.id, cantidad } })
+    const elegibilidad = async () => (await respuesta(await empresa.get(`${pedidos}/eligibilidad`))).data
+    const confirmarPedido = (clave: string, data: { cotizacion: string }) =>
+      empresa.post(pedidos, { headers: { 'Idempotency-Key': clave }, data })
+
+    // Cae el stock después de emitir una cotización auténtica. La confirmación tampoco puede sobrevender.
+    expect((await agregar(principal, 2)).status()).toBe(204)
+    const [cuenta] = await db.query(`SELECT cc.id_cuenta_corriente AS id, cc.limite_credito AS limite
+      FROM CUENTA_CORRIENTE cc JOIN CLIENTE c USING (id_cliente) WHERE c.email = ?`, [credentials.account.email])
+    expect(cuenta).toBeDefined()
+    await db.query('UPDATE CUENTA_CORRIENTE SET origen_datos = ? WHERE id_cuenta_corriente = ?', ['REAL', cuenta.id])
+    expect(await elegibilidad()).toMatchObject({ elegible: false, codigo: 'CUENTA_ACADEMICA_REQUERIDA', cotizacion: null })
+    await db.query('UPDATE CUENTA_CORRIENTE SET origen_datos = ?, limite_credito = ? WHERE id_cuenta_corriente = ?', ['DEMO', '1.00', cuenta.id])
+    expect(await elegibilidad()).toMatchObject({ elegible: false, codigo: 'CREDITO_INSUFICIENTE', simulado: true })
+    await db.query('UPDATE CUENTA_CORRIENTE SET limite_credito = ? WHERE id_cuenta_corriente = ?', [cuenta.limite, cuenta.id])
+    const antes = await elegibilidad()
+    expect(antes).toMatchObject({ elegible: true, simulado: true })
+    await setStock(principal, 1)
+    const claveSobreventa = randomUUID()
+    const sobreventa = await confirmarPedido(claveSobreventa, { cotizacion: antes.cotizacion })
+    expect(await respuesta(sobreventa, 409)).toMatchObject({ code: 'STOCK_INSUFICIENTE' })
+    expect(await stock(principal)).toBe(1)
+    expect((await db.query('SELECT COUNT(*) AS total FROM PEDIDO'))[0].total.toString()).toBe('0')
+    await setStock(principal, principal.stock)
+    expect((await empresa.delete(`/api/carrito/items/${principal.id}`)).status()).toBe(204)
+
+    const primera = await compraEnNavegador(page, browser, baseURL!, principal, cantidad => setStock(principal, cantidad))
+    const compras = []
+    for (const [indice, producto] of seleccion.entries()) {
+      const cantidad = indice === 0 ? 1 : 2
+      const unitario = Math.round(centavos(producto.precio) * (100 - Math.max(10, Number(producto.descuento ?? 0))) / 100)
+      const totalUSD = (unitario * cantidad / 100).toFixed(2)
+      const exceso = await agregar(producto, producto.stock + 1)
+      expect(await respuesta(exceso, 422)).toMatchObject({ code: 'STOCK_INSUFICIENTE' })
+      let clave = primera.clave
+      let solicitud = primera.solicitud
+      let compra = primera.compra
+      if (indice > 0) {
+        expect((await agregar(producto, cantidad)).status()).toBe(204)
+        const carrito = await respuesta(await empresa.get('/api/carrito'))
+        expect(carrito.items).toEqual([expect.objectContaining({ id_producto: producto.id, cantidad,
+          precio: expect.objectContaining({ datosSinteticos: true, compraAcademica: true }) })])
+        const elegible = await elegibilidad()
+        expect(elegible).toMatchObject({ elegible: true, simulado: true, totalUSD })
+        clave = randomUUID()
+        solicitud = { cotizacion: elegible.cotizacion }
+        compra = await respuesta(await confirmarPedido(clave, solicitud), 201)
+      }
+      expect(compra.data).toMatchObject({ estado: 'CONFIRMADO', modalidadPago: 'CUENTA_CORRIENTE', simulado: true, totalUSD })
+      expect(await respuesta(await confirmarPedido(clave, solicitud))).toEqual(compra)
+      expect(await respuesta(await empresa.get(`${pedidos}/${clave}`))).toEqual(compra)
+      expect((await respuesta(await empresa.get('/api/carrito'))).items).toEqual([])
+      expect(await stock(producto)).toBe(producto.stock - cantidad)
+      const { pedidoId, cargoId } = compra.data
+      const [ledger] = await db.query(`SELECT p.total, p.evidencia_total_usd AS evidencia, p.observaciones AS pedidoNota,
+        m.id_movimiento_cuenta AS cargo, m.observaciones AS cargoNota, m.monto, c.origen_datos AS origen,
+        d.cantidad, j.snapshot_json AS snapshot
+        FROM PEDIDO p JOIN MOVIMIENTO_CUENTA_CORRIENTE m ON m.id_pedido = p.id_pedido AND m.tipo_movimiento = 'CARGO'
+        JOIN CUENTA_CORRIENTE c USING (id_cuenta_corriente)
+        JOIN DETALLE_PEDIDO d ON d.id_pedido = p.id_pedido
+        JOIN DETALLE_PEDIDO_CC_PRECIO j USING (id_detalle_pedido) WHERE p.id_pedido = ?`, [pedidoId])
+      expect(ledger).toMatchObject({ total: totalUSD, monto: totalUSD, origen: 'DEMO', cantidad,
+        pedidoNota: 'Pedido simulado académico #286', cargoNota: 'Pedido simulado académico #286' })
+      expect(ledger.evidencia).toMatch(/^FER17-v1:ACADEMICO:SHA256:[a-f0-9]{64}$/)
+      expect(String(ledger.cargo)).toBe(cargoId)
+      expect(JSON.parse(ledger.snapshot)).toMatchObject({ simulado: true,
+        producto: { productoId: producto.id, evidenciaBaseUSD: { synthetic: true } } })
+      expect((await respuesta(await empresa.get(`/api/pedidos/${pedidoId}`))).data).toMatchObject({ pedidoId, totalUSD, simulado: true })
+      expect((await respuesta(await admin.get(`/api/admin/pedidos/${pedidoId}`))).data).toMatchObject({ idPedido: pedidoId, origen: 'DEMO', estadosPermitidos: [] })
+      compras.push({ sku: producto.codigo, categoria: usadas.find(c => c.id === producto.id_categoria)!.nombre,
+        pedidoId, cargoId, cantidad, stockInicial: producto.stock, stockFinal: producto.stock - cantidad,
+        totalUSD, confirmacion: indice === 0 ? 'interfaz' : 'API', idempotencia: true })
+    }
+    expect((await respuesta(await empresa.get('/api/pedidos'))).data.items).toHaveLength(5)
+    expect((await respuesta(await admin.get('/api/admin/pedidos'))).data.items).toHaveLength(5)
+    const [efectos] = await db.query(`SELECT (SELECT COUNT(*) FROM PEDIDO) AS pedidos,
+      (SELECT COUNT(*) FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE tipo_movimiento = 'CARGO') AS cargos,
+      (SELECT COUNT(*) FROM PAGO) AS pagos`)
+    expect([Number(efectos.pedidos), Number(efectos.cargos), Number(efectos.pagos)]).toEqual([5, 5, 0])
+    const [final] = await db.query('SELECT SUM(stock) AS unidades FROM PRODUCTO')
+    const unidadesDescontadas = dbFilas.reduce((total, p) => total + p.stock, 0) - Number(final.unidades)
+    expect(unidadesDescontadas).toBe(9)
+    await reporte('pricing-report.json', { moneda: 'USD', sinEvidencia, publicoUSD, empresaUSD,
+      descuentoListaEmpresaPct: 10, evidenciaSintetica: true, compras, pedidosSimulados: 5, cargosSimulados: 5,
+      pagos: 0, cuentaRealRechazada: true, creditoInsuficienteRechazado: true,
+      sobreventa: { carrito: 422, confirmacion: 409 }, unidadesDescontadas })
     await reporte('catalog-validation.json', {
       generados: filas.length, validados: dbFilas.length, activosYVisibles: ids.length, paginas,
       categorias: usadas, familias: familias.length, detalleBusquedaVerificadosPorFamilia: familias.length,
       imagenes, conImagenVerificada: imagenes.length, pendientesDeImagen: filas.length - imagenes.length,
-      vistasConFotoVerificada: ['Home', 'detalle'], anchoMovilPx: 360, socket,
+      vistasConFotoVerificada: ['Home', 'catálogo', 'detalle'], fotosVerificadasEnHome: 4,
+      anchoMovilPx: 360, socket: primera.socket,
     })
   } finally {
     await Promise.all([publico.dispose(), admin.dispose(), empresa.dispose(), db.end()])

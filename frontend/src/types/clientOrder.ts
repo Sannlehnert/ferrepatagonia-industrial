@@ -1,4 +1,5 @@
 export interface ClientOrderSummary {
+  simulado?: true
   pedidoId: number
   numero: string
   fecha: string

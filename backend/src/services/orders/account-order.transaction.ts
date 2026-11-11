@@ -24,6 +24,7 @@ import { quoteAccountOrderCart } from './account-order.pricing';
 import { AccountOrderError } from './account-order.errors';
 import type { ConfirmedAccountOrder } from './account-order.types';
 import { assertAccountOrderQuoteToken } from './account-order-quote-token';
+import { academicOrderNote, type AcademicCheckout } from './academic-checkout';
 
 export async function executePendingAccountOrder(
   manager: EntityManager,
@@ -31,6 +32,7 @@ export async function executePendingAccountOrder(
   clientId: number,
   key: string,
   quoteToken: unknown,
+  academicCheckout?: AcademicCheckout,
 ): Promise<{ status: 201; body: { data: ConfirmedAccountOrder }; productIds: number[] }> {
   const context = await lockAccountOrderContext(
     manager,
@@ -59,7 +61,8 @@ export async function executePendingAccountOrder(
   }
 
   const cart = await lockAccountOrderCart(manager, auth.id, clientId);
-  const quote = await quoteAccountOrderCart(manager, auth, cart);
+  const academic = academicCheckout && { policy: academicCheckout, origin: context.origin };
+  const quote = await quoteAccountOrderCart(manager, auth, cart, academic);
   assertAccountOrderQuoteToken(quoteToken, auth, clientId, cart.cartId, quote);
 
   if (toCents(quote.totalUSD) > toCents(context.availableUSD)) {
@@ -69,13 +72,14 @@ export async function executePendingAccountOrder(
     );
   }
 
-  const orderId = await persistAccountOrder(manager, clientId, quote);
+  const orderId = await persistAccountOrder(manager, clientId, quote, academic);
 
   const chargeId = await registrarCargoPorPedido({
     id_cuenta_corriente: context.accountId,
     id_pedido: orderId,
     monto: quote.totalUSD,
     moneda: 'USD',
+    ...(quote.simulado ? { observaciones: academicOrderNote } : {}),
   }, manager);
 
   await consumeAccountOrderCart(manager, cart);

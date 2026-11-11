@@ -8,7 +8,7 @@ export async function lockAccountOrderContext(
   manager: EntityManager,
   auth: AuthContext,
   clientId: number,
-): Promise<{ accountId: number; availableUSD: string }> {
+): Promise<{ accountId: number; availableUSD: string; origin: string }> {
   if (!manager.queryRunner?.isTransactionActive) {
     throw new Error('La confirmación requiere una transacción activa.');
   }
@@ -20,8 +20,8 @@ export async function lockAccountOrderContext(
     );
   }
 
-  const [account] = await manager.query<{ accountId: number }[]>(`
-    SELECT id_cuenta_corriente AS accountId
+  const [account] = await manager.query<{ accountId: number; origin: string }[]>(`
+    SELECT id_cuenta_corriente AS accountId, origen_datos AS origin
     FROM CUENTA_CORRIENTE
     WHERE id_cliente = ?
     FOR UPDATE
@@ -95,5 +95,6 @@ export async function lockAccountOrderContext(
   return {
     accountId: account.accountId,
     availableUSD: state.credito_disponible,
+    origin: account.origin,
   };
 }

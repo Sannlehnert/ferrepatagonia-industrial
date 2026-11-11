@@ -20,6 +20,7 @@ import {
   listClientOrders,
 } from '../services/orders/account-order.service';
 import type { RealtimeRequest } from '../realtime/committed-change';
+import { academicCheckoutFor } from '../services/orders/academic-checkout';
 
 type Operation = 'confirm' | 'recover' | 'eligibility';
 type OrderMutationOperation = 'confirm' | 'recover' | 'eligibility';
@@ -99,13 +100,14 @@ export function handleAccountOrder(
               req.get('Idempotency-Key'),
               (req.body as { cotizacion: string }).cotizacion,
               (req as RealtimeRequest).notifyCommittedChange,
+              academicCheckoutFor(req),
             )
             : operation === 'recover'
               ? await getAccountOrderResult(
                 auth,
                 req.params.clave,
               )
-              : await getAccountOrderEligibility(auth);
+              : await getAccountOrderEligibility(auth, academicCheckoutFor(req));
 
           if (cancellation.signal.aborted) return;
 

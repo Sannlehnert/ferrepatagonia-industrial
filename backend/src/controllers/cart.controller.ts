@@ -7,6 +7,7 @@ import type { CartMutation } from '../services/cart.service';
 import { CartError } from '../services/cart.errors';
 import { PricingError } from '../services/pricing/money';
 import type { RealtimeRequest } from '../realtime/committed-change';
+import { academicCheckoutFor } from '../services/orders/academic-checkout';
 
 const MAX_INT = 2147483647;
 const positiveInt = (value: unknown): value is number =>
@@ -62,7 +63,7 @@ export function handleCart(type?: CartMutation['type']): RequestHandler {
                     if (!signal.aborted) res.status(204).end();
                 } else {
                     if (hasBody(req)) invalidRequest();
-                    const cart = await getAuthenticatedClientCart(auth, signal);
+                    const cart = await getAuthenticatedClientCart(auth, signal, academicCheckoutFor(req));
                     if (!signal.aborted) res.json(cart);
                 }
             });

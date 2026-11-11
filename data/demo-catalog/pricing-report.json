@@ -3,52 +3,93 @@
   "sinEvidencia": {
     "lotes": 10,
     "verificados": 904,
-    "cotizables": 0
+    "cotizables": 0,
+    "comprablesAcademico": 0
   },
   "publicoUSD": {
     "lotes": 10,
     "verificados": 904,
-    "cotizables": 904
+    "cotizables": 904,
+    "comprablesAcademico": 0
   },
   "empresaUSD": {
     "lotes": 10,
     "verificados": 904,
-    "cotizables": 904
+    "cotizables": 904,
+    "comprablesAcademico": 904
   },
   "descuentoListaEmpresaPct": 10,
   "evidenciaSintetica": true,
-  "intentos": [
+  "compras": [
+    {
+      "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
+      "categoria": "Herramientas E2E",
+      "pedidoId": 1,
+      "cargoId": "1",
+      "cantidad": 1,
+      "stockInicial": 24,
+      "stockFinal": 23,
+      "totalUSD": "8.01",
+      "confirmacion": "interfaz",
+      "idempotencia": true
+    },
     {
       "sku": "FP-DEMO-OBR-MALLA-48-MM",
       "categoria": "Construcción y consumibles",
-      "estado": "PRECIO_SINTETICO",
-      "stock": 22
+      "pedidoId": 2,
+      "cargoId": "2",
+      "cantidad": 2,
+      "stockInicial": 22,
+      "stockFinal": 20,
+      "totalUSD": "6.84",
+      "confirmacion": "API",
+      "idempotencia": true
     },
     {
       "sku": "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
       "categoria": "Electricidad e iluminación",
-      "estado": "PRECIO_SINTETICO",
-      "stock": 79
+      "pedidoId": 3,
+      "cargoId": "3",
+      "cantidad": 2,
+      "stockInicial": 79,
+      "stockFinal": 77,
+      "totalUSD": "11.34",
+      "confirmacion": "API",
+      "idempotencia": true
     },
     {
       "sku": "FP-DEMO-TOR-HEX-ACABADO-DORADO",
       "categoria": "Fijaciones E2E",
-      "estado": "PRECIO_SINTETICO",
-      "stock": 24
-    },
-    {
-      "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
-      "categoria": "Herramientas E2E",
-      "estado": "PRECIO_SINTETICO",
-      "stock": 24
+      "pedidoId": 4,
+      "cargoId": "4",
+      "cantidad": 2,
+      "stockInicial": 24,
+      "stockFinal": 22,
+      "totalUSD": "2.16",
+      "confirmacion": "API",
+      "idempotencia": true
     },
     {
       "sku": "FP-DEMO-NEU-MANGUERA-PU-3-5-MM-INTERIOR-EXTERIOR",
       "categoria": "Neumática",
-      "estado": "PRECIO_SINTETICO",
-      "stock": 21
+      "pedidoId": 5,
+      "cargoId": "5",
+      "cantidad": 2,
+      "stockInicial": 21,
+      "stockFinal": 19,
+      "totalUSD": "13.50",
+      "confirmacion": "API",
+      "idempotencia": true
     }
   ],
-  "pedidos": 0,
-  "cargos": 0
+  "pedidosSimulados": 5,
+  "cargosSimulados": 5,
+  "pagos": 0,
+  "cuentaRealRechazada": true,
+  "creditoInsuficienteRechazado": true,
+  "sobreventa": {
+    "carrito": 422,
+    "confirmacion": 409
+  },
+  "unidadesDescontadas": 9
 }
