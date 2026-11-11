@@ -7,8 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/cart-admission.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs test/auth.rate-limit.test.cjs test/productImport.test.cjs test/pricing.test.cjs test/pricing.http.test.cjs test/account-order-request.test.cjs test/adminAccount.test.cjs test/order-sockets.test.cjs",
-    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs && npm run test:pricing:mariadb && node test/helpers/run-cart-mariadb.cjs && npm run test:cuenta-corriente:safety && node test/helpers/run-cuenta-corriente-mariadb.cjs && npm run test:cuenta-corriente:client && npm run test:orders:isolated && npm run test:orders:sockets && npm run test:receipts:isolated",
+    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/cart-admission.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs test/auth.rate-limit.test.cjs test/productImport.test.cjs test/pricing.test.cjs test/pricing.http.test.cjs test/account-order-request.test.cjs test/adminAccount.test.cjs test/order-sockets.test.cjs test/admin-orders.test.cjs",
+    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs && npm run test:pricing:mariadb && node test/helpers/run-cart-mariadb.cjs && npm run test:cuenta-corriente:safety && node test/helpers/run-cuenta-corriente-mariadb.cjs && npm run test:cuenta-corriente:client && npm run test:orders:isolated && npm run test:orders:sockets && npm run test:receipts:isolated && npm run test:admin-orders",
     "test:receipts:isolated": "node test/helpers/run-cuenta-corriente-mariadb.cjs receipts",
     "test:orders:isolated": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders",
     "test": "npm run build && npm run test:unit && npm run test:dto-source && npm run test:integration",
@@ -25,7 +25,8 @@
     "test:account:contract": "node test/helpers/run-account-mariadb.cjs contract",
     "test:account:client": "node test/helpers/run-account-mariadb.cjs client",
     "test:account-admin:isolated": "node test/helpers/run-admin-account-mariadb.cjs",
-    "test:orders:sockets": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders-sockets"
+    "test:orders:sockets": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders-sockets",
+    "test:admin-orders": "node test/helpers/run-admin-orders-mariadb.cjs"
   },
   "engines": {
     "node": ">=22"

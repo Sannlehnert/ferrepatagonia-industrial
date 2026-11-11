@@ -4,17 +4,9 @@ import { getClientes, patchClientCompanyApproval } from '../controllers/clientes
 import { adminProductRouter } from './adminProduct.routes';
 import { adminCategoryRouter } from './adminCategory.routes';
 import { productImportRouter } from './productImport.routes';
-import {
-  getAdminPriceLists,
-  getClientPriceLists,
-  putClientPriceList,
-  saveAdminPriceList,
-} from '../controllers/clientPriceList.controller';
-import {
-  clientIdPolicy,
-  priceListAssignmentPolicy,
-  priceListIdPolicy,
-} from '../dtos/clients/price-list-assignment.dto';
+import { adminOrderRouter } from './adminOrder.routes';
+import { getAdminPriceLists, getClientPriceLists, putClientPriceList, saveAdminPriceList } from '../controllers/clientPriceList.controller';
+import { clientIdPolicy, priceListAssignmentPolicy, priceListIdPolicy } from '../dtos/clients/price-list-assignment.dto';
 import { priceListPolicy } from '../dtos/clients/price-list.dto';
 import { companyApprovalPolicy } from '../dtos/clients/company-approval.dto';
 import { validateDto } from '../middlewares/validate-dto.middleware';
@@ -47,12 +39,9 @@ adminRouter.get('/listas-precio', getAdminPriceLists);
 adminRouter.post('/listas-precio', validateDto('body', priceListPolicy), saveAdminPriceList);
 adminRouter.put('/listas-precio/:id', validateDto('params', priceListIdPolicy), validateDto('body', priceListPolicy), saveAdminPriceList);
 adminRouter.get('/clientes/listas-precio', getClientPriceLists);
-adminRouter.put(
-  '/clientes/:id/lista-precio',
-  validateDto('params', clientIdPolicy),
-  validateDto('body', priceListAssignmentPolicy),
-  putClientPriceList,
-);
+adminRouter.put('/clientes/:id/lista-precio',
+    validateDto('params', clientIdPolicy), validateDto('body', priceListAssignmentPolicy), putClientPriceList);
+adminRouter.use('/pedidos', adminOrderRouter);
 adminRouter.use('/productos/importar', productImportRouter);
 adminRouter.use('/productos', adminProductRouter);
 adminRouter.use('/categorias', adminCategoryRouter);

@@ -1,5 +1,5 @@
 import { Router, type RequestHandler } from 'express';
-import { createCategory, deactivateCategory, updateCategory } from '../controllers/adminCategory.controller';
+import { createCategory, deactivateCategory, updateCategory, getAdminCategories } from '../controllers/adminCategory.controller';
 import { categoryIdPolicy, createCategoryPolicy, updateCategoryPolicy } from '../dtos/policies';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 
@@ -12,6 +12,8 @@ const withoutBody: RequestHandler = (req, res, next) => {
   }
   next();
 };
+
+adminCategoryRouter.get('/', getAdminCategories);
 
 adminCategoryRouter.post('/', validateDto('body', createCategoryPolicy), createCategory);
 adminCategoryRouter.put('/:id', validateDto('params', categoryIdPolicy), validateDto('body', updateCategoryPolicy), updateCategory);

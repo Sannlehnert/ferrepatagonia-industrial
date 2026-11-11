@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import type { ReadQuery } from '../config/database.config';
 import { env } from '../config/env.config';
+import { orderInstant, serializeOrderInstant } from './order-instant';
 import {
   bounded,
   decimal,
@@ -167,8 +168,6 @@ interface OrderLineRow {
   subtotal: string;
 }
 
-const orderInstant = "COALESCE(p.fecha_utc, CONVERT_TZ(p.fecha, ?, '+00:00'))";
-
 function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   const pedidoId = Number(row.pedidoId);
   const moneda = row.moneda !== null && row.moneda !== undefined ? String(row.moneda) : null;
@@ -177,7 +176,7 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   return {
     pedidoId,
     numero: `PED-${String(pedidoId).padStart(6, '0')}`,
-    fecha: new Date(row.fechaUtc.replace(' ', 'T').slice(0, 23) + 'Z').toISOString(),
+    fecha: serializeOrderInstant(row.fechaUtc),
     estado: row.estado,
     modalidadPago: row.modalidadPago,
     moneda,
