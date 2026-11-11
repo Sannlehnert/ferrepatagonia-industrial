@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { readFile, writeFile } from 'node:fs/promises'
+import { writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { expect, test, type APIRequestContext, type APIResponse, type Browser, type Locator, type Page, type WebSocketRoute } from '@playwright/test'
 
@@ -7,7 +7,8 @@ const require = createRequire(import.meta.url)
 const { categoriasRequeridas, csv, familias, generar } = require('../../../data/demo-catalog/generar.cjs')
 const { connectOwned } = require('../../../backend/test/helpers/cc260-disposable.cjs')
 const { credentials } = require('../../../backend/test/helpers/e2e-fixtures.cjs')
-const { parse } = require('../../../backend/node_modules/papaparse')
+const { leerFuentes, auditarCobertura } = require('../../../data/demo-catalog/cobertura-visual.cjs')
+const { asociarFotos } = require('../../../data/demo-catalog/asociar-fotos.cjs')
 const importar = '/api/admin/productos/importar'
 const pedidos = '/api/pedidos/cuenta-corriente'
 
@@ -17,6 +18,8 @@ type Fila = {
   precio_base_usd: string; descuento_especial_pct: string; stock: number
 }
 type Producto = Fila & { id: number; descuento: string | null; precio: string; activo: number; categoriaActiva: number }
+type Foto = { sku: string; archivo: string; bytes: Buffer }
+type Asociacion = { sku: string; archivo: string; estado: string; imagen: string | null }
 
 async function respuesta(response: APIResponse, status = 200) {
   expect(response.status(), new URL(response.url()).pathname).toBe(status)
@@ -44,9 +47,10 @@ async function confirmar(admin: APIRequestContext, previewToken: string) {
 
 const centavos = (valor: string) => Number(valor.replace('.', ''))
 
-async function verificarImagen(locator: Locator) {
+async function verificarImagen(locator: Locator, ruta: string) {
   await locator.scrollIntoViewIfNeeded()
   await expect(locator).toBeVisible()
+  await expect(locator).toHaveAttribute('src', ruta)
   expect(await locator.evaluate(async element => {
     const imagen = element as unknown as { decode(): Promise<void>; naturalWidth: number }
     await imagen.decode()
@@ -179,7 +183,7 @@ async function auditarPrecios(api: APIRequestContext, path: string, filas: Produ
 }
 
 test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerciales', async ({ page, baseURL, browser, playwright }, testInfo) => {
-  test.setTimeout(120_000)
+  test.setTimeout(300_000)
   expect(process.env.E2E_DEMO_CATALOG).toBe('1')
   const session = await connectOwned(JSON.parse(process.env.CCE2E_TEST_PROFILE!), 'E2E')
   const db = session.connection
@@ -245,23 +249,30 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
         descripcion: fila.descripcion, imagen: fila.imagen || null, precio: fila.precio_base_usd,
         stock: fila.stock, activo: 1, categoriaActiva: 1, descuento: fila.descuento_especial_pct || null })
     }
-    const fotos = parse(await readFile(new URL('../../../data/demo-catalog/image-sources.csv', import.meta.url), 'utf8'),
-      { header: true, skipEmptyLines: true })
-    expect(fotos.errors).toEqual([])
-    const fuentes = new Map<string, string>(fotos.data.map((fila: { sku: string; ruta_final: string }) => [fila.sku, fila.ruta_final]))
-    expect(fuentes.size).toBe(fotos.data.length)
-    for (const [sku, ruta] of fuentes) {
-      const producto = dbFilas.find(p => p.codigo === sku)!
-      expect(producto).toBeDefined()
-      expect(ruta).toMatch(/^\/demo-catalog\/[a-z0-9-]+\.webp$/)
-      const bytes = await readFile(new URL(`../../public${ruta}`, import.meta.url))
-      const actual = await respuesta(await admin.put(`/api/admin/productos/${producto.id}/con-imagen`, {
-        multipart: { producto: '{}', imagen: { name: ruta.split('/').at(-1)!, mimeType: 'image/webp', buffer: bytes } },
-      }))
-      expect(actual.imagen).toMatch(/^\/api\/product-images\/[a-f0-9-]+\.webp$/)
-      expect(actual).toMatchObject({ codigo: sku, stock: producto.stock })
-      producto.imagen = actual.imagen
+    const fuentes: Map<string, Foto> = leerFuentes()
+    const cobertura = auditarCobertura(fuentes)
+    const porSku = new Map(dbFilas.map(producto => [producto.codigo, producto]))
+    const porId = new Map(dbFilas.map(producto => [producto.id, producto]))
+    const apiFotos = {
+      get: async (ruta: string) => respuesta(await admin.get(ruta)),
+      async subir(ruta: string, { sku, archivo, bytes }: Foto) {
+        const actual = await respuesta(await admin.put(ruta, {
+          multipart: { producto: '{}', imagen: { name: archivo, mimeType: 'image/webp', buffer: bytes } },
+        }))
+        expect(actual).toMatchObject({ codigo: sku, stock: porSku.get(sku)!.stock })
+        return actual
+      },
     }
+    const plan: Asociacion[] = await asociarFotos(apiFotos, { fuentes })
+    expect(plan).toHaveLength(fuentes.size)
+    expect(plan.every(foto => foto.estado === 'pendiente')).toBe(true)
+    const fotos: Asociacion[] = await asociarFotos(apiFotos, { aplicar: true, fuentes })
+    expect(fotos.every(foto => foto.estado === 'asociada')).toBe(true)
+    for (const foto of fotos) porSku.get(foto.sku)!.imagen = foto.imagen!
+    const conservadas: Asociacion[] = await asociarFotos({ ...apiFotos, subir: () => {
+      throw new Error('Una segunda ejecución no debe reemplazar imágenes existentes')
+    } }, { aplicar: true, fuentes })
+    expect(conservadas).toEqual(fotos.map(foto => ({ ...foto, estado: 'conservada' })))
 
     const catalogo = async (params: Record<string, string>) =>
       (await respuesta(await publico.get('/api/catalogo', { params }))).data
@@ -272,7 +283,7 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       expect(data.pagination).toMatchObject({ total: filas.length, totalPages: paginas, hasNext: n < paginas })
       ids.push(...data.productos.map(({ id, disponible, imagen }: { id: number; disponible: boolean; imagen: string | null }) => {
         expect(disponible).toBe(true)
-        expect(imagen ?? null).toBe(dbFilas.find(p => p.id === id)!.imagen)
+        expect(imagen ?? null).toBe(porId.get(id)!.imagen)
         return id
       }))
     }
@@ -306,12 +317,17 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     await page.setViewportSize({ width: 360, height: 800 })
     await page.goto('/')
     const imagenes = []
+    const huellas = new Map<string, string>()
     for (const producto of dbFilas.filter(p => p.imagen)) {
       const recurso = await publico.get(producto.imagen)
       expect(recurso.status()).toBe(200)
       expect(recurso.headers()['content-type']).toBe('image/webp')
-      if (dbFilas.slice(0, 4).includes(producto)) await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
-      imagenes.push({ sku: producto.codigo, ruta: producto.imagen, archivo: fuentes.get(producto.codigo),
+      const archivo = fuentes.get(producto.codigo)!.archivo
+      const huella = createHash('sha256').update(await recurso.body()).digest('hex')
+      if (huellas.has(archivo)) expect(huella).toBe(huellas.get(archivo))
+      else huellas.set(archivo, huella)
+      if (dbFilas.slice(0, 4).includes(producto)) await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), new URL(producto.imagen, baseURL).href)
+      imagenes.push({ sku: producto.codigo, archivo, sha256Publicado: huella,
         http: 200, mime: 'image/webp' })
     }
     for (const producto of dbFilas.filter(p => p.imagen)) {
@@ -319,11 +335,12 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await expect(page.getByRole('form', { name: 'Buscar y filtrar productos' })).toBeVisible()
       const enlace = page.getByRole('link', { name: producto.nombre, exact: true })
       await expect(enlace).toBeVisible()
-      await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
+      const url = new URL(producto.imagen, baseURL).href
+      await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
       await enlace.focus()
       await page.keyboard.press('Enter')
       await expect(page.getByRole('heading', { name: producto.nombre, level: 1, exact: true })).toBeVisible()
-      await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }))
+      await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
     }
@@ -423,6 +440,8 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       generados: filas.length, validados: dbFilas.length, activosYVisibles: ids.length, paginas,
       categorias: usadas, familias: familias.length, detalleBusquedaVerificadosPorFamilia: familias.length,
       imagenes, conImagenVerificada: imagenes.length, pendientesDeImagen: filas.length - imagenes.length,
+      archivosFotograficos: cobertura.archivos, gruposPendientes: cobertura.grupos.length,
+      asociacionesConservadasAlRepetir: conservadas.length,
       vistasConFotoVerificada: ['Home', 'catálogo', 'detalle'], fotosVerificadasEnHome: 4,
       anchoMovilPx: 360, socket: primera.socket,
     })

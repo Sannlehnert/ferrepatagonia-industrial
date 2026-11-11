@@ -1,9 +1,9 @@
 const assert = require('node:assert/strict');
-const { readFileSync, existsSync } = require('node:fs');
+const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { test } = require('node:test');
-const { parse } = require('../../backend/node_modules/papaparse');
 const { categoriasRequeridas, columnas, csv, familias, generar } = require('./generar.cjs');
+const { auditarCobertura, leerFuentes } = require('./cobertura-visual.cjs');
 
 const { data: { categorias } } = require('./categorias-e2e.json');
 
@@ -24,21 +24,14 @@ test('el CSV versionado se regenera byte a byte con las categorías observadas',
   }
 });
 
-test('cada foto tiene un SKU existente, archivo local y atribución', () => {
-  const skus = new Set(generar(categorias).map(row => row.codigo));
-  const { data, errors } = parse(readFileSync(join(__dirname, 'image-sources.csv'), 'utf8'), { header: true, skipEmptyLines: true });
-  assert.deepEqual(errors, []);
-  assert.equal(new Set(data.map(row => row.sku)).size, data.length);
-  assert.ok(data.length >= 4);
-  for (const fuente of data) {
-    assert.ok(skus.has(fuente.sku));
-    assert.match(fuente.ruta_final, /^\/demo-catalog\/[a-z0-9-]+\.webp$/);
-    assert.ok(existsSync(join(__dirname, '../../frontend/public', fuente.ruta_final)));
-    assert.ok(fuente.autor && fuente.licencia && fuente.modificaciones);
-    for (const enlace of [fuente.fuente, fuente.url_original, fuente.referencia_licencia]) {
-      assert.equal(new URL(enlace).protocol, 'https:');
-    }
-  }
+test('el inventario visual reconcilia los 904 SKU con el registro de fotos y los pendientes', () => {
+  const fuentes = leerFuentes();
+  assert.ok(fuentes.size >= 31);
+  const reporte = auditarCobertura(fuentes);
+  const pendientes = reporte.grupos.flatMap(grupo => grupo.pendientes);
+  assert.equal(new Set(pendientes).size, reporte.skuPendientes);
+  assert.equal(pendientes.length + fuentes.size, 904);
+  assert.deepEqual(reporte, require('./visual-audit.json'));
 });
 
 test('el generador exige nombres de categoría inequívocos', () => {

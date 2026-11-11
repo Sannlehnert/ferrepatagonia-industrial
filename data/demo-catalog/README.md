@@ -4,7 +4,7 @@ El CSV contiene 904 SKU con precios en USD, stock y descuentos simulados. Las de
 
 ## Base y alcance
 
-El PR #102 incorpora `develop` en `23673457538c23a32e37792c8844b1ec031f6867`, que incluye #285. El flujo de subida ADMIN almacena las imágenes en `PRODUCT_IMAGE_STORAGE_DIR` y devuelve `/api/product-images/<uuid>.webp`. La prueba académica usa un directorio temporal y lo elimina junto con la base. [PR #101](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/101)
+El PR #102 incorpora `develop` en `c0b8ac5`, que incluye #285 y #278. El flujo de subida ADMIN almacena las imágenes en `PRODUCT_IMAGE_STORAGE_DIR` y devuelve `/api/product-images/<uuid>.webp`. La prueba académica usa un directorio temporal y lo elimina junto con la base. [PR #101](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/101)
 
 El entorno E2E habitual parte de 27 productos, de los cuales 25 son visibles. El perfil de #286 conserva las categorías y las listas de prueba, habilita una cuenta de empresa de prueba y comienza con 0 productos para que todas las filas visibles y las fotos de Home provengan de FER-16. Las categorías adicionales se crean mediante ADMIN en esa instalación y sus IDs se leen desde la API pública. Para pasar de 0 a más de 900 visibles hacen falta 901 filas. Se verificó la siguiente distribución.
 
@@ -45,7 +45,14 @@ El [CSV versionado](productos-ferrepatagonia-demo.csv) es el resultado reproduci
 node data/demo-catalog/generar.cjs categorias-destino.json catalogo-destino.csv "" equivalencias.json
 ```
 
-El archivo de equivalencias es opcional cuando coinciden los nombres. El generador exige una única categoría activa por nombre y crea un archivo nuevo. Para cada SKU con fuente aprobada, buscá el ID persistido y usá `PUT /api/admin/productos/:id/con-imagen` con `producto={}` y el WebP en el campo multipart `imagen`. Verificá que la respuesta conserve el SKU y que su ruta pública sea accesible, devuelva `image/webp` y se pueda decodificar en sesión anónima. Si el resultado de una subida es incierto, consultá primero el producto por ID. La ruta del archivo fuente y la atribución están en [`image-sources.csv`](image-sources.csv) y en `/demo-catalog/creditos.txt`.
+El archivo de equivalencias es opcional cuando coinciden los nombres. El generador exige una única categoría activa por nombre y crea un archivo nuevo. Después de importar, configurá `DEMO_ADMIN_EMAIL` y `DEMO_ADMIN_PASSWORD` en la sesión del operador. Ejecutá el comando primero sin `--aplicar` para revisar el plan y comprobar que los SKU y sus nombres coinciden con el catálogo de destino.
+
+```sh
+node data/demo-catalog/asociar-fotos.cjs "$ORIGEN"
+node data/demo-catalog/asociar-fotos.cjs "$ORIGEN" --aplicar
+```
+
+`ORIGEN` es el origen HTTPS del frontend o `http://127.0.0.1:<puerto>` en la instalación local. El script obtiene los IDs actuales del listado ADMIN y sube los WebP por `PUT /api/admin/productos/:id/con-imagen` con `producto={}`. Conserva las fotos ya asociadas y permite repetir la carga después de un corte. Revisá las fotos preexistentes antes de darlas por verificadas. Ejecutá la asociación sin ediciones ADMIN concurrentes sobre los mismos SKU, porque el endpoint vigente no tiene escritura condicional por versión. La fuente y sus créditos se conservan una vez por archivo. #285 genera un UUID por asociación y elimina el archivo reemplazado, por lo que compartir una misma URL administrada entre productos requeriría cambiar el contrato de almacenamiento. [Registro de fuentes](image-sources.csv) · [Contrato de imágenes ADMIN](../../docs/api/admin-productos.md)
 
 Para una instalación compartida se requiere la autorización expresa indicada en #286, identificar la base y verificar un respaldo reciente. Usá el importador ADMIN de CSV/XLSX y comprobá `validRowsCount`, `existingInDbCount`, duplicados y errores de fila en el preview. El tamaño del archivo debe ser inferior al límite de 5 MiB y el lote admite hasta 1.000 filas. Para una primera carga se esperan 904 filas elegibles. Guardá el `previewToken`, confirmá una vez y recuperá el resultado en `GET /api/admin/productos/importar/confirmaciones/:previewToken`. Si se pierde la respuesta, consultá ese estado con el mismo token y conciliá los SKU contra el destino antes de decidir cualquier reintento. Un nuevo preview del CSV ya cargado detecta los 904 SKU existentes y ofrece cero filas elegibles. Para actualizar las fotos de un SKU existente usá la edición ADMIN autorizada, ya que FER-16 omite los SKU preexistentes.
 
@@ -61,8 +68,8 @@ El perfil ejecuta cargos contables simulados en la base descartable y elimina su
 
 ## Evidencia y cobertura pendiente
 
-Se verificaron **31 SKU con siete archivos fotográficos**, publicados mediante #285 y decodificados anónimamente en catálogo y ficha a 360 px. Los primeros cuatro también se verificaron en Home. Quedan **873 SKU sin foto aprobada**. Las fotos compartidas entre medidas de destornillador, arandela y precinto representan el mismo tipo de artículo sin escala. El registro identifica cada SKU, fuente, autor, licencia y transformación. [Informe de catálogo](catalog-validation.json) · [Destornillador](https://commons.wikimedia.org/wiki/File:Yellow-flathead-screwdriver.jpg) · [Arandela](https://commons.wikimedia.org/wiki/File:Plain_washer.jpeg) · [Precinto](https://commons.wikimedia.org/wiki/File:Cable_tie.jpg)
+Se verificaron **132 SKU con 19 archivos fotográficos**, publicados mediante #285 y decodificados anónimamente en catálogo y ficha a 360 px. Los primeros cuatro también se verificaron en Home. Quedan **772 SKU sin foto aprobada**, agrupados en **295 modelos o variantes visuales pendientes**. `node data/demo-catalog/cobertura-visual.cjs` reproduce ese inventario desde el CSV y el registro de fuentes. Las fotos compartidas representan el modelo sin escala o una unidad de un pack. Las potencias, colores, leyendas y formas que distinguen modelos requieren una coincidencia específica. La búsqueda descartó candidatos por discrepancias visuales y algunos originales devolvieron HTTP 429. [Inventario por grupo](visual-audit.json) · [Informe de catálogo](catalog-validation.json) · [Fuentes, autores y licencias](image-sources.csv)
 
 Los 904 precios pasaron la auditoría de FER-17 en USD. La empresa descartable confirmó cinco pedidos de categorías distintas, con cinco cargos simulados, cero pagos y nueve unidades descontadas. El replay y la recuperación conservaron los mismos pedidos y cargos. Se rechazó la sobreventa al agregar al carrito y cuando cayó el stock tras cotizar. La compra por interfaz produjo eventos de stock y pedido en un segundo proceso Chromium. La ficha se reconcilió por REST al recibir el evento y al reconectar. [Informe de precios y compras](pricing-report.json)
 
-El despliegue común queda pendiente de validación. Esta ejecución utilizó únicamente bases descartables.
+Las cinco compras están comprobadas en MariaDB descartable. El despliegue compartido requiere una validación distinta y autorización expresa para cualquier carga sobre esa base.
