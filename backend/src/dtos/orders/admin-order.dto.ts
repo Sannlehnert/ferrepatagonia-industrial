@@ -162,14 +162,17 @@ export function parseAdminOrderListQuery(
 
   let fecha: string | undefined;
   if (query.fecha !== undefined && query.fecha !== '') {
-    if (typeof query.fecha !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(query.fecha)) {
+    const day = typeof query.fecha === 'string' && /^[1-9]\d{3}-\d{2}-\d{2}$/.test(query.fecha)
+      ? new Date(`${query.fecha}T00:00:00Z`)
+      : null;
+    if (!day || !Number.isFinite(day.getTime()) || day.toISOString().slice(0, 10) !== query.fecha) {
       throw new AdminOrderError(
         'PARAMETRO_INVALIDO',
         400,
-        'La fecha debe tener el formato YYYY-MM-DD.',
+        'La fecha debe ser un día válido en formato YYYY-MM-DD.',
       );
     }
-    fecha = query.fecha;
+    fecha = day.toISOString().slice(0, 10);
   }
 
   return {

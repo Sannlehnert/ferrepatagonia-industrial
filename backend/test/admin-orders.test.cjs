@@ -76,6 +76,16 @@ describe('Task #277 — Pedidos ADMIN: DTOs, transiciones autorizadas y permisos
     );
   });
 
+  test('el filtro fecha acepta un día civil real y rechaza fechas inexistentes', () => {
+    assert.equal(parseAdminOrderListQuery({ fecha: '2028-02-29' }).fecha, '2028-02-29');
+    for (const fecha of ['2026-02-29', '2026-13-01', '2026-11-10T00:00:00Z']) {
+      assert.throws(
+        () => parseAdminOrderListQuery({ fecha }),
+        err => err.status === 400 && err.code === 'PARAMETRO_INVALIDO',
+      );
+    }
+  });
+
   test('parseAdminOrderStatusBody autoriza solo estados definidos y bloquea campos financieros', () => {
     assert.deepEqual(parseAdminOrderStatusBody({ estado: 'EN_PREPARACION' }), {
       estado: 'EN_PREPARACION',

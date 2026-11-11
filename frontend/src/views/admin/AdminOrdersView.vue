@@ -46,6 +46,8 @@ const modalCloseBtn = ref<HTMLButtonElement | null>(null)
 const modalDialogRef = ref<HTMLElement | null>(null)
 
 let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
+let disposed = false
+let queuedListRefresh: string | undefined
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
@@ -56,6 +58,7 @@ const isSaving = computed(
 )
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires',
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
@@ -96,9 +99,24 @@ function resolveErrorMessage(
   return { message: 'No pudimos consultar el listado de pedidos.', status }
 }
 
-function loadList(page = activeFilters.page ?? 1) {
-  activeFilters = { ...activeFilters, page }
-  return list.load(signal => getAdminOrders(activeFilters, signal))
+function loadList(page = activeFilters.page ?? 1, keepData = false) {
+  const filters = { ...activeFilters, page }
+  activeFilters = filters
+  return list.load(signal => getAdminOrders(filters, signal), { keepData })
+}
+
+function isCurrentSession(session: string) {
+  return !disposed && allowed() && identity() === session
+}
+
+function reconcileList(session: string) {
+  if (!isCurrentSession(session) || queuedListRefresh === session) return
+  queuedListRefresh = session
+  queueMicrotask(() => {
+    if (queuedListRefresh !== session) return
+    queuedListRefresh = undefined
+    if (isCurrentSession(session)) void loadList(activeFilters.page, true)
+  })
 }
 
 function applyFilters() {
@@ -262,37 +280,33 @@ async function submitStatusChange() {
 
   savingOpeningId.value = targetOpening
   statusFeedback.value = null
+  const session = identity()
+  const isCurrentModal = () => isCurrentSession(session) &&
+    targetOpening === currentModalOpeningId.value && selectedOrderId.value === targetId
 
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
-
-    if (!allowed() || targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== targetId) {
-      return
-    }
+    reconcileList(session)
+    if (!isCurrentModal()) return
 
     await detail.load(async () => updated)
-    if (targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== targetId) {
-      return
-    }
+    if (!isCurrentModal()) return
 
     nextStatusSelection.value = updated.estadosPermitidos[0] ?? ''
     statusFeedback.value = {
       text: `Estado actualizado a ${formatAdminOrderStatus(updated.estado)}.`,
       error: false,
     }
-    void loadList(activeFilters.page ?? 1)
   } catch (error: unknown) {
-    if (!allowed() || targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== targetId) {
-      return
-    }
-
     const { message, status } = resolveErrorMessage(error, 'mutation')
+    if (status !== 401 && status !== 403) reconcileList(session)
+    if (!isCurrentModal()) return
     statusFeedback.value = { text: message, error: true }
 
-    if (status === 409) {
+    if (status === undefined || status === 409 || status >= 500) {
       await detail.load(signal => getAdminOrderDetail(targetId, signal))
       const fresh = detail.data.value
-      if (fresh && targetOpening === currentModalOpeningId.value) {
+      if (fresh && isCurrentModal()) {
         nextStatusSelection.value = fresh.estadosPermitidos[0] ?? ''
       }
     }
@@ -343,6 +357,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  disposed = true
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -414,14 +429,14 @@ onBeforeUnmount(() => {
 
     <p v-if="validationError" role="alert" class="mb-4 text-sm font-semibold text-red-600">{{ validationError }}</p>
 
-    <p v-if="list.loading.value" role="status" class="py-8 text-center text-slate-500">Cargando pedidos…</p>
+    <p v-if="list.loading.value && !ordersPage" role="status" class="py-8 text-center text-slate-500">Cargando pedidos…</p>
 
     <div v-else-if="list.error.value" class="mb-6 rounded-xl border border-slate-200 bg-[#F8FAFC] p-6 text-center">
       <p role="alert" class="m-0 mb-3 text-sm font-medium text-slate-700">{{ resolveErrorMessage(list.error.value, 'list').message }}</p>
       <button
         type="button"
         class="rounded-lg bg-[#145A8D] px-4 py-2 text-sm font-bold text-white hover:bg-[#103A5C]"
-        @click="loadList(1)"
+        @click="loadList()"
       >
         Reintentar consulta
       </button>

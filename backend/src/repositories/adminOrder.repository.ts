@@ -1,5 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { dataSource } from '../config/database.config';
+import { env } from '../config/env.config';
+import { commercialDayUtcRange, orderInstant, serializeOrderInstant } from './order-instant';
 import {
     getAllowedNextStates,
     type AdminOrderListFilters,
@@ -71,7 +73,7 @@ export interface AdminOrderListResult {
 
 interface RawOrderRow {
     id_pedido: number | string;
-    fecha: Date | string;
+    fecha_utc: string;
     estado: string;
     modalidad_pago: string;
     moneda_total: string | null;
@@ -108,15 +110,6 @@ interface RawOrderLineRow {
     regla_precio: string | null;
 }
 
-function toIsoDate(value: Date | string): string {
-    if (value instanceof Date) {
-        return value.toISOString();
-    }
-    const normalized = value.includes('T') ? value : `${value.replace(' ', 'T')}Z`;
-    const parsed = new Date(normalized);
-    return Number.isNaN(parsed.getTime()) ? String(value) : parsed.toISOString();
-}
-
 function toMoneyString(value: string | number): string {
     if (typeof value === 'string' && /^-?\d+\.\d{2}$/.test(value)) {
         return value;
@@ -137,7 +130,7 @@ function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
 
     return {
         idPedido: Number(row.id_pedido),
-        fecha: toIsoDate(row.fecha),
+        fecha: serializeOrderInstant(row.fecha_utc),
         estado,
         estadosPermitidos: getAllowedNextStates(estado, modalidadPago),
         modalidadPago,
@@ -189,8 +182,13 @@ export async function findAdminOrders(
     }
 
     if (filters.fecha !== undefined) {
-        conditions.push('DATE(p.fecha) = ?');
-        params.push(filters.fecha);
+        const { from, until } = commercialDayUtcRange(filters.fecha);
+        conditions.push(`${orderInstant} >= ?`);
+        params.push(env.legacyOrderOffset, from);
+        if (until !== null) {
+            conditions.push(`${orderInstant} < ?`);
+            params.push(env.legacyOrderOffset, until);
+        }
     }
 
     if (filters.q !== undefined) {
@@ -240,7 +238,7 @@ export async function findAdminOrders(
         `
             SELECT
                 p.id_pedido,
-                p.fecha,
+                CAST(${orderInstant} AS CHAR) AS fecha_utc,
                 p.estado,
                 p.modalidad_pago,
                 p.moneda_total,
@@ -274,10 +272,10 @@ export async function findAdminOrders(
             LEFT JOIN CONFIRMACION_PEDIDO_CC cpcc ON cpcc.id_pedido = p.id_pedido
             LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE mcc ON mcc.id_pedido = p.id_pedido AND mcc.tipo_movimiento = 'CARGO'
             ${whereClause}
-            ORDER BY p.fecha DESC, p.id_pedido DESC
+            ORDER BY fecha_utc DESC, p.id_pedido DESC
             LIMIT ? OFFSET ?
         `,
-        [...params, filters.limit, offset],
+        [env.legacyOrderOffset, ...params, filters.limit, offset],
     );
 
     return {
@@ -301,7 +299,7 @@ export async function findAdminOrderById(
         `
             SELECT
                 p.id_pedido,
-                p.fecha,
+                CAST(${orderInstant} AS CHAR) AS fecha_utc,
                 p.estado,
                 p.modalidad_pago,
                 p.moneda_total,
@@ -331,7 +329,7 @@ export async function findAdminOrderById(
             WHERE p.id_pedido = ?
             LIMIT 1
         `,
-        [orderId],
+        [env.legacyOrderOffset, orderId],
     );
 
     const row = headerRows[0];
