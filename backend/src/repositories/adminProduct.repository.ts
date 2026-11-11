@@ -76,7 +76,7 @@ export const create = async (data: CreateProductDTO): Promise<number> => {
     return Number(result.identifiers[0].id_producto);
 };
 
-export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange): Promise<boolean> => {
+export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange) => {
     // Never spread HTTP input into an entity; ignored keys stay ignored.
     const values: Record<string, string | number | null> = {};
     for (const field of ['id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo'] as const) {
@@ -85,22 +85,27 @@ export const update = async (id: number, data: UpdateProductDTO, notify?: Notify
         values[field] = field === 'codigo' || field === 'nombre' ? (value as string).trim()
             : field === 'activo' ? Number(value) : field === 'precio' ? String(value) : value as string | number | null;
     }
-    if (!Object.keys(values).length) return false;
-    const { updated, stockChanged } = await inTransaction(async manager => {
+    if (!Object.keys(values).length) return { updated: false, replacedImage: null };
+    const { updated, stockChanged, replacedImage } = await inTransaction(async manager => {
         // Compare under the same row lock as the update, including a PUT with other fields.
-        const [before] = notify && data.stock !== undefined
-            ? await manager.query<{ stock: number }[]>(
-                'SELECT stock FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
+        const [before] = data.imagen !== undefined || (notify && data.stock !== undefined)
+            ? await manager.query<{ stock: number; imagen: string | null }[]>(
+                'SELECT stock, imagen FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
             )
             : [];
         const result = await manager.getRepository(ProductoSchema).update({ id_producto: id }, values);
         const updated = (result.affected ?? 0) > 0;
-        return { updated, stockChanged: updated && before !== undefined && before.stock !== data.stock };
+        return {
+            updated,
+            stockChanged: updated && before !== undefined && data.stock !== undefined && before.stock !== data.stock,
+            replacedImage: updated && before && data.imagen !== undefined && before.imagen !== data.imagen
+                ? before.imagen : null,
+        };
     });
     if (stockChanged) notifyAfterCommit(notify, { kind: 'stock', productIds: [id] });
-    return updated;
+    return { updated, replacedImage };
 };
 
-export const deactivate = async (id: number): Promise<boolean> => update(id, { activo: false });
+export const deactivate = async (id: number): Promise<boolean> => (await update(id, { activo: false })).updated;
 export const updateStock = async (id: number, stock: number, notify?: NotifyCommittedChange): Promise<boolean> =>
-    update(id, { stock }, notify);
+    (await update(id, { stock }, notify)).updated;

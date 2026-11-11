@@ -10,6 +10,7 @@ export async function listCatalog(pagination: CatalogPagination) {
       id: Number(row.id_producto),
       nombre: row.nombre,
       codigo: row.codigo,
+      ...(row.imagen ? { imagen: row.imagen } : {}),
       categoria: { id: Number(row.id_categoria), nombre: row.categoria_nombre },
       // Contrato provisional autorizado para #189. FER-15 define el precio público.
       precio: null,

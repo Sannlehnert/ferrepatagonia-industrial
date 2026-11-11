@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ProductThumbnail from '@/components/ProductThumbnail.vue';
 import { ref, computed, onMounted } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 import axios from 'axios';
@@ -258,8 +259,8 @@ onMounted(() => {
                     class="absolute top-16 right-2 z-10 min-h-11 px-3 bg-white border border-[#E2E8F0] rounded-md shadow-sm text-sm text-[#103A5C] disabled:opacity-50"
                 >{{ prod.activo ? 'Desactivar' : 'Activar' }}</button>
 
-                <!-- Imagen Placeholder y Estado -->
                 <div class="h-32 bg-[#F8FAFC] flex items-center justify-center text-[#94A3B8] relative border-b border-[#E2E8F0]">
+                    <ProductThumbnail :image="prod.imagen" :alt="prod.nombre" image-class="h-full w-full object-contain" />
                     <span
                         class="absolute top-2 left-2 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border"
                         :class="prod.activo

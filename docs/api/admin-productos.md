@@ -161,3 +161,63 @@ Las pruebas de integración que verifican SKU usan el helper
 contenedor MariaDB exclusivo y sus volúmenes anónimos. No ejecutar la suite destructiva sobre la
 base Compose ni sobre datos compartidos. Ver también el procedimiento único en
 [database/README.md](../../database/README.md#migrar-sku-en-una-base-existente-197).
+
+## Fotos de productos (#285)
+
+| Método y ruta | Resultado |
+| --- | --- |
+| `POST /api/admin/productos/con-imagen` | `201` con el producto creado |
+| `PUT /api/admin/productos/:id/con-imagen` | `200` con el producto actualizado |
+| `GET /api/product-images/:uuid.webp` | `200` con la foto pública en WebP o `404` |
+
+Las mutaciones requieren la cookie de sesión ADMIN y el origen autorizado de la
+aplicación. Se envían como `multipart/form-data` con un archivo `imagen` y un
+campo de texto `producto` que contiene el objeto JSON de alta o edición sin el
+campo `imagen`. En edición, `producto={}` reemplaza solo la foto. La respuesta
+tiene la misma forma que la de alta o edición JSON y devuelve en `imagen` una
+URL relativa `/api/product-images/<uuid>.webp`. El alta y la edición JSON
+siguen admitiendo URLs existentes y externas. La ruta de fotos del mismo origen
+está reservada a las subidas y no se puede asignar por URL a otro producto.
+
+Se aceptan JPEG, PNG y WebP de hasta 5 MiB, 4096 px por lado y 12 megapíxeles.
+El servidor compara MIME y firma, decodifica con Sharp y genera WebP con los
+píxeles orientados y sin metadatos del original. La foto pública se entrega
+como `image/webp` con `nosniff` y una URL nueva por reemplazo.
+
+| Error | Motivo |
+| --- | --- |
+| `400` | Multipart incompleto, vacío o inválido, o error de DTO |
+| `401` | Sesión ausente o inválida |
+| `403` | Rol u origen no autorizado |
+| `404` | Producto o categoría inexistente |
+| `409` | SKU duplicado |
+| `413` | Foto o campo JSON por encima del límite |
+| `415` | Content-Type de la solicitud incorrecto, firma o MIME de foto no admitidos |
+| `422` | No se pudo decodificar o normalizar la foto dentro de los límites |
+| `503` | Directorio de fotos inaccesible o fallo al escribir |
+
+Un `503` de almacenamiento incluye `code: PRODUCT_IMAGE_REJECTED`. El
+formulario permite reintentar ese rechazo y reconcilia los errores de red
+recargando el listado antes de enviar otro cambio.
+
+## Almacenamiento y recuperación
+
+Crear un directorio dedicado con escritura para el usuario de la API y definir
+`PRODUCT_IMAGE_STORAGE_DIR` con su ruta absoluta. En contenedores, montarlo en
+un volumen persistente. Las réplicas que comparten la base deben compartir el
+mismo volumen. Mantenerlo separado de `RECEIPT_STORAGE_DIR`, sin solapamientos,
+y respaldarlo junto con la base. Si hay un proxy, debe aceptar cuerpos multipart
+de al menos 6 MiB en estas dos rutas. El proxy sigue enviando `/api` al backend.
+
+MariaDB guarda únicamente la URL. La escritura exclusiva del archivo termina
+antes de la mutación SQL. Un rechazo definitivo elimina la nueva foto. En
+edición se captura la URL anterior bajo el bloqueo de fila y se elimina el
+archivo anterior tras el commit. Si el resultado del commit es incierto, se
+conserva el archivo para que el producto pueda seguir sirviéndolo si quedó asociado.
+
+Para revisar sobrantes tras una caída o un error de limpieza, compilar el backend
+y ejecutar desde `backend` el comando `node scripts/reconcile-product-images.cjs`.
+El comando lista archivos sin referencia y fotos referenciadas que faltan.
+Para aplicar el borrado, detener primero todas las instancias que escriban sobre
+ese volumen y esa base, verificar la salida y volver a ejecutar con
+`--apply-offline`.

@@ -71,7 +71,7 @@ onBeforeUnmount(() => {
         <ul class="product-grid">
           <li v-for="product in products" :key="product.id">
             <article class="product-card">
-              <HomeProductImage :product-id="product.id" :name="product.nombre" />
+              <HomeProductImage :image="product.imagen" :name="product.nombre" />
               <div class="product-content">
                 <p class="product-code">COD. {{ product.codigo }}</p>
                 <h3>{{ product.nombre }}</h3>

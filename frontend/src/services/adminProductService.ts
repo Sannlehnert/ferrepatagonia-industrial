@@ -37,7 +37,7 @@ export interface ProductPayload {
     precio: number;
     stock: number;
     descripcion: string | null;
-    imagen: string | null;
+    imagen?: string | null;
     activo: boolean;
 }
 
@@ -117,4 +117,19 @@ export async function saveAdminProduct(
         );
         return response.data;
     }
+}
+
+export async function saveAdminProductWithImage(
+    payload: ProductPayload,
+    image: File,
+    productId?: number,
+): Promise<AdminProduct> {
+    const { imagen: _url, ...product } = payload;
+    const body = new FormData();
+    body.append('producto', JSON.stringify(product));
+    body.append('imagen', image);
+    const response = productId
+        ? await api.put<AdminProduct>(`/admin/productos/${productId}/con-imagen`, body)
+        : await api.post<AdminProduct>('/admin/productos/con-imagen', body);
+    return response.data;
 }
