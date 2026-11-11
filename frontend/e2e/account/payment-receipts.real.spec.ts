@@ -206,9 +206,9 @@ test('permite reintentar la consulta y la carga después de un error', async ({
 
   await submit.click()
   await expect(region.getByRole('alert')).toHaveCount(0)
-  await expect(region.getByRole('status')).toContainText(
-    /Comprobante recibido|Este comprobante ya estaba registrado/,
-  )
+  await expect(region.getByRole('status').filter({
+    hasText: /Comprobante recibido|Este comprobante ya estaba registrado/,
+  })).toBeVisible()
   await expect(region.getByRole('link', {
     name: 'Descargar comprobante',
   })).toBeVisible()
@@ -256,9 +256,9 @@ test('muestra la carga y bloquea envíos repetidos a 360 px', async ({ page }) =
 
     releaseUpload()
 
-    await expect(region.getByRole('status')).toContainText(
-      /Comprobante recibido|Este comprobante ya estaba registrado/,
-    )
+    await expect(region.getByRole('status').filter({
+      hasText: /Comprobante recibido|Este comprobante ya estaba registrado/,
+    })).toBeVisible()
     await expect(region.getByRole('button', {
       name: 'Adjuntar comprobante',
     })).toBeDisabled()
