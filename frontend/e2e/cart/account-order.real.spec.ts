@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import type { ClientOrderSummary } from '../../src/types/clientOrder'
 
 async function signIn(page: import('@playwright/test').Page) {
   await page.goto('/login')
@@ -111,7 +112,13 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
 
   await page.goto('/mi-cuenta/pedidos')
   await expect(page.getByRole('alert')).toContainText('No se pudieron cargar tus pedidos.')
+  const historyResponse = page.waitForResponse(response =>
+    new URL(response.url()).pathname === '/api/pedidos' && response.ok())
   await page.getByRole('button', { name: 'Reintentar', exact: true }).click()
+  const { data: history } = await (await historyResponse).json() as {
+    data: { items: ClientOrderSummary[] }
+  }
+  expect(history.items).toHaveLength(2)
 
   const order = page.getByRole('listitem').filter({
     has: page.getByRole('heading', { name: /^PED-\d+$/ }),
@@ -121,6 +128,14 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await expect(order).toHaveCount(1)
   await expect(order).toContainText('CONFIRMADO')
   const orderNumber = await order.getByRole('heading').innerText()
+  const savedOrder = history.items.find(item => item.numero === orderNumber)
+  if (!savedOrder) throw new Error(`El pedido ${orderNumber} no figura en la respuesta del historial.`)
+  expect(savedOrder).toMatchObject({ estado: 'CONFIRMADO', total: '124.00', moneda: 'USD' })
+  const date = new Intl.DateTimeFormat('es-AR', {
+    dateStyle: 'medium', timeZone: 'America/Argentina/Buenos_Aires',
+  }).format(new Date(savedOrder.fecha))
+  await expect(order.locator('time')).toHaveAttribute('datetime', savedOrder.fecha)
+  await expect(order.locator('time')).toHaveText(date)
 
   await page.route(/\/api\/pedidos\/\d+$/, route =>
     route.fulfill({ status: 503, json: { message: 'Detalle no disponible.' } }),
@@ -131,6 +146,11 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await expect(order.getByRole('alert')).toContainText('No se pudo cargar el detalle del pedido.')
   await order.getByRole('button', { name: 'Reintentar detalle', exact: true }).click()
   await expect(order.getByText('Producto E2E 24', { exact: true })).toBeVisible()
+  await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
+
+  await page.reload()
+  await expect(order.getByRole('heading', { name: orderNumber, exact: true })).toBeVisible()
+  await order.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
   await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
 
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()

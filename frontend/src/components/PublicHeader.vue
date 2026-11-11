@@ -89,7 +89,7 @@ function toggleCartDrawer() {
           type="search"
           name="busqueda"
           enterkeyhint="search"
-          placeholder="Nombre o código de producto"
+          placeholder="Buscar"
           class="fp-input fp-focus"
         />
         <button type="submit" aria-label="Buscar" class="fp-action fp-action--primary fp-focus">

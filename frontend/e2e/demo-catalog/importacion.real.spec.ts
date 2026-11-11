@@ -353,9 +353,26 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
     }
+    expect(imagenes).toHaveLength(132)
+    const sinImagen = dbFilas.filter(p => !p.imagen)
+    expect(sinImagen).toHaveLength(772)
+    const muestra = sinImagen[0]!
+    const listado = `/catalogo?busqueda=${encodeURIComponent(muestra.codigo)}&categoria=${muestra.id_categoria}`
+    await page.goto(listado)
+    const enlace = page.getByRole('link', { name: muestra.nombre, exact: true })
+    const tarjeta = page.getByRole('listitem').filter({ has: enlace })
+    await expect(tarjeta.getByText('Sin imagen', { exact: true })).toBeVisible()
+    await expect(tarjeta.getByRole('img')).toHaveCount(0)
+    await enlace.click()
+    await expect(page.getByRole('heading', { name: muestra.nombre, level: 1, exact: true })).toBeVisible()
+    await expect(page.getByText('Sin imagen disponible', { exact: true })).toBeVisible()
+    await page.goBack()
+    await expect(page).toHaveURL(listado)
+    await expect(enlace).toBeVisible()
+    await page.goForward()
+    await expect(page.getByRole('heading', { name: muestra.nombre, level: 1, exact: true })).toBeVisible()
     if (process.env.E2E_DEMO_INTERACTIVE === '1') {
       expect(empresaUSD.comprablesAcademico).toBe(904)
-      expect(imagenes).toHaveLength(132)
       expect((await respuesta(await empresa.get('/api/pedidos'))).data.items).toHaveLength(0)
       console.log(`Carga interactiva verificada: ${filas.length} SKU y ${imagenes.length} imágenes; sin pedidos previos.`)
       return

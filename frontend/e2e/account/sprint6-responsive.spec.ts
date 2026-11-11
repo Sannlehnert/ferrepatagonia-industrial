@@ -2,6 +2,21 @@ import { expect, test, type Page } from '@playwright/test'
 
 const viewports = [320, 360, 390, 768, 1024, 1280]
 
+// El proyecto de tipos E2E usa Node; estas APIs solo existen dentro del navegador.
+type SearchInput = {
+  clientWidth: number
+  placeholder: string
+  ownerDocument: {
+    fonts: { ready: Promise<unknown> }
+    defaultView: {
+      getComputedStyle(input: SearchInput, pseudo?: string): { getPropertyValue(name: string): string }
+    }
+    createElement(tag: 'canvas'): {
+      getContext(kind: '2d'): { font: string; measureText(text: string): { width: number } }
+    }
+  }
+}
+
 async function assertNoHorizontalScroll(page: Page, contextName: string) {
   const { scrollWidth, clientWidth } = await page.locator('html').evaluate(html => ({
     scrollWidth: html.scrollWidth,
@@ -51,6 +66,27 @@ for (const width of viewports) {
       await page.goto('/carrito')
       await expect(page.getByRole('heading', { name: 'Tu carrito', exact: true })).toBeVisible()
       await assertNoHorizontalScroll(page, `Carrito a ${width}px`)
+      if (width === 320) {
+        const search = page.getByRole('searchbox', { name: 'Buscar productos por nombre o código' })
+        await expect(search).toBeVisible()
+        const { textWidth, availableWidth } = await search.evaluate(async element => {
+          const input = element as unknown as SearchInput
+          const doc = input.ownerDocument
+          await doc.fonts.ready
+          const style = doc.defaultView.getComputedStyle(input)
+          const placeholder = doc.defaultView.getComputedStyle(input, '::placeholder')
+          const ctx = doc.createElement('canvas').getContext('2d')
+          ctx.font = ['font-style', 'font-weight', 'font-size', 'font-family']
+            .map(property => placeholder.getPropertyValue(property)).join(' ')
+          return {
+            textWidth: ctx.measureText(input.placeholder).width,
+            availableWidth: input.clientWidth - parseFloat(style.getPropertyValue('padding-left'))
+              - parseFloat(style.getPropertyValue('padding-right')),
+          }
+        })
+        expect(textWidth, 'El placeholder completo debe caber en el buscador').toBeGreaterThan(0)
+        expect(textWidth, 'El placeholder completo debe caber en el buscador').toBeLessThanOrEqual(availableWidth)
+      }
 
       // 3. Mi Cuenta - Datos Personales (#274)
       await page.goto('/mi-cuenta/datos')
@@ -83,9 +119,15 @@ for (const width of viewports) {
 
     test(`Cabecera móvil, menú desplegable y botón Volver a ${width}px`, async ({ page }) => {
       await loginClient(page)
-      await page.goto('/catalogo')
-      await page.goto('/mi-cuenta/datos')
-      await page.goto('/mi-cuenta/pedidos')
+      const origin = '/catalogo?busqueda=Producto'
+      await page.goto(origin)
+      await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible()
+      const publicMenu = page.getByRole('button', { name: 'Menú principal', exact: true })
+      if (await publicMenu.isVisible()) await publicMenu.click()
+      const accountLink = page.getByRole('banner').getByRole('link', { name: 'Mi cuenta', exact: true })
+      await expect(accountLink).toBeVisible()
+      await accountLink.click()
+      await expect(page).toHaveURL('/mi-cuenta')
 
       if (width < 768) {
         // Validar área táctil del botón Volver (>= 44x44px)
@@ -103,18 +145,21 @@ for (const width of viewports) {
         await expect(menuToggle).toBeVisible()
         await menuToggle.click()
 
-        await expect(page.getByRole('link', { name: 'Historial de pedidos' })).toBeVisible()
-        await expect(page.getByRole('link', { name: 'Pedidos sin comprobante' })).toBeVisible()
-        await expect(page.getByRole('link', { name: 'Mis datos' })).toBeVisible()
+        const accountMenu = page.getByRole('navigation', { name: 'Menú de navegación de cuenta' })
+        await expect(accountMenu.getByRole('link', { name: 'Pedidos sin comprobante', exact: true })).toBeVisible()
+        await accountMenu.getByRole('link', { name: 'Historial de pedidos', exact: true }).click()
+        await expect(page).toHaveURL('/mi-cuenta/pedidos')
+        await expect(accountMenu).toBeHidden()
+        await menuToggle.click()
 
         // Al hacer clic en un enlace del menú, debe cerrar el menú y navegar
-        await page.getByRole('link', { name: 'Mis datos' }).click()
-        await expect(page).toHaveURL(/\/mi-cuenta\/datos/)
-        await expect(page.getByRole('link', { name: 'Historial de pedidos' })).toBeHidden()
+        await accountMenu.getByRole('link', { name: 'Mis datos', exact: true }).click()
+        await expect(page).toHaveURL('/mi-cuenta/datos')
+        await expect(accountMenu).toBeHidden()
 
-        // Al presionar Volver, retorna inmediatamente a la ruta externa de origen (/catalogo)
+        // El regreso conserva la búsqueda de origen.
         await backBtn.click()
-        await expect(page).toHaveURL(/\/catalogo/)
+        await expect(page).toHaveURL(origin)
       }
     })
   })
