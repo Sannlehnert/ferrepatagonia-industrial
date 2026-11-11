@@ -173,7 +173,7 @@ jobs:
 
             - name: Install Playwright Chromium browser
               working-directory: frontend
-              run: npx playwright install --with-deps chromium
+              run: npx playwright install chromium
 
             - name: Run integrated E2E suite
               run: node backend/test/helpers/run-e2e.cjs
