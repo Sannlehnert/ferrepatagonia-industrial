@@ -7,6 +7,7 @@ export interface CatalogProduct {
     id: number
     nombre: string
     codigo: string
+    imagen?: string | null
     categoria: CatalogCategory
     precio: null
     estadoPrecio: 'PENDIENTE_DEFINICION'

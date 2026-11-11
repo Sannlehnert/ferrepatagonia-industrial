@@ -48,6 +48,7 @@ async function mount(t, page, handler = query => response(query.page)) {
       '@/components/CatalogFilters.vue',
       '@/components/ProductPrices.vue',
       '@/components/ProductPrice.vue',
+      '@/components/ProductThumbnail.vue',
       '@/components/CatalogCartButton.vue',
     ].includes(name)) {
       return { default: {} }

@@ -17,6 +17,7 @@ import { cuentaCorrienteRouter } from './routes/cuentaCorriente.routes';
 import { accountOrderPrivateResponses } from './middlewares/account-order-http.middleware';
 import { accountOrderRouter, clientOrderRouter } from './routes/accountOrder.routes';
 import { receiptRouter } from './routes/paymentReceipt.routes';
+import { productImageRouter } from './routes/productImage.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
@@ -36,6 +37,7 @@ app.use(authPassport.initialize());
 // Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
 app.use('/api/auth', authRouter);
 app.use('/api', receiptRouter);
+app.use('/api', productImageRouter);
 app.use(express.json());
 app.use('/api', healthRouter);
 app.use('/api', catalogRouter);

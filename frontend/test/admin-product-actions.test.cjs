@@ -22,7 +22,7 @@ function load(file, mocks={}) {
 async function mount(t, modal=false, overrides={}, props={}) {
  const calls=[];
  const service={getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
- const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'./ProductFormModal.vue':{default:{}},'vue-router':{useRouter:()=>({push(){}})}}).default;
+ const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRouter:()=>({push(){}})}}).default;
  component.render=()=>null;
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
@@ -65,7 +65,7 @@ test('stock zero uses stock-only operation and preserves all original fields',as
 });
 test('general edit preserves description, image and category',async t=>{
  const {state,calls}=await mount(t,true);state.form.nombre='Nuevo';await state.handleSubmit();
- assert.deepEqual(calls,[['save',{nombre:'Nuevo',codigo:'SKU-7',id_categoria:2,precio:10,stock:5,descripcion:'Original',imagen:'https://example.test/image',activo:true},7]]);
+ assert.deepEqual(calls,[['save',{nombre:'Nuevo',codigo:'SKU-7',id_categoria:2,precio:10,stock:5,descripcion:'Original',activo:true},7]]);
 });
 test('modal deactivation cancel preserves draft without request',async t=>{
  const {state,calls}=await mount(t,true);state.form.activo=false;state.form.stock=0;global.window={confirm:()=>false};await state.handleSubmit();assert.equal(calls.length,0);assert.equal(state.form.stock,0);

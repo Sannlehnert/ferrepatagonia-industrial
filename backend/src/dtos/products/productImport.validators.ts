@@ -2,6 +2,8 @@ import {
     ValidatorConstraint,
     ValidatorConstraintInterface
 } from 'class-validator';
+import { env } from '../../config/env.config';
+import { usesProductImageNamespace } from '../../utils/product-image';
 
 @ValidatorConstraint({ name: 'maxUtf8Bytes', async: false })
 export class MaxUtf8BytesConstraint implements ValidatorConstraintInterface {
@@ -54,7 +56,8 @@ export class ValidHttpUrlConstraint implements ValidatorConstraintInterface {
         }
         try {
             const parsed = new URL(value);
-            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+            return (parsed.protocol === 'http:' || parsed.protocol === 'https:') &&
+                !usesProductImageNamespace(value, env.httpSecurity.publicOrigin);
         } catch {
             return false;
         }

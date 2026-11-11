@@ -20,6 +20,8 @@ Se exige `PRODUCTO.activo = 1` **y** `CATEGORIA.activo = 1`.
 Los productos sin stock siguen visibles con `disponible: false`.
 `disponible` significa exclusivamente `PRODUCTO.stock > 0`: no reserva unidades
 ni garantiza disponibilidad al confirmar una compra. No se expone el stock exacto.
+El listado incluye `imagen` cuando el producto tiene una URL asociada. Home
+y catálogo usan esa URL directamente para mostrar la foto.
 
 **Precio provisional, autorizado el 16/10/2026:** `precio` siempre es `null` y
 `estadoPrecio` siempre es `PENDIENTE_DEFINICION`. No representa un precio comercial,
