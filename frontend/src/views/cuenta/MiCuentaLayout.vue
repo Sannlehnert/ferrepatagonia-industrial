@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { RouterView, useRoute, useRouter } from 'vue-router'
 import AccountMenu from '@/components/AccountMenu.vue'
+import PublicHeader from '@/components/PublicHeader.vue'
+import PublicFooter from '@/components/PublicFooter.vue'
+import CartDrawer from '@/components/CartDrawer.vue'
 import { getPermissionsForUser } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
+import { useCartPanelStore } from '@/stores/cartPanel'
 
 const auth = useAuthStore()
+const panel = useCartPanelStore()
 const router = useRouter()
+const route = useRoute()
 const isLoggingOut = ref(false)
 const logoutError = ref('')
 
@@ -19,6 +25,12 @@ const permissions = computed(() =>
         }
       : null,
   ),
+)
+
+watch(() => route.fullPath, () => panel.close())
+watch(
+  () => [auth.user?.id, auth.rol, auth.sessionVersion],
+  () => panel.close(),
 )
 
 async function logout() {
@@ -37,19 +49,45 @@ async function logout() {
 </script>
 
 <template>
-  <section class="grid grid-cols-1 gap-8 p-4 min-[701px]:grid-cols-[220px_minmax(0,1fr)] min-[701px]:p-8">
-    <aside>
-      <h2 class="mb-4 text-xl font-semibold text-[#0b2438]">Mi Cuenta</h2>
-      <AccountMenu :permissions="permissions" />
+  <div class="fp-public flex min-h-screen flex-col bg-[#F8FAFC]">
+    <div class="sticky top-0 z-40 w-full bg-white shadow-xs">
+      <PublicHeader />
+    </div>
 
-      <p v-if="logoutError" role="alert" class="text-red-800">{{ logoutError }}</p>
-      <button class="mt-4 min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#103a5c] hover:bg-slate-100 disabled:opacity-60" type="button" :disabled="isLoggingOut" @click="logout">
-        {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
-      </button>
-    </aside>
+    <div class="flex-1 w-full flex flex-col md:flex-row min-w-0">
+      <aside
+        class="bg-[#0B2438] text-white w-full md:w-64 md:min-h-[calc(100vh-theme(spacing.16))] p-4 md:p-6 flex flex-col justify-between shrink-0"
+      >
+        <div class="min-w-0">
+          <h2 class="text-xl font-bold mb-4 md:mb-6 text-white">Mi Cuenta</h2>
+          <div class="overflow-x-auto pb-2 md:overflow-visible md:pb-0">
+            <AccountMenu :permissions="permissions" />
+          </div>
+        </div>
 
-    <main class="min-w-0">
-      <RouterView />
-    </main>
-  </section>
+        <div class="pt-3 md:pt-6 border-t border-[#35556F] mt-3 md:mt-auto">
+          <p v-if="logoutError" role="alert" class="text-red-400 text-xs mb-2">{{ logoutError }}</p>
+          <button
+            class="inline-flex min-h-[44px] min-w-[44px] w-full items-center justify-center md:justify-start gap-2 rounded-[8px] border border-[#35556F] bg-transparent px-3 py-2 text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-white transition-colors cursor-pointer"
+            type="button"
+            :disabled="isLoggingOut"
+            @click="logout"
+          >
+            <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="min-w-0 flex-1 p-4 sm:p-6 md:p-8">
+        <RouterView />
+      </main>
+    </div>
+
+    <PublicFooter class="mt-auto w-full" />
+
+    <CartDrawer v-if="panel.visible && auth.rol === 'CLIENTE'" />
+  </div>
 </template>
