@@ -47,6 +47,7 @@ test('alta y reemplazo con vista previa, estado de carga y catálogo a 360 px', 
   await expect(page.getByRole('alert')).toContainText('Seleccioná una foto JPEG, PNG o WebP.')
   await expect(page.getByRole('button', { name: 'Crear Producto', exact: true })).toBeDisabled()
   await photoInput(page).setInputFiles(await photo(24))
+  await expect(photoInput(page)).toHaveValue(/producto\.png$/)
   await expectLoaded(page.getByRole('img', { name: 'Vista previa de la foto' }), 24)
   expect(await page.locator('form').evaluate(form => form.scrollWidth <= form.clientWidth)).toBe(true)
   await info.attach('vista-previa-360', { body: await page.screenshot(), contentType: 'image/png' })

@@ -41,18 +41,18 @@ const previewUrl = ref('');
 const imageError = ref('');
 const imageInput = ref<HTMLInputElement>();
 
-function clearImage() {
+function clearImage(resetInput = true) {
     if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
     previewUrl.value = '';
     imageFile.value = undefined;
     imageError.value = '';
-    if (imageInput.value) imageInput.value.value = '';
+    if (resetInput && imageInput.value) imageInput.value.value = '';
 }
 
 function selectImage(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
-    clearImage();
+    clearImage(false);
     if (!file) return;
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
         imageError.value = 'Seleccioná una foto JPEG, PNG o WebP.';
@@ -416,8 +416,7 @@ const requestClose = () => {
                         <p v-if="imageError" role="alert" class="mt-1 text-sm text-red-700">{{ imageError }}</p>
                         <img v-if="previewUrl" :src="previewUrl" alt="Vista previa de la foto"
                             class="mt-2 h-28 max-w-full rounded-md object-contain" @error="rejectPreview">
-                        <p v-if="imageFile" class="mt-1 break-all text-xs text-[#64748B]">{{ imageFile.name }}</p>
-                        <button v-if="imageFile || imageError" type="button" :disabled="formDisabled" @click="clearImage"
+                        <button v-if="imageFile || imageError" type="button" :disabled="formDisabled" @click="clearImage()"
                             class="min-h-11 border-0 bg-transparent text-sm text-[#103A5C] underline">Quitar selección</button>
                         <ProductThumbnail v-if="product?.imagen" :image="product.imagen" alt="Foto actual del producto"
                             image-class="mt-2 block h-20 max-w-full rounded-md object-contain" />
