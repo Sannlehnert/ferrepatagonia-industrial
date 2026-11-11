@@ -94,11 +94,11 @@ function handleDialogKeydown(event: KeyboardEvent) {
       <header
         class="box-border flex min-h-[72px] items-center
           justify-between gap-3 border-0 border-b border-solid
-          border-slate-200 py-3.5 pl-5 pr-3.5"
+          border-slate-200 py-3.5 pl-4 pr-3.5 sm:pl-5"
       >
         <h2
           id="cart-drawer-title"
-          class="m-0 text-[22px] font-semibold"
+          class="m-0 text-xl font-semibold text-[#0B2438] sm:text-[22px]"
         >
           Tu carrito
         </h2>
@@ -107,7 +107,7 @@ function handleDialogKeydown(event: KeyboardEvent) {
           type="button"
           aria-label="Cerrar carrito"
           autofocus
-          class="grid min-h-11 min-w-11 cursor-pointer
+          class="grid min-h-[44px] min-w-[44px] cursor-pointer
             place-items-center rounded border-0 bg-white
             focus-visible:outline-2
             focus-visible:outline-[#145a8d]"
@@ -122,17 +122,16 @@ function handleDialogKeydown(event: KeyboardEvent) {
         </button>
       </header>
 
-      <div class="px-5 pb-5">
+      <div class="px-4 pb-4 sm:px-5 sm:pb-5">
         <CartContents />
 
         <RouterLink
           :to="{ name: 'carrito' }"
-          class="mt-2 box-border flex min-h-12 items-center
-            justify-center rounded-lg border border-solid
-            border-slate-200 bg-white p-2 text-center
-            font-semibold text-[#103a5c] no-underline
+          class="mt-3 box-border flex min-h-12 w-full items-center
+            justify-center rounded-lg bg-[#103A5C] p-2 text-center
+            font-semibold text-white no-underline hover:bg-[#145a8d]
             focus-visible:outline-2
-            focus-visible:outline-[#145a8d]"
+            focus-visible:outline-[#145a8d] transition-colors"
           @click="panel.close()"
         >
           Ver carrito completo

@@ -556,7 +556,7 @@ onBeforeUnmount(() => {
           <button
             ref="modalCloseBtn"
             type="button"
-            class="rounded-lg p-1.5 text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
             aria-label="Cerrar modal"
             @click="closeModal"
           >
@@ -683,10 +683,10 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Footer -->
-        <div class="shrink-0 border-t border-slate-200 bg-[#F8FAFC] px-6 py-3 text-right">
+        <div class="shrink-0 border-t border-slate-200 bg-[#F8FAFC] px-4 py-3 sm:px-6 text-right">
           <button
             type="button"
-            class="h-10 rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
             @click="closeModal"
           >
             Cerrar

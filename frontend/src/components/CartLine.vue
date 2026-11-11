@@ -48,23 +48,23 @@ const availabilityMessage = computed(() => {
 
 <template>
   <li
-    class="grid grid-cols-[72px_minmax(0,1fr)_auto] gap-3
+    class="grid grid-cols-[64px_minmax(0,1fr)] gap-3
       border-0 border-b border-solid border-slate-200 py-4
-      max-[380px]:grid-cols-[56px_minmax(0,1fr)]"
+      sm:grid-cols-[72px_minmax(0,1fr)_auto]"
   >
     <img
       v-if="item.imagen && !failedImage"
       :src="item.imagen"
       :alt="item.nombre"
-      class="size-[72px] rounded-lg object-contain max-[380px]:size-14"
+      class="size-16 rounded-lg object-contain sm:size-[72px]"
       loading="lazy"
       @error="failedImage = true"
     />
 
     <div
       v-else
-      class="grid size-[72px] place-items-center rounded-lg
-        bg-slate-100 text-[11px] text-slate-500 max-[380px]:size-14"
+      class="grid size-16 place-items-center rounded-lg
+        bg-slate-100 text-[11px] text-slate-500 sm:size-[72px]"
     >
       Sin imagen
     </div>
@@ -105,8 +105,8 @@ const availabilityMessage = computed(() => {
 
       <button
         type="button"
-        class="min-h-11 cursor-pointer border-0 bg-transparent p-0
-          font-[inherit] text-xs text-[#103a5c] underline
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center border-0 bg-transparent p-0
+          font-[inherit] text-sm sm:text-xs text-[#103a5c] underline
           disabled:cursor-not-allowed disabled:opacity-50
           focus-visible:outline-2 focus-visible:outline-[#145a8d]"
         :disabled="busy || stale"
@@ -118,9 +118,8 @@ const availabilityMessage = computed(() => {
     </div>
 
     <div
-      class="max-w-[115px] text-right [overflow-wrap:anywhere]
-        max-[380px]:col-start-2 max-[380px]:max-w-none
-        max-[380px]:text-left"
+      class="col-start-2 text-left [overflow-wrap:anywhere]
+        sm:col-start-auto sm:max-w-[115px] sm:text-right"
     >
       <template v-if="priced && item.disponible && item.precio">
         <p v-if="item.precio.compraAcademica" class="m-0 text-[11px] text-slate-600">Precio simulado</p>

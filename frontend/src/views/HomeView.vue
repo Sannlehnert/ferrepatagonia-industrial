@@ -56,7 +56,7 @@ const business = computed(() => {
   }
   if (auth.rol === 'CLIENTE') {
     return {
-      route: 'cuenta-datos',
+      route: 'cuenta-dashboard',
       label: 'Ir a mi cuenta',
       description: 'Estás navegando con una cuenta particular. Desde tu perfil podés consultar tus datos y pedidos.',
     }

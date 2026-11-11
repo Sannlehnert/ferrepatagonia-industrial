@@ -88,12 +88,12 @@ async function add() {
   <div>
     <button
       type="button"
-      class="min-h-11 w-full cursor-pointer rounded-md
-        border-0 bg-[#145a8d] px-4 py-2 font-[inherit]
-        text-sm font-semibold text-white hover:bg-[#103a5c]
+      class="flex min-h-[44px] min-w-[44px] w-full items-center justify-center cursor-pointer rounded-md
+        border-0 bg-[#103A5C] hover:bg-[#145A8D] px-4 py-2 font-[inherit]
+        text-base sm:text-sm font-semibold text-white
         disabled:cursor-not-allowed disabled:bg-slate-400
         focus-visible:outline-2 focus-visible:outline-offset-2
-        focus-visible:outline-[#145a8d]"
+        focus-visible:outline-[#145a8d] transition-colors"
       :disabled="disabled"
       :aria-describedby="`cart-message-${product.id}`"
       @click="add"

@@ -138,7 +138,19 @@ const router = createRouter({
       component: () => import('@/views/cuenta/MiCuentaLayout.vue'),
       meta: { requiresAuth: true, roles: ['CLIENTE'] },
       children: [
-        { path: '', redirect: { name: 'cuenta-datos' } },
+        {
+          path: '',
+          name: 'cuenta-dashboard',
+          component: () => import('@/views/cuenta/MiCuentaDashboardView.vue'),
+        },
+        {
+          path: 'resumen',
+          redirect: { name: 'cuenta-dashboard' },
+        },
+        {
+          path: 'dashboard',
+          redirect: { name: 'cuenta-dashboard' },
+        },
         {
           path: 'datos',
           name: 'cuenta-datos',
@@ -157,6 +169,20 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to, from) => {
+  if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+    if (!from.path.startsWith('/mi-cuenta') && to.path.startsWith('/mi-cuenta')) {
+      const isAuthRoute = from.path === '/login' || from.path === '/registro'
+      const fallback = from.fullPath && from.fullPath !== '/' && !isAuthRoute ? from.fullPath : '/catalogo'
+      try {
+        sessionStorage.setItem('last_external_route', fallback)
+      } catch {
+        // Ignorar restricciones de almacenamiento en navegadores privados
+      }
+    }
+  }
 })
 
 router.beforeEach(async (to) => {

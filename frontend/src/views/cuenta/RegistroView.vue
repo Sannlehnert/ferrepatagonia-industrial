@@ -49,7 +49,7 @@ async function enviar() {
     await registrar(armarPayload(form))
     registrado = true
     await auth.login(form.email.trim(), form.password)
-    await router.push('/mi-cuenta')
+    await router.push({ name: 'cuenta-datos' })
   } catch (e) {
     if (registrado) {
       await router.push({ name: 'login' }) // la cuenta existe, falló solo el login
