@@ -6,11 +6,23 @@ import type {
     AdminPriceList,
     AdminPriceListInput,
     AdminClientsResponse,
+    CompanyApprovalStatus,
 } from '@/types/adminClient'
 
 export async function getAdminClients(): Promise<AdminClient[]> {
     const response = await api.get<AdminClientsResponse>('/admin/clientes')
     return response.data.data.clientes
+}
+
+export async function updateAdminCompanyApproval(
+    idCliente: number,
+    estado: CompanyApprovalStatus,
+): Promise<AdminClient> {
+    const response = await api.patch<{ data: { cliente: AdminClient }; message: string }>(
+        `/admin/clientes/${idCliente}/estado-empresa`,
+        { estado },
+    )
+    return response.data.data.cliente
 }
 
 export async function getAdminClientPriceLists(): Promise<AdminClientPriceLists> {
