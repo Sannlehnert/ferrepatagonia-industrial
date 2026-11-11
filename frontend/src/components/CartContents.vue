@@ -70,8 +70,8 @@ const busy = computed(() =>
       <button
         type="button"
         :disabled="cartBusy"
-        class="min-h-11 cursor-pointer border-0 bg-transparent
-          p-0 font-[inherit] text-[#103a5c] underline
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent
+          p-0 font-[inherit] text-sm text-[#103a5c] underline
           disabled:cursor-not-allowed disabled:opacity-50
           focus-visible:outline-2 focus-visible:outline-[#145a8d]"
         @click="cart.cargarCarrito()"
@@ -90,8 +90,8 @@ const busy = computed(() =>
 
         <RouterLink
           :to="{ name: 'catalogo' }"
-          class="inline-flex min-h-11 items-center
-            text-[#103a5c] underline
+          class="inline-flex min-h-[44px] min-w-[44px] items-center
+            text-sm text-[#103a5c] underline
             focus-visible:outline-2 focus-visible:outline-[#145a8d]"
           @click="panel.close()"
         >

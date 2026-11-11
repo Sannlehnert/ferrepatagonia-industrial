@@ -86,32 +86,32 @@ async function retryAfterRejection() {
 
 <template>
   <section aria-label="Confirmación de pedido" class="mt-5 border-t border-slate-200 pt-4">
-    <p v-if="order.eligibilityLoading" role="status" class="mb-3">
+    <p v-if="order.eligibilityLoading" role="status" class="mb-3 text-sm text-slate-600">
       Verificando si este pedido puede confirmarse a crédito…
     </p>
     <div v-else-if="order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
-      <p role="alert" class="mb-2 mt-0">{{ order.eligibilityError }}</p>
-      <button type="button" class="min-h-11 underline" @click="order.loadEligibility()">
+      <p role="alert" class="mb-2 mt-0 text-sm">{{ order.eligibilityError }}</p>
+      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.loadEligibility()">
         Volver a consultar elegibilidad
       </button>
     </div>
 
-    <p v-if="order.attemptError" role="alert" class="mb-3 rounded-md border border-red-200 bg-red-50 p-3">
+    <p v-if="order.attemptError" role="alert" class="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
       {{ order.attemptError }}
     </p>
-    <p v-if="order.attemptState === 'pending'" role="status" class="mb-3">
+    <p v-if="order.attemptState === 'pending'" role="status" class="mb-3 text-sm">
       La confirmación todavía no tiene un resultado definitivo. Conservamos el mismo identificador para evitar duplicados.
-      <button type="button" class="ml-1 min-h-11 underline" @click="order.consultResult()">
+      <button type="button" class="ml-1 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.consultResult()">
         Consultar resultado
       </button>
-      <button v-if="order.pendingQuoteToken" type="button" class="ml-3 min-h-11 underline" @click="order.retryPendingConfirmation()">
+      <button v-if="order.pendingQuoteToken" type="button" class="ml-3 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.retryPendingConfirmation()">
         Reintentar con el mismo identificador
       </button>
     </p>
     <button
       v-if="order.attemptState === 'rejected' && showTotal"
       type="button"
-      class="mb-3 min-h-11 underline"
+      class="mb-3 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]"
       @click="retryAfterRejection()"
     >
       Actualizar carrito y crédito para reintentar
@@ -122,21 +122,21 @@ async function retryAfterRejection() {
         order.canUseCredit && showTotal &&
         order.attemptState !== 'confirmed'"
     >
-      <dl class="mb-3 grid gap-2 text-sm sm:grid-cols-2">
+      <dl class="mb-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
         <div class="flex flex-wrap justify-between gap-2">
-          <dt>Total del pedido</dt>
-          <dd class="m-0 font-semibold">USD {{ order.eligibility?.totalUSD }}</dd>
+          <dt class="text-slate-600">Total del pedido</dt>
+          <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.totalUSD }}</dd>
         </div>
         <div class="flex flex-wrap justify-between gap-2">
-          <dt>Crédito disponible</dt>
-          <dd class="m-0 font-semibold">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
+          <dt class="text-slate-600">Crédito disponible</dt>
+          <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
         </div>
       </dl>
 
       <fieldset class="mb-3 rounded-md border border-slate-300 p-3">
-        <legend class="px-1 font-medium">Modalidad de pago</legend>
-        <label class="inline-flex min-h-11 cursor-pointer items-center gap-2">
-          <input v-model="selected" type="radio" name="payment-method" value="CUENTA_CORRIENTE">
+        <legend class="px-1 text-sm font-medium text-slate-700">Modalidad de pago</legend>
+        <label class="inline-flex min-h-[44px] cursor-pointer items-center gap-2 text-base sm:text-sm">
+          <input v-model="selected" type="radio" name="payment-method" value="CUENTA_CORRIENTE" class="size-4 text-[#103a5c]">
           Cuenta corriente
         </label>
       </fieldset>
@@ -144,10 +144,10 @@ async function retryAfterRejection() {
       <button
         type="button"
         :disabled="!canConfirm"
-        class="min-h-12 w-full rounded-lg border-0 bg-[#145a8d] px-4 py-2
-          font-[inherit] font-semibold text-white
+        class="flex min-h-12 w-full items-center justify-center rounded-lg border-0 bg-[#103A5C] hover:bg-[#145A8D] px-4 py-2
+          font-[inherit] text-base sm:text-sm font-semibold text-white
           focus-visible:outline-2 focus-visible:outline-[#145a8d]
-          disabled:cursor-not-allowed disabled:opacity-60"
+          disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
         @click="confirmOrder()"
       >
         {{ order.attemptState === 'submitting' ? 'Confirmando…' : 'Confirmar pedido a cuenta corriente' }}
@@ -157,22 +157,22 @@ async function retryAfterRejection() {
     <template v-else-if="snapshot && order.attemptState !== 'confirmed'">
       <dl
         v-if="!order.eligibilityLoading && !order.eligibilityError && hasServerAmounts"
-        class="mb-3 grid gap-2 text-sm sm:grid-cols-2"
+        class="mb-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2"
       >
         <div class="flex flex-wrap justify-between gap-2">
-          <dt>Total del pedido</dt>
-          <dd class="m-0 font-semibold">USD {{ order.eligibility?.totalUSD }}</dd>
+          <dt class="text-slate-600">Total del pedido</dt>
+          <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.totalUSD }}</dd>
         </div>
         <div class="flex flex-wrap justify-between gap-2">
-          <dt>Crédito disponible</dt>
-          <dd class="m-0 font-semibold">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
+          <dt class="text-slate-600">Crédito disponible</dt>
+          <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
         </div>
       </dl>
       <button
         type="button"
         disabled
-        class="min-h-12 w-full cursor-not-allowed rounded-lg border-0
-          bg-[#145a8d] px-4 py-2 font-[inherit] font-semibold
+        class="flex min-h-12 w-full cursor-not-allowed items-center justify-center rounded-lg border-0
+          bg-[#103A5C] px-4 py-2 font-[inherit] text-base sm:text-sm font-semibold
           text-white opacity-60"
       >
         Finalizar compra
@@ -194,7 +194,7 @@ async function retryAfterRejection() {
         v-if="order.eligibility && !order.eligibility.elegible && showTotal"
         type="button"
         :disabled="busy"
-        class="mt-2 min-h-11 underline disabled:cursor-not-allowed disabled:opacity-60"
+        class="mt-2 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
         @click="order.loadEligibility()"
       >
         Volver a consultar elegibilidad

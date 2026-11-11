@@ -7,7 +7,7 @@ import CartContents from '@/components/CartContents.vue'
     class="box-border mx-auto w-full max-w-3xl
       px-4 py-6 sm:px-6 lg:py-10"
   >
-    <h1 class="mb-6 mt-0 text-2xl font-semibold text-[#13293a]">
+    <h1 class="mb-6 mt-0 text-2xl font-semibold text-[#0B2438]">
       Tu carrito
     </h1>
 

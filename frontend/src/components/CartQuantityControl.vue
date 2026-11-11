@@ -52,13 +52,13 @@ function submitDraft() {
 
 <template>
   <div>
-    <div class="flex flex-wrap items-center gap-1">
+    <div class="flex flex-wrap items-center gap-1.5">
       <button
         type="button"
-        class="min-h-11 min-w-8 cursor-pointer rounded border-0
-          bg-slate-50 font-bold text-[#103a5c]
+        class="flex min-h-[44px] min-w-[44px] items-center justify-center cursor-pointer rounded border-0
+          bg-slate-100 hover:bg-slate-200 font-bold text-[#103a5c]
           disabled:cursor-not-allowed disabled:opacity-50
-          focus-visible:outline-2 focus-visible:outline-[#145a8d]"
+          focus-visible:outline-2 focus-visible:outline-[#145a8d] transition-colors"
         :disabled="disabled || quantity <= 1"
         :aria-label="`Disminuir cantidad de ${productName}`"
         @click="submit(Math.min(quantity - 1, maximum))"
@@ -74,9 +74,9 @@ function submitDraft() {
         min="1"
         :max="maximum"
         step="1"
-        class="box-border min-h-11 w-14 rounded border border-solid
+        class="box-border min-h-[44px] w-14 rounded border border-solid
           border-slate-200 bg-white p-1 text-center font-[inherit]
-          text-sm text-[#13293a] disabled:opacity-50
+          text-base sm:text-sm text-[#13293a] disabled:opacity-50
           focus-visible:outline-2 focus-visible:outline-[#145a8d]"
         :disabled="disabled"
         :aria-label="`Cantidad de ${productName}`"
@@ -87,10 +87,10 @@ function submitDraft() {
 
       <button
         type="button"
-        class="min-h-11 min-w-8 cursor-pointer rounded border-0
-          bg-slate-50 font-bold text-[#103a5c]
+        class="flex min-h-[44px] min-w-[44px] items-center justify-center cursor-pointer rounded border-0
+          bg-slate-100 hover:bg-slate-200 font-bold text-[#103a5c]
           disabled:cursor-not-allowed disabled:opacity-50
-          focus-visible:outline-2 focus-visible:outline-[#145a8d]"
+          focus-visible:outline-2 focus-visible:outline-[#145a8d] transition-colors"
         :disabled="disabled || quantity >= maximum"
         :aria-label="`Aumentar cantidad de ${productName}`"
         @click="submit(quantity + 1)"
