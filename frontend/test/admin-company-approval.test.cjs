@@ -204,6 +204,63 @@ test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y ac
   assert.match(tableHtml, /Rechazar cuenta empresa de Constructora Sur SRL/);
 });
 
+function findNode(n, pred) {
+  if (pred(n)) return n;
+  for (const c of n.children || []) {
+    const found = findNode(c, pred);
+    if (found) return found;
+  }
+  return null;
+}
+
+test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea acciones ante resultado incierto', async t => {
+  const service = {
+    getAdminClients: async () => sampleClients(),
+    getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+    saveAdminClientPriceList: async () => null,
+    updateAdminCompanyApproval: async () => {
+      throw Object.assign(new Error('timeout'), { isAxiosError: true, response: undefined });
+    },
+  };
+
+  const component = load(
+    'views/admin/AdminClientsView.vue',
+    {
+      '@/services/adminClientService': service,
+      './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+    },
+    true,
+  ).default;
+
+  const dom = createTestRenderer();
+  const rootEl = dom.createRoot();
+  const app = dom.renderer.createApp(component);
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  await settle();
+
+  // Reconciliación automática también falla simulando caída total de red/servidor
+  service.getAdminClients = async () => {
+    throw Object.assign(new Error('unreachable'), { isAxiosError: true, response: undefined });
+  };
+
+  const approveBtn = findNode(rootEl, n =>
+    typeof n.props?.['aria-label'] === 'string' &&
+    n.props['aria-label'].includes('Aprobar cuenta empresa de Constructora Sur SRL')
+  );
+  assert.ok(approveBtn, 'Botón de aprobar debe existir en el DOM');
+
+  await approveBtn.props.onClick();
+  await settle();
+
+  const html = dom.serialize(rootEl);
+  assert.match(html, /Reintentar verificación/);
+  assert.match(html, /El resultado es incierto/);
+
+  // Verificar que el botón de aprobar quedó deshabilitado por el bloqueo de incertidumbre
+  assert.equal(approveBtn.props.disabled, true);
+});
+
 test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble envío con updatingApprovalClientId y maneja errores', async t => {
   const calls = [];
   let resolvePending;
@@ -292,7 +349,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   await state.setCompanyApproval(empresaPendiente, 'PENDIENTE');
   assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'PENDIENTE');
 
-  // Manejo de error 400/404 y 500
+  // Manejo de error determinista 400 (no marca incierto ni reconcilia)
   service.updateAdminCompanyApproval = async () => {
     throw Object.assign(new Error('bad request'), {
       isAxiosError: true,
@@ -301,22 +358,76 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   };
   await state.setCompanyApproval(empresaPendiente, 'APROBADA');
   assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
   assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'PENDIENTE');
   assert.deepEqual(state.approvalFeedback[20], {
     text: 'Solo las cuentas de tipo empresa admiten aprobación o rechazo.',
     error: true,
   });
 
+  // H-01: Error 500 / red con reconciliación exitosa (MariaDB llegó a persistir APROBADA)
   service.updateAdminCompanyApproval = async () => {
     throw Object.assign(new Error('internal sql'), {
       isAxiosError: true,
       response: { status: 500, data: { message: 'detalle interno SQL' } },
     });
   };
+  service.getAdminClients = async () => [
+    sampleClients()[0],
+    { ...sampleClients()[1], estadoAprobacionEmpresa: 'APROBADA' },
+    sampleClients()[2],
+    sampleClients()[3],
+  ];
+
   await state.setCompanyApproval(empresaPendiente, 'APROBADA');
   assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
+  assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'APROBADA');
   assert.deepEqual(state.approvalFeedback[20], {
-    text: 'No se pudo actualizar el estado de la empresa.',
+    text: 'Estado verificado con el servidor.',
+    error: false,
+  });
+
+  // H-01: Error 500 / corte de red con reconciliación fallida (bloqueo estricto e incertidumbre)
+  service.updateAdminCompanyApproval = async () => {
+    throw Object.assign(new Error('network error'), {
+      isAxiosError: true,
+      response: undefined,
+    });
+  };
+  service.getAdminClients = async () => {
+    throw Object.assign(new Error('server unreachable'), {
+      isAxiosError: true,
+      response: undefined,
+    });
+  };
+
+  await state.setCompanyApproval(empresaPendiente, 'RECHAZADA');
+  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  assert.deepEqual(state.approvalFeedback[20], {
+    text: 'No pudimos verificar el estado con el servidor. El resultado es incierto.',
     error: true,
+  });
+
+  // Intento de mutar mientras está en estado incierto debe ser ignorado estrictamente
+  const callsBeforeBlindAttempt = calls.length;
+  await state.setCompanyApproval(empresaPendiente, 'RECHAZADA');
+  await state.setCompanyApproval(empresaPendiente, 'APROBADA');
+  assert.equal(calls.length, callsBeforeBlindAttempt);
+
+  // Reintento explícito de verificación reconcilia y desbloquea cuando el servidor vuelve a responder
+  service.getAdminClients = async () => [
+    sampleClients()[0],
+    { ...sampleClients()[1], estadoAprobacionEmpresa: 'RECHAZADA' },
+    sampleClients()[2],
+    sampleClients()[3],
+  ];
+  await state.reconcileCompanyApproval(20);
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
+  assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'RECHAZADA');
+  assert.deepEqual(state.approvalFeedback[20], {
+    text: 'Estado verificado con el servidor.',
+    error: false,
   });
 });

@@ -24,6 +24,8 @@ const selections = ref<Record<number, number | ''>>({})
 const feedback = ref<Record<number, { text: string; error: boolean }>>({})
 const approvalFeedback = ref<Record<number, { text: string; error: boolean }>>({})
 const updatingApprovalClientId = ref<number | null>(null)
+const uncertainApprovalClientIds = ref<Record<number, boolean>>({})
+const reconcilingApprovalClientId = ref<number | null>(null)
 const priceListsLoading = ref(true)
 const priceListsError = ref<string | null>(null)
 const savingClientId = ref<number | null>(null)
@@ -94,9 +96,41 @@ async function savePriceList(id: number) {
     }
 }
 
+async function reconcileCompanyApproval(clientId: number): Promise<void> {
+    reconcilingApprovalClientId.value = clientId
+    try {
+        const freshClients = await getAdminClients()
+        const fresh = freshClients.find(c => c.id === clientId)
+        const current = clients.value.find(c => c.id === clientId)
+        if (fresh && current) {
+            current.estadoAprobacionEmpresa = fresh.estadoAprobacionEmpresa
+            current.nombreRazonSocial = fresh.nombreRazonSocial
+            current.tipoCliente = fresh.tipoCliente
+            current.cuit = fresh.cuit
+            current.email = fresh.email
+            current.fechaRegistro = fresh.fechaRegistro
+        }
+        delete uncertainApprovalClientIds.value[clientId]
+        approvalFeedback.value[clientId] = {
+            text: 'Estado verificado con el servidor.',
+            error: false,
+        }
+    } catch {
+        uncertainApprovalClientIds.value[clientId] = true
+        approvalFeedback.value[clientId] = {
+            text: 'No pudimos verificar el estado con el servidor. El resultado es incierto.',
+            error: true,
+        }
+    } finally {
+        reconcilingApprovalClientId.value = null
+    }
+}
+
 async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprovalStatus) {
     if (
         updatingApprovalClientId.value !== null ||
+        reconcilingApprovalClientId.value !== null ||
+        uncertainApprovalClientIds.value[client.id] ||
         client.tipoCliente !== 'EMPRESA' ||
         client.estadoAprobacionEmpresa === newStatus
     ) return
@@ -106,6 +140,7 @@ async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprova
     try {
         const updated = await updateAdminCompanyApproval(client.id, newStatus)
         client.estadoAprobacionEmpresa = updated.estadoAprobacionEmpresa ?? newStatus
+        delete uncertainApprovalClientIds.value[client.id]
         approvalFeedback.value[client.id] = {
             text: newStatus === 'APROBADA' ? 'Empresa aprobada.' : 'Empresa rechazada.',
             error: false,
@@ -113,11 +148,14 @@ async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprova
     } catch (error: unknown) {
         const response = axios.isAxiosError<{ message?: string }>(error) ? error.response : undefined
         if (!response || response.status >= 500) {
+            uncertainApprovalClientIds.value[client.id] = true
             approvalFeedback.value[client.id] = {
-                text: 'No se pudo actualizar el estado de la empresa.',
+                text: 'No pudimos confirmar el cambio en el servidor. Verificando estado actual…',
                 error: true,
             }
+            await reconcileCompanyApproval(client.id)
         } else {
+            delete uncertainApprovalClientIds.value[client.id]
             approvalFeedback.value[client.id] = {
                 text: response.data?.message ?? 'No se pudo actualizar el estado de la empresa.',
                 error: true,
@@ -134,6 +172,7 @@ async function loadClients(): Promise<void> {
 
     try {
         clients.value = await getAdminClients()
+        uncertainApprovalClientIds.value = {}
     } catch (error: unknown) {
         const status = axios.isAxiosError(error)
             ? error.response?.status
@@ -235,7 +274,7 @@ onMounted(() => {
                                 <div class="flex flex-wrap gap-1">
                                     <button
                                         type="button"
-                                        :disabled="updatingApprovalClientId !== null || client.estadoAprobacionEmpresa === 'APROBADA'"
+                                        :disabled="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null || !!uncertainApprovalClientIds[client.id] || client.estadoAprobacionEmpresa === 'APROBADA'"
                                         class="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
                                         :aria-label="`Aprobar cuenta empresa de ${client.nombreRazonSocial}`"
                                         @click="setCompanyApproval(client, 'APROBADA')"
@@ -244,12 +283,22 @@ onMounted(() => {
                                     </button>
                                     <button
                                         type="button"
-                                        :disabled="updatingApprovalClientId !== null || client.estadoAprobacionEmpresa === 'RECHAZADA'"
+                                        :disabled="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null || !!uncertainApprovalClientIds[client.id] || client.estadoAprobacionEmpresa === 'RECHAZADA'"
                                         class="rounded bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40"
                                         :aria-label="`Rechazar cuenta empresa de ${client.nombreRazonSocial}`"
                                         @click="setCompanyApproval(client, 'RECHAZADA')"
                                     >
                                         {{ updatingApprovalClientId === client.id ? '…' : 'Rechazar' }}
+                                    </button>
+                                    <button
+                                        v-if="uncertainApprovalClientIds[client.id]"
+                                        type="button"
+                                        :disabled="reconcilingApprovalClientId === client.id"
+                                        class="rounded border border-amber-600 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+                                        :aria-label="`Reintentar verificación de cuenta empresa de ${client.nombreRazonSocial}`"
+                                        @click="reconcileCompanyApproval(client.id)"
+                                    >
+                                        {{ reconcilingApprovalClientId === client.id ? 'Verificando…' : 'Reintentar verificación' }}
                                     </button>
                                 </div>
                                 <p
