@@ -54,12 +54,7 @@ const router = createRouter({
         {
           path: 'pedidos',
           name: 'admin-orders',
-          component: () =>
-            import('@/views/admin/AdminSectionPlaceholderView.vue'),
-          props: {
-            title: 'Pedidos',
-            description: 'Consulta y seguimiento administrativo de pedidos.',
-          },
+          component: () => import('@/views/admin/AdminOrdersView.vue'),
         },
         {
           path: 'productos',
