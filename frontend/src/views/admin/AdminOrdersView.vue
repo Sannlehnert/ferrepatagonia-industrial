@@ -32,15 +32,15 @@ const statusInput = ref<AdminOrderFilterStatus | ''>('')
 const dateInput = ref('')
 const validationError = ref('')
 
-// Modal y control de operaciones desacoplado por apertura (H-01)
+// Modal y control de operaciones desacoplado por apertura reactiva (H-01)
 const showModal = ref(false)
 const selectedOrderId = ref<number | null>(null)
 const nextStatusSelection = ref<AdminOrderOperationalStatus | ''>('')
-let currentModalOpeningId = 0
+const currentModalOpeningId = ref(0)
 const savingOpeningId = ref<number | null>(null)
 const statusFeedback = ref<{ text: string; error: boolean } | null>(null)
 
-// Trazabilidad y contención de foco (H-02)
+// Trazabilidad y contención de foco accesible (H-02)
 let lastTriggerElement: HTMLElement | null = null
 const modalCloseBtn = ref<HTMLButtonElement | null>(null)
 const modalDialogRef = ref<HTMLElement | null>(null)
@@ -50,8 +50,10 @@ let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
 
-// isSaving es reactivo y solo aplica a la apertura activa (H-01)
-const isSaving = computed(() => savingOpeningId.value !== null && savingOpeningId.value === currentModalOpeningId)
+// isSaving es 100% reactivo: al cambiar currentModalOpeningId.value se invalida de inmediato
+const isSaving = computed(
+  () => savingOpeningId.value !== null && savingOpeningId.value === currentModalOpeningId.value
+)
 
 const dateFormatter = new Intl.DateTimeFormat('es-AR', {
   day: '2-digit',
@@ -64,7 +66,10 @@ function formatDate(value: string): string {
   return Number.isNaN(parsed.getTime()) ? value : dateFormatter.format(parsed)
 }
 
-function resolveErrorMessage(error: unknown, context: 'list' | 'detail' | 'mutation'): { message: string; status?: number } {
+function resolveErrorMessage(
+  error: unknown,
+  context: 'list' | 'detail' | 'mutation'
+): { message: string; status?: number } {
   const response = axios.isAxiosError<{ message?: string }>(error)
     ? error.response
     : (error as { response?: { status?: number; data?: { message?: string } } })?.response
@@ -124,7 +129,6 @@ function clearFilters() {
   void loadList(1)
 }
 
-// Trampa de foco accesible y segura frente a tipos (H-02, TS2532, TS18048)
 function getFocusableElements(): HTMLElement[] {
   const dialog = modalDialogRef.value
   if (!dialog) return []
@@ -190,8 +194,8 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
     lastTriggerElement = triggerEvent.currentTarget
   }
 
-  currentModalOpeningId++
-  const thisOpening = currentModalOpeningId
+  currentModalOpeningId.value++
+  const thisOpening = currentModalOpeningId.value
   selectedOrderId.value = orderId
   showModal.value = true
   statusFeedback.value = null
@@ -199,7 +203,7 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
 
   await detail.load(signal => getAdminOrderDetail(orderId, signal))
 
-  if (thisOpening !== currentModalOpeningId || selectedOrderId.value !== orderId) {
+  if (thisOpening !== currentModalOpeningId.value || selectedOrderId.value !== orderId) {
     return
   }
 
@@ -217,7 +221,7 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
 }
 
 function closeModal() {
-  currentModalOpeningId++
+  currentModalOpeningId.value++
   showModal.value = false
   selectedOrderId.value = null
   detail.reset()
@@ -243,7 +247,7 @@ const canSubmitStatusChange = computed(() => {
 async function submitStatusChange() {
   const targetId = selectedOrderId.value
   const order = selectedOrder.value
-  const targetOpening = currentModalOpeningId
+  const targetOpening = currentModalOpeningId.value
   const targetStatus = nextStatusSelection.value
 
   if (
@@ -262,12 +266,12 @@ async function submitStatusChange() {
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
 
-    if (!allowed() || targetOpening !== currentModalOpeningId || selectedOrderId.value !== targetId) {
+    if (!allowed() || targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== targetId) {
       return
     }
 
     await detail.load(async () => updated)
-    if (targetOpening !== currentModalOpeningId || selectedOrderId.value !== targetId) {
+    if (targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== targetId) {
       return
     }
 
@@ -278,7 +282,7 @@ async function submitStatusChange() {
     }
     void loadList(activeFilters.page ?? 1)
   } catch (error: unknown) {
-    if (!allowed() || targetOpening !== currentModalOpeningId || selectedOrderId.value !== targetId) {
+    if (!allowed() || targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== targetId) {
       return
     }
 
@@ -288,7 +292,7 @@ async function submitStatusChange() {
     if (status === 409) {
       await detail.load(signal => getAdminOrderDetail(targetId, signal))
       const fresh = detail.data.value
-      if (fresh && targetOpening === currentModalOpeningId) {
+      if (fresh && targetOpening === currentModalOpeningId.value) {
         nextStatusSelection.value = fresh.estadosPermitidos[0] ?? ''
       }
     }
@@ -317,7 +321,7 @@ function statusBadgeClass(status: string): string {
 watch(
   () => [identity(), auth.loggingOut, auth.loggingIn],
   () => {
-    currentModalOpeningId++
+    currentModalOpeningId.value++
     savingOpeningId.value = null
     list.reset()
     detail.reset()

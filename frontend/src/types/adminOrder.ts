@@ -28,10 +28,10 @@ export interface AdminOrderClientDetail extends AdminOrderClientSummary {
 export interface AdminOrderListItem {
   idPedido: number
   fecha: string
-  estado: string
+  estado: AdminOrderFilterStatus | string
   estadosPermitidos: AdminOrderOperationalStatus[]
   modalidadPago: string
-  moneda: string | null
+  moneda: string
   subtotal: string
   descuento: string
   total: string
@@ -56,39 +56,9 @@ export interface AdminOrderLineItem {
   reglaPrecio: string | null
 }
 
-export interface AdminOrderDetail {
-  idPedido: number
-  fecha: string
-  estado: AdminOrderOperationalStatus
-  modalidadPago: string
-  moneda: string | null
-  subtotal: string
-  descuento: string
-  total: string
-  observaciones: string | null
-  cargoCuentaCorrienteId: number | null
-  estadosPermitidos: AdminOrderOperationalStatus[]
-  cliente: {
-    idCliente: number
-    nombreRazonSocial: string
-    tipoCliente: 'CONSUMIDOR_FINAL' | 'EMPRESA'
-    estadoAprobacionEmpresa?: string | null
-    cuit?: string | null
-    documento?: string | null
-    email?: string | null
-    telefono?: string | null
-    direccion?: string | null
-  }
-  items: Array<{
-    idDetallePedido: number
-    codigoProducto: string
-    nombreProducto: string
-    cantidad: number
-    precioUnitario: string
-    descuento: string
-    subtotal: string
-    reglaPrecio?: string | null
-  }>
+export interface AdminOrderDetail extends Omit<AdminOrderListItem, 'cliente'> {
+  cliente: AdminOrderClientDetail
+  items: AdminOrderLineItem[]
 }
 
 export interface AdminOrderPagination {
@@ -109,6 +79,6 @@ export interface AdminOrderQueryFilters {
   estado?: AdminOrderFilterStatus
   modalidadPago?: string
   clienteId?: number
-  fecha?: string // YYYY-MM-DD
+  fecha?: string
   q?: string
 }

@@ -9,7 +9,7 @@ test.describe('Task #277 — Admin Orders Modal: Prevención de carrera y foco a
       tipoCliente: null,
     };
 
-    // Hidratar sesión de ADMIN para que useAuthStore habilite la ruta sin redirección
+    // Hidratar sesión de ADMIN para useAuthStore sin redirección a login
     await page.route(/\/api\/auth\/me(\?.*)?$/, async route => {
       await route.fulfill({
         status: 200,
@@ -285,30 +285,31 @@ test.describe('Task #277 — Admin Orders Modal: Prevención de carrera y foco a
     await page.getByRole('button', { name: 'Cerrar modal' }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
 
-    // 4. Abrir modal del pedido 11
+    // 4. Abrir modal del pedido 11 MIENTRAS EL PATCH DE A SIGUE EN VUELO
     await page.getByRole('button', { name: 'Ver detalle del pedido 11' }).click();
     await expect(page.getByRole('heading', { name: 'Pedido #11' })).toBeVisible();
     await expect(page.getByRole('dialog')).toContainText('Empresa B SA');
 
-    // 5. Destrabar el PATCH de 10
-    unblockPatchA();
-    await page.waitForTimeout(300);
-
-    // 6. Verificar que el modal de B conserva su identidad
-    await expect(page.getByRole('heading', { name: 'Pedido #11' })).toBeVisible();
-    await expect(page.getByRole('dialog')).toContainText('Empresa B SA');
-    await expect(page.getByRole('dialog')).not.toContainText('Empresa A SRL');
-
-    // 7. H-01: El botón de B DEBE estar habilitado y NO decir "Guardando…"
+    // 5. H-01 COMPROBACIÓN EN TIEMPO DE VUELO: el botón de B DEBE estar habilitado y decir "Guardar Estado"
+    // (sin esperar a que unblockPatchA resuelva)
     const saveButtonB = page.getByRole('button', { name: 'Guardar Estado' });
     await expect(saveButtonB).toBeEnabled();
     await expect(saveButtonB).toHaveText('Guardar Estado');
 
-    // 8. B puede ejecutar su propia mutación sin bloqueos
+    // 6. El usuario puede mutar B normalmente mientras A sigue pendiente
     await saveButtonB.click();
     await expect(page.getByText('Estado actualizado a En preparación.')).toBeVisible();
 
-    // 9. H-02: Contención de foco por teclado (evitando TS2584)
+    // 7. Destrabar el PATCH de 10 después de haber comprobado y operado sobre B
+    unblockPatchA();
+    await page.waitForTimeout(300);
+
+    // 8. Verificar que el modal de B sigue conservando su propia identidad
+    await expect(page.getByRole('heading', { name: 'Pedido #11' })).toBeVisible();
+    await expect(page.getByRole('dialog')).toContainText('Empresa B SA');
+    await expect(page.getByRole('dialog')).not.toContainText('Empresa A SRL');
+
+    // 9. H-02: Contención de foco por teclado
     const closeBtn = page.getByRole('button', { name: 'Cerrar', exact: true });
     await closeBtn.focus();
     await page.keyboard.press('Tab');
