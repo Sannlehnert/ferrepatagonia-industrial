@@ -1,4 +1,5 @@
 export interface AccountOrderEligibility {
+  simulado?: true
   elegible: boolean
   moneda: 'USD'
   totalUSD: string | null
@@ -9,6 +10,7 @@ export interface AccountOrderEligibility {
 }
 
 export interface ConfirmedAccountOrder {
+  simulado?: true
   pedidoId: number
   estado: 'CONFIRMADO'
   modalidadPago: 'CUENTA_CORRIENTE'

@@ -1,6 +1,11 @@
 import axios from 'axios'
 import api from '@/services/api'
-import type { CartSnapshot, CartTransport } from '@/types/cart'
+import type { CartItem, CartSnapshot, CartTransport } from '@/types/cart'
+
+export function precioCarritoComprable(precio: CartItem['precio'] | undefined): boolean {
+  return precio?.estadoPrecio === 'DEFINIDO' && precio.precioComprable === true &&
+    (precio.datosSinteticos === false || (precio.datosSinteticos === true && precio.compraAcademica === true))
+}
 
 export const cartService: CartTransport = {
   async get(signal) {

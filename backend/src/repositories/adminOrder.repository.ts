@@ -1,6 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { dataSource } from '../config/database.config';
 import { env } from '../config/env.config';
+import { academicOrderReference } from '../services/orders/academic-checkout';
 import { commercialDayUtcRange, orderInstant, serializeOrderInstant } from './order-instant';
 import {
     getAllowedNextStates,
@@ -118,8 +119,8 @@ function toMoneyString(value: string | number): string {
     return Number.isFinite(num) ? num.toFixed(2) : '0.00';
 }
 
-function resolveOrigin(estado: string, modalidadPago: string): 'REAL' | 'DEMO' {
-    return estado.startsWith('DEMO_') || modalidadPago.startsWith('DEMO_')
+function resolveOrigin(estado: string, modalidadPago: string, evidencia: string | null): 'REAL' | 'DEMO' {
+    return estado.startsWith('DEMO_') || modalidadPago.startsWith('DEMO_') || evidencia?.startsWith(academicOrderReference)
         ? 'DEMO'
         : 'REAL';
 }
@@ -127,12 +128,13 @@ function resolveOrigin(estado: string, modalidadPago: string): 'REAL' | 'DEMO' {
 function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
     const estado = String(row.estado);
     const modalidadPago = String(row.modalidad_pago);
+    const origen = resolveOrigin(estado, modalidadPago, row.evidencia_total_usd);
 
     return {
         idPedido: Number(row.id_pedido),
         fecha: serializeOrderInstant(row.fecha_utc),
         estado,
-        estadosPermitidos: getAllowedNextStates(estado, modalidadPago),
+        estadosPermitidos: origen === 'DEMO' ? [] : getAllowedNextStates(estado, modalidadPago),
         modalidadPago,
         moneda: row.moneda_total ? String(row.moneda_total) : null,
         subtotal: toMoneyString(row.subtotal),
@@ -145,7 +147,7 @@ function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
         cargoCuentaCorrienteId: row.id_cargo !== null && row.id_cargo !== undefined
             ? Number(row.id_cargo)
             : null,
-        origen: resolveOrigin(estado, modalidadPago),
+        origen,
         cliente: {
             idCliente: Number(row.id_cliente),
             tipoCliente: row.tipo_cliente,
@@ -392,6 +394,7 @@ export interface LockedOrderStateRow {
     idPedido: number;
     estado: string;
     modalidadPago: string;
+    origen: 'REAL' | 'DEMO';
 }
 
 export async function lockAdminOrderForStateChange(
@@ -399,10 +402,10 @@ export async function lockAdminOrderForStateChange(
     orderId: number,
 ): Promise<LockedOrderStateRow | null> {
     const rows = await manager.query<
-        Array<{ id_pedido: number | string; estado: string; modalidad_pago: string }>
+        Array<{ id_pedido: number | string; estado: string; modalidad_pago: string; evidencia_total_usd: string | null }>
     >(
         `
-            SELECT id_pedido, estado, modalidad_pago
+            SELECT id_pedido, estado, modalidad_pago, evidencia_total_usd
             FROM PEDIDO
             WHERE id_pedido = ?
             FOR UPDATE
@@ -419,6 +422,7 @@ export async function lockAdminOrderForStateChange(
         idPedido: Number(row.id_pedido),
         estado: String(row.estado),
         modalidadPago: String(row.modalidad_pago),
+        origen: resolveOrigin(row.estado, row.modalidad_pago, row.evidencia_total_usd),
     };
 }
 

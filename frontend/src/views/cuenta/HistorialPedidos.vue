@@ -410,6 +410,9 @@ async function submitModalReceipt() {
                 <h3 role="heading" class="m-0 block text-xs font-bold text-[#0B2438] font-mono">
                   {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
                 </h3>
+                <p v-if="(order as any).simulado" class="m-0 text-[11px] font-semibold text-slate-500">
+                  Pedido simulado académico
+                </p>
               </td>
 
               <!-- Monto Total -->
@@ -512,6 +515,9 @@ async function submitModalReceipt() {
                 {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
               </h3>
               <span class="block text-xs text-slate-500">{{ dateFormat.format(new Date(order.fecha)) }}</span>
+              <p v-if="(order as any).simulado" class="m-0 text-[11px] font-semibold text-slate-500">
+                Pedido simulado académico
+              </p>
             </div>
             <span
               class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"

@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import CartQuantityControl from '@/components/CartQuantityControl.vue'
 import type { CartItem } from '@/types/cart'
+import { precioCarritoComprable } from '@/services/cartService'
 
 const props = defineProps<{
   item: CartItem
@@ -22,9 +23,7 @@ watch(() => props.item.imagen, () => {
 
 const priced = computed(() =>
   !props.stale &&
-  props.item.precio?.precioComprable === true &&
-  props.item.precio.datosSinteticos === false &&
-  props.item.precio.estadoPrecio === 'DEFINIDO',
+  precioCarritoComprable(props.item.precio),
 )
 
 const adjustable = computed(() =>
@@ -123,6 +122,7 @@ const availabilityMessage = computed(() => {
         sm:col-start-auto sm:max-w-[115px] sm:text-right"
     >
       <template v-if="priced && item.disponible && item.precio">
+        <p v-if="item.precio.compraAcademica" class="m-0 text-[11px] text-slate-600">Precio simulado</p>
         <p class="m-0 text-sm font-bold text-[#13293a]">
           USD {{ item.precio.subtotalUSD }}
         </p>

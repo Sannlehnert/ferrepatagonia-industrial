@@ -1,0 +1,42 @@
+{
+  "data": {
+    "categorias": [
+      {
+        "id": 10,
+        "nombre": "Construcción y consumibles"
+      },
+      {
+        "id": 9,
+        "nombre": "Electricidad e iluminación"
+      },
+      {
+        "id": 2,
+        "nombre": "Fijaciones E2E"
+      },
+      {
+        "id": 1,
+        "nombre": "Herramientas E2E"
+      },
+      {
+        "id": 5,
+        "nombre": "Neumática"
+      },
+      {
+        "id": 6,
+        "nombre": "Protección personal"
+      },
+      {
+        "id": 7,
+        "nombre": "Ropa y calzado de trabajo"
+      },
+      {
+        "id": 8,
+        "nombre": "Señalización y balizamiento"
+      },
+      {
+        "id": 3,
+        "nombre": "Vacía E2E"
+      }
+    ]
+  }
+}

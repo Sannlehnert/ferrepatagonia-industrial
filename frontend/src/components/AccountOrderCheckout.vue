@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { CartSnapshot } from '@/types/cart'
 import { useAccountOrderStore } from '@/stores/accountOrder'
 import { useCartStore } from '@/stores/cart'
+import { precioCarritoComprable } from '@/services/cartService'
 
 const props = defineProps<{
   snapshot?: CartSnapshot
@@ -21,6 +22,7 @@ const eligibilityKey = computed(() => props.snapshot && JSON.stringify({
     item.cantidad,
     item.precio?.precioUnitarioUSD,
     item.precio?.estadoPrecio,
+    item.precio?.compraAcademica,
   ]),
 }))
 
@@ -34,10 +36,7 @@ const showTotal = computed(() => {
     /^(0|[1-9]\d{0,9})\.\d{2}$/.test(snapshot.totalUSD) &&
     snapshot.totalUSD !== '0.00' &&
     snapshot.items.every(item =>
-      item.disponible &&
-      item.precio?.estadoPrecio === 'DEFINIDO' &&
-      item.precio.precioComprable === true &&
-      item.precio.datosSinteticos === false,
+      item.disponible && precioCarritoComprable(item.precio),
     )
 })
 
@@ -59,6 +58,7 @@ const busy = computed(() =>
 const canConfirm = computed(() =>
   showTotal.value &&
   order.canUseCredit &&
+  (!props.snapshot?.items.some(item => item.precio?.datosSinteticos === true) || order.eligibility?.simulado === true) &&
   selected.value &&
   !busy.value &&
   order.attemptState === 'idle',
@@ -132,6 +132,8 @@ async function retryAfterRejection() {
           <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
         </div>
       </dl>
+
+      <p v-if="order.eligibility?.simulado" class="mb-3 font-semibold">Pedido simulado académico · sin cargo real.</p>
 
       <fieldset class="mb-3 rounded-md border border-slate-300 p-3">
         <legend class="px-1 text-sm font-medium text-slate-700">Modalidad de pago</legend>

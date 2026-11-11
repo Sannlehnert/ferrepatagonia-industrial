@@ -1,6 +1,7 @@
 import type { EntityManager } from 'typeorm';
 import { lockAccountOrderAttempt } from './accountOrderAttempt.repository';
 import { AccountOrderError } from '../services/orders/account-order.errors';
+import { academicOrderReference } from '../services/orders/academic-checkout';
 import type {
   ConfirmedAccountOrder,
 } from '../services/orders/account-order.types';
@@ -10,6 +11,7 @@ interface ConfirmedOrderRow {
   totalUSD: string;
   cargoId: number;
   venceEl: string;
+  evidencia: string;
 }
 
 export async function completeAccountOrderAttempt(
@@ -46,7 +48,8 @@ export async function completeAccountOrderAttempt(
       p.id_pedido AS pedidoId,
       p.total AS totalUSD,
       m.id_movimiento_cuenta AS cargoId,
-      DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
+      DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl,
+      p.evidencia_total_usd AS evidencia
     FROM PEDIDO p
     INNER JOIN MOVIMIENTO_CUENTA_CORRIENTE m
       ON m.id_pedido = p.id_pedido
@@ -87,6 +90,7 @@ export async function completeAccountOrderAttempt(
       totalUSD: row.totalUSD,
       cargoId: String(row.cargoId),
       venceEl: row.venceEl,
+      ...(row.evidencia.startsWith(academicOrderReference) ? { simulado: true as const } : {}),
     },
   };
 

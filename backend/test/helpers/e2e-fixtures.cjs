@@ -16,10 +16,14 @@ const credentials = {
   },
 };
 
-async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false } = {}) {
+async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false, includeCatalogProducts = true, persistentProfile } = {}) {
   const [current] = await connection.query("SELECT DATABASE() AS databaseName");
 
-  assert.match(current.databaseName, /^e2e_test_[a-f0-9]{32}$/);
+  if (persistentProfile) {
+    await require('./demo286-persistent.cjs').verifySql(connection, persistentProfile);
+    assert.equal(includeCatalogProducts, false);
+    assert.equal(includeReceiptFixture, 'particular');
+  } else assert.match(current.databaseName, /^e2e_test_[a-f0-9]{32}$/);
 
   // No borrar ni sobrescribir datos: exigir una base recién creada.
   for (const table of ["CATEGORIA", "PRODUCTO", "CLIENTE", "USUARIO"]) {
@@ -49,35 +53,37 @@ async function seedFixtures(connection, { includeAccountOrderFixture = true, inc
         (2, 'SINTETICO E2E lista 20%', 20, 1)
     `);
 
-    for (let id = 1; id <= 25; id++) {
-      const number = String(id).padStart(2, "0");
+    if (includeCatalogProducts) {
+      for (let id = 1; id <= 25; id++) {
+        const number = String(id).padStart(2, "0");
 
-      await connection.query(
-        `
+        await connection.query(
+          `
+          INSERT INTO PRODUCTO
+            (id_producto, id_categoria, codigo, nombre,
+            descripcion, precio, stock, imagen, activo)
+          VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1)
+        `,
+          [
+            id,
+            id <= 22 ? 1 : 2,
+            `E2E-${number}`,
+            `Producto E2E ${number}`,
+            "Descripción de prueba",
+            100 + id,
+            id === 1 ? 0 : 30,
+          ],
+        );
+      }
+
+      await connection.query(`
         INSERT INTO PRODUCTO
-          (id_producto, id_categoria, codigo, nombre,
-          descripcion, precio, stock, imagen, activo)
-        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, 1)
-      `,
-        [
-          id,
-          id <= 22 ? 1 : 2,
-          `E2E-${number}`,
-          `Producto E2E ${number}`,
-          "Descripción de prueba",
-          100 + id,
-          id === 1 ? 0 : 30,
-        ],
-      );
+          (id_producto, id_categoria, codigo, nombre, precio, stock, activo)
+        VALUES
+          (26, 1, 'E2E-INACTIVO', 'Producto inactivo E2E', 100, 10, 0),
+          (27, 4, 'E2E-OCULTO', 'Producto categoría oculta E2E', 100, 10, 1)
+      `);
     }
-
-    await connection.query(`
-      INSERT INTO PRODUCTO
-        (id_producto, id_categoria, codigo, nombre, precio, stock, activo)
-      VALUES
-        (26, 1, 'E2E-INACTIVO', 'Producto inactivo E2E', 100, 10, 0),
-        (27, 4, 'E2E-OCULTO', 'Producto categoría oculta E2E', 100, 10, 1)
-    `);
 
     await connection.query(
       `
@@ -113,8 +119,13 @@ async function seedFixtures(connection, { includeAccountOrderFixture = true, inc
       `);
     }
 
-    const hash = await bcrypt.hash(credentials.admin.password, 10);
-    if (includeReceiptFixture) {
+    const hash = await bcrypt.hash(persistentProfile?.accountPassword ?? credentials.admin.password, 10);
+    if (includeReceiptFixture === 'particular') {
+      await connection.query(
+        "INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total) " +
+        "VALUES (1, 'CONFIRMADO', 'TRANSFERENCIA', 42, 0, 42, 'USD')",
+      );
+    } else if (includeReceiptFixture) {
       await connection.query(
         "INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total) VALUES " +
         "(1, 'CONFIRMADO', 'TRANSFERENCIA', 42, 0, 42, 'USD'), (4, 'CONFIRMADO', 'CUENTA_CORRIENTE', 84, 0, 84, 'USD')",
@@ -147,26 +158,28 @@ async function seedFixtures(connection, { includeAccountOrderFixture = true, inc
         credentials.account.email, hash],
     );
 
-    await connection.query(`
-      INSERT INTO PRECIO_USD_EVIDENCIA
-        (id_producto, precio_verificado, evidencia, id_admin,
-        verificado_utc, valida, sintetica)
-      VALUES
-        (25, 125.00, 'SINTETICO E2E precio USD explícito', 1,
-        '2020-01-01 12:00:00', 1, 1)
-    `);
+    if (includeCatalogProducts) {
+      await connection.query(`
+        INSERT INTO PRECIO_USD_EVIDENCIA
+          (id_producto, precio_verificado, evidencia, id_admin,
+          verificado_utc, valida, sintetica)
+        VALUES
+          (25, 125.00, 'SINTETICO E2E precio USD explícito', 1,
+          '2020-01-01 12:00:00', 1, 1)
+      `);
 
-    // Exclusivo de la base descartable E2E: simula una verificación
-    // USD aceptada para probar el recorrido de compra de la interfaz.
-    // No agrega productos ni modifica los precios legacy restantes.
-    await connection.query(`
-      INSERT INTO PRECIO_USD_EVIDENCIA
-        (id_producto, precio_verificado, evidencia, id_admin,
-        verificado_utc, valida, sintetica)
-      VALUES
-        (24, 124.00, 'TEST-ONLY: verificación para interfaz de carrito',
-        1, '2020-01-01 12:00:00', 1, 0)
-    `);
+      // Exclusivo de la base descartable E2E: simula una verificación
+      // USD aceptada para probar el recorrido de compra de la interfaz.
+      // No agrega productos ni modifica los precios legacy restantes.
+      await connection.query(`
+        INSERT INTO PRECIO_USD_EVIDENCIA
+          (id_producto, precio_verificado, evidencia, id_admin,
+          verificado_utc, valida, sintetica)
+        VALUES
+          (24, 124.00, 'TEST-ONLY: verificación para interfaz de carrito',
+          1, '2020-01-01 12:00:00', 1, 0)
+      `);
+    }
 
     await connection.commit();
   } catch (error) {

@@ -1,7 +1,7 @@
 import type { PriceLine } from './pricing'
 
 type CartPrice = Pick<PriceLine, 'estadoPrecio' | 'precioComprable' | 'precioUnitarioUSD' |
-  'subtotalUSD' | 'descuentoAplicado' | 'origenDescuento'> & { datosSinteticos: boolean }
+  'subtotalUSD' | 'descuentoAplicado' | 'origenDescuento' | 'compraAcademica'> & { datosSinteticos: boolean }
 
 export interface CartItem {
   id_item_carrito: number

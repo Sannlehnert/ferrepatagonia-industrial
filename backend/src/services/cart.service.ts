@@ -10,13 +10,14 @@ import { PricingError } from './pricing/money';
 import { PricingService, sumAmounts } from './pricing/pricing.service';
 import type { PriceLine } from './pricing/pricing.types';
 import { CartError, CartLockStatementTimeout, cartConflict, hasDatabaseError } from './cart.errors';
+import { isAcademicPrice, type AcademicCheckout } from './orders/academic-checkout';
 
 export type CartMutation =
     | { type: 'add' | 'update'; productoId: number; cantidad: number }
     | { type: 'remove'; productoId: number };
 
 type CartPrice = Pick<PriceLine, 'estadoPrecio' | 'precioComprable' | 'precioUnitarioUSD' | 'subtotalUSD'
-    | 'descuentoAplicado' | 'origenDescuento'> & { datosSinteticos: boolean };
+    | 'descuentoAplicado' | 'origenDescuento'> & { datosSinteticos: boolean; compraAcademica?: true };
 
 function pricing(manager: EntityManager) {
     return new PricingService(new MariaDbPricingSource(undefined, manager));
@@ -57,7 +58,7 @@ async function withClientCart<T>(auth: AuthContext, signal: AbortSignal,
     }
 }
 
-export function getAuthenticatedClientCart(auth: AuthContext, signal: AbortSignal) {
+export function getAuthenticatedClientCart(auth: AuthContext, signal: AbortSignal, academicCheckout?: AcademicCheckout) {
     return withClientCart(auth, signal, async (manager, clientId, existingId) => {
         const idCarrito = existingId ?? await createCart(manager, clientId);
         const rawItems = await findCartItems(manager, idCarrito);
@@ -85,6 +86,7 @@ export function getAuthenticatedClientCart(auth: AuthContext, signal: AbortSigna
                         precioUnitarioUSD: line.precioUnitarioUSD, subtotalUSD: line.subtotalUSD,
                         descuentoAplicado: line.descuentoAplicado, origenDescuento: line.origenDescuento,
                         datosSinteticos: line.evidenciaBaseUSD?.synthetic ?? false,
+                        ...(academicCheckout && isAcademicPrice(line) ? { compraAcademica: true as const } : {}),
                     };
                 }
             } catch (error) {

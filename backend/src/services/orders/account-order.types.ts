@@ -1,4 +1,5 @@
 export interface ConfirmedAccountOrder {
+  simulado?: true;
   pedidoId: number;
   estado: 'CONFIRMADO';
   modalidadPago: 'CUENTA_CORRIENTE';
@@ -15,6 +16,7 @@ export interface PendingAccountOrder {
 }
 
 export interface ClientOrderSummary {
+  simulado?: true;
   pedidoId: number;
   numero: string;
   fecha: string;
@@ -78,6 +80,7 @@ export interface AccountOrderResult {
 }
 
 export interface AccountOrderEligibility {
+  simulado?: true;
   elegible: boolean;
   moneda: 'USD';
   totalUSD: string | null;

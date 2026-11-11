@@ -40,7 +40,7 @@ const busy = computed(() =>
         role="status"
         class="mb-2 last:mb-0"
       >
-        Pedido #{{ receipt.pedidoId }} confirmado por USD {{ receipt.totalUSD }}.
+        {{ receipt.simulado ? 'Pedido simulado' : 'Pedido' }} #{{ receipt.pedidoId }} confirmado por USD {{ receipt.totalUSD }}.
         Vence el {{ receipt.venceEl }}.
       </li>
     </ul>

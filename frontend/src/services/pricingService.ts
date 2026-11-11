@@ -13,7 +13,8 @@ export function precioComprable(line: PriceLine | undefined): boolean {
     decimal.test(line.precioBaseUSD) && line.precioBaseUSD !== '0.00' &&
     typeof line.evidenciaBaseUSD?.reference === 'string' && !!line.evidenciaBaseUSD.reference.trim() &&
     typeof line.evidenciaBaseUSD.verifiedAt === 'string' && Number.isFinite(Date.parse(line.evidenciaBaseUSD.verifiedAt)) &&
-    line.evidenciaBaseUSD.synthetic === false
+    (line.evidenciaBaseUSD.synthetic === false ||
+      (line.evidenciaBaseUSD.synthetic === true && line.compraAcademica === true))
 }
 
 export async function getPrices(ids: readonly number[], personalized: boolean, signal?: AbortSignal): Promise<PriceLine[]> {
@@ -30,7 +31,10 @@ export async function getPrices(ids: readonly number[], personalized: boolean, s
     }, { signal })
     const result = data.data
     if (!result || result.regla !== 'FER17-v1' || result.ivaIncluido !== true ||
-      result.moneda !== 'USD' || result.datosSinteticos !== false || !Array.isArray(result.productos) ||
+      result.moneda !== 'USD' || !Array.isArray(result.productos) ||
+      (result.datosSinteticos !== false && !(personalized && result.datosSinteticos === true &&
+        result.productos.some(p => p.evidenciaBaseUSD?.synthetic === true) &&
+        result.productos.every(p => p.evidenciaBaseUSD?.synthetic !== true || p.compraAcademica === true))) ||
       result.productos.length !== batch.length || new Set(result.productos.map(p => p.productoId)).size !== batch.length ||
       result.productos.some(p => !batch.includes(p.productoId) || p.cantidad !== 1 || p.moneda !== 'USD' ||
         !states.includes(p.estadoPrecio) || typeof p.precioComprable !== 'boolean' ||
