@@ -46,7 +46,7 @@ async function main() {
     const schemaBefore = await fingerprint();
     const tests = process.argv.slice(2).length > 0
       ? process.argv.slice(2)
-      : ['test/adminProduct.test.cjs', 'test/catalog.integration.test.cjs', 'test/register.integration.test.cjs', 'test/auth.me.integration.test.cjs', 'test/clientes.integration.test.cjs', 'test/company-approval.test.cjs', 'test/orm.integration.test.cjs', 'test/database-policy.integration.test.cjs', 'test/auth.security.integration.test.cjs', 'test/fer17-data-model.integration.test.cjs'];
+      : ['test/adminProduct.test.cjs', 'test/product-image.integration.test.cjs', 'test/catalog.integration.test.cjs', 'test/register.integration.test.cjs', 'test/auth.me.integration.test.cjs', 'test/clientes.integration.test.cjs', 'test/company-approval.test.cjs', 'test/orm.integration.test.cjs', 'test/database-policy.integration.test.cjs', 'test/auth.security.integration.test.cjs', 'test/fer17-data-model.integration.test.cjs'];
     const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', ...tests], {
       cwd: backend, stdio: 'inherit', env: { ...process.env,
         DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),

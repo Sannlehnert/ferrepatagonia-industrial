@@ -21,6 +21,7 @@ const services = [];
 let connection;
 let testProcess;
 let receiptStorage;
+let productImageStorage;
 let containerCreationAttempted = false;
 let interrupted = false;
 function startService(file, cwd, env) {
@@ -118,6 +119,7 @@ async function main() {
   await prepareDatabase(session, checkInterrupted);
   if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: receipts, includeReceiptFixture: receipts });
   if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+  productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);
@@ -150,6 +152,7 @@ async function main() {
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
     RECEIPT_STORAGE_DIR: receiptStorage ?? '',
+    PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
     DB_HOST: profile.host,
     DB_PORT: String(profile.port),
     DB_NAME: profile.database,
@@ -253,8 +256,8 @@ async function cleanup() {
     }
   }
 
-  if (receiptStorage) {
-    try { fs.rmSync(receiptStorage, { recursive: true, force: true }); }
+  for (const directory of [receiptStorage, productImageStorage].filter(Boolean)) {
+    try { fs.rmSync(directory, { recursive: true, force: true }); }
     catch { failed = true; }
   }
 

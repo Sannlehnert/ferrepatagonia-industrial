@@ -1,9 +1,12 @@
 import {findAllAdmin,findById,categoryExists,create,update,updateStock,CreateProductDTO,UpdateProductDTO} from '../repositories/adminProduct.repository';
 
 import { validateDtoInput } from '../dtos/validation';
-import { createProductPolicy, updateProductPolicy, stockPolicy } from '../dtos/policies';
+import { createProductPolicy, updateProductPolicy, updateProductWithImagePolicy, stockPolicy } from '../dtos/policies';
 import { roundSqlDecimal2 } from '../dtos/rules';
 import type { NotifyCommittedChange } from '../realtime/committed-change';
+import { env } from '../config/env.config';
+import { usesProductImageNamespace } from '../utils/product-image';
+import { removeReplacedProductImage, withProductImage } from './productImage.service';
 
 export class ValidationError extends Error {
     statusCode: number;
@@ -16,9 +19,8 @@ export class ValidationError extends Error {
 // Candado en memoria complementario al UNIQUE de MariaDB
 const activeSkuLocks = new Set<string>();
 
-const validateProductFields = async (data: unknown, isUpdate = false) => {
-    const result = isUpdate ? await validateDtoInput(updateProductPolicy, data)
-      : await validateDtoInput(createProductPolicy, data);
+const validateProductFields = async (data: unknown, policy: typeof updateProductPolicy) => {
+    const result = await validateDtoInput(policy, data);
     if (!result.valid) throw new ValidationError(result.message);
     if (result.data.id_categoria !== undefined && !await categoryExists(result.data.id_categoria)) {
         throw new ValidationError('La categoría no existe.', 404);
@@ -35,7 +37,13 @@ export const getAdminProductById = async (id: number) => {
     return product;
 };
 
-export const createAdminProduct = async (payload: CreateProductDTO) => {
+function validateImageUrl(value: string | null | undefined, current?: string | null) {
+    if (value && value !== current && usesProductImageNamespace(value, env.httpSecurity.publicOrigin)) {
+        throw new ValidationError('Seleccioná un archivo para asociar una foto del catálogo.');
+    }
+}
+
+export const createAdminProduct = async (payload: CreateProductDTO, file?: Express.Multer.File) => {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new ValidationError('El cuerpo de la solicitud es obligatorio y debe ser un objeto JSON válido.');
     }
@@ -49,7 +57,8 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
     if (sku) activeSkuLocks.add(sku);
 
     try {
-        await validateProductFields(payload, false);
+        await validateProductFields(payload, createProductPolicy);
+        validateImageUrl(payload.imagen);
 
         const normalizedPrice = roundSqlDecimal2(payload.precio);
         const normalizedPayload: CreateProductDTO = {
@@ -59,7 +68,10 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
             precio: normalizedPrice
         };
 
-        const insertId = await create(normalizedPayload);
+        const insertId = await withProductImage(file, imagen => {
+            if (imagen) normalizedPayload.imagen = imagen;
+            return create(normalizedPayload);
+        });
 
         // Si el INSERT fue exitoso pero falla el SELECT posterior, devolvemos un fallback consistente con MariaDB
         try {
@@ -85,7 +97,9 @@ export const createAdminProduct = async (payload: CreateProductDTO) => {
     }
 };
 
-export const updateAdminProduct = async (id: number, payload: UpdateProductDTO, notify?: NotifyCommittedChange) => {
+export const updateAdminProduct = async (
+    id: number, payload: UpdateProductDTO, notify?: NotifyCommittedChange, file?: Express.Multer.File,
+) => {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new ValidationError('El cuerpo de la solicitud es obligatorio y debe ser un objeto JSON válido.');
     }
@@ -93,7 +107,8 @@ export const updateAdminProduct = async (id: number, payload: UpdateProductDTO, 
     const existing = await findById(id);
     if (!existing) throw new ValidationError('Producto no encontrado.', 404);
 
-    await validateProductFields(payload, true);
+    await validateProductFields(payload, file ? updateProductWithImagePolicy : updateProductPolicy);
+    validateImageUrl(payload.imagen, existing.imagen);
 
     const normalizedPayload: UpdateProductDTO = {
         ...payload,
@@ -102,7 +117,15 @@ export const updateAdminProduct = async (id: number, payload: UpdateProductDTO, 
         ...(payload.precio !== undefined && payload.precio !== null ? { precio: roundSqlDecimal2(payload.precio) } : {})
     };
 
-    await update(id, normalizedPayload, notify);
+    // Avoid reassigning an unchanged URL if another writer replaces it before our update.
+    if (normalizedPayload.imagen === existing.imagen) delete normalizedPayload.imagen;
+    const result = await withProductImage(file, async imagen => {
+        if (imagen) normalizedPayload.imagen = imagen;
+        const result = await update(id, normalizedPayload, notify);
+        if (imagen && !result.updated) throw new ValidationError('Producto no encontrado.', 404);
+        return result;
+    });
+    await removeReplacedProductImage(result.replacedImage);
     return await findById(id);
 };
 

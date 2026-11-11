@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ProductPrices from '@/components/ProductPrices.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
+import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
@@ -273,8 +274,11 @@ onBeforeUnmount(() => {
 
         <ul v-else class="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-4 m-0 list-none p-0 [@media(max-width:560px)]:grid-cols-2 [@media(max-width:560px)]:gap-3">
           <li v-for="p in productos" :key="p.id" class="box-border flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 [@media(max-width:560px)]:p-3">
-            <!-- CatalogProduct no tiene imagen todavía -->
-            <div class="mb-3 grid h-[140px] place-items-center rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]" aria-hidden="true"><span>Sin imagen</span></div>
+            <div class="mb-3 grid h-[140px] place-items-center overflow-hidden rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]">
+              <ProductThumbnail :image="p.imagen" :alt="p.nombre" image-class="h-full min-h-0 w-full object-contain">
+                <span aria-hidden="true">Sin imagen</span>
+              </ProductThumbnail>
+            </div>
 
             <p class="m-0 min-w-0 max-w-full text-[.75rem] text-[var(--fp-muted)] [overflow-wrap:anywhere]">COD. {{ p.codigo }}</p>
             <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">

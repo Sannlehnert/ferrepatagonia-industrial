@@ -1,30 +1,15 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import CommerceIcon from './CommerceIcon.vue'
-import { getCatalogProduct } from '@/services/catalogService'
-import { getProductImageSource } from '@/utils/productImage'
+import ProductThumbnail from './ProductThumbnail.vue'
 
-const props = defineProps<{ productId: number; name: string }>()
-const source = ref<string | null>(null)
-
-// The list DTO has no image. Each of the four Home cards can use its public detail.
-watch(() => props.productId, async (id, _previous, onCleanup) => {
-  source.value = null
-  const controller = new AbortController()
-  onCleanup(() => controller.abort())
-  try {
-    const detail = await getCatalogProduct(id, controller.signal)
-    if (!controller.signal.aborted) source.value = getProductImageSource(detail.imagen)
-  } catch {
-    // An unavailable detail or image leaves the card's visual placeholder in place.
-  }
-}, { immediate: true })
+defineProps<{ image?: string | null; name: string }>()
 </script>
 
 <template>
   <div class="product-media">
-    <img v-if="source" :key="source" :src="source" :alt="name" loading="lazy" decoding="async" @error="source = null" />
-    <CommerceIcon v-else name="box" />
+    <ProductThumbnail :image="image" :alt="name">
+      <CommerceIcon name="box" />
+    </ProductThumbnail>
   </div>
 </template>
 
@@ -47,7 +32,7 @@ watch(() => props.productId, async (id, _previous, onCleanup) => {
   border-radius: var(--fp-radius);
   background: white;
 }
-.product-media img {
+.product-media :deep(img) {
   box-sizing: border-box;
   width: 100%;
   height: 100%;
