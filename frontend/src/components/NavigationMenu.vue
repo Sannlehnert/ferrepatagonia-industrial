@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import {
     filterMenuByPermissions,
     getNavigableMenu,
@@ -22,6 +22,8 @@ const props = withDefaults(
     },
 )
 
+const route = useRoute()
+
 const visibleItems = computed(() => {
     if (props.variant === 'account') {
         return filterMenuByPermissions(props.items, props.permissions)
@@ -42,6 +44,32 @@ function getItemRoute(item: MenuItem) {
     return { name: 'cuenta-pedidos' }
 }
 
+function isItemActive(item: MenuItem): boolean {
+    if (!route || props.variant !== 'account') return false
+    const path = (route.path || '').replace(/\/$/, '')
+    const query = route.query || {}
+
+    if (item.id === 'account-orders') {
+        return path === '/mi-cuenta/pedidos' && !query.filtro
+    }
+    if (item.id === 'account-orders-without-receipt') {
+        return path === '/mi-cuenta/pedidos' && query.filtro === 'sin-comprobante'
+    }
+    if (item.id === 'account-credit-orders') {
+        return path === '/mi-cuenta/pedidos' && query.filtro === 'cuenta-corriente'
+    }
+    if (item.id === 'account-credit') {
+        return path === '/mi-cuenta/cuenta-corriente'
+    }
+    if (item.id === 'account-details') {
+        return path === '/mi-cuenta/datos'
+    }
+    if (item.routeName) {
+        return route.name === item.routeName
+    }
+    return false
+}
+
 const linkClasses = computed(() => {
     const base =
         'box-border flex min-h-11 items-center px-3 py-2 no-underline focus-visible:outline-2 focus-visible:outline-offset-2'
@@ -50,13 +78,22 @@ const linkClasses = computed(() => {
         case 'admin':
             return `${base} rounded-md border-s-2 border-transparent text-white hover:bg-[var(--fp-steel)] focus-visible:outline-[var(--fp-amber-light)] [&.router-link-active]:border-[var(--fp-amber-light)] [&.router-link-active]:bg-[var(--fp-steel)] [&.router-link-active]:font-bold`
         case 'account':
-            return `${base} rounded-[8px] whitespace-nowrap shrink-0 md:shrink text-[#A7B6C4] hover:text-white hover:bg-[#103A5C]/40 focus-visible:outline-white transition-colors [&.router-link-active]:bg-[#103A5C] [&.router-link-active]:text-white [&.router-link-active]:font-semibold`
+            return `${base} rounded-[8px] whitespace-nowrap shrink-0 md:shrink focus-visible:outline-white transition-colors`
         case 'public':
             return `${base} rounded-md inline-flex justify-center bg-[#145a8d] px-6 text-white hover:bg-[#0b426b] focus-visible:outline-[#145a8d]`
         default:
             return `${base} rounded-md text-inherit hover:bg-slate-100 focus-visible:outline-[#145a8d] [&.router-link-active]:font-semibold`
     }
 })
+
+function getItemClasses(item: MenuItem) {
+    if (props.variant === 'account') {
+        return isItemActive(item)
+            ? 'bg-[#103A5C] text-white font-semibold'
+            : 'text-[#A7B6C4] hover:text-white hover:bg-[#103A5C]/40'
+    }
+    return ''
+}
 </script>
 
 <template>
@@ -75,8 +112,11 @@ const linkClasses = computed(() => {
             :key="item.id"
             :to="getItemRoute(item)"
             :aria-label="item.label"
+            :aria-current="props.variant === 'account' ? (isItemActive(item) ? 'page' : undefined) : undefined"
+            :active-class="props.variant === 'account' ? '' : undefined"
+            :exact-active-class="props.variant === 'account' ? '' : undefined"
             class="navigation-menu__link"
-            :class="linkClasses"
+            :class="[linkClasses, getItemClasses(item)]"
         >
             <span v-if="item.id === 'account-details' && props.variant === 'account'" class="hidden sm:inline">Configuración de datos</span>
             <span v-if="item.id === 'account-details' && props.variant === 'account'" class="sm:hidden">Mis datos</span>

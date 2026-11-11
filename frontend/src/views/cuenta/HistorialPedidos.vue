@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ClientOrderDetail from '@/components/ClientOrderDetail.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
@@ -11,6 +11,7 @@ import type { ClientOrderSummary } from '@/types/clientOrder'
 
 const auth = useAuthStore()
 const route = useRoute()
+const router = useRouter()
 const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}`
 const allowed = () => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.loggingOut
 
@@ -45,26 +46,6 @@ onRealtime(change => {
   }
 })
 
-// Metrics
-const totalOrdersCount = computed(() => orders.value?.length ?? 0)
-const creditOrdersCount = computed(() =>
-  orders.value?.filter(o => o.modalidadPago === 'CUENTA_CORRIENTE').length ?? 0,
-)
-const pendingReceiptOrdersCount = computed(() =>
-  orders.value?.filter(o =>
-    o.modalidadPago === 'TRANSFERENCIA' && (o.estado === 'PENDIENTE' || !receiptsUploaded.value.has(o.pedidoId)),
-  ).length ?? 0,
-)
-const ultimoPedidoFecha = computed(() => {
-  if (!orders.value || orders.value.length === 0) return ''
-  const first = orders.value[0]
-  if (!first?.fecha) return ''
-  const d = new Date(first.fecha)
-  const day = String(d.getDate()).padStart(2, '0')
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  return `${day}/${month}`
-})
-
 // Filters
 const filtroFecha = ref('')
 const filtroComprobante = ref('')
@@ -76,8 +57,13 @@ watch(
   filtro => {
     if (filtro === 'sin-comprobante') {
       filtroComprobante.value = 'NO_ADJUNTO'
+      filtroModalidad.value = ''
     } else if (filtro === 'cuenta-corriente') {
       filtroModalidad.value = 'CUENTA_CORRIENTE'
+      filtroComprobante.value = ''
+    } else {
+      filtroComprobante.value = ''
+      filtroModalidad.value = ''
     }
   },
   { immediate: true },
@@ -88,6 +74,9 @@ function limpiarFiltros() {
   filtroComprobante.value = ''
   filtroEstado.value = ''
   filtroModalidad.value = ''
+  if (route.query.filtro) {
+    void router.replace({ query: {} })
+  }
 }
 
 // Receipt status simulation / tracking
@@ -226,71 +215,76 @@ async function submitModalReceipt() {
 
 <template>
   <div class="space-y-6">
-    <!-- Header with Welcome -->
-    <div class="text-center my-6">
-      <h2 class="text-2xl font-bold text-[#0B2438] m-0">{{ auth.user?.nombre || 'Mi Cuenta' }}</h2>
-    </div>
-
-    <!-- 3 Metrics Cards -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-      <!-- Card 1: Pedidos Realizados -->
-      <div class="rounded-[10px] border border-[#E2E8F0] p-6 shadow-sm bg-white flex flex-col justify-between">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="font-bold text-[#0B2438] text-base m-0">Pedidos Realizados</h4>
-          <svg class="w-6 h-6 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-          </svg>
-        </div>
-        <div class="text-4xl font-bold text-[#10B981] my-2">
-          {{ totalOrdersCount }}
-        </div>
-        <p class="text-xs text-slate-500 m-0">
-          Todos los estados{{ ultimoPedidoFecha ? ' - último: ' + ultimoPedidoFecha : '' }}
-        </p>
-      </div>
-
-      <!-- Card 2: Pedidos con Cuenta Corriente -->
-      <div class="rounded-[10px] border border-[#E2E8F0] p-6 shadow-sm bg-white flex flex-col justify-between">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="font-bold text-[#0B2438] text-base m-0">Pedidos con Cuenta Corriente</h4>
-          <svg class="w-6 h-6 text-[#0EA5E9]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
-        </div>
-        <div class="text-4xl font-bold text-[#0EA5E9] my-2">
-          {{ creditOrdersCount }}
-        </div>
-        <p class="text-xs text-slate-500 m-0">
-          Modalidad cuenta corriente
-        </p>
-      </div>
-
-      <!-- Card 3: Pedidos sin comprobante -->
-      <div class="rounded-[10px] border border-[#E2E8F0] p-6 shadow-sm bg-white flex flex-col justify-between">
-        <div class="flex items-center justify-between mb-2">
-          <h4 class="font-bold text-[#0B2438] text-base m-0">Pedidos sin comprobante</h4>
-          <svg class="w-6 h-6 text-[#10B981]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-        </div>
-        <div class="text-4xl font-bold text-[#10B981] my-2">
-          {{ pendingReceiptOrdersCount }}
-        </div>
-        <p class="text-xs text-slate-500 m-0">
-          Transferencias pendientes
-        </p>
-      </div>
-    </div>
-
     <!-- Section Heading -->
     <h3 class="m-0 mb-4 text-xl font-bold text-[#0B2438]">Mis pedidos</h3>
 
+    <!-- Filter Bar -->
+    <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
+      <div class="flex flex-wrap items-center gap-3 min-w-0">
+        <div class="flex items-center gap-2">
+          <label for="filtro-fecha" class="text-xs font-semibold text-slate-600">Fecha:</label>
+          <input
+            id="filtro-fecha"
+            v-model="filtroFecha"
+            type="date"
+            aria-label="Filtrar por fecha"
+            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+          />
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label for="filtro-comprobante" class="text-xs font-semibold text-slate-600">Comprobante:</label>
+          <select
+            id="filtro-comprobante"
+            v-model="filtroComprobante"
+            aria-label="Estado del Comprobante"
+            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+          >
+            <option value="">Estado del Comprobante (Todos)</option>
+            <option value="SUBIDO">Subido</option>
+            <option value="NO_ADJUNTO">No adjunto</option>
+            <option value="APROBADO">Aprobado</option>
+            <option value="RECHAZADO">Rechazado</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
+          <select
+            id="filtro-estado"
+            v-model="filtroEstado"
+            aria-label="Estado del Pedido"
+            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+          >
+            <option value="">Estado del Pedido (Todos)</option>
+            <option value="PENDIENTE">Pendiente</option>
+            <option value="CONFIRMADO">Confirmado</option>
+            <option value="ENVIADO">Enviado</option>
+            <option value="ENTREGADO">Entregado</option>
+            <option value="CANCELADO">Cancelado</option>
+          </select>
+        </div>
+      </div>
+
+      <button
+        v-if="filtroFecha || filtroComprobante || filtroEstado || filtroModalidad"
+        type="button"
+        class="text-xs text-[#145A8D] hover:underline font-semibold min-h-[44px] px-2 py-1 cursor-pointer"
+        @click="limpiarFiltros"
+      >
+        Limpiar filtros
+      </button>
+    </div>
+
+    <!-- Table States & Content -->
     <!-- Loading State -->
-    <p v-if="loading && !orders" role="status" class="text-slate-500">Cargando tus pedidos…</p>
+    <div v-if="loading && !orders" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+      <p role="status" class="text-slate-500 m-0">Cargando tus pedidos…</p>
+    </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="space-y-3">
-      <p role="alert" class="text-red-700">No se pudieron cargar tus pedidos.</p>
+    <div v-else-if="error" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm space-y-3">
+      <p role="alert" class="text-red-700 m-0">No se pudieron cargar tus pedidos.</p>
       <button
         type="button"
         class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
@@ -301,78 +295,22 @@ async function submitModalReceipt() {
     </div>
 
     <!-- Empty State -->
-    <p v-else-if="orders?.length === 0" role="status" class="text-slate-600">Todavía no tenés pedidos.</p>
+    <div v-else-if="orders?.length === 0" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+      <p role="status" class="text-slate-600 m-0">Todavía no tenés pedidos.</p>
+    </div>
+
+    <!-- Filter empty message -->
+    <p
+      v-else-if="filteredOrders.length === 0"
+      class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 text-center text-slate-500 shadow-sm"
+    >
+      No se encontraron pedidos con los filtros seleccionados.
+    </p>
 
     <!-- Content with Orders -->
-    <div v-else-if="orders" class="space-y-6">
-      <!-- Filter Bar -->
-      <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
-        <div class="flex flex-wrap items-center gap-3 min-w-0">
-          <div class="flex items-center gap-2">
-            <label for="filtro-fecha" class="text-xs font-semibold text-slate-600">Fecha:</label>
-            <input
-              id="filtro-fecha"
-              v-model="filtroFecha"
-              type="date"
-              aria-label="Filtrar por fecha"
-              class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
-            />
-          </div>
-
-          <div class="flex items-center gap-2">
-            <label for="filtro-comprobante" class="text-xs font-semibold text-slate-600">Comprobante:</label>
-            <select
-              id="filtro-comprobante"
-              v-model="filtroComprobante"
-              aria-label="Estado del Comprobante"
-              class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
-            >
-              <option value="">Estado del Comprobante (Todos)</option>
-              <option value="SUBIDO">Subido</option>
-              <option value="NO_ADJUNTO">No adjunto</option>
-              <option value="APROBADO">Aprobado</option>
-              <option value="RECHAZADO">Rechazado</option>
-            </select>
-          </div>
-
-          <div class="flex items-center gap-2">
-            <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
-            <select
-              id="filtro-estado"
-              v-model="filtroEstado"
-              aria-label="Estado del Pedido"
-              class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
-            >
-              <option value="">Estado del Pedido (Todos)</option>
-              <option value="PENDIENTE">Pendiente</option>
-              <option value="CONFIRMADO">Confirmado</option>
-              <option value="ENVIADO">Enviado</option>
-              <option value="ENTREGADO">Entregado</option>
-              <option value="CANCELADO">Cancelado</option>
-            </select>
-          </div>
-        </div>
-
-        <button
-          v-if="filtroFecha || filtroComprobante || filtroEstado || filtroModalidad"
-          type="button"
-          class="text-xs text-[#145A8D] hover:underline font-semibold min-h-[44px] px-2 py-1 cursor-pointer"
-          @click="limpiarFiltros"
-        >
-          Limpiar filtros
-        </button>
-      </div>
-
-      <!-- Filter empty message -->
-      <p
-        v-if="filteredOrders.length === 0"
-        class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 text-center text-slate-500 shadow-sm"
-      >
-        No se encontraron pedidos con los filtros seleccionados.
-      </p>
-
+    <div v-else class="space-y-6">
       <!-- Desktop Table (>= 768px) -->
-      <div v-else class="hidden md:block rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm">
+      <div class="hidden md:block rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm">
         <table class="w-full min-w-[640px] border-collapse text-left">
           <thead class="bg-slate-50 border-b border-[#E2E8F0]">
             <tr>

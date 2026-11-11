@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { RouterView, useRoute, useRouter } from 'vue-router'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AccountMenu from '@/components/AccountMenu.vue'
 import PublicHeader from '@/components/PublicHeader.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
@@ -50,7 +50,7 @@ async function logout() {
 
 <template>
   <div class="fp-public flex min-h-screen flex-col bg-[#F8FAFC]">
-    <div class="sticky top-0 z-40 w-full bg-white shadow-xs">
+    <div class="w-full bg-white shadow-xs">
       <PublicHeader />
     </div>
 
@@ -59,7 +59,11 @@ async function logout() {
         class="bg-[#0B2438] text-white w-full md:w-64 md:min-h-[calc(100vh-theme(spacing.16))] p-4 md:p-6 flex flex-col justify-between shrink-0"
       >
         <div class="min-w-0">
-          <h2 class="text-xl font-bold mb-4 md:mb-6 text-white">Mi Cuenta</h2>
+          <h2 class="text-xl font-bold mb-4 md:mb-6 text-white">
+            <RouterLink to="/mi-cuenta" class="hover:text-slate-200 no-underline text-inherit focus-visible:outline-2 focus-visible:outline-white rounded">
+              Mi Cuenta
+            </RouterLink>
+          </h2>
           <div class="overflow-x-auto pb-2 md:overflow-visible md:pb-0">
             <AccountMenu :permissions="permissions" />
           </div>

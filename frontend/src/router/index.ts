@@ -138,7 +138,11 @@ const router = createRouter({
       component: () => import('@/views/cuenta/MiCuentaLayout.vue'),
       meta: { requiresAuth: true, roles: ['CLIENTE'] },
       children: [
-        { path: '', redirect: { name: 'cuenta-datos' } },
+        {
+          path: '',
+          name: 'cuenta-dashboard',
+          component: () => import('@/views/cuenta/MiCuentaDashboardView.vue'),
+        },
         {
           path: 'datos',
           name: 'cuenta-datos',
