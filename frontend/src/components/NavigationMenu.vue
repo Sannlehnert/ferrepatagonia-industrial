@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { RouterLink, useRoute } from 'vue-router'
+import { RouterLink, useRoute, useRouter } from 'vue-router'
 import {
     filterMenuByPermissions,
     getNavigableMenu,
@@ -9,9 +9,14 @@ import {
 import type { Permission } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
 
+export type NavigationItem = MenuItem & {
+    to?: string | { path?: string }
+    query?: Record<string, any>
+}
+
 const props = withDefaults(
     defineProps<{
-        items: readonly MenuItem[]
+        items: readonly NavigationItem[]
         permissions: ReadonlySet<Permission>
         label: string
         orientation?: 'vertical' | 'horizontal'
@@ -24,6 +29,7 @@ const props = withDefaults(
 )
 
 const route = useRoute()
+const router = useRouter()
 
 const isParticular = computed(() => {
     let u: Record<string, any> | null | undefined
@@ -37,7 +43,7 @@ const isParticular = computed(() => {
     return tipo === 'PARTICULAR'
 })
 
-const visibleItems = computed(() => {
+const visibleItems = computed<NavigationItem[]>(() => {
     let items = props.variant === 'account'
         ? filterMenuByPermissions(props.items, props.permissions)
         : getNavigableMenu(props.items, props.permissions)
@@ -52,10 +58,25 @@ const visibleItems = computed(() => {
         )
     }
 
-    return items
+    return items.map(item => {
+        const routeTarget = getItemRoute(item)
+        let resolvedPath: string | undefined
+        if (router && typeof routeTarget === 'object' && routeTarget !== null && 'name' in routeTarget) {
+            try {
+                resolvedPath = router.resolve(routeTarget).path
+            } catch {
+                resolvedPath = undefined
+            }
+        }
+        return {
+            ...item,
+            to: (item as NavigationItem).to ?? resolvedPath,
+            query: (item as NavigationItem).query ?? (typeof routeTarget === 'object' && routeTarget !== null && 'query' in routeTarget ? (routeTarget.query as Record<string, any>) : undefined),
+        }
+    })
 })
 
-function getItemRoute(item: MenuItem) {
+function getItemRoute(item: MenuItem | NavigationItem) {
     if (item.routeName) {
         return { name: item.routeName }
     }
@@ -68,30 +89,49 @@ function getItemRoute(item: MenuItem) {
     return { name: 'cuenta-pedidos' }
 }
 
-function isItemActive(item: MenuItem): boolean {
-    if (!route || props.variant !== 'account') return false
-    const path = (route.path || '').replace(/\/$/, '')
-    const query = route.query || {}
+function isItemActive(item: NavigationItem): boolean {
+    if (!route) return false
 
-    if (item.id === 'account-orders') {
-        return path === '/mi-cuenta/pedidos' && !query.filtro
+    // Variante Mi Cuenta: lógica granular con query params
+    if (props.variant === 'account') {
+        const path = (route.path || '').replace(/\/$/, '')
+        const query = route.query || {}
+
+        if (item.query?.filtro) {
+            return (route.path === item.to && route.query.filtro === item.query.filtro) || (path === '/mi-cuenta/pedidos' && query.filtro === 'sin-comprobante')
+        }
+        if (item.to === '/mi-cuenta/pedidos') {
+            return (route.path === '/mi-cuenta/pedidos' && !route.query.filtro) || (path === '/mi-cuenta/pedidos' && !query.filtro)
+        }
+        if (item.id === 'account-orders') {
+            return path === '/mi-cuenta/pedidos' && !query.filtro
+        }
+        if (item.id === 'account-orders-without-receipt') {
+            return path === '/mi-cuenta/pedidos' && query.filtro === 'sin-comprobante'
+        }
+        if (item.id === 'account-credit-orders') {
+            return path === '/mi-cuenta/pedidos' && query.filtro === 'cuenta-corriente'
+        }
+        if (item.id === 'account-credit') {
+            return path === '/mi-cuenta/cuenta-corriente'
+        }
+        if (item.id === 'account-details') {
+            return path === '/mi-cuenta/datos'
+        }
+        return route.path === item.to
     }
-    if (item.id === 'account-orders-without-receipt') {
-        return path === '/mi-cuenta/pedidos' && query.filtro === 'sin-comprobante'
+
+    // Variante Administración (y cualquier otra):
+    const targetPath = typeof item.to === 'string' ? item.to : (item.to?.path || '')
+    if (!targetPath) return false
+
+    // Exact match para Dashboard o ruta base
+    if (targetPath === '/admin' || targetPath === '/admin/dashboard') {
+        return route.path === targetPath
     }
-    if (item.id === 'account-credit-orders') {
-        return path === '/mi-cuenta/pedidos' && query.filtro === 'cuenta-corriente'
-    }
-    if (item.id === 'account-credit') {
-        return path === '/mi-cuenta/cuenta-corriente'
-    }
-    if (item.id === 'account-details') {
-        return path === '/mi-cuenta/datos'
-    }
-    if (item.routeName) {
-        return route.name === item.routeName
-    }
-    return false
+
+    // Coincidencia por prefijo para subsecciones administrativas (/admin/productos, etc.)
+    return route.path === targetPath || route.path.startsWith(targetPath + '/')
 }
 
 const linkClasses = computed(() => {
@@ -110,7 +150,7 @@ const linkClasses = computed(() => {
     }
 })
 
-function getItemClasses(item: MenuItem) {
+function getItemClasses(item: NavigationItem) {
     if (props.variant === 'account') {
         return isItemActive(item)
             ? 'bg-[#103A5C] text-white font-semibold'
@@ -136,7 +176,7 @@ function getItemClasses(item: MenuItem) {
             :key="item.id"
             :to="getItemRoute(item)"
             :aria-label="item.label"
-            :aria-current="props.variant === 'account' ? (isItemActive(item) ? 'page' : undefined) : undefined"
+            :aria-current="isItemActive(item) ? 'page' : undefined"
             :active-class="props.variant === 'account' ? '' : undefined"
             :exact-active-class="props.variant === 'account' ? '' : undefined"
             class="navigation-menu__link"
