@@ -1,0 +1,88 @@
+{
+  "generados": 904,
+  "validados": 904,
+  "activosYVisibles": 904,
+  "paginas": 10,
+  "categorias": [
+    {
+      "id": 10,
+      "nombre": "Construcción y consumibles"
+    },
+    {
+      "id": 9,
+      "nombre": "Electricidad e iluminación"
+    },
+    {
+      "id": 2,
+      "nombre": "Fijaciones E2E"
+    },
+    {
+      "id": 1,
+      "nombre": "Herramientas E2E"
+    },
+    {
+      "id": 5,
+      "nombre": "Neumática"
+    },
+    {
+      "id": 6,
+      "nombre": "Protección personal"
+    },
+    {
+      "id": 7,
+      "nombre": "Ropa y calzado de trabajo"
+    },
+    {
+      "id": 8,
+      "nombre": "Señalización y balizamiento"
+    }
+  ],
+  "familias": 25,
+  "detalleBusquedaVerificadosPorFamilia": 25,
+  "imagenes": [
+    {
+      "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
+      "ruta": "/demo-catalog/llave-ajustable.webp",
+      "urlLocal": "http://127.0.0.1:57166/demo-catalog/llave-ajustable.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-CONO-NARANJA-30-CM",
+      "ruta": "/demo-catalog/cono-naranja-30-cm.webp",
+      "urlLocal": "http://127.0.0.1:57166/demo-catalog/cono-naranja-30-cm.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-BLANCO-BARBOQUEJO",
+      "ruta": "/demo-catalog/casco-blanco-barboquejo.webp",
+      "urlLocal": "http://127.0.0.1:57166/demo-catalog/casco-blanco-barboquejo.webp",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-HEX-ACABADO-DORADO",
+      "ruta": "/demo-catalog/tornillo-hexagonal.webp",
+      "urlLocal": "http://127.0.0.1:57166/demo-catalog/tornillo-hexagonal.webp",
+      "http": 200,
+      "mime": "image/webp"
+    }
+  ],
+  "conImagenVerificada": 4,
+  "pendientesDeImagen": 900,
+  "vistasConFotoVerificada": [
+    "Home",
+    "detalle"
+  ],
+  "anchoMovilPx": 360,
+  "socket": {
+    "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
+    "navegadores": 2,
+    "origenCambio": "ADMIN stock",
+    "evento": "stock.actualizado.v1",
+    "refrescoRest": true,
+    "reconexion": true,
+    "stockFinal": 24
+  }
+}

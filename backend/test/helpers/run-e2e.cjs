@@ -15,7 +15,9 @@ const profile = newProfile('E2E');
 const args = process.argv.slice(2);
 const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
 const receipts = args.includes('--receipts');
-const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts'].includes(arg));
+const demoCatalog = args.includes('--demo-catalog');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--demo-catalog'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
 
 const services = [];
 let connection;
@@ -116,7 +118,11 @@ async function main() {
   const session = await openDatabase(profile, 'E2E', checkInterrupted);
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
-  if (!fer19) await seedFixtures(connection, { includeAccountOrderFixture: receipts, includeReceiptFixture: receipts });
+  if (!fer19) await seedFixtures(connection, {
+    includeAccountOrderFixture: receipts || demoCatalog,
+    includeReceiptFixture: receipts,
+    includeCatalogProducts: !demoCatalog,
+  });
   if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
   await connection.end();
   connection = undefined;
@@ -146,6 +152,7 @@ async function main() {
     AUTH_REGISTER_WINDOW_MS: '60000',
     DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
     E2E_ISOLATED: '1',
+    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
     JWT_SECRET: randomUUID(),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
@@ -171,6 +178,7 @@ async function main() {
     ...process.env,
     NODE_ENV: 'test',
     E2E_ISOLATED: '1',
+    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
     E2E_WEB_PORT: String(plannedWebPort),
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),

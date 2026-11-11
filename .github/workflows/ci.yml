@@ -181,6 +181,11 @@ jobs:
             - name: Verify private payment receipts in the browser
               run: node backend/test/helpers/run-e2e.cjs --receipts
 
+            - name: Verify the academic catalog in disposable MariaDB
+              run: |
+                  node --test data/demo-catalog/generar.test.cjs
+                  E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog
+
             - name: Run FER-19 acceptance with the disposable #253 ledger
               run: node backend/test/helpers/run-e2e.cjs --fer19
 

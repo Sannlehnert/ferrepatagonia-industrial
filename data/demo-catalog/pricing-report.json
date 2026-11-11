@@ -1,0 +1,54 @@
+{
+  "moneda": "USD",
+  "sinEvidencia": {
+    "lotes": 10,
+    "verificados": 904,
+    "cotizables": 0
+  },
+  "publicoUSD": {
+    "lotes": 10,
+    "verificados": 904,
+    "cotizables": 904
+  },
+  "empresaUSD": {
+    "lotes": 10,
+    "verificados": 904,
+    "cotizables": 904
+  },
+  "descuentoListaEmpresaPct": 10,
+  "evidenciaSintetica": true,
+  "intentos": [
+    {
+      "sku": "FP-DEMO-OBR-MALLA-48-MM",
+      "categoria": "Construcción y consumibles",
+      "estado": "PRECIO_SINTETICO",
+      "stock": 22
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
+      "categoria": "Electricidad e iluminación",
+      "estado": "PRECIO_SINTETICO",
+      "stock": 79
+    },
+    {
+      "sku": "FP-DEMO-TOR-HEX-ACABADO-DORADO",
+      "categoria": "Fijaciones E2E",
+      "estado": "PRECIO_SINTETICO",
+      "stock": 24
+    },
+    {
+      "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
+      "categoria": "Herramientas E2E",
+      "estado": "PRECIO_SINTETICO",
+      "stock": 24
+    },
+    {
+      "sku": "FP-DEMO-NEU-MANGUERA-PU-3-5-MM-INTERIOR-EXTERIOR",
+      "categoria": "Neumática",
+      "estado": "PRECIO_SINTETICO",
+      "stock": 21
+    }
+  ],
+  "pedidos": 0,
+  "cargos": 0
+}
