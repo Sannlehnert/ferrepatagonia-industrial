@@ -162,4 +162,20 @@ test('API ADMIN de categorías con HTTP y MariaDB', {
     await request(productPath, 404);
     assert.deepEqual(await productRow(), before);
   });
+
+    await t.test('#280: el listado ADMIN incluye activas e inactivas con descripción', async () => {
+    await mutate('GET', '', 401, undefined, { cookie: null });
+    await mutate('GET', '', 403, undefined, { cookie: client.cookie });
+
+    const active = await mutate('POST', '', 201, {
+      nombre: `Categoría activa ${randomUUID()}`,
+      descripcion: 'Descripción visible en el panel',
+    });
+
+    const { data } = await mutate('GET', '', 200);
+    assert.equal((await getPersisted(id)).activo, 0);
+    assert.deepEqual(data.categorias.find(category => category.id_categoria === id), await getPersisted(id));
+    assert.deepEqual(data.categorias.find(category => category.id_categoria === active.id_categoria), active);
+    assert.ok(!(await getPublic()).some(category => category.id === id));
+  });
 });
