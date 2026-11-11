@@ -95,8 +95,8 @@ async function logout() {
 
 <template>
   <div class="fp-public flex min-h-screen flex-col bg-[#F8FAFC]">
-    <!-- Cabecera estándar -->
-    <div class="w-full bg-white shadow-xs">
+    <!-- Cabecera estándar Desktop (>= 768px) -->
+    <div class="hidden md:block w-full bg-white shadow-xs">
       <PublicHeader />
     </div>
 
@@ -120,7 +120,7 @@ async function logout() {
       <!-- 2. Centro (60%): Título "Mi Cuenta" centrado -->
       <div class="w-[60%] text-center">
         <RouterLink
-          to="/mi-cuenta"
+          :to="{ name: 'cuenta-dashboard' }"
           class="block font-bold text-base text-white tracking-wide truncate no-underline hover:text-slate-200"
         >
           Mi Cuenta
@@ -222,7 +222,7 @@ async function logout() {
       >
         <div class="min-w-0">
           <h2 class="text-xl font-bold mb-6 text-white">
-            <RouterLink to="/mi-cuenta" class="hover:text-slate-200 no-underline text-inherit focus-visible:outline-2 focus-visible:outline-white rounded">
+            <RouterLink :to="{ name: 'cuenta-dashboard' }" class="hover:text-slate-200 no-underline text-inherit focus-visible:outline-2 focus-visible:outline-white rounded">
               Mi Cuenta
             </RouterLink>
           </h2>

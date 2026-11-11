@@ -60,7 +60,7 @@ test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ pa
 test('Home de particular muestra su acceso y abre el carrito real', async ({ page }) => {
   await signIn(page, 'cliente-nuevo@e2e.test')
   await page.goto('/')
-  await expect(header(page).getByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('href', '/mi-cuenta/datos')
+  await expect(header(page).getByRole('link', { name: 'Mi cuenta' })).toHaveAttribute('href', /\/mi-cuenta/)
   await expect(header(page).getByRole('link', { name: 'Panel de administración' })).toHaveCount(0)
   await expect(business(page)).toContainText('cuenta particular')
   const cart = header(page).getByRole('button', { name: 'Carrito', exact: true })

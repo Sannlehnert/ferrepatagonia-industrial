@@ -106,13 +106,60 @@ function limpiarFiltros() {
 }
 
 // Receipt status simulation / tracking
-const receiptsUploaded = ref(new Set<number>())
+function getInitialUploadedReceipts(): Set<number> {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const raw = window.localStorage.getItem('ferrepatagonia_uploaded_receipts')
+      if (raw) {
+        const arr = JSON.parse(raw)
+        if (Array.isArray(arr)) {
+          return new Set(arr.map(Number).filter(n => Number.isInteger(n) && n > 0))
+        }
+      }
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return new Set()
+}
 
-function getReceiptStatus(order: ClientOrderSummary): 'Subido' | 'No adjunto' | 'Aprobado' | 'Rechazado' {
+const receiptsUploaded = ref(getInitialUploadedReceipts())
+
+function markReceiptUploaded(orderId: number) {
+  receiptsUploaded.value.add(orderId)
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem('ferrepatagonia_uploaded_receipts', JSON.stringify([...receiptsUploaded.value]))
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+onMounted(() => {
+  const handler = (e: Event) => {
+    const custom = e as CustomEvent<{ path: string }>
+    const match = custom.detail?.path?.match(/\/pedidos\/(\d+)\/comprobantes/)
+    if (match) {
+      markReceiptUploaded(Number(match[1]))
+    }
+  }
+  window.addEventListener('ferrepatagonia:receipt-uploaded', handler)
+  onUnmounted(() => {
+    window.removeEventListener('ferrepatagonia:receipt-uploaded', handler)
+  })
+})
+
+function handleReceiptUploaded(orderId: number) {
+  markReceiptUploaded(orderId)
+}
+
+function getReceiptStatus(order: ClientOrderSummary): 'Subido' | 'No adjunto' | 'Aprobado' | 'Rechazado' | '-' {
+  if (order.modalidadPago === 'CUENTA_CORRIENTE') return '-'
+
   if (receiptsUploaded.value.has(order.pedidoId)) return 'Subido'
-  if (order.modalidadPago === 'CUENTA_CORRIENTE') return 'Aprobado'
-  if (order.estado === 'ENTREGADO') return 'Aprobado'
-  if (order.estado === 'CANCELADO') return 'Rechazado'
+  if (order.estado === 'ENTREGADO' || order.estado === 'CONFIRMADO' || order.estado === 'ENVIADO') return 'Aprobado'
+  if (order.estado === 'CANCELADO' || order.estado === 'RECHAZADO') return 'Rechazado'
   if (order.estado === 'PENDIENTE') return 'No adjunto'
   return 'Subido'
 }
@@ -131,6 +178,7 @@ const filteredOrders = computed(() => {
       return false
     }
     if (filtroComprobante.value) {
+      if (order.modalidadPago === 'CUENTA_CORRIENTE') return false
       const status = getReceiptStatus(order)
       if (filtroComprobante.value === 'SUBIDO' && status !== 'Subido') return false
       if (filtroComprobante.value === 'NO_ADJUNTO' && status !== 'No adjunto') return false
@@ -219,7 +267,8 @@ async function submitModalReceipt() {
     const path = orderReceiptsPath(modalTargetOrder.value.pedidoId)
     const success = await uploadPaymentReceipt(path, modalFile.value, controller.signal)
     if (success) {
-      receiptsUploaded.value.add(modalTargetOrder.value.pedidoId)
+      const orderId = modalTargetOrder.value.pedidoId
+      markReceiptUploaded(orderId)
       modalNotice.value = 'Comprobante recibido. La acreditación del pago se gestiona por separado.'
       setTimeout(() => {
         closeReceiptModal()
@@ -391,33 +440,38 @@ async function submitModalReceipt() {
 
               <!-- Comprobante -->
               <td class="py-4 px-6 text-sm">
-                <div class="flex items-center gap-2">
-                  <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                  </svg>
-                  <span
-                    class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                    :class="getReceiptBadgeClasses(getReceiptStatus(order))"
-                  >
-                    {{ getReceiptStatus(order) }}
-                  </span>
-                  <button
-                    type="button"
-                    class="text-[#145A8D] font-semibold underline cursor-pointer text-xs ml-1 hover:text-[#103A5C]"
-                    @click="toggleOrder(order.pedidoId)"
-                  >
-                    ver
-                  </button>
-                  <button
-                    type="button"
-                    class="inline-flex items-center justify-center min-h-[32px] min-w-[32px] text-slate-500 hover:text-[#103A5C] hover:bg-slate-100 rounded-[8px] transition cursor-pointer p-1"
-                    title="Subir o editar comprobante"
-                    aria-label="Subir o editar comprobante"
-                    @click="openReceiptModal(order)"
-                  >
-                    ✏️
-                  </button>
-                </div>
+                <template v-if="order.modalidadPago === 'CUENTA_CORRIENTE'">
+                  <span class="text-slate-400 font-medium">-</span>
+                </template>
+                <template v-else>
+                  <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span
+                      class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
+                      :class="getReceiptBadgeClasses(getReceiptStatus(order))"
+                    >
+                      {{ getReceiptStatus(order) }}
+                    </span>
+                    <button
+                      type="button"
+                      class="text-[#145A8D] font-semibold underline cursor-pointer text-xs ml-1 hover:text-[#103A5C]"
+                      @click="toggleOrder(order.pedidoId)"
+                    >
+                      ver
+                    </button>
+                    <button
+                      type="button"
+                      class="inline-flex items-center justify-center min-h-[32px] min-w-[32px] text-slate-500 hover:text-[#103A5C] hover:bg-slate-100 rounded-[8px] transition cursor-pointer p-1"
+                      title="Subir o editar comprobante"
+                      aria-label="Subir o editar comprobante"
+                      @click="openReceiptModal(order)"
+                    >
+                      ✏️
+                    </button>
+                  </div>
+                </template>
               </td>
 
               <!-- Detalle Action Button -->
@@ -437,7 +491,7 @@ async function submitModalReceipt() {
             <!-- Expanded Detail Row -->
             <tr v-if="expandedOrderId === order.pedidoId">
               <td colspan="6" class="p-4 sm:p-6 bg-slate-50/50 border-t border-[#E2E8F0]">
-                <ClientOrderDetail :order-id="order.pedidoId" />
+                <ClientOrderDetail :order-id="order.pedidoId" @receipt-uploaded="handleReceiptUploaded(order.pedidoId)" />
               </td>
             </tr>
           </tbody>
@@ -486,7 +540,7 @@ async function submitModalReceipt() {
             </div>
           </div>
 
-          <div class="flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-sm">
+          <div v-if="order.modalidadPago !== 'CUENTA_CORRIENTE'" class="flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-sm">
             <div class="flex items-center gap-2">
               <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -516,6 +570,10 @@ async function submitModalReceipt() {
               ✏️ Comprobante
             </button>
           </div>
+          <div v-else class="flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-sm text-slate-500">
+            <span class="text-xs">Comprobante:</span>
+            <span class="text-xs font-medium">-</span>
+          </div>
 
           <button
             type="button"
@@ -530,6 +588,7 @@ async function submitModalReceipt() {
           <ClientOrderDetail
             v-if="expandedOrderId === order.pedidoId"
             :order-id="order.pedidoId"
+            @receipt-uploaded="handleReceiptUploaded(order.pedidoId)"
           />
         </div>
       </div>

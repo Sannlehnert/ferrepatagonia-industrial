@@ -62,7 +62,7 @@ const auth = useAuthStore()
         </div>
         <RouterLink
           v-else-if="auth.user?.tipo_cliente === 'EMPRESA' && auth.rol === 'CLIENTE'"
-          :to="{ name: 'cuenta-datos' }"
+          :to="{ name: 'cuenta-dashboard' }"
           class="inline-flex min-h-11 items-center rounded text-sm font-bold text-[#145a8d] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
         >
           Ir a mi cuenta

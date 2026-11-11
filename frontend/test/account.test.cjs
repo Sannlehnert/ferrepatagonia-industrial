@@ -103,6 +103,6 @@ test('MiCuentaLayout and CartView provide mobile header and intelligent back nav
 
  const headerSource = readFileSync(resolve(__dirname, '../src/components/PublicHeader.vue'), 'utf8');
  assert.match(headerSource, /openCartDrawer/);
- assert.match(headerSource, /route:\s*'cuenta-datos'/);
+ assert.match(headerSource, /route:\s*'cuenta-dashboard'/);
 });
 

@@ -127,12 +127,11 @@ function handleDialogKeydown(event: KeyboardEvent) {
 
         <RouterLink
           :to="{ name: 'carrito' }"
-          class="mt-2 box-border flex min-h-[44px] sm:min-h-12 items-center
-            justify-center rounded-lg border border-solid
-            border-slate-200 bg-white p-2 text-center
-            font-semibold text-[#103a5c] no-underline hover:bg-slate-50
+          class="mt-3 box-border flex min-h-12 w-full items-center
+            justify-center rounded-lg bg-[#103A5C] p-2 text-center
+            font-semibold text-white no-underline hover:bg-[#145a8d]
             focus-visible:outline-2
-            focus-visible:outline-[#145a8d]"
+            focus-visible:outline-[#145a8d] transition-colors"
           @click="panel.close()"
         >
           Ver carrito completo

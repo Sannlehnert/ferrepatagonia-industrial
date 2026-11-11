@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import DatosClientes from '@/views/cuenta/DatosClientes.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
 import { onRealtime } from '@/services/realtime'
@@ -150,5 +151,7 @@ const isParticular = computed(() => {
     <p v-if="loading && !orders" role="status" class="text-center text-sm text-slate-500">
       Cargando métricas…
     </p>
+
+    <DatosClientes />
   </div>
 </template>

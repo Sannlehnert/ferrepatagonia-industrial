@@ -36,7 +36,7 @@ const account = computed(() => {
     const admin = navigation.value.find(item => item.id === 'public-admin-panel')
     return admin ? { label: admin.label, route: admin.routeName } : null
   }
-  if (auth.rol === 'CLIENTE') return { label: 'Mi cuenta', route: 'cuenta-datos' }
+  if (auth.rol === 'CLIENTE') return { label: 'Mi cuenta', route: 'cuenta-dashboard' }
   return { label: 'Ingresar', route: 'login' }
 })
 

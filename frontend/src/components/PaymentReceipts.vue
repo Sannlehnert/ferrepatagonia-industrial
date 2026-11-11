@@ -90,6 +90,9 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
     if (!valid()) return
     notice.value = message
     clearFile()
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('ferrepatagonia:receipt-uploaded', { detail: { path: props.path } }))
+    }
     await reload(props.mode === 'admin' ? page.value : 1)
   } catch (cause) {
     if (!valid()) return
