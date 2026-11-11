@@ -1,8 +1,14 @@
+export type CompanyApprovalStatus = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA';
+
 export interface AdminClient {
     id: number
     nombreRazonSocial: string
     email: string
     fechaRegistro: string
+    tipoCliente?: 'PARTICULAR' | 'EMPRESA'
+    cuit?: string | null
+    docCliente?: string | null
+    estadoAprobacionEmpresa?: CompanyApprovalStatus | null
 }
 
 export interface AdminClientsResponse {
