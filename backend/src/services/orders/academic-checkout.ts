@@ -5,7 +5,7 @@ import { env } from '../../config/env.config';
 import type { PriceLine } from '../pricing/pricing.types';
 import { AccountOrderError } from './account-order.errors';
 
-type AcademicCheckout = Readonly<{ database: string; hostname: string }>;
+type AcademicCheckout = Readonly<{ database: string; hostname: string; marker?: string }>;
 const issued = new WeakSet<AcademicCheckout>();
 const requestPolicy = Symbol('academicCheckout');
 type AcademicRequest = IncomingMessage & { [requestPolicy]?: AcademicCheckout };
@@ -24,7 +24,11 @@ async function verifyDatabase(manager: EntityManager, expected: AcademicCheckout
   );
   if (actual?.db !== expected.database || actual.host !== expected.hostname ||
     !/^11\.4\.\d+-MariaDB\b/.test(actual.version)) {
-    throw new Error('El checkout académico requiere la MariaDB descartable verificada.');
+    throw new Error('El checkout académico requiere la MariaDB académica verificada.');
+  }
+  if (expected.marker) {
+    const [identity] = await manager.query<{ token: string }[]>('SELECT token FROM DEMO286_IDENTIDAD WHERE id = 1');
+    if (identity?.token !== expected.marker) throw new Error('La identidad de la base académica no coincide.');
   }
 }
 
@@ -39,6 +43,22 @@ export async function issueAcademicCheckout(profile: { database: string; id: str
     throw new Error('Configuración incompatible con el checkout académico descartable.');
   }
   const policy = Object.freeze({ database: profile.database, hostname: profile.id.slice(0, 12) });
+  await verifyDatabase(dataSource.manager, policy);
+  issued.add(policy);
+  return policy;
+}
+
+// El lanzador local, separado de npm start, acredita el contenedor y su volumen
+// antes de abrir la conexión. Además se contrasta la identidad SQL en cada compra.
+export async function issuePersistentAcademicCheckout(profile: { database: string; token: string; port: number }) {
+  const origin = new URL(env.httpSecurity.publicOrigin);
+  if (!process.send || env.httpSecurity.mode !== 'test' || env.db.host !== '127.0.0.1' ||
+    env.db.user !== 'demo286' || env.db.port !== profile.port || env.db.database !== profile.database ||
+    !/^[a-f0-9]{32}$/.test(profile.token) || profile.database !== 'ferre_demo_' + profile.token ||
+    origin.protocol !== 'http:' || origin.hostname !== 'localhost') {
+    throw new Error('Configuración incompatible con el checkout académico local.');
+  }
+  const policy = Object.freeze({ database: profile.database, hostname: 'demo286-' + profile.token, marker: profile.token });
   await verifyDatabase(dataSource.manager, policy);
   issued.add(policy);
   return policy;

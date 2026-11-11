@@ -16,10 +16,14 @@ const credentials = {
   },
 };
 
-async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false, includeCatalogProducts = true } = {}) {
+async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false, includeCatalogProducts = true, persistentProfile } = {}) {
   const [current] = await connection.query("SELECT DATABASE() AS databaseName");
 
-  assert.match(current.databaseName, /^e2e_test_[a-f0-9]{32}$/);
+  if (persistentProfile) {
+    await require('./demo286-persistent.cjs').verifySql(connection, persistentProfile);
+    assert.equal(includeCatalogProducts, false);
+    assert.equal(includeReceiptFixture, 'particular');
+  } else assert.match(current.databaseName, /^e2e_test_[a-f0-9]{32}$/);
 
   // No borrar ni sobrescribir datos: exigir una base recién creada.
   for (const table of ["CATEGORIA", "PRODUCTO", "CLIENTE", "USUARIO"]) {
@@ -115,8 +119,13 @@ async function seedFixtures(connection, { includeAccountOrderFixture = true, inc
       `);
     }
 
-    const hash = await bcrypt.hash(credentials.admin.password, 10);
-    if (includeReceiptFixture) {
+    const hash = await bcrypt.hash(persistentProfile?.accountPassword ?? credentials.admin.password, 10);
+    if (includeReceiptFixture === 'particular') {
+      await connection.query(
+        "INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total) " +
+        "VALUES (1, 'CONFIRMADO', 'TRANSFERENCIA', 42, 0, 42, 'USD')",
+      );
+    } else if (includeReceiptFixture) {
       await connection.query(
         "INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total, moneda_total) VALUES " +
         "(1, 'CONFIRMADO', 'TRANSFERENCIA', 42, 0, 42, 'USD'), (4, 'CONFIRMADO', 'CUENTA_CORRIENTE', 84, 0, 84, 'USD')",

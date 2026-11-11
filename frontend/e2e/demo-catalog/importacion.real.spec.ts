@@ -185,7 +185,16 @@ async function auditarPrecios(api: APIRequestContext, path: string, filas: Produ
 test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerciales', async ({ page, baseURL, browser, playwright }, testInfo) => {
   test.setTimeout(300_000)
   expect(process.env.E2E_DEMO_CATALOG).toBe('1')
-  const session = await connectOwned(JSON.parse(process.env.CCE2E_TEST_PROFILE!), 'E2E')
+  const persistent = process.env.E2E_LOCAL_PERSISTENT === '1'
+  const profile = persistent ? JSON.parse(process.env.DEMO286_LOCAL_PROFILE!) : null
+  if (persistent) expect(process.env.E2E_DEMO_INTERACTIVE).toBe('1')
+  const session = persistent
+    ? await require('../../../backend/test/helpers/demo286-persistent.cjs').connectPersistent(profile)
+    : await connectOwned(JSON.parse(process.env.CCE2E_TEST_PROFILE!), 'E2E')
+  const auth = persistent ? {
+    admin: { ...credentials.admin, password: profile.accountPassword },
+    account: { ...credentials.account, password: profile.accountPassword },
+  } : credentials
   const db = session.connection
   const config = { baseURL, extraHTTPHeaders: { Origin: baseURL! } }
   const publico = await playwright.request.newContext(config)
@@ -197,8 +206,8 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     const [inicial] = await db.query('SELECT COUNT(*) AS total FROM PRODUCTO')
     expect(Number(inicial.total)).toBe(0)
     expect((await respuesta(await publico.get('/api/catalogo'))).data.pagination.total).toBe(0)
-    await respuesta(await admin.post('/api/auth/login', { data: credentials.admin }))
-    await respuesta(await empresa.post('/api/auth/login', { data: credentials.account }))
+    await respuesta(await admin.post('/api/auth/login', { data: auth.admin }))
+    await respuesta(await empresa.post('/api/auth/login', { data: auth.account }))
     const categorias = async (): Promise<Categoria[]> =>
       (await respuesta(await publico.get('/api/categorias'))).data.categorias
     const previas = await categorias()
@@ -343,6 +352,13 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
+    }
+    if (process.env.E2E_DEMO_INTERACTIVE === '1') {
+      expect(empresaUSD.comprablesAcademico).toBe(904)
+      expect(imagenes).toHaveLength(132)
+      expect((await respuesta(await empresa.get('/api/pedidos'))).data.items).toHaveLength(0)
+      console.log(`Carga interactiva verificada: ${filas.length} SKU y ${imagenes.length} imágenes; sin pedidos previos.`)
+      return
     }
     const principal = dbFilas[0]!
     const seleccion = [principal, ...usadas.filter(c => c.id !== principal.id_categoria).slice(0, 4)

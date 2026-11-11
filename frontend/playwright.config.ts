@@ -10,7 +10,9 @@ if (!baseURL || process.env.E2E_ISOLATED !== '1') {
 
 const target = new URL(baseURL);
 
-if (target.protocol !== 'http:' || target.hostname !== '127.0.0.1') {
+const allowedHost = process.env.E2E_LOCAL_PERSISTENT === '1' && process.env.E2E_DEMO_CATALOG === '1'
+    ? 'localhost' : '127.0.0.1';
+if (target.protocol !== 'http:' || target.hostname !== allowedHost) {
     throw new Error('Las E2E solo pueden ejecutarse contra el servidor local aislado.');
 }
 
