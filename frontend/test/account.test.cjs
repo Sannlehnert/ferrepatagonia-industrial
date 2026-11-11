@@ -88,7 +88,7 @@ test('NavigationMenu and MiCuentaDashboardView segregate PARTICULAR from EMPRESA
 
 test('MiCuentaLayout and CartView provide mobile header and intelligent back navigation', () => {
  const layoutSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaLayout.vue'), 'utf8');
- assert.match(layoutSource, /hidden\s+md:block\s+w-full\s+bg-white\s+shadow-xs/);
+ assert.match(layoutSource, /w-full\s+bg-white\s+shadow-xs/);
  assert.match(layoutSource, /bg-\[#0B2438\]\s+text-white\s+px-4\s+py-3\s+flex\s+items-center\s+justify-between/);
  assert.match(layoutSource, /Volver/);
  assert.match(layoutSource, /last_external_route/);
@@ -102,8 +102,7 @@ test('MiCuentaLayout and CartView provide mobile header and intelligent back nav
  assert.match(cartSource, /router\.back\(\)/);
 
  const headerSource = readFileSync(resolve(__dirname, '../src/components/PublicHeader.vue'), 'utf8');
- assert.match(headerSource, /window\.innerWidth\s*<\s*768/);
- assert.match(headerSource, /router\.push\('\/carrito'\)/);
- assert.match(headerSource, /route:\s*'cuenta-dashboard'/);
+ assert.match(headerSource, /openCartDrawer/);
+ assert.match(headerSource, /route:\s*'cuenta-datos'/);
 });
 

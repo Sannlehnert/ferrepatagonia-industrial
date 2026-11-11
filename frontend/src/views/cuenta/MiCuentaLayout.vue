@@ -95,12 +95,12 @@ async function logout() {
 
 <template>
   <div class="fp-public flex min-h-screen flex-col bg-[#F8FAFC]">
-    <!-- Cabecera estándar Desktop (>= 768px) -->
-    <div class="hidden md:block w-full bg-white shadow-xs">
+    <!-- Cabecera estándar -->
+    <div class="w-full bg-white shadow-xs">
       <PublicHeader />
     </div>
 
-    <!-- Cabecera móvil Mi Cuenta (< 768px) con proporción 20% / 60% / 20% -->
+    <!-- Barra de herramientas móvil Mi Cuenta (< 768px) con proporción 20% / 60% / 20% -->
     <header class="md:hidden bg-[#0B2438] text-white px-4 py-3 flex items-center justify-between border-b border-[#35556F]">
       <!-- 1. Izquierda (20%): Botón Volver estilizado con área táctil >= 44x44px -->
       <div class="w-[20%] flex items-center justify-start">

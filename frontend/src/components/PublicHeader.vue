@@ -36,7 +36,7 @@ const account = computed(() => {
     const admin = navigation.value.find(item => item.id === 'public-admin-panel')
     return admin ? { label: admin.label, route: admin.routeName } : null
   }
-  if (auth.rol === 'CLIENTE') return { label: 'Mi cuenta', route: 'cuenta-dashboard' }
+  if (auth.rol === 'CLIENTE') return { label: 'Mi cuenta', route: 'cuenta-datos' }
   return { label: 'Ingresar', route: 'login' }
 })
 
@@ -61,10 +61,15 @@ async function submitSearch() {
   await finishNavigation()
 }
 
-function handleCartClick() {
+function openCartDrawer() {
   close()
-  if (typeof window !== 'undefined' && window.innerWidth < 768) {
-    void router.push('/carrito')
+  cartPanel.open()
+}
+
+function toggleCartDrawer() {
+  close()
+  if (cartPanel.visible) {
+    cartPanel.close()
   } else {
     cartPanel.open()
   }
@@ -99,7 +104,7 @@ function handleCartClick() {
         aria-label="Carrito"
         aria-haspopup="dialog"
         :aria-expanded="cartPanel.visible"
-        @click="handleCartClick"
+        @click="openCartDrawer"
       >
         <CommerceIcon name="cart" /> <span>Carrito</span>
       </button>
