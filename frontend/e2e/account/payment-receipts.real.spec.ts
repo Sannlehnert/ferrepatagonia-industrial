@@ -11,7 +11,9 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Cerrar sesión', exact: true })).toBeVisible()
+  const logout = page.getByRole('button', { name: 'Cerrar sesión', exact: true })
+  const menu = page.getByRole('button', { name: 'Menú de navegación de cuenta' })
+  await expect(logout.or(menu)).toBeVisible()
 }
 
 async function upload(region: Locator) {

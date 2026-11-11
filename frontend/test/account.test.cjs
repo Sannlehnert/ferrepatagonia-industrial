@@ -39,6 +39,7 @@ test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedi
  const routerSource = readFileSync(resolve(__dirname, '../src/router/index.ts'), 'utf8');
  assert.match(routerSource, /path:\s*''[\s\S]*?MiCuentaDashboardView\.vue/);
  assert.match(routerSource, /path:\s*'pedidos'[\s\S]*?HistorialPedidos\.vue/);
+ assert.match(routerSource, /last_external_route/);
 });
 
 test('MiCuentaDashboardView renders greeting, 3 metric cards and no orders table', () => {
@@ -89,9 +90,11 @@ test('MiCuentaLayout and CartView provide mobile header and intelligent back nav
  const layoutSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaLayout.vue'), 'utf8');
  assert.match(layoutSource, /hidden\s+md:block\s+w-full\s+bg-white\s+shadow-xs/);
  assert.match(layoutSource, /bg-\[#0B2438\]\s+text-white\s+px-4\s+py-3\s+flex\s+items-center\s+justify-between/);
- assert.match(layoutSource, /← Volver/);
- assert.match(layoutSource, /router\.back\(\)/);
- assert.match(layoutSource, /router\.push\('\/catalogo'\)/);
+ assert.match(layoutSource, /Volver/);
+ assert.match(layoutSource, /last_external_route/);
+ assert.match(layoutSource, /router\.push\(fallback\)/);
+ assert.match(layoutSource, /isMobileMenuOpen/);
+ assert.match(layoutSource, /Menú de navegación de cuenta/);
 
  const cartSource = readFileSync(resolve(__dirname, '../src/views/CartView.vue'), 'utf8');
  assert.match(cartSource, /md:hidden[\s\S]*?← Volver/);

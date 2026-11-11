@@ -18,7 +18,9 @@ async function loginClient(page: Page) {
   await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Cerrar sesión', exact: true })).toBeVisible()
+  const logoutBtn = page.getByRole('button', { name: 'Cerrar sesión', exact: true })
+  const menuToggle = page.getByRole('button', { name: 'Menú de navegación de cuenta' })
+  await expect(logoutBtn.or(menuToggle)).toBeVisible()
 }
 
 for (const width of viewports) {
@@ -61,6 +63,10 @@ for (const width of viewports) {
       await assertNoHorizontalScroll(page, `Historial de Pedidos a ${width}px`)
 
       // Validar área táctil del botón Cerrar Sesión
+      const menuToggle = page.getByRole('button', { name: 'Menú de navegación de cuenta' })
+      if (await menuToggle.isVisible()) {
+        await menuToggle.click()
+      }
       const logoutBtn = page.getByRole('button', { name: 'Cerrar sesión', exact: true })
       await expect(logoutBtn).toBeVisible()
       const logoutBox = await logoutBtn.boundingBox()
@@ -68,6 +74,47 @@ for (const width of viewports) {
       if (logoutBox) {
         expect(logoutBox.height).toBeGreaterThanOrEqual(44)
         expect(logoutBox.width).toBeGreaterThanOrEqual(44)
+      }
+      if (await menuToggle.isVisible()) {
+        await assertNoHorizontalScroll(page, `Menú de cuenta desplegado a ${width}px`)
+        await menuToggle.click()
+      }
+    })
+
+    test(`Cabecera móvil, menú desplegable y botón Volver a ${width}px`, async ({ page }) => {
+      await loginClient(page)
+      await page.goto('/catalogo')
+      await page.goto('/mi-cuenta/datos')
+      await page.goto('/mi-cuenta/pedidos')
+
+      if (width < 768) {
+        // Validar área táctil del botón Volver (>= 44x44px)
+        const backBtn = page.getByRole('button', { name: 'Volver', exact: true })
+        await expect(backBtn).toBeVisible()
+        const backBox = await backBtn.boundingBox()
+        expect(backBox).not.toBeNull()
+        if (backBox) {
+          expect(backBox.height).toBeGreaterThanOrEqual(44)
+          expect(backBox.width).toBeGreaterThanOrEqual(44)
+        }
+
+        // Validar despliegue del menú móvil con accesibilidad y navegación
+        const menuToggle = page.getByRole('button', { name: 'Menú de navegación de cuenta' })
+        await expect(menuToggle).toBeVisible()
+        await menuToggle.click()
+
+        await expect(page.getByRole('link', { name: 'Historial de pedidos' })).toBeVisible()
+        await expect(page.getByRole('link', { name: 'Pedidos sin comprobante' })).toBeVisible()
+        await expect(page.getByRole('link', { name: 'Mis datos' })).toBeVisible()
+
+        // Al hacer clic en un enlace del menú, debe cerrar el menú y navegar
+        await page.getByRole('link', { name: 'Mis datos' }).click()
+        await expect(page).toHaveURL(/\/mi-cuenta\/datos/)
+        await expect(page.getByRole('link', { name: 'Historial de pedidos' })).toBeHidden()
+
+        // Al presionar Volver, retorna inmediatamente a la ruta externa de origen (/catalogo)
+        await backBtn.click()
+        await expect(page).toHaveURL(/\/catalogo/)
       }
     })
   })

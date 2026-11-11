@@ -163,6 +163,20 @@ const router = createRouter({
   ],
 })
 
+router.beforeEach((to, from) => {
+  if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+    if (!from.path.startsWith('/mi-cuenta') && to.path.startsWith('/mi-cuenta')) {
+      const isAuthRoute = from.path === '/login' || from.path === '/registro'
+      const fallback = from.fullPath && from.fullPath !== '/' && !isAuthRoute ? from.fullPath : '/catalogo'
+      try {
+        sessionStorage.setItem('last_external_route', fallback)
+      } catch {
+        // Ignorar restricciones de almacenamiento en navegadores privados
+      }
+    }
+  }
+})
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
