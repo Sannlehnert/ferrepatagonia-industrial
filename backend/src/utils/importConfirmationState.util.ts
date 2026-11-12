@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { readStorageDir } from '../config/storage-env.config';
 import { ProductImportRowDto, RowFieldIssue } from '../dtos/products/productImport.dto';
 
 export type ImportBatchGlobalState = 'pendiente' | 'procesando' | 'por_verificar' | 'completado';
@@ -60,7 +61,13 @@ export const isTokenActivelyExecuting = (token: string): boolean => {
 };
 
 const getStorageDir = (): string => {
-    const dir = process.env.IMPORT_STORAGE_DIR || path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
+    let configured: string | undefined;
+    try {
+        configured = readStorageDir('IMPORT_STORAGE_DIR', process.env);
+    } catch {
+        return os.tmpdir();
+    }
+    const dir = configured ?? path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
     try {
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });

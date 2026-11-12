@@ -2,6 +2,7 @@ import { constants, existsSync } from 'node:fs';
 import { lstat, open, realpath, stat, unlink } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { readStorageDir } from '../../config/storage-env.config';
 import { isReceiptId, ReceiptError, receiptUnavailable, type ReceiptMime } from './receipt-types';
 
 function contains(parent: string, child: string): boolean {
@@ -10,8 +11,13 @@ function contains(parent: string, child: string): boolean {
 }
 
 export async function receiptDirectory(): Promise<string> {
-  const configured = process.env.RECEIPT_STORAGE_DIR;
-  if (!configured || !isAbsolute(configured)) throw receiptUnavailable();
+  let configured: string | undefined;
+  try {
+    configured = readStorageDir('RECEIPT_STORAGE_DIR', process.env);
+  } catch {
+    throw receiptUnavailable();
+  }
+  if (!configured) throw receiptUnavailable();
   const backend = resolve(__dirname, '../../..');
   const parent = resolve(backend, '..');
   const projectDir = existsSync(join(parent, '.git')) ||
