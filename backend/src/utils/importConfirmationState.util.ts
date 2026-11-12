@@ -61,13 +61,14 @@ export const isTokenActivelyExecuting = (token: string): boolean => {
 };
 
 const getStorageDir = (): string => {
+    const fallbackDir = path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
     let configured: string | undefined;
     try {
         configured = readStorageDir('IMPORT_STORAGE_DIR', process.env);
     } catch {
-        return os.tmpdir();
+        configured = undefined;
     }
-    const dir = configured ?? path.join(os.tmpdir(), 'ferrepatagonia-import-storage');
+    const dir = configured ?? fallbackDir;
     try {
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });

@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
-const { randomBytes } = require('node:crypto');
+const { randomBytes, randomUUID } = require('node:crypto');
+const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { test } = require('node:test');
@@ -60,6 +61,7 @@ Object.assign(process.env, {
 const { loadEnv } = require('../dist/config/env.config');
 const { loadHttpSecurity, validateJwtSecret } = require('../dist/config/http-security.config');
 const { loadStorageConfig, readStorageDir } = require('../dist/config/storage-env.config');
+const { persistRecordToDisk } = require('../dist/utils/importConfirmationState.util');
 
 test('Joi env: aplica valores predeterminados válidos en desarrollo sin storage configurado', () => {
   const cfg = loadEnv(baseDevEnv());
@@ -254,6 +256,84 @@ test('Joi storage: readStorageDir refleja mutaciones dinámicas de process.env c
   } finally {
     if (prev === undefined) delete process.env.PRODUCT_IMAGE_STORAGE_DIR;
     else process.env.PRODUCT_IMAGE_STORAGE_DIR = prev;
+  }
+});
+
+test('Joi storage: importConfirmationState unifica el fallback en ferrepatagonia-import-storage ante ausencia, vacío o valor inválido posterior', () => {
+  const savedEnv = {
+    IMPORT_STORAGE_DIR: process.env.IMPORT_STORAGE_DIR,
+    TEMP: process.env.TEMP,
+    TMP: process.env.TMP,
+    TMPDIR: process.env.TMPDIR,
+  };
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-import-fallback-'));
+  const expectedFallbackDir = path.join(tmpRoot, 'ferrepatagonia-import-storage');
+  const customDir = path.join(tmpRoot, 'custom-import-dir');
+
+  const persistSample = token => {
+    const now = Date.now();
+    persistRecordToDisk({
+      token,
+      createdAtMs: now,
+      expiresAtMs: now + 60_000,
+      adminId: 1,
+      status: 'pendiente',
+      rows: [],
+      attemptedSkus: new Set(),
+      importedProductIds: new Set(),
+      batchLinkedProducts: new Map(),
+    });
+  };
+
+  try {
+    process.env.TEMP = tmpRoot;
+    process.env.TMP = tmpRoot;
+    process.env.TMPDIR = tmpRoot;
+    assert.equal(os.tmpdir(), tmpRoot);
+
+    // 1. IMPORT_STORAGE_DIR ausente
+    delete process.env.IMPORT_STORAGE_DIR;
+    const missingToken = randomUUID();
+    persistSample(missingToken);
+    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${missingToken}.json`)), true);
+    assert.equal(fs.existsSync(path.join(tmpRoot, `${missingToken}.json`)), false);
+
+    // 2. IMPORT_STORAGE_DIR=''
+    process.env.IMPORT_STORAGE_DIR = '';
+    const emptyToken = randomUUID();
+    persistSample(emptyToken);
+    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${emptyToken}.json`)), true);
+    assert.equal(fs.existsSync(path.join(tmpRoot, `${emptyToken}.json`)), false);
+
+    // 3. Modificación posterior a un valor inválido (incluso tras configuración válida y sin existir aún el subdirectorio)
+    process.env.IMPORT_STORAGE_DIR = customDir;
+    const validToken = randomUUID();
+    persistSample(validToken);
+    assert.equal(fs.existsSync(path.join(customDir, `${validToken}.json`)), true);
+
+    fs.rmSync(expectedFallbackDir, { recursive: true, force: true });
+    process.env.IMPORT_STORAGE_DIR = 'relative/invalid-import-dir';
+    const invalidToken = randomUUID();
+    persistSample(invalidToken);
+    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${invalidToken}.json`)), true);
+    assert.equal(fs.existsSync(path.join(tmpRoot, `${invalidToken}.json`)), false);
+
+    process.env.IMPORT_STORAGE_DIR = '   ';
+    const blankInvalidToken = randomUUID();
+    persistSample(blankInvalidToken);
+    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${blankInvalidToken}.json`)), true);
+    assert.equal(fs.existsSync(path.join(tmpRoot, `${blankInvalidToken}.json`)), false);
+
+    assert.deepEqual(
+      fs.readdirSync(tmpRoot).filter(entry => entry.endsWith('.json')),
+      [],
+    );
+  } finally {
+    for (const [key, value] of Object.entries(savedEnv)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    fs.rmSync(tmpRoot, { recursive: true, force: true });
   }
 });
 
