@@ -32,8 +32,9 @@ requisitos; los valores entre `<...>` son placeholders, no credenciales:
 | `HTTPS_TERMINATION` | En producción debe ser `trusted-proxy`; identifica la terminación HTTPS confiable, no un proveedor específico. |
 | `AUTH_RATE_STORE`, `API_PROCESS_COUNT` | El único store disponible es `memory`; requiere exactamente un proceso. En producción ambos deben configurarse explícitamente. |
 | `AUTH_LOGIN_LIMIT`, `AUTH_LOGIN_WINDOW_MS`, `AUTH_REGISTER_LIMIT`, `AUTH_REGISTER_WINDOW_MS` | Umbrales de rate limit positivos. Los valores locales son operativos, no límites comerciales ni productivos acordados. |
+| `PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR` | Opcionales al iniciar; si se informan con valor no vacío, deben ser rutas absolutas válidas. |
 
-Ejemplo de formato, sin valores de secretos:
+La validación de esquema de todas estas variables se realiza al inicio con **Joi** antes de abrir la base de datos o el servidor HTTP. Ejemplo de formato, sin valores de secretos:
 
 ```dotenv
 PORT=<puerto>
@@ -662,3 +663,40 @@ Consultar el [contrato REST, decisiones y pruebas](../docs/api/catalogo.md).
 ## Comprobantes de pago (#275)
 
 Consultar el [contrato REST y la configuración del almacenamiento privado](../docs/275-payment-receipts.md).
+
+## Cumplimiento académico — Programación Backend
+
+Resumen técnico verificable de los requisitos de la materia implementados en este backend:
+
+1. **Login y control de acceso con JWT**
+   - `POST /api/auth/login` ([auth.routes.ts](src/routes/auth.routes.ts), [auth.controller.ts](src/controllers/auth.controller.ts)) valida credenciales con `bcrypt.compare` ([auth.services.ts](src/services/auth.services.ts)) y firma un JWT `HS256` con expiración de `2h` mediante `signToken` ([token.service.ts](src/services/token.service.ts)).
+   - El token se emite en la cookie HttpOnly `jwt_token` ([auth-cookie.config.ts](src/config/auth-cookie.config.ts)); `POST /api/auth/logout` limpia dicha cookie.
+   - El registro de clientes utiliza `bcrypt.hash` con `SALT_ROUNDS = 12` en [password.service.ts](src/services/password.service.ts).
+   - Las rutas privadas verifican firma, algoritmo `HS256`, expiración (`ignoreExpiration: false`), vigencia de usuario activo y coincidencia de rol contra la base de datos mediante Passport JWT (`sessionJwtStrategy`, `authPassport`) y los middlewares `authenticate` y `authorizeRoles` ([passport.config.ts](src/config/passport.config.ts), [auth.middleware.ts](src/middlewares/auth.middleware.ts), [admin.routes.ts](src/routes/admin.routes.ts)).
+
+2. **Validación de variables de entorno con Joi**
+   - Implementada con `Joi.object(...)` y `{ convert: false, abortEarly: true }` al importar la configuración de entorno ([env.config.ts](src/config/env.config.ts), [http-security.config.ts](src/config/http-security.config.ts), [storage-env.config.ts](src/config/storage-env.config.ts)), antes de ejecutar `initializeDatabase()` y `server.listen()` en [server.ts](src/server.ts).
+   - Valida configuración principal (`PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `LEGACY_ORDER_UTC_OFFSET`), configuración de seguridad HTTP (`NODE_ENV`, `APP_PUBLIC_ORIGIN`, `TRUSTED_PROXY_CIDRS`, `HTTPS_TERMINATION`, `AUTH_RATE_STORE`, `API_PROCESS_COUNT`, rate limits) y variables opcionales de almacenamiento (`PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR`) sin filtrar secretos ni valores sensibles en los errores.
+   - Los consumidores de almacenamiento ([productImage.service.ts](src/services/productImage.service.ts), [receipt-storage.ts](src/services/receipts/receipt-storage.ts), [importConfirmationState.util.ts](src/utils/importConfirmationState.util.ts)) consultan dinámicamente `readStorageDir(...)` con el mismo esquema Joi.
+
+3. **ORM TypeORM para comunicación con MariaDB**
+   - `ControlledDataSource` ([database.config.ts](src/config/database.config.ts), `connectorPackage: 'mysql2'`) registra las 11 definiciones `EntitySchema` de `activeSchemas` ([active.schemas.ts](src/entities/active.schemas.ts)): `CategoriaSchema`, `ProductoSchema`, `ClienteSchema`, `UsuarioSchema`, `ListaPrecioSchema`, `CotizacionSchema`, `CarritoSchema`, `ItemCarritoSchema`, `CuentaCorrienteSchema`, `MovimientoCuentaCorrienteSchema` e `ImputacionMovimientoCuentaSchema`.
+   - El código de aplicación combina operaciones de repositorio y `QueryBuilder` de TypeORM (`dataSource.getRepository(...)` en [usuario.repository.ts](src/repositories/usuario.repository.ts), [category.repository.ts](src/repositories/category.repository.ts), [cliente.repository.ts](src/repositories/cliente.repository.ts) y [adminProduct.repository.ts](src/repositories/adminProduct.repository.ts)) con transacciones explícitas sobre `QueryRunner`/`EntityManager` mediante `inTransaction(...)`.
+   - El proyecto mantiene SQL directo parametrizado con `EntityManager.query` en flujos transaccionales críticos (por ejemplo, bloqueos `FOR UPDATE` en [cart.repository.ts](src/repositories/cart.repository.ts)) y un pool `mariadb` dedicado únicamente al snapshot consistente de lectura del catálogo ([catalog-snapshot.config.ts](src/config/catalog-snapshot.config.ts)). Además, `synchronize`, `dropSchema` y `migrationsRun` permanecen deshabilitados porque la autoridad del esquema es SQL.
+
+4. **Carga de archivos con Multer (requisito opcional)**
+   - Importación de catálogo CSV/XLSX: `uploadCatalogFile` ([fileUpload.middleware.ts](src/middlewares/fileUpload.middleware.ts)) en las rutas de [productImport.routes.ts](src/routes/productImport.routes.ts) (`/api/admin/productos/importar/...`), con `memoryStorage`, límite de `5 MiB`, filtro de extensión y MIME, validación de firma binaria (ZIP para `.xlsx` y ausencia de bytes NUL/ZIP en `.csv`) y manejo controlado de `MulterError` (413/400).
+   - Imágenes de productos: `uploadProductImage` ([productImageUpload.middleware.ts](src/middlewares/productImageUpload.middleware.ts)) en `POST /api/admin/productos/con-imagen` y `PUT /api/admin/productos/:id/con-imagen` ([adminProduct.routes.ts](src/routes/adminProduct.routes.ts)), con validación MIME `multipart/form-data`, límite de `5 MiB`, procesamiento con `sharp` y almacenamiento controlado en [productImage.service.ts](src/services/productImage.service.ts). (Nota: los comprobantes en [paymentReceipt.routes.ts](src/routes/paymentReceipt.routes.ts) usan lectura binaria directa con `express.raw`, no Multer.)
+
+5. **Comunicación en tiempo real con Socket.IO (requisito opcional)**
+   - Adjunto al servidor HTTP en `createBackendServer` ([http-server.ts](src/http-server.ts)) mediante `attachOrderSockets` ([order-sockets.ts](src/realtime/order-sockets.ts)), con verificación de origen/transporte (`allowsSocketTransport`) y autenticación JWT por cookie en Engine.IO/Socket.IO.
+   - Emite notificaciones post-commit (`stock.actualizado.v1`, `carrito.actualizado.v1` y `pedido.confirmado.v1`) a salas por cliente, administración y catálogo autenticado (`orders:client:<id>`, `orders:admin`, `catalog:authenticated`).
+
+Comprobación rápida desde `backend/`:
+
+```bash
+npm run type-check
+npm run build
+npm run test:unit
+npm run test:dto-source
+```

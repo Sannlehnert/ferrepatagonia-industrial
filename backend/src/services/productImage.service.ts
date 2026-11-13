@@ -4,6 +4,7 @@ import { lstat, open, realpath, unlink } from 'node:fs/promises';
 import { isAbsolute, join, relative, sep } from 'node:path';
 import sharp from 'sharp';
 import { DatabaseOutcomeUnknownError } from '../config/database-policy';
+import { readStorageDir } from '../config/storage-env.config';
 import { isProductImageName, productImageName, productImagePrefix } from '../utils/product-image';
 
 export const productImageMaxBytes = 5 * 1024 * 1024;
@@ -23,11 +24,11 @@ function contains(parent: string, child: string): boolean {
 
 export async function productImageDirectory(): Promise<string> {
     try {
-        const configured = process.env.PRODUCT_IMAGE_STORAGE_DIR;
-        if (!configured || !isAbsolute(configured)) throw new Error();
+        const configured = readStorageDir('PRODUCT_IMAGE_STORAGE_DIR', process.env);
+        if (!configured) throw new Error();
         const root = await realpath(configured);
         if (!(await lstat(root)).isDirectory()) throw new Error();
-        const privateDir = process.env.RECEIPT_STORAGE_DIR;
+        const privateDir = readStorageDir('RECEIPT_STORAGE_DIR', process.env);
         if (privateDir) {
             const receipts = await realpath(privateDir);
             if (contains(root, receipts) || contains(receipts, root)) throw new Error();
