@@ -32,7 +32,7 @@ requisitos; los valores entre `<...>` son placeholders, no credenciales:
 | `HTTPS_TERMINATION` | En producción debe ser `trusted-proxy`; identifica la terminación HTTPS confiable, no un proveedor específico. |
 | `AUTH_RATE_STORE`, `API_PROCESS_COUNT` | El único store disponible es `memory`; requiere exactamente un proceso. En producción ambos deben configurarse explícitamente. |
 | `AUTH_LOGIN_LIMIT`, `AUTH_LOGIN_WINDOW_MS`, `AUTH_REGISTER_LIMIT`, `AUTH_REGISTER_WINDOW_MS` | Umbrales de rate limit positivos. Los valores locales son operativos, no límites comerciales ni productivos acordados. |
-| `PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR` | Opcionales al iniciar; si se informan con valor no vacío, deben ser rutas absolutas válidas. |
+| `PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR` | Opcionales al iniciar; si se informan con valor no vacío, deben ser rutas absolutas válidas. Si se omiten `PRODUCT_IMAGE_STORAGE_DIR` o `RECEIPT_STORAGE_DIR`, esas rutas responden `503` al operar. Si se omite o queda vacía `IMPORT_STORAGE_DIR`, se usa un subdirectorio temporal del sistema operativo (no persistente entre limpiezas temporales o reinicios); si se configura explícitamente, debe existir y ser escribible o responde `503` sin fallback silencioso. |
 
 La validación de esquema de todas estas variables se realiza al inicio con **Joi** antes de abrir la base de datos o el servidor HTTP. Ejemplo de formato, sin valores de secretos:
 
@@ -677,7 +677,7 @@ Resumen técnico verificable de los requisitos de la materia implementados en es
 2. **Validación de variables de entorno con Joi**
    - Implementada con `Joi.object(...)` y `{ convert: false, abortEarly: true }` al importar la configuración de entorno ([env.config.ts](src/config/env.config.ts), [http-security.config.ts](src/config/http-security.config.ts), [storage-env.config.ts](src/config/storage-env.config.ts)), antes de ejecutar `initializeDatabase()` y `server.listen()` en [server.ts](src/server.ts).
    - Valida configuración principal (`PORT`, `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `JWT_SECRET`, `LEGACY_ORDER_UTC_OFFSET`), configuración de seguridad HTTP (`NODE_ENV`, `APP_PUBLIC_ORIGIN`, `TRUSTED_PROXY_CIDRS`, `HTTPS_TERMINATION`, `AUTH_RATE_STORE`, `API_PROCESS_COUNT`, rate limits) y variables opcionales de almacenamiento (`PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR`) sin filtrar secretos ni valores sensibles en los errores.
-   - Los consumidores de almacenamiento ([productImage.service.ts](src/services/productImage.service.ts), [receipt-storage.ts](src/services/receipts/receipt-storage.ts), [importConfirmationState.util.ts](src/utils/importConfirmationState.util.ts)) consultan dinámicamente `readStorageDir(...)` con el mismo esquema Joi.
+   - Los consumidores de almacenamiento ([productImage.service.ts](src/services/productImage.service.ts), [receipt-storage.ts](src/services/receipts/receipt-storage.ts), [importConfirmationState.util.ts](src/utils/importConfirmationState.util.ts)) consultan dinámicamente `readStorageDir(...)` con el mismo esquema Joi. En `IMPORT_STORAGE_DIR`, cuando se configura explícitamente un directorio, se verifica su existencia y permisos de escritura sin degradación silenciosa a rutas temporales y propagando error controlado (`503`) si falla la escritura en disco.
 
 3. **ORM TypeORM para comunicación con MariaDB**
    - `ControlledDataSource` ([database.config.ts](src/config/database.config.ts), `connectorPackage: 'mysql2'`) registra las 11 definiciones `EntitySchema` de `activeSchemas` ([active.schemas.ts](src/entities/active.schemas.ts)): `CategoriaSchema`, `ProductoSchema`, `ClienteSchema`, `UsuarioSchema`, `ListaPrecioSchema`, `CotizacionSchema`, `CarritoSchema`, `ItemCarritoSchema`, `CuentaCorrienteSchema`, `MovimientoCuentaCorrienteSchema` e `ImputacionMovimientoCuentaSchema`.
@@ -690,7 +690,7 @@ Resumen técnico verificable de los requisitos de la materia implementados en es
 
 5. **Comunicación en tiempo real con Socket.IO (requisito opcional)**
    - Adjunto al servidor HTTP en `createBackendServer` ([http-server.ts](src/http-server.ts)) mediante `attachOrderSockets` ([order-sockets.ts](src/realtime/order-sockets.ts)), con verificación de origen/transporte (`allowsSocketTransport`) y autenticación JWT por cookie en Engine.IO/Socket.IO.
-   - Emite notificaciones post-commit (`stock.actualizado.v1`, `carrito.actualizado.v1` y `pedido.confirmado.v1`) a salas por cliente, administración y catálogo autenticado (`orders:client:<id>`, `orders:admin`, `catalog:authenticated`).
+   - Emite notificaciones post-commit: `stock.actualizado.v1` hacia `catalog:authenticated` (usuarios `CLIENTE` y `ADMIN` autenticados) y `carrito.actualizado.v1` / `pedido.confirmado.v1` hacia salas por cliente (`orders:client:<id>`). La sala `orders:admin` existe para conexiones `ADMIN`, pero permanece reservada y actualmente no recibe emisiones.
 
 Comprobación rápida desde `backend/`:
 
