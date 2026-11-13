@@ -7,6 +7,7 @@ import {
     ConfirmationTokenRecord,
     ImportBatchGlobalState,
     ImportBatchRowState,
+    PreviewBatchRowEntry,
     getConfirmationTokenRecordRaw,
     isConfirmationTokenExpired,
     restoreConfirmationRecord,
@@ -110,6 +111,27 @@ export const verifyTokenAccessAndTtl = (
     return record;
 };
 
+/**
+ * Removes provisional link metadata for a row that was rolled back or belongs to another batch.
+ */
+const clearProvisionalProductLink = (
+    record: ConfirmationTokenRecord,
+    entry: PreviewBatchRowEntry,
+    normSku: string,
+    linkedId: number | undefined
+): void => {
+    delete entry.id_producto;
+    record.batchLinkedProducts.delete(normSku);
+    if (linkedId !== undefined) {
+        const stillReferenced =
+            Array.from(record.batchLinkedProducts.values()).includes(linkedId) ||
+            record.rows.some((r) => r !== entry && r.estado === 'importado' && r.id_producto === linkedId);
+        if (!stillReferenced) {
+            record.importedProductIds.delete(linkedId);
+        }
+    }
+};
+
 export const reconcileUncertainRowsWithDb = async (
     record: ConfirmationTokenRecord
 ): Promise<boolean> => {
@@ -138,19 +160,22 @@ export const reconcileUncertainRowsWithDb = async (
         for (const entry of pendingEntries) {
             const normSku = normalizeSkuForComparison(entry.codigo);
             const foundId = foundProductsMap.get(normSku);
+            const linkedId = record.batchLinkedProducts.get(normSku);
 
             if (foundId !== undefined) {
-                const linkedId = record.batchLinkedProducts.get(normSku);
                 const wasInsertedByThisBatch =
-                    (linkedId !== undefined && linkedId === foundId) ||
-                    record.importedProductIds.has(foundId);
+                    linkedId !== undefined
+                        ? linkedId === foundId
+                        : record.importedProductIds.has(foundId);
 
                 if (wasInsertedByThisBatch) {
                     entry.estado = 'importado';
                     entry.id_producto = foundId;
                     entry.motivos = [];
+                    record.batchLinkedProducts.set(normSku, foundId);
                     record.importedProductIds.add(foundId);
                 } else {
+                    clearProvisionalProductLink(record, entry, normSku, linkedId);
                     entry.estado = 'omitido';
                     entry.motivos = [
                         {
@@ -161,6 +186,7 @@ export const reconcileUncertainRowsWithDb = async (
                     ];
                 }
             } else {
+                clearProvisionalProductLink(record, entry, normSku, linkedId);
                 entry.estado = 'omitido';
                 entry.motivos = [
                     {

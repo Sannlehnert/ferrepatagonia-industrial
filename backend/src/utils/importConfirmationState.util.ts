@@ -45,6 +45,7 @@ interface SerializableConfirmationTokenRecord {
 const confirmationTokens = new Map<string, ConfirmationTokenRecord>();
 const activeImportSkuLocks = new Set<string>();
 const activeExecutionTokens = new Set<string>();
+const pendingRollbackDiskSync = new Set<string>();
 const PREVIEW_TOKEN_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 export const PREVIEW_TTL_MS = 30 * 60 * 1000;
@@ -167,6 +168,7 @@ export const persistRecordToDisk = (record: ConfirmationTokenRecord): void => {
     try {
         fs.writeFileSync(tmpPath, payload, 'utf8');
         fs.renameSync(tmpPath, filePath);
+        pendingRollbackDiskSync.delete(record.token);
     } catch (error) {
         try {
             if (fs.existsSync(tmpPath)) {
@@ -231,6 +233,7 @@ export const cleanExpiredConfirmationTokens = (): void => {
 
         if (isPendingExpired || isRetentionExpired) {
             confirmationTokens.delete(token);
+            pendingRollbackDiskSync.delete(token);
             try {
                 const p = getRecordFilePath(token);
                 if (fs.existsSync(p)) fs.unlinkSync(p);
@@ -335,7 +338,11 @@ export const recordBatchProvisionalProductLink = (
                 record.importedProductIds.delete(idProducto);
             }
             if (matchingRow) {
-                matchingRow.id_producto = prevRowId;
+                if (prevRowId === undefined) {
+                    delete matchingRow.id_producto;
+                } else {
+                    matchingRow.id_producto = prevRowId;
+                }
             }
             throw error;
         }
@@ -364,6 +371,32 @@ export const recordImportedProductLink = (
 export const saveConfirmationRecord = (record: ConfirmationTokenRecord): void => {
     persistRecordToDisk(record);
     confirmationTokens.set(record.token, record);
+};
+
+/**
+ * Restores a confirmation record after a confirmed pre-commit SQL rollback and clears
+ * any provisional links from disk, deferring the disk sync until recovery if storage is still failing.
+ */
+export const restoreConfirmedRollbackState = (
+    record: ConfirmationTokenRecord,
+    preConfirmSnapshot: ConfirmationTokenRecord
+): void => {
+    restoreConfirmationRecord(record, preConfirmSnapshot);
+    confirmationTokens.set(record.token, record);
+    try {
+        persistRecordToDisk(record);
+    } catch {
+        pendingRollbackDiskSync.add(record.token);
+    }
+};
+
+/**
+ * Flushes a deferred confirmed-rollback cleanup to disk once storage recovers.
+ */
+export const syncPendingRollbackIfNeeded = (record: ConfirmationTokenRecord): void => {
+    if (pendingRollbackDiskSync.has(record.token)) {
+        persistRecordToDisk(record);
+    }
 };
 
 export const tryAcquireSkuLocks = (skus: string[]): boolean => {

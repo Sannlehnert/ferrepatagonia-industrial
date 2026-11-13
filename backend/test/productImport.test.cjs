@@ -980,4 +980,94 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
             fs.rmSync(storageDir, { recursive: true, force: true });
         }
     });
+
+    await t.test('Rollback confirmado pre-commit tras vinculación provisional: sincroniza limpieza pendiente al recuperar disco y habilita reintento', async (t2) => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+        const prevImportDir = process.env.IMPORT_STORAGE_DIR;
+        const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-http-rb-unit-'));
+
+        try {
+            process.env.IMPORT_STORAGE_DIR = storageDir;
+            const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-RB-U1,Prod RB U1,1,100,5\nSKU-RB-U2,Prod RB U2,1,200,5';
+            const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'rb-unit.csv', 1);
+            const persistedFile = path.join(storageDir, `${prev.previewToken}.json`);
+
+            const { recordBatchProvisionalProductLink } = require('../dist/utils/importConfirmationState.util.js');
+            const { writeFileSync } = fs;
+            let writeCount = 0;
+            let failAllWritesFrom3 = true;
+
+            t2.mock.method(fs, 'writeFileSync', (...args) => {
+                writeCount += 1;
+                if (failAllWritesFrom3 && writeCount >= 3) {
+                    const err = new Error('ENOSPC');
+                    err.code = 'ENOSPC';
+                    throw err;
+                }
+                return writeFileSync.apply(fs, args);
+            });
+
+            let attempt = 0;
+            t2.mock.method(repo, 'insertImportedProductsBatch', async (_rows, token) => {
+                attempt += 1;
+                if (attempt === 1 && token) {
+                    recordBatchProvisionalProductLink(token, 'SKU-RB-U1', 701);
+                    recordBatchProvisionalProductLink(token, 'SKU-RB-U2', 702);
+                }
+                const outcomes = new Map();
+                outcomes.set(2, { success: true, id_producto: 801, codigo: 'SKU-RB-U1', nombre: 'Prod RB U1' });
+                outcomes.set(3, { success: true, id_producto: 802, codigo: 'SKU-RB-U2', nombre: 'Prod RB U2' });
+                return { outcomes, uncertainRowNumbers: new Set() };
+            });
+
+            const failedRes = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+                body: JSON.stringify({ previewToken: prev.previewToken })
+            });
+            assert.equal(failedRes.status, 503);
+
+            // Mientras el disco siga fallando, pendingRollbackDiskSync evita leer estado sucio como OK
+            const getWhileDown = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+                headers: { Cookie: `jwt_token=${adminToken}` }
+            });
+            assert.equal(getWhileDown.status, 503);
+
+            // Al recuperar disco, GET sincroniza limpieza del rollback a pendiente y limpia enlaces provisionales
+            failAllWritesFrom3 = false;
+            const getRecovered = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+                headers: { Cookie: `jwt_token=${adminToken}` }
+            });
+            assert.equal(getRecovered.status, 200);
+            const recoveredBody = await getRecovered.json();
+            assert.equal(recoveredBody.estado, 'pendiente');
+
+            const cleanedDisk = JSON.parse(fs.readFileSync(persistedFile, 'utf8'));
+            assert.equal(cleanedDisk.status, 'pendiente');
+            assert.deepEqual(cleanedDisk.batchLinkedProducts, []);
+            assert.equal(cleanedDisk.importedProductIds.length, 0);
+            assert.equal(cleanedDisk.rows[0].id_producto, undefined);
+
+            // Reintento limpio tras recuperación
+            const retryRes = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+                body: JSON.stringify({ previewToken: prev.previewToken })
+            });
+            assert.equal(retryRes.status, 200);
+            const retryBody = await retryRes.json();
+            assert.equal(retryBody.estado, 'completado');
+            assert.equal(retryBody.importados, 2);
+        } finally {
+            if (prevImportDir === undefined) delete process.env.IMPORT_STORAGE_DIR;
+            else process.env.IMPORT_STORAGE_DIR = prevImportDir;
+            fs.rmSync(storageDir, { recursive: true, force: true });
+        }
+    });
 });

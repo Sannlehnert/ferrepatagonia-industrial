@@ -11,9 +11,11 @@ import {
     markTokenActiveExecution,
     releaseSkuLocks,
     restoreConfirmationRecord,
+    restoreConfirmedRollbackState,
     saveConfirmationRecord,
     setConfirmationTokenStatus,
     snapshotConfirmationRecord,
+    syncPendingRollbackIfNeeded,
     tryAcquireSkuLocks
 } from '../utils/importConfirmationState.util';
 import { FileImportValidationError } from '../utils/import.utils';
@@ -43,6 +45,7 @@ export const getImportConfirmationStatus = async (
     }
 
     const record = verifyTokenAccessAndTtl(cleanToken, adminId);
+    syncPendingRollbackIfNeeded(record);
     const isInterrupted = record.status === 'procesando' && !isTokenActivelyExecuting(cleanToken);
 
     if (record.status === 'por_verificar' || isInterrupted) {
@@ -99,6 +102,7 @@ export const confirmProductImport = async (
     }
 
     const tokenRecord = verifyTokenAccessAndTtl(token, adminId);
+    syncPendingRollbackIfNeeded(tokenRecord);
     const isInterrupted = tokenRecord.status === 'procesando' && !isTokenActivelyExecuting(token);
 
     if (tokenRecord.status === 'completado') {
@@ -146,6 +150,8 @@ export const confirmProductImport = async (
             409
         );
     }
+
+    const preConfirmSnapshot = snapshotConfirmationRecord(tokenRecord);
 
     try {
         setConfirmationTokenStatus(token, 'procesando');
@@ -245,7 +251,11 @@ export const confirmProductImport = async (
                 batchResult = await insertImportedProductsBatch(batchInputs, token);
             }
         } catch (batchError) {
-            restoreConfirmationRecord(tokenRecord, preBatchSnapshot);
+            if (batchError instanceof FileImportValidationError) {
+                restoreConfirmedRollbackState(tokenRecord, preConfirmSnapshot);
+            } else {
+                restoreConfirmationRecord(tokenRecord, preBatchSnapshot);
+            }
             throw batchError;
         }
 
@@ -313,7 +323,11 @@ export const confirmProductImport = async (
 
             return buildReportFromRecord(tokenRecord);
         } catch (storageError) {
-            restoreConfirmationRecord(tokenRecord, postBatchSnapshot);
+            if (rowsToInsert.length === 0 && storageError instanceof FileImportValidationError) {
+                restoreConfirmedRollbackState(tokenRecord, preConfirmSnapshot);
+            } else {
+                restoreConfirmationRecord(tokenRecord, postBatchSnapshot);
+            }
             throw storageError;
         }
     } finally {
