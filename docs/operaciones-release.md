@@ -42,8 +42,10 @@ el host accesible desde el backend es `127.0.0.1:3307`. Las demás variables y
 condiciones están documentadas en [backend/README.md](../backend/README.md#configuración).
 
 Para crear un esquema local nuevo, seguir una sola vez el orden
-`schema.sql`, `seed.sql`, `verify-seed.sql` de [database/README.md](../database/README.md#3-ejecutar-los-scripts-en-orden).
-No repetir esos scripts sobre una base cargada. Arrancar y verificar:
+`schema.sql`, `migrate-fer-20-account-movements.sql`, `seed.sql`, `verify-seed.sql`
+(junto con la verificación SQL de las 21 tablas y los 3 triggers FER-20) de
+[database/README.md](../database/README.md#3-ejecutar-los-scripts-en-orden).
+No repetir `schema.sql` ni `seed.sql` sobre una base cargada. Arrancar y verificar:
 
 ```powershell
 npm run build

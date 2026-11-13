@@ -9,15 +9,18 @@ El motor utilizado actualmente es **MariaDB**.
 ```text
 database/
 ├── schema.sql
+├── migrate-fer-20-account-movements.sql
 ├── seed.sql
 ├── verify-seed.sql
 ├── migrate-uq-producto-codigo.sql
 └── README.md
 ```
 
+*(El directorio incluye también scripts incrementales anteriores ya consolidados en `schema.sql` y `fixtures/` para ensayos aislados.)*
+
 ### `schema.sql`
 
-Crea la estructura inicial de la base de datos:
+Crea las **21 tablas** base de la base de datos:
 
 - tablas;
 - claves primarias;
@@ -27,7 +30,17 @@ Crea la estructura inicial de la base de datos:
 - restricciones `CHECK`;
 - relaciones definidas en el MER vigente.
 
-Debe ejecutarse sobre una base de datos vacía.
+Debe ejecutarse sobre una base de datos vacía. **No incluye los 3 triggers FER-20** de cuenta corriente e imputaciones, que se instalan en el paso siguiente con `migrate-fer-20-account-movements.sql`.
+
+### `migrate-fer-20-account-movements.sql`
+
+Completa e instala de forma idempotente las guardias de cuenta corriente FER-20 y crea los tres triggers obligatorios del modelo financiero:
+
+- `fer260_cuenta_revision` (`BEFORE UPDATE` en `CUENTA_CORRIENTE`);
+- `fer260_imputacion_insert` (`BEFORE INSERT` en `IMPUTACION_MOVIMIENTO_CUENTA`);
+- `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`).
+
+**Debe ejecutarse inmediatamente después de `schema.sql` en toda instalación desde cero** (incluidas instalaciones nuevas sin `seed.sql`) y antes de cargar datos o iniciar la aplicación. Sobre bases existentes previas al corte FER-20, debe aplicarse con aplicación detenida y respaldo previo verificado.
 
 ### `seed.sql`
 
@@ -73,13 +86,16 @@ Si alguna verificación falla, el script genera un error.
 
 ## Orden de ejecución
 
-Sobre una base de datos nueva:
+Sobre una base de datos nueva y vacía:
 
 ```text
 1. schema.sql
-2. seed.sql
-3. verify-seed.sql
+2. migrate-fer-20-account-movements.sql
+3. seed.sql (solo entorno de desarrollo/pruebas)
+4. verify-seed.sql (solo después de seed.sql)
 ```
+
+`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1 y 2 más la verificación SQL de tablas y triggers.
 
 `verify-seed.sql` debe ejecutarse antes de modificar manualmente los datos cargados por el seed.
 
@@ -112,7 +128,7 @@ Los comandos siguientes se ejecutan desde la **raíz del repositorio**, donde es
 | Contraseña de desarrollo | `ferrepatagonia_dev_only` |
 | Contraseña de `root` (administración) | `root_dev_only` |
 
-**Todas estas credenciales son públicas y exclusivas de desarrollo local. No deben reutilizarse en producción ni reemplazarse por secretos reales en este archivo.** Compose no necesita `.env`: los valores de desarrollo son explícitos. El backend sí usa `backend/.env`, preparado desde su `.env.example`, como explica la [guía del backend](../backend/README.md). El usuario `ferrepatagonia` tiene permisos sobre la base de desarrollo y alcanza para ejecutar los tres scripts; no hace falta trabajar como `root`.
+**Todas estas credenciales son públicas y exclusivas de desarrollo local. No deben reutilizarse en producción ni reemplazarse por secretos reales en este archivo.** Compose no necesita `.env`: los valores de desarrollo son explícitos. El backend sí usa `backend/.env`, preparado desde su `.env.example`, como explica la [guía del backend](../backend/README.md). El usuario `ferrepatagonia` tiene permisos sobre la base de desarrollo y alcanza para ejecutar los cuatro scripts (incluido `migrate-fer-20-account-movements.sql` con la creación de los tres triggers) y las consultas SQL de verificación; no hace falta trabajar como `root`.
 
 El puerto se publica solamente en `127.0.0.1`, para acceder desde el mismo equipo que ejecuta Docker. Se usa `3307` para evitar conflictos con instalaciones locales que usen `3306`. Si Docker corre dentro de una VM Debian, ejecutar el cliente dentro de esa VM o usar un túnel SSH; `localhost` de Windows no es el de Debian.
 
@@ -148,13 +164,19 @@ Si queda en `unhealthy`, revisar los logs. Si aparece un error de conexión con 
 
 Sobre la base recién creada y vacía, ejecutar cada comando por separado. Si alguno falla, detenerse y revisar el error antes de seguir.
 
-Crear las tablas:
+Crear las 21 tablas base:
 
 ```bash
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
 ```
 
-Cargar los datos ficticios:
+Instalar los 3 triggers y guardias FER-20 de cuenta corriente (obligatorio también tras `schema.sql`):
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-20-account-movements.sql'
+```
+
+Cargar los datos ficticios de desarrollo:
 
 ```bash
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/seed.sql'
@@ -166,11 +188,19 @@ Verificar los datos antes de modificarlos:
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/verify-seed.sql'
 ```
 
-La redirección `<` se realiza dentro del contenedor, por eso los mismos comandos sirven en PowerShell y Bash. Si todo está correcto, la verificación termina indicando:
+La redirección `<` se realiza dentro del contenedor, por eso los mismos comandos sirven en PowerShell y Bash. Si todo está correcto, `verify-seed.sql` termina indicando:
 
 ```text
 PASS: conteos, relaciones, importes y destinos de pago
 ```
+
+`verify-seed.sql` valida únicamente conteos, relaciones e importes del seed; **no detecta si faltan los triggers FER-20**. Comprobar explícitamente por SQL las 21 tablas y la presencia exacta de los tres triggers:
+
+```bash
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE(); SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME;"
+```
+
+La consulta debe informar `21` tablas y los tres triggers `fer260_cuenta_revision` (`BEFORE UPDATE` en `CUENTA_CORRIENTE`), `fer260_imputacion_insert` (`BEFORE INSERT` en `IMPUTACION_MOVIMIENTO_CUENTA`) y `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`).
 
 `schema.sql` requiere una base vacía y `seed.sql` requiere tablas vacías: no deben repetirse sobre una base ya cargada. Detener o reiniciar el contenedor no vacía la base. Para reconstruirla desde cero, usar el procedimiento de eliminación de datos indicado más abajo.
 
@@ -239,7 +269,7 @@ Para reconstruir:
 docker compose up -d --wait --wait-timeout 180
 ```
 
-Después ejecutar nuevamente los tres comandos del paso 3: `schema.sql`, `seed.sql` y `verify-seed.sql`, en ese orden. No es necesario borrar la imagen descargada.
+Después ejecutar nuevamente los cuatro comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
 
 ---
 
