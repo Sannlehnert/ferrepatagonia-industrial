@@ -61,7 +61,14 @@ Object.assign(process.env, {
 const { loadEnv } = require('../dist/config/env.config');
 const { loadHttpSecurity, validateJwtSecret } = require('../dist/config/http-security.config');
 const { loadStorageConfig, readStorageDir } = require('../dist/config/storage-env.config');
-const { persistRecordToDisk } = require('../dist/utils/importConfirmationState.util');
+const { FileImportValidationError } = require('../dist/utils/import.utils');
+const {
+  getConfirmationTokenRecordRaw,
+  persistRecordToDisk,
+  registerConfirmationToken,
+  saveConfirmationRecord,
+  setConfirmationTokenStatus,
+} = require('../dist/utils/importConfirmationState.util');
 
 test('Joi env: aplica valores predeterminados válidos en desarrollo sin storage configurado', () => {
   const cfg = loadEnv(baseDevEnv());
@@ -259,30 +266,32 @@ test('Joi storage: readStorageDir refleja mutaciones dinámicas de process.env c
   }
 });
 
-test('Joi storage: importConfirmationState unifica el fallback en ferrepatagonia-import-storage ante ausencia, vacío o valor inválido posterior', () => {
+test('Joi storage: importConfirmationState usa ruta temporal controlada solo cuando IMPORT_STORAGE_DIR no está configurada y rechaza rutas explícitas inválidas o inexistentes sin fallback silencioso', async t => {
   const savedEnv = {
     IMPORT_STORAGE_DIR: process.env.IMPORT_STORAGE_DIR,
     TEMP: process.env.TEMP,
     TMP: process.env.TMP,
     TMPDIR: process.env.TMPDIR,
   };
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-import-fallback-'));
-  const expectedFallbackDir = path.join(tmpRoot, 'ferrepatagonia-import-storage');
+  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-import-storage-'));
+  const expectedTempDir = path.join(tmpRoot, 'ferrepatagonia-import-storage');
   const customDir = path.join(tmpRoot, 'custom-import-dir');
+  const missingDir = path.join(tmpRoot, 'missing-import-dir');
+  const regularFilePath = path.join(tmpRoot, 'not-a-directory.txt');
 
-  const persistSample = token => {
+  const makeSampleRecord = (token, status = 'pendiente') => {
     const now = Date.now();
-    persistRecordToDisk({
+    return {
       token,
       createdAtMs: now,
       expiresAtMs: now + 60_000,
       adminId: 1,
-      status: 'pendiente',
+      status,
       rows: [],
       attemptedSkus: new Set(),
       importedProductIds: new Set(),
       batchLinkedProducts: new Map(),
-    });
+    };
   };
 
   try {
@@ -291,43 +300,149 @@ test('Joi storage: importConfirmationState unifica el fallback en ferrepatagonia
     process.env.TMPDIR = tmpRoot;
     assert.equal(os.tmpdir(), tmpRoot);
 
-    // 1. IMPORT_STORAGE_DIR ausente
-    delete process.env.IMPORT_STORAGE_DIR;
-    const missingToken = randomUUID();
-    persistSample(missingToken);
-    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${missingToken}.json`)), true);
-    assert.equal(fs.existsSync(path.join(tmpRoot, `${missingToken}.json`)), false);
+    await t.test('usa ruta temporal controlada cuando IMPORT_STORAGE_DIR está ausente o vacía y lee lo persistido en disco', () => {
+      delete process.env.IMPORT_STORAGE_DIR;
+      const missingToken = randomUUID();
+      persistRecordToDisk(makeSampleRecord(missingToken));
+      assert.equal(fs.existsSync(path.join(expectedTempDir, `${missingToken}.json`)), true);
+      assert.equal(fs.existsSync(path.join(tmpRoot, `${missingToken}.json`)), false);
 
-    // 2. IMPORT_STORAGE_DIR=''
-    process.env.IMPORT_STORAGE_DIR = '';
-    const emptyToken = randomUUID();
-    persistSample(emptyToken);
-    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${emptyToken}.json`)), true);
-    assert.equal(fs.existsSync(path.join(tmpRoot, `${emptyToken}.json`)), false);
+      process.env.IMPORT_STORAGE_DIR = '';
+      const emptyToken = randomUUID();
+      registerConfirmationToken(emptyToken, [], 42);
+      const persistedPath = path.join(expectedTempDir, `${emptyToken}.json`);
+      assert.equal(fs.existsSync(persistedPath), true);
 
-    // 3. Modificación posterior a un valor inválido (incluso tras configuración válida y sin existir aún el subdirectorio)
-    process.env.IMPORT_STORAGE_DIR = customDir;
-    const validToken = randomUUID();
-    persistSample(validToken);
-    assert.equal(fs.existsSync(path.join(customDir, `${validToken}.json`)), true);
+      // Verificación real de lectura en disco desde un proceso limpio sin caché en memoria
+      const readBack = spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `const assert = require('node:assert/strict');
+           const { getConfirmationTokenRecordRaw } = require('./dist/utils/importConfirmationState.util');
+           const rec = getConfirmationTokenRecordRaw(${JSON.stringify(emptyToken)});
+           assert.ok(rec);
+           assert.equal(rec.status, 'pendiente');
+           assert.equal(rec.adminId, 42);`,
+        ],
+        { cwd: backendDir, env: process.env, encoding: 'utf8' },
+      );
+      assert.equal(readBack.status, 0, readBack.stderr);
+    });
 
-    fs.rmSync(expectedFallbackDir, { recursive: true, force: true });
-    process.env.IMPORT_STORAGE_DIR = 'relative/invalid-import-dir';
-    const invalidToken = randomUUID();
-    persistSample(invalidToken);
-    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${invalidToken}.json`)), true);
-    assert.equal(fs.existsSync(path.join(tmpRoot, `${invalidToken}.json`)), false);
+    await t.test('usa el directorio configurado explícitamente cuando existe y es escribible, y recupera el estado desde disco', () => {
+      fs.mkdirSync(customDir);
+      process.env.IMPORT_STORAGE_DIR = customDir;
+      fs.rmSync(expectedTempDir, { recursive: true, force: true });
 
-    process.env.IMPORT_STORAGE_DIR = '   ';
-    const blankInvalidToken = randomUUID();
-    persistSample(blankInvalidToken);
-    assert.equal(fs.existsSync(path.join(expectedFallbackDir, `${blankInvalidToken}.json`)), true);
-    assert.equal(fs.existsSync(path.join(tmpRoot, `${blankInvalidToken}.json`)), false);
+      const customToken = randomUUID();
+      registerConfirmationToken(customToken, [], 7);
+      setConfirmationTokenStatus(customToken, 'procesando');
+      const record = getConfirmationTokenRecordRaw(customToken);
+      assert.ok(record);
+      record.status = 'completado';
+      saveConfirmationRecord(record);
 
-    assert.deepEqual(
-      fs.readdirSync(tmpRoot).filter(entry => entry.endsWith('.json')),
-      [],
-    );
+      assert.equal(fs.existsSync(path.join(customDir, `${customToken}.json`)), true);
+      assert.equal(fs.existsSync(expectedTempDir), false);
+
+      const readBack = spawnSync(
+        process.execPath,
+        [
+          '-e',
+          `const assert = require('node:assert/strict');
+           const { getConfirmationTokenRecordRaw } = require('./dist/utils/importConfirmationState.util');
+           const rec = getConfirmationTokenRecordRaw(${JSON.stringify(customToken)});
+           assert.ok(rec);
+           assert.equal(rec.status, 'completado');
+           assert.equal(rec.adminId, 7);`,
+        ],
+        { cwd: backendDir, env: process.env, encoding: 'utf8' },
+      );
+      assert.equal(readBack.status, 0, readBack.stderr);
+    });
+
+    await t.test('rechaza ruta configurada inválida, inexistente o de archivo sin crearla ni degradar silenciosamente', () => {
+      fs.rmSync(expectedTempDir, { recursive: true, force: true });
+      fs.writeFileSync(regularFilePath, 'not-a-dir', 'utf8');
+
+      for (const badConfiguredPath of ['relative/invalid-import-dir', '   ', missingDir, regularFilePath]) {
+        process.env.IMPORT_STORAGE_DIR = badConfiguredPath;
+        const token = randomUUID();
+        assert.throws(
+          () => registerConfirmationToken(token, [], 1),
+          err =>
+            err instanceof FileImportValidationError &&
+            err.statusCode === 503 &&
+            !err.message.includes(badConfiguredPath.trim() || badConfiguredPath),
+        );
+        assert.equal(getConfirmationTokenRecordRaw === undefined, false);
+        assert.throws(
+          () => getConfirmationTokenRecordRaw(token),
+          err => err instanceof FileImportValidationError && err.statusCode === 503,
+        );
+        assert.equal(fs.existsSync(expectedTempDir), false);
+        assert.equal(fs.existsSync(missingDir), false);
+      }
+
+      assert.deepEqual(
+        fs.readdirSync(tmpRoot).filter(entry => entry.endsWith('.json')),
+        [],
+      );
+    });
+
+    await t.test('rechaza ruta configurada sin permisos y falla de escritura en disco sin conservar estado enganoso en memoria', t2 => {
+      const restrictedDir = path.join(tmpRoot, 'restricted-import-dir');
+      fs.mkdirSync(restrictedDir);
+      process.env.IMPORT_STORAGE_DIR = restrictedDir;
+
+      const baselineToken = randomUUID();
+      registerConfirmationToken(baselineToken, [], 9);
+
+      if (process.platform !== 'win32' && typeof process.getuid === 'function' && process.getuid() !== 0) {
+        fs.chmodSync(restrictedDir, 0o555);
+        try {
+          assert.throws(
+            () => registerConfirmationToken(randomUUID(), [], 9),
+            err => err instanceof FileImportValidationError && err.statusCode === 503 && !err.message.includes(restrictedDir),
+          );
+        } finally {
+          fs.chmodSync(restrictedDir, 0o755);
+        }
+      }
+
+      t2.mock.method(fs, 'accessSync', () => {
+        const eacces = new Error('EACCES: permission denied');
+        eacces.code = 'EACCES';
+        throw eacces;
+      });
+      assert.throws(
+        () => registerConfirmationToken(randomUUID(), [], 9),
+        err => err instanceof FileImportValidationError && err.statusCode === 503 && !err.message.includes('EACCES'),
+      );
+      t2.mock.restoreAll();
+
+      t2.mock.method(fs, 'writeFileSync', () => {
+        const diskFull = new Error('ENOSPC: no space left on device');
+        diskFull.code = 'ENOSPC';
+        throw diskFull;
+      });
+      const unpersistedToken = randomUUID();
+      assert.throws(
+        () => registerConfirmationToken(unpersistedToken, [], 9),
+        err => err instanceof FileImportValidationError && err.statusCode === 503 && !err.message.includes('ENOSPC'),
+      );
+      assert.throws(
+        () => setConfirmationTokenStatus(baselineToken, 'completado'),
+        err => err instanceof FileImportValidationError && err.statusCode === 503,
+      );
+      t2.mock.restoreAll();
+
+      // Al restaurarse el almacenamiento, el token fallido no quedó en memoria ni se adulteró el estado del baseline
+      assert.equal(getConfirmationTokenRecordRaw(unpersistedToken), undefined);
+      assert.equal(fs.existsSync(path.join(restrictedDir, `${unpersistedToken}.json`)), false);
+      assert.equal(getConfirmationTokenRecordRaw(baselineToken)?.status, 'pendiente');
+    });
   } finally {
     for (const [key, value] of Object.entries(savedEnv)) {
       if (value === undefined) delete process.env[key];

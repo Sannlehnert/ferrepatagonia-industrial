@@ -9,7 +9,9 @@ import {
     ImportBatchRowState,
     getConfirmationTokenRecordRaw,
     isConfirmationTokenExpired,
-    saveConfirmationRecord
+    restoreConfirmationRecord,
+    saveConfirmationRecord,
+    snapshotConfirmationRecord
 } from '../utils/importConfirmationState.util';
 import { FileImportValidationError } from '../utils/import.utils';
 
@@ -117,11 +119,18 @@ export const reconcileUncertainRowsWithDb = async (
 
     const pendingEntries = record.rows.filter((r) => r.estado === 'pendiente');
     if (pendingEntries.length === 0) {
-        record.status = 'completado';
-        saveConfirmationRecord(record);
-        return true;
+        const snapshot = snapshotConfirmationRecord(record);
+        try {
+            record.status = 'completado';
+            saveConfirmationRecord(record);
+            return true;
+        } catch (error) {
+            restoreConfirmationRecord(record, snapshot);
+            throw error;
+        }
     }
 
+    const snapshot = snapshotConfirmationRecord(record);
     try {
         const skusToVerify = pendingEntries.map((r) => r.codigo);
         const foundProductsMap = await findExistingProductsBySkus(skusToVerify);
@@ -169,7 +178,11 @@ export const reconcileUncertainRowsWithDb = async (
             saveConfirmationRecord(record);
             return true;
         }
-    } catch {
+    } catch (error) {
+        restoreConfirmationRecord(record, snapshot);
+        if (error instanceof FileImportValidationError) {
+            throw error;
+        }
         // En caso de caída transitoria de red se mantiene por_verificar
     }
 

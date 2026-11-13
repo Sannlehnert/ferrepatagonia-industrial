@@ -2,6 +2,7 @@ declare const exports: any;
 
 import { dataSource } from '../config/database.config';
 import { CategoriaSchema, ProductoSchema } from '../entities/active.schemas';
+import { FileImportValidationError } from '../utils/import.utils';
 import {
     normalizeSkuKey,
     recordBatchProvisionalProductLink
@@ -381,6 +382,9 @@ export const insertImportedProductsBatch = async (
             outcomes.set(rowNum, outcome);
         }
     } catch (_txOrCommitError: any) {
+        if (_txOrCommitError instanceof FileImportValidationError) {
+            throw _txOrCommitError;
+        }
         // H04: Si falla la confirmación del commit o se pierde la conexión,
         // no afirmar reversión prematura: marcar como resultado incierto por verificar.
         for (let idx = 0; idx < rows.length; idx++) {
