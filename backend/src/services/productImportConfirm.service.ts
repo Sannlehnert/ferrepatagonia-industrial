@@ -1,20 +1,21 @@
 import {
     findExistingCategoryIds,
-    findExistingProductsBySkus,
     findExistingSkuRows,
     insertImportedProductsBatch,
     normalizeSkuForComparison
 } from '../repositories/productImport.repository';
 import {
-    ConfirmationTokenRecord,
     PreviewBatchRowEntry,
     clearTokenActiveExecution,
     isTokenActivelyExecuting,
     markTokenActiveExecution,
-    recordImportedProductLink,
     releaseSkuLocks,
+    restoreConfirmationRecord,
+    restoreConfirmedRollbackState,
     saveConfirmationRecord,
     setConfirmationTokenStatus,
+    snapshotConfirmationRecord,
+    syncPendingRollbackIfNeeded,
     tryAcquireSkuLocks
 } from '../utils/importConfirmationState.util';
 import { FileImportValidationError } from '../utils/import.utils';
@@ -22,84 +23,17 @@ import {
     ConfirmImportItemDetail,
     ImportConfirmationReport,
     buildReportFromRecord,
+    reconcileUncertainRowsWithDb,
     verifyTokenAccessAndTtl
 } from './productImportReconcile.util.service';
 
-export { ConfirmImportItemDetail, ImportConfirmationReport };
+export { ConfirmImportItemDetail, ImportConfirmationReport, reconcileUncertainRowsWithDb };
 
 export interface ConfirmImportPayload {
     previewToken?: string;
     politicaInvalidos?: 'omitir' | 'rechazar_todo';
     [key: string]: unknown;
 }
-
-export const reconcileUncertainRowsWithDb = async (
-    record: ConfirmationTokenRecord
-): Promise<boolean> => {
-    if (record.status !== 'por_verificar' && record.status !== 'procesando') {
-        return (record.status as string) === 'completado';
-    }
-
-    const pendingEntries = record.rows.filter((r) => r.estado === 'pendiente');
-    if (pendingEntries.length === 0) {
-        record.status = 'completado';
-        saveConfirmationRecord(record);
-        return true;
-    }
-
-    try {
-        const skusToVerify = pendingEntries.map((r) => r.codigo);
-        const foundProductsMap = await findExistingProductsBySkus(skusToVerify);
-
-        for (const entry of pendingEntries) {
-            const normSku = normalizeSkuForComparison(entry.codigo);
-            const foundId = foundProductsMap.get(normSku);
-
-            if (foundId !== undefined) {
-                const linkedId = record.batchLinkedProducts.get(normSku);
-                const wasInsertedByThisBatch =
-                    (linkedId !== undefined && linkedId === foundId) ||
-                    record.importedProductIds.has(foundId);
-
-                if (wasInsertedByThisBatch) {
-                    entry.estado = 'importado';
-                    entry.id_producto = foundId;
-                    entry.motivos = [];
-                    record.importedProductIds.add(foundId);
-                } else {
-                    entry.estado = 'omitido';
-                    entry.motivos = [
-                        {
-                            field: 'codigo',
-                            code: 'SKU_EXISTS',
-                            message: 'El SKU ya existe en el catálogo'
-                        }
-                    ];
-                }
-            } else {
-                entry.estado = 'omitido';
-                entry.motivos = [
-                    {
-                        field: 'codigo',
-                        code: 'COMMIT_FAILED',
-                        message: 'La transacción fue revertida en MariaDB y no persistió este producto.'
-                    }
-                ];
-            }
-        }
-
-        const stillPending = record.rows.some((r) => r.estado === 'pendiente');
-        if (!stillPending) {
-            record.status = 'completado';
-            saveConfirmationRecord(record);
-            return true;
-        }
-    } catch {
-        // En caso de caída transitoria de red se mantiene por_verificar
-    }
-
-    return false;
-};
 
 export const getImportConfirmationStatus = async (
     previewToken: string,
@@ -111,6 +45,7 @@ export const getImportConfirmationStatus = async (
     }
 
     const record = verifyTokenAccessAndTtl(cleanToken, adminId);
+    syncPendingRollbackIfNeeded(record);
     const isInterrupted = record.status === 'procesando' && !isTokenActivelyExecuting(cleanToken);
 
     if (record.status === 'por_verificar' || isInterrupted) {
@@ -167,6 +102,7 @@ export const confirmProductImport = async (
     }
 
     const tokenRecord = verifyTokenAccessAndTtl(token, adminId);
+    syncPendingRollbackIfNeeded(tokenRecord);
     const isInterrupted = tokenRecord.status === 'procesando' && !isTokenActivelyExecuting(token);
 
     if (tokenRecord.status === 'completado') {
@@ -179,9 +115,15 @@ export const confirmProductImport = async (
             return buildReportFromRecord(tokenRecord);
         }
         if (isInterrupted && !isCompleted) {
-            tokenRecord.status = 'por_verificar';
-            saveConfirmationRecord(tokenRecord);
-            return buildReportFromRecord(tokenRecord);
+            const snapshot = snapshotConfirmationRecord(tokenRecord);
+            try {
+                tokenRecord.status = 'por_verificar';
+                saveConfirmationRecord(tokenRecord);
+                return buildReportFromRecord(tokenRecord);
+            } catch (error) {
+                restoreConfirmationRecord(tokenRecord, snapshot);
+                throw error;
+            }
         }
     }
 
@@ -209,10 +151,12 @@ export const confirmProductImport = async (
         );
     }
 
-    setConfirmationTokenStatus(token, 'procesando');
-    markTokenActiveExecution(token);
+    const preConfirmSnapshot = snapshotConfirmationRecord(tokenRecord);
 
     try {
+        setConfirmationTokenStatus(token, 'procesando');
+        markTokenActiveExecution(token);
+
         const skuChecks = eligibleEntries.map((e: PreviewBatchRowEntry) => ({
             rowNumber: e.row,
             codigo: e.codigo
@@ -230,95 +174,39 @@ export const confirmProductImport = async (
                 findExistingCategoryIds(categoryIds)
             ]);
         } catch {
-            for (const entry of eligibleEntries) {
-                entry.motivos = [
-                    {
-                        field: 'codigo',
-                        code: 'COMMIT_UNCERTAIN',
-                        message: 'Estado de escritura pendiente de verificación con la base de datos.'
-                    }
-                ];
-            }
-            setConfirmationTokenStatus(token, 'por_verificar');
-            return buildReportFromRecord(tokenRecord);
-        }
-
-        const rowsToInsert: Array<{ entry: PreviewBatchRowEntry }> = [];
-
-        for (const entry of eligibleEntries) {
-            if (existingSkuRows.has(entry.row)) {
-                entry.estado = 'omitido';
-                entry.motivos = [
-                    {
-                        field: 'codigo',
-                        code: 'SKU_EXISTS',
-                        message: 'El SKU ya existe en el catálogo'
-                    }
-                ];
-                continue;
-            }
-
-            if (!existingCategories.has(entry.dto.id_categoria)) {
-                entry.estado = 'rechazado';
-                entry.motivos = [
-                    {
-                        field: 'id_categoria',
-                        code: 'CATEGORY_NOT_FOUND',
-                        message: `La categoría con ID ${entry.dto.id_categoria} no existe o no se encuentra activa.`
-                    }
-                ];
-                continue;
-            }
-
-            tokenRecord.attemptedSkus.add(normalizeSkuForComparison(entry.codigo));
-            rowsToInsert.push({ entry });
-        }
-
-        if (rowsToInsert.length > 0) {
-            const batchInputs = rowsToInsert.map(({ entry }) => ({
-                rowNumber: entry.row,
-                codigo: entry.dto.codigo,
-                nombre: entry.dto.nombre,
-                descripcion: entry.dto.descripcion,
-                precio_base_usd: entry.dto.precio_base_usd,
-                descuento_especial_pct: entry.dto.descuento_especial_pct,
-                stock: entry.dto.stock,
-                id_categoria: entry.dto.id_categoria,
-                imagen: entry.dto.imagen,
-                activo: entry.dto.activo
-            }));
-
-            const { outcomes, uncertainRowNumbers } = await insertImportedProductsBatch(
-                batchInputs,
-                token
-            );
-
-            for (const { entry } of rowsToInsert) {
-                if (uncertainRowNumbers.has(entry.row)) {
-                    entry.estado = 'pendiente';
+            const snapshot = snapshotConfirmationRecord(tokenRecord);
+            try {
+                for (const entry of eligibleEntries) {
                     entry.motivos = [
                         {
                             field: 'codigo',
                             code: 'COMMIT_UNCERTAIN',
-                            message: 'La confirmación del commit es incierta; pendiente de conciliación con MariaDB.'
+                            message: 'Estado de escritura pendiente de verificación con la base de datos.'
                         }
                     ];
-                    continue;
                 }
+                tokenRecord.status = 'por_verificar';
+                saveConfirmationRecord(tokenRecord);
+                return buildReportFromRecord(tokenRecord);
+            } catch (storageError) {
+                restoreConfirmationRecord(tokenRecord, snapshot);
+                throw storageError;
+            }
+        }
 
-                const outcome = outcomes.get(entry.row);
-                if (!outcome) continue;
+        const preBatchSnapshot = snapshotConfirmationRecord(tokenRecord);
+        const rowsToInsert: Array<{ entry: PreviewBatchRowEntry }> = [];
 
-                if (outcome.isCategoryInactive) {
-                    entry.estado = 'rechazado';
-                    entry.motivos = [
-                        {
-                            field: 'id_categoria',
-                            code: 'CATEGORY_NOT_FOUND',
-                            message: outcome.error || 'La categoría fue desactivada antes de la escritura.'
-                        }
-                    ];
-                } else if (outcome.isDuplicateConflict) {
+        let batchResult:
+            | {
+                  outcomes: Map<number, any>;
+                  uncertainRowNumbers: Set<number>;
+              }
+            | undefined;
+
+        try {
+            for (const entry of eligibleEntries) {
+                if (existingSkuRows.has(entry.row)) {
                     entry.estado = 'omitido';
                     entry.motivos = [
                         {
@@ -327,31 +215,121 @@ export const confirmProductImport = async (
                             message: 'El SKU ya existe en el catálogo'
                         }
                     ];
-                } else if (outcome.success && outcome.id_producto) {
-                    entry.estado = 'importado';
-                    entry.id_producto = outcome.id_producto;
-                    entry.motivos = [];
-                    recordImportedProductLink(token, outcome.id_producto);
-                } else {
-                    entry.estado = 'pendiente';
+                    continue;
+                }
+
+                if (!existingCategories.has(entry.dto.id_categoria)) {
+                    entry.estado = 'rechazado';
                     entry.motivos = [
                         {
-                            field: 'codigo',
-                            code: 'COMMIT_UNCERTAIN',
-                            message: outcome.error || 'Resultado de escritura por verificar.'
+                            field: 'id_categoria',
+                            code: 'CATEGORY_NOT_FOUND',
+                            message: `La categoría con ID ${entry.dto.id_categoria} no existe o no se encuentra activa.`
                         }
                     ];
+                    continue;
                 }
+
+                tokenRecord.attemptedSkus.add(normalizeSkuForComparison(entry.codigo));
+                rowsToInsert.push({ entry });
             }
+
+            if (rowsToInsert.length > 0) {
+                const batchInputs = rowsToInsert.map(({ entry }) => ({
+                    rowNumber: entry.row,
+                    codigo: entry.dto.codigo,
+                    nombre: entry.dto.nombre,
+                    descripcion: entry.dto.descripcion,
+                    precio_base_usd: entry.dto.precio_base_usd,
+                    descuento_especial_pct: entry.dto.descuento_especial_pct,
+                    stock: entry.dto.stock,
+                    id_categoria: entry.dto.id_categoria,
+                    imagen: entry.dto.imagen,
+                    activo: entry.dto.activo
+                }));
+
+                batchResult = await insertImportedProductsBatch(batchInputs, token);
+            }
+        } catch (batchError) {
+            if (batchError instanceof FileImportValidationError) {
+                restoreConfirmedRollbackState(tokenRecord, preConfirmSnapshot);
+            } else {
+                restoreConfirmationRecord(tokenRecord, preBatchSnapshot);
+            }
+            throw batchError;
         }
 
-        const hasPendingUncertain = tokenRecord.rows.some(
-            (r: PreviewBatchRowEntry): boolean => r.estado === 'pendiente'
-        );
-        setConfirmationTokenStatus(token, hasPendingUncertain ? 'por_verificar' : 'completado');
-        saveConfirmationRecord(tokenRecord);
+        const postBatchSnapshot = snapshotConfirmationRecord(tokenRecord);
+        try {
+            if (batchResult) {
+                const { outcomes, uncertainRowNumbers } = batchResult;
+                for (const { entry } of rowsToInsert) {
+                    if (uncertainRowNumbers.has(entry.row)) {
+                        entry.estado = 'pendiente';
+                        entry.motivos = [
+                            {
+                                field: 'codigo',
+                                code: 'COMMIT_UNCERTAIN',
+                                message: 'La confirmación del commit es incierta; pendiente de conciliación con MariaDB.'
+                            }
+                        ];
+                        continue;
+                    }
 
-        return buildReportFromRecord(tokenRecord);
+                    const outcome = outcomes.get(entry.row);
+                    if (!outcome) continue;
+
+                    if (outcome.isCategoryInactive) {
+                        entry.estado = 'rechazado';
+                        entry.motivos = [
+                            {
+                                field: 'id_categoria',
+                                code: 'CATEGORY_NOT_FOUND',
+                                message: outcome.error || 'La categoría fue desactivada antes de la escritura.'
+                            }
+                        ];
+                    } else if (outcome.isDuplicateConflict) {
+                        entry.estado = 'omitido';
+                        entry.motivos = [
+                            {
+                                field: 'codigo',
+                                code: 'SKU_EXISTS',
+                                message: 'El SKU ya existe en el catálogo'
+                            }
+                        ];
+                    } else if (outcome.success && outcome.id_producto) {
+                        entry.estado = 'importado';
+                        entry.id_producto = outcome.id_producto;
+                        entry.motivos = [];
+                        tokenRecord.importedProductIds.add(outcome.id_producto);
+                    } else {
+                        entry.estado = 'pendiente';
+                        entry.motivos = [
+                            {
+                                field: 'codigo',
+                                code: 'COMMIT_UNCERTAIN',
+                                message: outcome.error || 'Resultado de escritura por verificar.'
+                            }
+                        ];
+                    }
+                }
+            }
+
+            const hasPendingUncertain = tokenRecord.rows.some(
+                (r: PreviewBatchRowEntry): boolean => r.estado === 'pendiente'
+            );
+            tokenRecord.status = hasPendingUncertain ? 'por_verificar' : 'completado';
+            saveConfirmationRecord(tokenRecord);
+
+            return buildReportFromRecord(tokenRecord);
+        } catch (storageError) {
+            if (rowsToInsert.length === 0 && storageError instanceof FileImportValidationError) {
+                restoreConfirmedRollbackState(tokenRecord, preConfirmSnapshot);
+            } else {
+                restoreConfirmationRecord(tokenRecord, postBatchSnapshot);
+            }
+            throw storageError;
+        }
     } finally {
         clearTokenActiveExecution(token);
         releaseSkuLocks(candidateSkus);

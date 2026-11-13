@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const { test, before, after } = require('node:test');
 const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const zlib = require('node:zlib');
 
 Object.assign(process.env, {
@@ -855,5 +858,216 @@ test('Product Import Service & Endpoint - Unit Tests (#235 & #236)', async (t) =
         const row = report.detalles.find((d) => d.codigo === 'SKU-CAT-RACE');
         assert.equal(row?.estado, 'rechazado');
         assert.equal(row?.motivos[0]?.field, 'id_categoria');
+    });
+
+    await t.test('Almacenamiento explícito y fallas de persistencia: responde 503 sin filtrar rutas, libera locks y concilia tras recuperación', async (t2) => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+        const prevImportDir = process.env.IMPORT_STORAGE_DIR;
+        const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-http-import-'));
+        const missingDir = path.join(storageDir, 'no-existe');
+
+        try {
+            // 1. Previsualizar con IMPORT_STORAGE_DIR inexistente devuelve 503 sin filtrar la ruta
+            process.env.IMPORT_STORAGE_DIR = missingDir;
+            const formBad = new FormData();
+            formBad.append(
+                'file',
+                new Blob(['codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-STO-1,Prod Sto,1,100,5'], {
+                    type: 'text/csv'
+                }),
+                'sto.csv'
+            );
+            const badPreviewRes = await fetch(baseUrl, {
+                method: 'POST',
+                headers: { Cookie: `jwt_token=${adminToken}` },
+                body: formBad
+            });
+            assert.equal(badPreviewRes.status, 503);
+            const badPreviewJson = await badPreviewRes.json();
+            assert.equal(typeof badPreviewJson.message, 'string');
+            assert.equal(badPreviewJson.message.includes(missingDir), false);
+
+            // 2. Directorio válido explícito persiste previsualización y reporte
+            process.env.IMPORT_STORAGE_DIR = storageDir;
+            const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-STO-OK,Prod Sto OK,1,100,5';
+            const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'sto-ok.csv', 1);
+            const persistedFile = path.join(storageDir, `${prev.previewToken}.json`);
+            assert.equal(fs.existsSync(persistedFile), true);
+
+            // Si el directorio configurado deja de existir o es inválido al consultar GET, devuelve 503
+            process.env.IMPORT_STORAGE_DIR = 'relative/invalid-path';
+            const statusBadDirRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+                headers: { Cookie: `jwt_token=${adminToken}` }
+            });
+            assert.equal(statusBadDirRes.status, 503);
+
+            // Restaurar directorio válido
+            process.env.IMPORT_STORAGE_DIR = storageDir;
+
+            // 3. Falla de escritura al iniciar confirmar: retorna 503 y libera SKU locks para reintentar
+            const { writeFileSync } = fs;
+            const denyWrites = t2.mock.method(fs, 'writeFileSync', (...args) => {
+                const err = new Error('EACCES');
+                err.code = 'EACCES';
+                throw err;
+            });
+            const preFailRes = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+                body: JSON.stringify({ previewToken: prev.previewToken })
+            });
+            assert.equal(preFailRes.status, 503);
+            denyWrites.mock.restore();
+
+            // 4. Falla de escritura después de vincular el alta provisional en batch:
+            // no responde 200 completado engañoso, mantiene procesando y al recuperarse GET concilia en completado.
+            const { recordBatchProvisionalProductLink } = require('../dist/utils/importConfirmationState.util.js');
+            let writesToFailAfterCommit = 0;
+            t2.mock.method(repo, 'insertImportedProductsBatch', async (_rows, token) => {
+                if (token) {
+                    recordBatchProvisionalProductLink(token, 'SKU-STO-OK', 912);
+                }
+                writesToFailAfterCommit = 1;
+                const outcomes = new Map();
+                outcomes.set(2, {
+                    success: true,
+                    id_producto: 912,
+                    codigo: 'SKU-STO-OK',
+                    nombre: 'Prod Sto OK'
+                });
+                return { outcomes, uncertainRowNumbers: new Set() };
+            });
+
+            t2.mock.method(fs, 'writeFileSync', (...args) => {
+                if (writesToFailAfterCommit > 0) {
+                    writesToFailAfterCommit--;
+                    const err = new Error('ENOSPC');
+                    err.code = 'ENOSPC';
+                    throw err;
+                }
+                return writeFileSync.apply(fs, args);
+            });
+
+            const postCommitFailRes = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+                body: JSON.stringify({ previewToken: prev.previewToken })
+            });
+            assert.equal(postCommitFailRes.status, 503);
+
+            const diskBeforeRecovery = JSON.parse(fs.readFileSync(persistedFile, 'utf8'));
+            assert.equal(diskBeforeRecovery.status, 'procesando');
+
+            // Restaurar mock de escritura y conciliar vía GET /confirmaciones/:previewToken
+            t2.mock.method(repo, 'findExistingProductsBySkus', async () => new Map([['SKU-STO-OK', 912]]));
+            const recoveredRes = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+                headers: { Cookie: `jwt_token=${adminToken}` }
+            });
+            assert.equal(recoveredRes.status, 200);
+            const recoveredReport = await recoveredRes.json();
+            assert.equal(recoveredReport.estado, 'completado');
+            assert.equal(recoveredReport.importados, 1);
+            assert.equal(recoveredReport.detalles[0]?.id_producto, 912);
+        } finally {
+            if (prevImportDir === undefined) delete process.env.IMPORT_STORAGE_DIR;
+            else process.env.IMPORT_STORAGE_DIR = prevImportDir;
+            fs.rmSync(storageDir, { recursive: true, force: true });
+        }
+    });
+
+    await t.test('Rollback confirmado pre-commit tras vinculación provisional: sincroniza limpieza pendiente al recuperar disco y habilita reintento', async (t2) => {
+        test.mock.method(usuarioRepo, 'findUsuarioById', async () => ({
+            id_usuario: 1,
+            email: 'admin@test.com',
+            rol: 'ADMIN',
+            activo: 1
+        }));
+        const adminToken = signToken({ id: 1, rol: 'ADMIN' });
+        const prevImportDir = process.env.IMPORT_STORAGE_DIR;
+        const storageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-http-rb-unit-'));
+
+        try {
+            process.env.IMPORT_STORAGE_DIR = storageDir;
+            const csv = 'codigo,nombre,id_categoria,precio_base_usd,stock\nSKU-RB-U1,Prod RB U1,1,100,5\nSKU-RB-U2,Prod RB U2,1,200,5';
+            const prev = await validateProductImportFile(Buffer.from(csv, 'utf8'), 'rb-unit.csv', 1);
+            const persistedFile = path.join(storageDir, `${prev.previewToken}.json`);
+
+            const { recordBatchProvisionalProductLink } = require('../dist/utils/importConfirmationState.util.js');
+            const { writeFileSync } = fs;
+            let writeCount = 0;
+            let failAllWritesFrom3 = true;
+
+            t2.mock.method(fs, 'writeFileSync', (...args) => {
+                writeCount += 1;
+                if (failAllWritesFrom3 && writeCount >= 3) {
+                    const err = new Error('ENOSPC');
+                    err.code = 'ENOSPC';
+                    throw err;
+                }
+                return writeFileSync.apply(fs, args);
+            });
+
+            let attempt = 0;
+            t2.mock.method(repo, 'insertImportedProductsBatch', async (_rows, token) => {
+                attempt += 1;
+                if (attempt === 1 && token) {
+                    recordBatchProvisionalProductLink(token, 'SKU-RB-U1', 701);
+                    recordBatchProvisionalProductLink(token, 'SKU-RB-U2', 702);
+                }
+                const outcomes = new Map();
+                outcomes.set(2, { success: true, id_producto: 801, codigo: 'SKU-RB-U1', nombre: 'Prod RB U1' });
+                outcomes.set(3, { success: true, id_producto: 802, codigo: 'SKU-RB-U2', nombre: 'Prod RB U2' });
+                return { outcomes, uncertainRowNumbers: new Set() };
+            });
+
+            const failedRes = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+                body: JSON.stringify({ previewToken: prev.previewToken })
+            });
+            assert.equal(failedRes.status, 503);
+
+            // Mientras el disco siga fallando, pendingRollbackDiskSync evita leer estado sucio como OK
+            const getWhileDown = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+                headers: { Cookie: `jwt_token=${adminToken}` }
+            });
+            assert.equal(getWhileDown.status, 503);
+
+            // Al recuperar disco, GET sincroniza limpieza del rollback a pendiente y limpia enlaces provisionales
+            failAllWritesFrom3 = false;
+            const getRecovered = await fetch(`${importBaseUrl}/confirmaciones/${prev.previewToken}`, {
+                headers: { Cookie: `jwt_token=${adminToken}` }
+            });
+            assert.equal(getRecovered.status, 200);
+            const recoveredBody = await getRecovered.json();
+            assert.equal(recoveredBody.estado, 'pendiente');
+
+            const cleanedDisk = JSON.parse(fs.readFileSync(persistedFile, 'utf8'));
+            assert.equal(cleanedDisk.status, 'pendiente');
+            assert.deepEqual(cleanedDisk.batchLinkedProducts, []);
+            assert.equal(cleanedDisk.importedProductIds.length, 0);
+            assert.equal(cleanedDisk.rows[0].id_producto, undefined);
+
+            // Reintento limpio tras recuperación
+            const retryRes = await fetch(`${importBaseUrl}/confirmar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Cookie: `jwt_token=${adminToken}` },
+                body: JSON.stringify({ previewToken: prev.previewToken })
+            });
+            assert.equal(retryRes.status, 200);
+            const retryBody = await retryRes.json();
+            assert.equal(retryBody.estado, 'completado');
+            assert.equal(retryBody.importados, 2);
+        } finally {
+            if (prevImportDir === undefined) delete process.env.IMPORT_STORAGE_DIR;
+            else process.env.IMPORT_STORAGE_DIR = prevImportDir;
+            fs.rmSync(storageDir, { recursive: true, force: true });
+        }
     });
 });
