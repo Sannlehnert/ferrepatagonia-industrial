@@ -5,10 +5,43 @@ type CatalogRow = {
   id_producto: number;
   nombre: string;
   codigo: string;
+  imagen: string | null;
   id_categoria: number;
   categoria_nombre: string;
   disponible: number;
 };
+
+export type CatalogProductDetailRow = {
+  id_producto: number;
+  nombre: string;
+  codigo: string;
+  descripcion: string | null;
+  imagen: string | null;
+  stock: number;
+  id_categoria: number;
+  categoria_nombre: string;
+};
+
+export async function findCatalogProductById(id: number): Promise<CatalogProductDetailRow | null> {
+  const connection = await pool.getConnection();
+  let reusable = true;
+  try {
+    const rows = await connection.query<CatalogProductDetailRow[]>({ sql: `
+      SELECT p.id_producto, p.nombre, p.codigo, p.descripcion, p.imagen, p.stock,
+             c.id_categoria, c.nombre AS categoria_nombre
+      FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
+      WHERE p.id_producto = ? AND p.activo = 1 AND c.activo = 1
+      LIMIT 1
+    `, timeout: 5000 }, [id]);
+    return rows[0] ?? null;
+  } catch (error) {
+    reusable = false;
+    throw error;
+  } finally {
+    if (reusable) connection.release();
+    else connection.destroy();
+  }
+}
 
 export async function findCatalogPage({ limit, offset, categoria, busqueda }: CatalogPagination) {
   const where = 'p.activo = 1 AND c.activo = 1'
@@ -32,7 +65,7 @@ export async function findCatalogPage({ limit, offset, categoria, busqueda }: Ca
       WHERE ${where}
     `, timeout: 5000 }, parameters);
     const rows = await connection.query<CatalogRow[]>({ sql: `
-      SELECT p.id_producto, p.nombre, p.codigo, c.id_categoria,
+      SELECT p.id_producto, p.nombre, p.codigo, p.imagen, c.id_categoria,
              c.nombre AS categoria_nombre, (p.stock > 0) AS disponible
       FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
       WHERE ${where}

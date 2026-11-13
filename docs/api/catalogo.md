@@ -1,5 +1,17 @@
 # Catálogo público — FER-12 (#189, #190) y FER-13 (#193, #194)
 
+## Detalle público — FER-23 (#272)
+
+`GET /api/catalogo/:id` devuelve el detalle de un producto y su categoría solo
+cuando ambos están activos. Devuelve nombre, código, descripción, URL de imagen
+(nullable) y stock exacto para la vista de detalle. Un producto inexistente,
+inactivo o perteneciente a una categoría inactiva responde 404.
+
+El detalle no publica el precio legado: conserva `precio: null` y
+`estadoPrecio: PENDIENTE_DEFINICION`. La UI obtiene importes exclusivamente de
+FER-17 mediante `/api/precios` o `/api/precios/mios`, y la acción de compra
+reutiliza el carrito autoritativo de `/api/carrito`.
+
 ## Alcance y decisiones autorizadas
 
 `GET /api/catalogo` es público y no requiere cookie ni JWT. Una cookie inválida
@@ -8,6 +20,8 @@ Se exige `PRODUCTO.activo = 1` **y** `CATEGORIA.activo = 1`.
 Los productos sin stock siguen visibles con `disponible: false`.
 `disponible` significa exclusivamente `PRODUCTO.stock > 0`: no reserva unidades
 ni garantiza disponibilidad al confirmar una compra. No se expone el stock exacto.
+El listado incluye `imagen` cuando el producto tiene una URL asociada. Home
+y catálogo usan esa URL directamente para mostrar la foto.
 
 **Precio provisional, autorizado el 16/10/2026:** `precio` siempre es `null` y
 `estadoPrecio` siempre es `PENDIENTE_DEFINICION`. No representa un precio comercial,

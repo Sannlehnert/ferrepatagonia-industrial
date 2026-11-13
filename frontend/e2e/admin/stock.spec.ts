@@ -111,11 +111,14 @@ test('valida stock y refleja los cambios en el catálogo público', async ({
         exact: true,
       });
 
-      if (quantity === 0) {
-        await expect(add).toBeDisabled();
-      } else {
-        await expect(add).toBeEnabled();
-      }
+      // El visitante consulta stock, pero necesita sesión para agregar.
+      await expect(add).toBeDisabled();
+      await expect(add).toHaveAccessibleDescription(
+        'Iniciá sesión para agregar productos.',
+      );
+      await expect(product.getByText('Precio pendiente de verificación', {
+        exact: true,
+      })).toBeVisible();
     }
   } finally {
     try {

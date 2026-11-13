@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import ProductThumbnail from '@/components/ProductThumbnail.vue';
 import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { RouterLink, useRouter } from 'vue-router';
 import axios from 'axios';
 import ProductFormModal from './ProductFormModal.vue';
 import {
@@ -89,8 +90,12 @@ const productosFiltrados = computed(() => {
     );
 });
 
-const formatPrice = (value: number) =>
-    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+const formatPrice = (value: number | string | null | undefined): string => {
+    if (value === null || value === undefined || value === '') return '—';
+    const num = Number(value);
+    if (isNaN(num)) return '—';
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
+};
 
 const openCreateModal = () => {
     if (actionsDisabled.value) return;
@@ -155,7 +160,15 @@ onMounted(() => {
     <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
         <!-- Barra Superior -->
         <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 sticky top-0 bg-[#F1F5F9] py-4 z-20">
-            <h2 class="text-2xl font-bold text-[#0B2438]">Catálogo de Productos</h2>
+            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 class="text-2xl font-bold text-[#0B2438]">Catálogo de Productos</h2>
+                <RouterLink
+                    :to="{ name: 'admin-product-import' }"
+                    class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                >
+                    Importar desde planilla
+                </RouterLink>
+            </div>
             <input
                 v-model="searchQuery"
                 type="text"
@@ -246,8 +259,8 @@ onMounted(() => {
                     class="absolute top-16 right-2 z-10 min-h-11 px-3 bg-white border border-[#E2E8F0] rounded-md shadow-sm text-sm text-[#103A5C] disabled:opacity-50"
                 >{{ prod.activo ? 'Desactivar' : 'Activar' }}</button>
 
-                <!-- Imagen Placeholder y Estado -->
                 <div class="h-32 bg-[#F8FAFC] flex items-center justify-center text-[#94A3B8] relative border-b border-[#E2E8F0]">
+                    <ProductThumbnail :image="prod.imagen" :alt="prod.nombre" image-class="h-full w-full object-contain" />
                     <span
                         class="absolute top-2 left-2 text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-wider border"
                         :class="prod.activo
@@ -276,8 +289,8 @@ onMounted(() => {
                         </div>
                         <div class="flex flex-col min-w-0 text-right">
                             <span class="text-[10px] text-[#64748B] uppercase font-semibold">Precio USD</span>
-                            <span class="font-bold text-[#103A5C] text-sm break-words">
-                                ${{ formatPrice(prod.precio) }}
+                            <span class="font-bold text-[#103A5C] text-lg">
+                                {{ prod.precio !== null && prod.precio !== undefined ? `USD $${formatPrice(prod.precio)}` : 'Sin precio' }}
                             </span>
                         </div>
                     </div>

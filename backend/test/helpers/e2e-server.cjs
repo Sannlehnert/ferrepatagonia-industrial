@@ -1,18 +1,23 @@
 const assert = require("node:assert/strict");
+const { childProfile, connectOwned } = require("./cc260-disposable.cjs");
+const { seedAdminAccounts } = require("./admin-account-fixture.cjs");
+const { seedDemo } = require("../../../database/fixtures/fer19-demo.cjs");
 
 // El ejecutor deberá proporcionar una base exclusiva para esta ejecución.
 assert.equal(process.env.E2E_ISOLATED, "1");
 assert.equal(process.env.DB_HOST, "127.0.0.1");
-assert.match(process.env.DB_NAME || "", /^e2e_test_[a-f0-9]{32}$/);
+const persistent = process.env.E2E_LOCAL_PERSISTENT === '1';
+assert.match(process.env.DB_NAME || "", persistent ? /^ferre_demo_[a-f0-9]{32}$/ : /^e2e_test_[a-f0-9]{32}$/);
 assert.ok(process.send, "Este servidor debe iniciarse desde el ejecutor E2E.");
 
-const { app } = require("../../dist/app");
+const { createBackendServer } = require("../../dist/http-server");
 const {
   initializeDatabase,
   destroyDatabase,
 } = require("../../dist/config/database.config");
 
 let server;
+let backend;
 let stopping = false;
 
 async function stop(exitCode = 0) {
@@ -25,10 +30,7 @@ async function stop(exitCode = 0) {
 
   try {
     if (server?.listening) {
-      await new Promise((resolve, reject) => {
-        server.close((error) => (error ? reject(error) : resolve()));
-        server.closeAllConnections();
-      });
+      await backend.close();
     }
   } catch {
     exitCode = 1;
@@ -51,11 +53,49 @@ process.once("SIGINT", () => void stop());
 process.once("SIGTERM", () => void stop());
 
 async function main() {
-  await initializeDatabase();
+  let profile;
+  if (persistent) {
+    assert.equal(process.env.E2E_DEMO_CATALOG, '1');
+    profile = JSON.parse(process.env.DEMO286_LOCAL_PROFILE);
+    assert.equal(process.env.DB_PASSWORD, profile.password);
+    assert.equal(process.env.DB_PORT, String(profile.port));
+    assert.equal(process.env.DB_NAME, profile.database);
+    assert.ok([3000, 53000].includes(Number(process.env.PORT)));
+  }
+  const session = persistent ? await require('./demo286-persistent.cjs').connectPersistent(profile)
+    : await connectOwned(childProfile("E2E"), "E2E");
+  let fixture;
+  let fer19Fixture;
+  let academicCheckout;
+  try {
+    await initializeDatabase();
+    if (persistent) {
+      const { issuePersistentAcademicCheckout } = require('../../dist/services/orders/academic-checkout');
+      academicCheckout = await issuePersistentAcademicCheckout(profile);
+    } else if (process.env.E2E_FER19) {
+      fer19Fixture = await seedDemo(session, { browser: true });
+    } else if (process.env.E2E_DEMO_CATALOG === '1') {
+      const { issueAcademicCheckout } = require('../../dist/services/orders/academic-checkout');
+      academicCheckout = await issueAcademicCheckout(session.profile);
+    } else if (process.env.E2E_RECEIPTS !== "1") {
+      fixture = await seedAdminAccounts(session, { browser: true });
+    }
+  } finally {
+    await session.connection.end();
+  }
 
   if (stopping) return;
 
-  server = app.listen(0, "127.0.0.1");
+  // Keep the isolated loopback transport. Exercise the real H04 read policy
+  // outside NODE_ENV=test after the guarded fixture has been seeded.
+  if (process.env.E2E_FER19 === "production") process.env.NODE_ENV = "development";
+
+  backend = createBackendServer(academicCheckout);
+  if (persistent) {
+    const fingerprint = require('node:crypto').createHash('sha256').update('demo286:' + profile.token).digest('hex');
+    backend.server.prependListener('request', (_req, res) => res.setHeader('X-Ferre-Demo', fingerprint));
+  }
+  server = backend.server.listen(persistent ? Number(process.env.PORT) : 0, "127.0.0.1");
 
   server.once("error", () => {
     console.error("No se pudo iniciar la API aislada.");
@@ -68,11 +108,13 @@ async function main() {
     process.send({
       type: "ready",
       port: address.port,
+      adminAccounts: fixture && Object.fromEntries(Object.entries(fixture.accounts).map(([key, account]) => [key, account.clientId])),
+      fer19Fixture,
     });
   });
 }
 
-main().catch(() => {
-  console.error("No se pudo inicializar la API aislada.");
+main().catch((error) => {
+  console.error("No se pudo inicializar la API aislada:", error?.stack || error);
   void stop(1);
 });

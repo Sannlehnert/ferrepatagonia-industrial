@@ -34,8 +34,13 @@ test('mantiene visible el producto sin stock y deshabilita Agregar', async ({
   await expect(withStock.getByRole('button', {
     name: 'Agregar',
     exact: true,
-  })).toBeEnabled();
+  })).toBeDisabled();
 
+  // El visitante necesita iniciar sesión para agregar productos.
+  await expect(withStock.getByText(
+    'Iniciá sesión para agregar productos.',
+    { exact: true },
+  )).toBeVisible();
   await page.reload();
 
   await expect(withoutStock.getByRole('button', {
@@ -45,7 +50,7 @@ test('mantiene visible el producto sin stock y deshabilita Agregar', async ({
   await expect(withStock.getByRole('button', {
     name: 'Agregar',
     exact: true,
-  })).toBeEnabled();
+  })).toBeDisabled();
 });
 
 for (const scenario of [

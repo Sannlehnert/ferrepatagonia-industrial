@@ -16,7 +16,8 @@ const router = createRouter({
     if (savedPosition) return savedPosition
 
     if (to.hash) {
-      return { el: to.hash, behavior: 'smooth' }
+      const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      return { el: to.hash, behavior: reducedMotion ? 'instant' : 'smooth' }
     }
 
     return { top: 0 }
@@ -32,6 +33,16 @@ const router = createRouter({
       },
       children: [
         {
+          path: 'cuentas-corrientes',
+          name: 'admin-accounts',
+          component: () => import('@/views/admin/AdminAccountsView.vue'),
+        },
+        {
+          path: 'comprobantes',
+          name: 'admin-receipts',
+          component: () => import('@/views/admin/AdminPaymentReceiptsView.vue'),
+        },
+        {
           path: '',
           redirect: { name: 'admin-dashboard' },
         },
@@ -43,12 +54,7 @@ const router = createRouter({
         {
           path: 'pedidos',
           name: 'admin-orders',
-          component: () =>
-            import('@/views/admin/AdminSectionPlaceholderView.vue'),
-          props: {
-            title: 'Pedidos',
-            description: 'Consulta y seguimiento administrativo de pedidos.',
-          },
+          component: () => import('@/views/admin/AdminOrdersView.vue'),
         },
         {
           path: 'productos',
@@ -56,14 +62,14 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminProductsListView.vue'),
         },
         {
+          path: 'productos/importar',
+          name: 'admin-product-import',
+          component: () => import('@/views/admin/AdminProductImportView.vue'),
+        },
+        {
           path: 'categorias',
           name: 'admin-categories',
-          component: () =>
-            import('@/views/admin/AdminSectionPlaceholderView.vue'),
-          props: {
-            title: 'Categorías',
-            description: 'Organización de las categorías del catálogo.',
-          },
+          component: () => import('@/views/admin/AdminCategoriesView.vue'),
         },
         {
           path: 'clientes',
@@ -85,6 +91,30 @@ const router = createRouter({
           path: 'catalogo',
           name: 'catalogo',
           component: () => import('@/views/CatalogoView.vue'),
+        },
+        {
+          path: 'producto/:id',
+          name: 'producto-detalle',
+          component: () => import('@/views/ProductDetailView.vue'),
+        },
+        {
+          path: 'ayuda',
+          name: 'public-faq',
+          component: () => import('@/views/FaqView.vue'),
+        },
+        {
+          path: 'sobre-nosotros',
+          name: 'public-about',
+          component: () => import('@/views/AboutView.vue'),
+        },
+        {
+          path: 'carrito',
+          name: 'carrito',
+          component: () => import('@/views/CartView.vue'),
+          meta: {
+            requiresAuth: true,
+            roles: ['CLIENTE'],
+          },
         },
       ],
     },
@@ -108,7 +138,19 @@ const router = createRouter({
       component: () => import('@/views/cuenta/MiCuentaLayout.vue'),
       meta: { requiresAuth: true, roles: ['CLIENTE'] },
       children: [
-        { path: '', redirect: { name: 'cuenta-datos' } },
+        {
+          path: '',
+          name: 'cuenta-dashboard',
+          component: () => import('@/views/cuenta/MiCuentaDashboardView.vue'),
+        },
+        {
+          path: 'resumen',
+          redirect: { name: 'cuenta-dashboard' },
+        },
+        {
+          path: 'dashboard',
+          redirect: { name: 'cuenta-dashboard' },
+        },
         {
           path: 'datos',
           name: 'cuenta-datos',
@@ -119,9 +161,28 @@ const router = createRouter({
           name: 'cuenta-pedidos',
           component: () => import('@/views/cuenta/HistorialPedidos.vue'),
         },
+        {
+          path: 'cuenta-corriente',
+          name: 'cuenta-corriente',
+          component: () => import('@/views/cuenta/CuentaCorrienteView.vue'),
+        },
       ],
     },
   ],
+})
+
+router.beforeEach((to, from) => {
+  if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
+    if (!from.path.startsWith('/mi-cuenta') && to.path.startsWith('/mi-cuenta')) {
+      const isAuthRoute = from.path === '/login' || from.path === '/registro'
+      const fallback = from.fullPath && from.fullPath !== '/' && !isAuthRoute ? from.fullPath : '/catalogo'
+      try {
+        sessionStorage.setItem('last_external_route', fallback)
+      } catch {
+        // Ignorar restricciones de almacenamiento en navegadores privados
+      }
+    }
+  }
 })
 
 router.beforeEach(async (to) => {

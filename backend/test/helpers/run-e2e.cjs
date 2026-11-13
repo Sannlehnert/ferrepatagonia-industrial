@@ -1,44 +1,35 @@
 const assert = require('node:assert/strict');
-const { execFileSync, fork, spawn } = require('node:child_process');
+const { fork, spawn } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
-const mariadb = require('mariadb');
+const { newProfile } = require('./cc260-disposable.cjs');
+const { openDatabase, prepareDatabase, removeDatabase } = require('./admin-account-db.cjs');
 const { seedFixtures } = require('./e2e-fixtures.cjs');
 
 const root = path.resolve(__dirname, '../../..');
 const backend = path.join(root, 'backend');
 const frontend = path.join(root, 'frontend');
-const token = randomUUID().replaceAll('-', '');
-const database = `e2e_test_${token}`;
-const container = `ferrepatagonia-e2e-${token}`;
-const password = randomUUID();
+const profile = newProfile('E2E');
+const args = process.argv.slice(2);
+const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
+const receipts = args.includes('--receipts');
+const demoCatalog = args.includes('--demo-catalog');
+const demoInteractive = args.includes('--demo-interactiva');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--demo-catalog', '--demo-interactiva'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
+assert.ok(!demoInteractive || (demoCatalog && process.stdin.isTTY && testArgs.length === 0),
+  'Para la demo interactiva usá --demo-catalog --demo-interactiva en una terminal, sin otros argumentos.');
 
 const services = [];
 let connection;
 let testProcess;
+let receiptStorage;
+let productImageStorage;
 let containerCreationAttempted = false;
 let interrupted = false;
-const anonymousVolumes = new Set();
-
-function inspectContainer() {
-  const info = JSON.parse(docker('inspect', container))[0];
-  for (const mount of info.Mounts || []) {
-    if (mount.Type === 'volume') anonymousVolumes.add(mount.Name);
-  }
-  return info;
-}
-
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
-function docker(...args) {
-  return execFileSync('docker', args, {
-    encoding: 'utf8',
-    timeout: 180_000,
-    windowsHide: true,
-  }).trim();
-}
-
+let demoPrompt;
 function startService(file, cwd, env) {
   const child = fork(file, [], {
     cwd,
@@ -54,13 +45,13 @@ function startService(file, cwd, env) {
       finish(new Error(`Tiempo agotado al iniciar ${path.basename(file)}`));
     }, 60_000);
 
-    function finish(error, port) {
+    function finish(error, ready) {
       clearTimeout(timer);
       child.off('message', onMessage);
       child.off('exit', onExit);
       child.off('error', onError);
       if (error) reject(error);
-      else resolve(port);
+      else resolve(ready);
     }
 
     function onMessage(message) {
@@ -70,7 +61,7 @@ function startService(file, cwd, env) {
         message.port > 0 &&
         message.port <= 65535
       ) {
-        finish(null, message.port);
+        finish(null, message);
       }
     }
 
@@ -111,6 +102,7 @@ async function stopChild(child) {
 
 function onInterrupt() {
   interrupted = true;
+  demoPrompt?.close();
   if (testProcess) testProcess.kill();
 }
 
@@ -129,54 +121,19 @@ async function main() {
 
   containerCreationAttempted = true;
 
-  docker(
-    'run', '--rm', '-d',
-    '--name', container,
-    '-p', '127.0.0.1::3306',
-    '-e', `MARIADB_ROOT_PASSWORD=${password}`,
-    '-e', `MARIADB_DATABASE=${database}`,
-    'mariadb:11.4',
-  );
-
-  const info = inspectContainer();
-  const dbPort = Number(
-    info.NetworkSettings.Ports['3306/tcp'][0].HostPort,
-  );
-
-  for (let attempt = 0; attempt < 60; attempt++) {
-    checkInterrupted();
-
-    try {
-      connection = await mariadb.createConnection({
-        host: '127.0.0.1',
-        port: dbPort,
-        user: 'root',
-        password,
-        database,
-        connectTimeout: 1000,
-      });
-      break;
-    } catch {
-      await delay(1000);
-    }
-  }
-
-  assert.ok(connection, 'MariaDB aislada no está disponible.');
-
-  const schema = fs.readFileSync(
-    path.join(root, 'database/schema.sql'),
-    'utf8',
-  );
-
-  for (const statement of schema.split(';').filter(sql => sql.trim())) {
-    await connection.query(statement);
-  }
-
-  await seedFixtures(connection);
+  const session = await openDatabase(profile, 'E2E', checkInterrupted);
+  connection = session.connection;
+  await prepareDatabase(session, checkInterrupted);
+  if (!fer19) await seedFixtures(connection, {
+    includeAccountOrderFixture: receipts || demoCatalog,
+    includeReceiptFixture: receipts,
+    includeCatalogProducts: !demoCatalog,
+  });
+  if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+  productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
-
-  console.log(`Base E2E preparada: ${database}`);
+  console.log(`Base E2E preparada: ${profile.database}`);
   checkInterrupted();
 
   // Elegir el origen antes de iniciar la API; strictPort falla si se ocupa.
@@ -190,6 +147,7 @@ async function main() {
   const apiEnv = {
     ...process.env,
     NODE_ENV: 'test',
+    TZ: 'UTC',
     APP_PUBLIC_ORIGIN: 'http://127.0.0.1:' + plannedWebPort,
     TRUSTED_PROXY_CIDRS: 'none',
     HTTPS_TERMINATION: 'trusted-proxy',
@@ -201,16 +159,22 @@ async function main() {
     AUTH_REGISTER_WINDOW_MS: '60000',
     DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
     E2E_ISOLATED: '1',
+    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
     JWT_SECRET: randomUUID(),
-    DB_HOST: '127.0.0.1',
-    DB_PORT: String(dbPort),
-    DB_NAME: database,
+    E2E_FER19: fer19,
+    E2E_RECEIPTS: receipts ? '1' : '',
+    RECEIPT_STORAGE_DIR: receiptStorage ?? '',
+    PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
+    DB_HOST: profile.host,
+    DB_PORT: String(profile.port),
+    DB_NAME: profile.database,
     DB_USER: 'root',
-    DB_PASSWORD: password,
+    DB_PASSWORD: profile.password,
+    CCE2E_TEST_PROFILE: JSON.stringify(profile),
     PORT: '3000',
   };
 
-  const apiPort = await startService(
+  const { port: apiPort, adminAccounts, fer19Fixture } = await startService(
     path.join(__dirname, 'e2e-server.cjs'),
     backend,
     apiEnv,
@@ -222,11 +186,23 @@ async function main() {
     ...process.env,
     NODE_ENV: 'test',
     E2E_ISOLATED: '1',
+    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
     E2E_WEB_PORT: String(plannedWebPort),
     E2E_API_URL: `http://127.0.0.1:${apiPort}`,
+    E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
+    E2E_FER19: fer19,
+    E2E_RECEIPTS: receipts ? '1' : '',
   };
+  if (fer19 === 'production') browserEnv.E2E_PRODUCTION_BUILD = '1';
+  else if (fer19) browserEnv.E2E_PRODUCTION_BUILD = '0';
+  if (browserEnv.E2E_PRODUCTION_BUILD === '1') {
+    assert.ok(
+      fs.existsSync(path.join(frontend, 'dist/index.html')),
+      'Primero compilá el frontend para E2E de producción.',
+    );
+  }
 
-  const webPort = await startService(
+  const { port: webPort } = await startService(
     path.join(frontend, 'e2e/helpers/vite-server.mjs'),
     frontend,
     browserEnv,
@@ -241,10 +217,19 @@ async function main() {
     testProcess = spawn(process.execPath, [
       path.join(frontend, 'node_modules/@playwright/test/cli.js'),
       'test',
-      ...process.argv.slice(2),
+      ...testArgs,
     ], {
       cwd: frontend,
-      env: { ...browserEnv, E2E_BASE_URL: baseURL },
+      env: {
+        ...browserEnv, E2E_BASE_URL: baseURL,
+        E2E_DEMO_INTERACTIVE: demoInteractive ? '1' : '',
+        // Only the Playwright worker needs access to test controls, never Vite.
+        ...(fer19 ? {
+          FER19_E2E_FIXTURE: JSON.stringify(fer19Fixture),
+          FER19_E2E_PROFILE: JSON.stringify(profile),
+          FER19_E2E_CURSOR_KEY: apiEnv.JWT_SECRET,
+        } : { CCE2E_TEST_PROFILE: JSON.stringify(profile) }),
+      },
       stdio: 'inherit',
       windowsHide: true,
     });
@@ -253,6 +238,16 @@ async function main() {
     testProcess.once('exit', code => resolve(code));
   });
 
+  if (demoInteractive && result === 0 && !interrupted) {
+    const { account } = require('./e2e-fixtures.cjs').credentials;
+    console.log(`Demo académica local: ${baseURL}\nUsuario de prueba: ${account.email}\nClave de prueba: ${account.password}`);
+    console.log('Buscá FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM. Abrí la ficha en dos sesiones con el mismo usuario de prueba.');
+    demoPrompt = require('node:readline').createInterface({ input: process.stdin, output: process.stdout });
+    await new Promise(resolve => {
+      demoPrompt.once('close', resolve);
+      demoPrompt.question('Presioná Enter al terminar para borrar la base y las imágenes temporales.\n', () => demoPrompt.close());
+    });
+  }
   process.exitCode = result === 0 && !interrupted ? 0 : 1;
 }
 
@@ -277,40 +272,17 @@ async function cleanup() {
 
   if (containerCreationAttempted) {
     try {
-      const findContainer = () => docker(
-        'ps', '-a',
-        '--filter', `name=^/${container}$`,
-        '--format', '{{.Names}}',
-      );
-
-      const existing = findContainer();
-
-      if (existing !== '') {
-        assert.equal(existing, container);
-        // Volver a inventariar también si run o el primer inspect fallaron.
-        // Un fallo de inventario no debe impedir intentar el borrado seguro.
-        try {
-          inspectContainer();
-        } catch {
-          failed = true;
-          console.error('No se pudieron identificar los volúmenes E2E.');
-        }
-        docker('rm', '-f', '-v', container);
-      }
-
-      assert.equal(findContainer(), '');
-      const remainingVolumes = docker('volume', 'ls', '--format', '{{.Name}}')
-        .split(/\r?\n/);
-      for (const volume of anonymousVolumes) {
-        assert.ok(!remainingVolumes.includes(volume), 'Quedó un volumen E2E');
-      }
-      console.log(
-        'Limpieza E2E confirmada: no quedan el contenedor ni sus volúmenes.',
-      );
+      await removeDatabase(profile, 'E2E');
+      console.log('Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.');
     } catch {
-      console.error(`No se pudo confirmar la limpieza de ${container}`);
+      console.error(`No se pudo confirmar la limpieza de ${profile.container}`);
       failed = true;
     }
+  }
+
+  for (const directory of [receiptStorage, productImageStorage].filter(Boolean)) {
+    try { fs.rmSync(directory, { recursive: true, force: true }); }
+    catch { failed = true; }
   }
 
   if (failed) process.exitCode = 1;
@@ -318,7 +290,7 @@ async function cleanup() {
 
 main()
   .catch(error => {
-    console.error(error.message);
+    console.error(error.message.replaceAll(profile.password, '[oculta]'));
     process.exitCode = 1;
   })
   .finally(cleanup);

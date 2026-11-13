@@ -12,6 +12,8 @@
   contratos y validaciones del catálogo.
 - [Productos administrativos](api/admin-productos.md): endpoints, permisos,
   validaciones y errores de administración de productos.
+- [Categorías administrativas #279](279/README.md), con el contrato de alta,
+  edición y desactivación lógica y sus pruebas.
 - [MER vigente](modelo-datos/mer-ferrepatagonia.md) y
   [spike FER-15](spikes/fer-15-modelo-listas-precios.md): modelo y propuesta
   comercial; esta última sigue sujeta a validación del cliente.
@@ -40,7 +42,8 @@ La suite de integración prepara MariaDB en contenedores desechables. Estos
 registros son evidencia de pruebas locales; no equivalen a una ejecución de CI
 ni a una aprobación de release.
 
-Para el estado de integración y CI, usar el
-[corte fechado de operación](operaciones-release.md#corte-de-integración--28102026-1747-art),
-que distingue el run de PR, push/develop y la candidata pendiente de revisión.
+Para el estado de integración y CI, consultar la sección vigente de
+[preparación de release académico Backend (13/11/2026)](operaciones-release.md#preparación-de-release-académico-backend--13112026)
+y el registro histórico del
+[corte fechado de operación](operaciones-release.md#corte-de-integración--28102026-1747-art).
 Los ensayos locales no certifican TLS/proxy o respaldos del entorno de destino.

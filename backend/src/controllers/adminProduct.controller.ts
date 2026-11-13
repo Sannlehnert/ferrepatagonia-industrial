@@ -1,5 +1,7 @@
 import { mutationErrorMessage } from '../config/database-policy';
 import { Request, Response } from 'express';
+import type { RealtimeRequest } from '../realtime/committed-change';
+import { ProductImageError } from '../services/productImage.service';
 import {
     listAdminProducts,
     getAdminProductById,
@@ -33,9 +35,10 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        const newProduct = await createAdminProduct(res.locals.dto.body);
+        const newProduct = await createAdminProduct(res.locals.dto.body, req.file);
         return res.status(201).json(newProduct);
     } catch (error: any) {
+        if (error instanceof ProductImageError) return res.status(error.statusCode).json({ message: error.message, code: error.code });
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
         if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'El código SKU ya está registrado.' });
         if (error?.code === 'ER_DATA_TOO_LONG' || error?.code === 'ER_WARN_DATA_OUT_OF_RANGE') {
@@ -50,9 +53,10 @@ export const updateProduct = async (req: Request, res: Response) => {
     try {
         const { id } = res.locals.dto.params;
 
-        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body);
+        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body, (req as RealtimeRequest).notifyCommittedChange, req.file);
         return res.status(200).json(updatedProduct);
     } catch (error: any) {
+        if (error instanceof ProductImageError) return res.status(error.statusCode).json({ message: error.message, code: error.code });
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });
         if (error?.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'El código SKU ya está registrado.' });
         if (error?.code === 'ER_DATA_TOO_LONG' || error?.code === 'ER_WARN_DATA_OUT_OF_RANGE') {
@@ -78,7 +82,7 @@ export const updateProductStock = async (req: Request, res: Response) => {
     try {
         const { id } = res.locals.dto.params;
 
-        const product = await updateAdminProductStock(id, res.locals.dto.body.stock);
+        const product = await updateAdminProductStock(id, res.locals.dto.body.stock, (req as RealtimeRequest).notifyCommittedChange);
         return res.status(200).json({ message: 'Stock actualizado exitosamente', product });
     } catch (error: any) {
         if (error instanceof ValidationError) return res.status(error.statusCode).json({ message: error.message });

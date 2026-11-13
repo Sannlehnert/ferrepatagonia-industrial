@@ -10,6 +10,24 @@ function parseOrigin(value: string, referer: boolean): string | null {
     return url.origin;
   } catch { return null; }
 }
+export function isAllowedOrigin(
+  config: HttpSecurityConfig,
+  source: string | undefined,
+  referer: string | undefined,
+  metadata: string | undefined,
+  host: string | undefined,
+  protocol: string,
+  requireEvidence: boolean,
+): boolean {
+  const origin = new URL(config.publicOrigin);
+  if (metadata !== undefined && metadata !== 'same-origin') return false;
+  if (referer !== undefined && parseOrigin(referer, true) !== origin.origin) return false;
+  if (source !== undefined) return parseOrigin(source, false) === origin.origin;
+  if (referer !== undefined || !requireEvidence) return true;
+  return metadata === 'same-origin' && host === origin.host &&
+    protocol === origin.protocol.slice(0, -1);
+}
+
 export function httpSecurity(config: HttpSecurityConfig): RequestHandler {
   return (req, res, next) => {
     if (!req.ip || !isIP(req.ip)) {
@@ -22,19 +40,10 @@ export function httpSecurity(config: HttpSecurityConfig): RequestHandler {
     // Same-origin deployment: no Access-Control-Allow-* reflection or external CORS.
     // Reject foreign preflights too, without turning OPTIONS into a CSRF bypass.
     if (mutating || req.method === 'OPTIONS') {
-      const source = req.get('Origin'), referer = req.get('Referer');
-      const metadata = req.get('Sec-Fetch-Site');
-      const badMetadata = metadata !== undefined && metadata !== 'same-origin';
-      const conflictingReferer = referer !== undefined && parseOrigin(referer, true) !== config.publicOrigin;
-      const knownOrigin = source !== undefined
-        ? parseOrigin(source, false) === config.publicOrigin
-        : referer !== undefined ? parseOrigin(referer, true) === config.publicOrigin : false;
       // Missing Origin can use a valid Referer, or same-origin Fetch Metadata plus
       // the configured canonical Host. Never derive the allowed origin from XFH.
-      const metadataFallback = source === undefined && referer === undefined && metadata === 'same-origin' &&
-        req.get('Host') === new URL(config.publicOrigin).host && req.protocol === new URL(config.publicOrigin).protocol.slice(0, -1);
-      if ((mutating && (!knownOrigin && !metadataFallback)) || badMetadata || conflictingReferer ||
-        (source !== undefined && !knownOrigin) || (referer !== undefined && !knownOrigin)) {
+      if (!isAllowedOrigin(config, req.get('Origin'), req.get('Referer'),
+        req.get('Sec-Fetch-Site'), req.get('Host'), req.protocol, mutating)) {
         res.status(403).json({ message: 'Origen de solicitud no permitido.' }); return;
       }
     }

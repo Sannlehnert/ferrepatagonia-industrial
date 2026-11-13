@@ -1,154 +1,233 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
-import NavigationMenu from '@/components/NavigationMenu.vue'
-import { publicMenu } from '@/config/menu'
-import { getPermissionsForUser } from '@/config/permissions'
+import CommerceIcon from './CommerceIcon.vue'
+import PublicBrand from './PublicBrand.vue'
+import { getNavigableMenu, publicMenu } from '@/config/menu'
+import { getPermissionsForRole } from '@/config/permissions'
+import { useNavigationDisclosure } from '@/composables/useNavigationDisclosure'
 import { useAuthStore } from '@/stores/auth'
+import { useCartPanelStore } from '@/stores/cartPanel'
 
+const emit = defineEmits<{ navigate: [] }>()
 const auth = useAuthStore()
+const cartPanel = useCartPanelStore()
 const router = useRouter()
 const route = useRoute()
 const search = ref('')
+const { expanded, trigger, panel, close, toggle, escape } = useNavigationDisclosure()
 
 watch(
   () => [route.name, route.query.busqueda] as const,
   ([name, busqueda]) => {
-    search.value =
-      name === 'catalogo' && typeof busqueda === 'string'
-        ? busqueda
-        : ''
+    search.value = name === 'catalogo' && typeof busqueda === 'string' ? busqueda : ''
   },
   { immediate: true },
 )
 
-const permissions = computed(() =>
-  getPermissionsForUser(
-    auth.user
-      ? {
-          rol: auth.user.rol,
-          tipoCliente: auth.user.tipo_cliente,
-        }
-      : null,
-  ),
-)
-
-const accountRoute = computed(() => {
-  if (auth.rol === 'ADMIN') return 'admin-dashboard'
-  if (auth.rol === 'CLIENTE') return 'cuenta-datos'
-  return 'login'
+const navigation = computed(() => getNavigableMenu(publicMenu, getPermissionsForRole(auth.rol))
+  .filter(item => router.hasRoute(item.routeName)))
+const institutional = computed(() => navigation.value.filter(item =>
+  item.id === 'public-about' || item.id === 'public-faq',
+))
+const catalog = computed(() => navigation.value.find(item => item.id === 'public-catalog'))
+const account = computed(() => {
+  if (auth.rol === 'ADMIN') {
+    const admin = navigation.value.find(item => item.id === 'public-admin-panel')
+    return admin ? { label: admin.label, route: admin.routeName } : null
+  }
+  if (auth.rol === 'CLIENTE') return { label: 'Mi cuenta', route: 'cuenta-dashboard' }
+  return { label: 'Ingresar', route: 'login' }
 })
 
-const accountLabel = computed(() => {
-  if (auth.rol === 'ADMIN') return 'Administración'
-  return 'Mi cuenta'
-})
+async function finishNavigation() {
+  if (!expanded.value) return
+  close()
+  await nextTick()
+  emit('navigate')
+}
+
+watch(() => route.fullPath, finishNavigation)
+
+function followCurrentLink(event: MouseEvent) {
+  if (event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
+  const link = event.target instanceof Element ? event.target.closest('a') : null
+  if (link?.getAttribute('href') === route.fullPath) void finishNavigation()
+}
 
 async function submitSearch() {
   const busqueda = search.value.trim()
+  await router.push({ name: 'catalogo', query: busqueda ? { busqueda } : {} })
+  await finishNavigation()
+}
 
-  await router.push({
-    name: 'catalogo',
-    query: busqueda ? { busqueda } : {},
-  })
+function openCartDrawer() {
+  close()
+  cartPanel.open()
+}
+
+function toggleCartDrawer() {
+  close()
+  if (cartPanel.visible) {
+    cartPanel.close()
+  } else {
+    cartPanel.open()
+  }
 }
 </script>
 
 <template>
-  <header class="bg-white text-[#103a5c]">
-    <div class="bg-[#0b2438] text-white">
-      <div
-        class="box-border flex min-h-9 items-center px-4 py-2 text-xs sm:px-6 lg:px-10"
+  <header class="store-header" @keydown.esc="escape">
+    <div class="fp-shell header-main">
+      <PublicBrand />
+
+      <form role="search" aria-label="Buscar en el catálogo" class="header-search" @submit.prevent="submitSearch">
+        <label for="home-search" class="sr-only">Buscar productos por nombre o código</label>
+        <input
+          id="home-search"
+          v-model="search"
+          type="search"
+          name="busqueda"
+          enterkeyhint="search"
+          placeholder="Buscar"
+          class="fp-input fp-focus"
+        />
+        <button type="submit" aria-label="Buscar" class="fp-action fp-action--primary fp-focus">
+          <CommerceIcon name="search" /> <span>Buscar</span>
+        </button>
+      </form>
+
+      <button
+        v-if="auth.rol === 'CLIENTE'"
+        type="button"
+        class="header-control header-cart fp-focus"
+        aria-label="Carrito"
+        aria-haspopup="dialog"
+        :aria-expanded="cartPanel.visible"
+        @click="openCartDrawer"
       >
-        Envíos y retiros coordinados · Neuquén Capital
-      </div>
+        <CommerceIcon name="cart" /> <span>Carrito</span>
+      </button>
+      <button
+        ref="trigger"
+        type="button"
+        class="header-control header-toggle fp-focus"
+        aria-label="Menú principal"
+        aria-controls="store-navigation"
+        :aria-expanded="expanded"
+        @click="toggle"
+      >
+        <CommerceIcon :name="expanded ? 'close' : 'menu'" />
+      </button>
     </div>
 
-    <div class="border-0 border-b border-solid border-[#e2e8f0]">
-      <div
-        class="box-border grid grid-cols-[1fr_auto] items-center gap-x-6 gap-y-3 px-4 py-4 sm:px-6 lg:min-h-20 lg:grid-cols-[223px_minmax(0,1fr)_auto] lg:px-10"
-      >
-        <RouterLink
-          :to="{ name: 'home' }"
-          aria-label="Ferrepatagonia Industrial — Inicio"
-          class="inline-flex min-h-11 w-fit flex-col justify-center rounded text-[#0b2438] no-underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#2b7bbb]"
-        >
-          <span class="text-lg leading-tight font-extrabold">
-            FERREPATAGONIA
-          </span>
-          <span
-            class="text-[8px] leading-tight font-bold tracking-[1.2px] text-[#2b7bbb]"
-          >
-            INDUSTRIAL
-          </span>
-        </RouterLink>
-
-        <form
-          role="search"
-          aria-label="Buscar en el catálogo"
-          class="order-last col-span-2 flex min-w-0 lg:order-none lg:col-span-1"
-          @submit.prevent="submitSearch"
-        >
-          <label for="home-search" class="sr-only">
-            Buscar productos por nombre o código
-          </label>
-
-          <input
-            id="home-search"
-            v-model="search"
-            type="search"
-            name="busqueda"
-            enterkeyhint="search"
-            placeholder="Buscar productos o código..."
-            class="box-border h-11 w-full min-w-0 rounded-l-[10px] border border-r-0 border-solid border-[#e2e8f0] bg-[#f8fafc] px-4 font-[inherit] text-sm text-[#103a5c] placeholder:text-slate-500 focus-visible:relative focus-visible:outline-2 focus-visible:outline-[#2b7bbb]"
-          />
-
-          <button
-            type="submit"
-            class="box-border min-h-11 shrink-0 cursor-pointer rounded-r-[10px] border border-solid border-[#e2e8f0] bg-[#f8fafc] px-3 font-[inherit] text-xs font-bold text-[#103a5c] hover:bg-slate-200 focus-visible:relative focus-visible:outline-2 focus-visible:outline-[#2b7bbb]"
-          >
-            Buscar
-          </button>
-        </form>
-
-        <div class="flex flex-wrap items-center justify-end gap-x-4">
+    <div id="store-navigation" ref="panel" class="header-strip" :class="{ 'is-open': expanded }" @click="followCurrentLink">
+      <div class="fp-shell header-nav">
+        <nav aria-label="Menú principal">
+          <RouterLink v-if="catalog" :to="{ name: catalog.routeName }" class="header-link fp-focus">{{ catalog.label }}</RouterLink>
           <RouterLink
-            :to="{ name: accountRoute }"
-            class="inline-flex min-h-11 items-center rounded text-xs font-bold text-[#103a5c] no-underline hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7bbb]"
-          >
-            {{ accountLabel }}
+            :to="{ name: 'home', hash: '#categorias' }"
+            :aria-current-value="route.name === 'home' && route.hash === '#categorias' ? 'location' : 'false'"
+            class="header-link fp-focus"
+          >Categorías</RouterLink>
+          <RouterLink
+            :to="{ name: 'home', hash: '#empresas' }"
+            :aria-current-value="route.name === 'home' && route.hash === '#empresas' ? 'location' : 'false'"
+            class="header-link fp-focus"
+          >Empresas</RouterLink>
+          <RouterLink v-for="item in institutional" :key="item.id" :to="{ name: item.routeName }" class="header-link fp-focus">
+            {{ item.label }}
           </RouterLink>
-
-          <RouterLink
-            v-if="!auth.isAuthenticated"
-            :to="{ name: 'registro' }"
-            class="inline-flex min-h-11 items-center rounded text-xs font-bold text-[#103a5c] no-underline hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2b7bbb]"
-          >
-            Crear cuenta
+        </nav>
+        <div class="header-account">
+          <RouterLink v-if="account" :to="{ name: account.route }" class="header-link fp-focus">
+            <CommerceIcon name="user" /> {{ account.label }}
+          </RouterLink>
+          <RouterLink v-if="!auth.isAuthenticated" :to="{ name: 'registro' }" class="header-link register-link fp-focus">
+            Crear cuenta <CommerceIcon name="arrow" />
           </RouterLink>
         </div>
       </div>
     </div>
-
-    <div class="border-0 border-b border-solid border-[#e2e8f0]">
-      <div
-        class="box-border flex flex-wrap items-center gap-1 px-1 text-sm font-bold sm:px-3 lg:px-7"
-      >
-        <NavigationMenu
-          :items="publicMenu"
-          :permissions="permissions"
-          label="Menú principal"
-          orientation="horizontal"
-          variant="default"
-        />
-
-        <RouterLink
-          :to="{ name: 'home', hash: '#categorias' }"
-          class="box-border inline-flex min-h-11 items-center rounded-md px-3 py-2 text-[#103a5c] no-underline hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
-        >
-          Categorías
-        </RouterLink>
-      </div>
-    </div>
   </header>
 </template>
+
+<style scoped>
+.store-header { position: relative; z-index: 2; background: white; color: var(--fp-navy); }
+.header-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: .5rem;
+  padding-block: .45rem .75rem;
+}
+.header-main .fp-brand { grid-column: 1 / -1; }
+.header-main:has(.header-cart) { grid-template-columns: minmax(0, 1fr) auto auto; }
+.header-search { display: flex; min-width: 0; }
+.header-search input { border-radius: var(--fp-radius) 0 0 var(--fp-radius); border-right: 0; background: var(--fp-bg); }
+.header-search button { flex: none; border-radius: 0 var(--fp-radius) var(--fp-radius) 0; padding-inline: .7rem; }
+.header-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .45rem;
+  min-height: 46px;
+  min-width: 44px;
+  padding-inline: .5rem;
+  border: 1px solid var(--fp-control-line);
+  border-radius: var(--fp-radius);
+  background: white;
+  color: var(--fp-navy);
+  font: inherit;
+  font-size: .88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.header-control:hover, .header-control[aria-expanded="true"] { background: var(--fp-bg); color: var(--fp-blue); }
+.header-cart span, .header-search button span { display: none; }
+.header-strip { display: none; border-block: 1px solid var(--fp-line); background: var(--fp-bg); }
+.header-strip.is-open { display: block; }
+.header-nav { display: grid; gap: .5rem; padding-block: .55rem .8rem; }
+.header-nav nav, .header-account { display: grid; }
+.header-account { border-top: 1px solid var(--fp-line); padding-top: .45rem; }
+.header-link {
+  display: inline-flex;
+  align-items: center;
+  gap: .5rem;
+  min-height: 44px;
+  padding-inline: .7rem;
+  border-radius: var(--fp-radius);
+  color: inherit;
+  font-size: .88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+.header-link:hover, .header-link:is([aria-current="page"], [aria-current="location"]) {
+  background: #e6eff6;
+  color: var(--fp-blue);
+  text-decoration: underline;
+  text-underline-offset: .24em;
+}
+.register-link { color: var(--fp-blue); }
+
+@media (min-width: 900px) {
+  .header-main, .header-main:has(.header-cart) {
+    grid-template-columns: minmax(220px, 1fr) minmax(0, 2.2fr) minmax(120px, .5fr);
+    gap: clamp(16px, 3vw, 48px);
+    padding-block: .85rem;
+  }
+  .header-main .fp-brand { grid-column: auto; }
+  .header-cart { justify-self: end; padding-inline: .85rem; }
+  .header-cart span, .header-search button span { display: inline; }
+  .header-search button { padding-inline: 1rem; }
+  .header-strip { display: block; }
+  .header-toggle { display: none; }
+  .header-nav { display: flex; justify-content: space-between; padding-block: .15rem; }
+  .header-nav nav, .header-account { display: flex; align-items: center; gap: .25rem; }
+  .header-nav nav { margin-inline-start: -.7rem; }
+  .header-account { border: 0; padding-top: 0; }
+}
+@media (max-width: 899px) {
+  .header-main .fp-brand { --fp-brand-width: 190px; }
+}
+</style>

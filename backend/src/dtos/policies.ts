@@ -5,6 +5,7 @@ import { CatalogQuery, catalogError, prepareCatalog } from './catalog/catalog-qu
 import { ProductIdParams, prepareProductId } from './products/product-id-params.dto';
 import { CreateProduct, UpdateProduct, productFields } from './products/product.dto';
 import { Stock } from './products/stock.dto';
+import { CategoryIdParams, CreateCategory, UpdateCategory, categoryFields, prepareCategory, prepareCategoryId } from './categories/category.dto';
 
 const unknownError = 'El body contiene campos no permitidos.';
 const objectError = 'El cuerpo de la solicitud es requerido y debe ser un objeto válido.';
@@ -25,5 +26,17 @@ export const updateProductPolicy: DtoPolicy<UpdateProduct> = { type: UpdateProdu
   fields: productFields, unknownError, objectError,
   check: input => productFields.some(key => input[key] !== undefined) ? null
     : 'Debe proporcionar al menos un campo válido para actualizar.' };
+export const updateProductWithImagePolicy: DtoPolicy<UpdateProduct> = {
+  ...updateProductPolicy, check: undefined,
+};
 export const stockPolicy: DtoPolicy<Stock> = { type: Stock, fields: ['stock'],
   unknownError, objectError: 'El campo stock es requerido' };
+export const categoryIdPolicy: DtoPolicy<CategoryIdParams> = { type: CategoryIdParams,
+  fields: ['id'], prepare: prepareCategoryId,
+  unknownError: 'ID inválido', objectError: 'ID inválido', error: 'ID inválido' };
+export const createCategoryPolicy: DtoPolicy<CreateCategory> = { type: CreateCategory,
+  fields: categoryFields, prepare: prepareCategory, unknownError, objectError };
+export const updateCategoryPolicy: DtoPolicy<UpdateCategory> = { type: UpdateCategory,
+  fields: categoryFields, prepare: prepareCategory, unknownError, objectError,
+  check: input => categoryFields.some(key => input[key] !== undefined) ? null
+    : 'Debe proporcionar al menos un campo válido para actualizar.' };

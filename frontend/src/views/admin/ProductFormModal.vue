@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, onBeforeUnmount } from 'vue';
 import axios from 'axios';
+import ProductThumbnail from '@/components/ProductThumbnail.vue';
 import {
     saveAdminProduct,
+    saveAdminProductWithImage,
     updateAdminProductStock,
     type AdminProduct,
     type CategoryOption
@@ -34,6 +36,40 @@ const backendError = ref('');
 const uncertain = ref(false);
 const formDisabled = computed(() => isSubmitting.value || uncertain.value || props.mutationBlocked);
 const fieldErrors = ref<Record<string, string>>({});
+const imageFile = ref<File>();
+const previewUrl = ref('');
+const imageError = ref('');
+const imageInput = ref<HTMLInputElement>();
+
+function clearImage(resetInput = true) {
+    if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
+    previewUrl.value = '';
+    imageFile.value = undefined;
+    imageError.value = '';
+    if (resetInput && imageInput.value) imageInput.value.value = '';
+}
+
+function selectImage(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    clearImage(false);
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+        imageError.value = 'Seleccioná una foto JPEG, PNG o WebP.';
+    } else if (!file.size || file.size > 5 * 1024 * 1024) {
+        imageError.value = 'La foto debe tener contenido y pesar hasta 5 MiB.';
+    } else {
+        imageFile.value = file;
+        previewUrl.value = URL.createObjectURL(file);
+    }
+}
+
+function rejectPreview() {
+    clearImage();
+    imageError.value = 'No se pudo abrir la foto. Elegí otra imagen.';
+}
+
+onBeforeUnmount(clearImage);
 
 const form = ref({
     nombre: '',
@@ -68,28 +104,32 @@ const availableCategories = computed<CategoryOption[]>(() => {
 watch(
     () => props.isOpen,
     (isOpen, wasOpen) => {
+        if (!isOpen) clearImage();
         if (!isOpen || wasOpen) return;
         backendError.value = '';
         uncertain.value = false;
         fieldErrors.value = {};
 
         if (props.product) {
+            const rawPrecio = props.product.precio;
+            const hasPrecio = rawPrecio !== null && rawPrecio !== undefined && (rawPrecio as unknown) !== '';
+
             form.value = {
                 nombre: props.product.nombre ?? '',
                 codigo: props.product.codigo ?? '',
-                id_categoria: Number(props.product.id_categoria) || '',
-                precio: Number(props.product.precio ?? 0),
+                id_categoria: Number(props.product.id_categoria) || 1,
+                // H05: Si no tiene precio dejamos ''; si tiene precio, Number() normaliza "150.00" a 150
+                precio: hasPrecio ? Number(rawPrecio) : '',
                 stock: Number(props.product.stock ?? 0),
                 descripcion: props.product.descripcion ?? '',
                 imagen: props.product.imagen ?? '',
                 activo: Boolean(props.product.activo)
             };
         } else {
-            const firstCategory = props.categories?.[0];
             form.value = {
                 nombre: '',
                 codigo: '',
-                id_categoria: firstCategory ? firstCategory.id_categoria : '',
+                id_categoria: props.categories?.[0]?.id_categoria ?? 1,
                 precio: '',
                 stock: '',
                 descripcion: '',
@@ -113,27 +153,41 @@ watch(
 
 const validateForm = (): boolean => {
     const errors: Record<string, string> = {};
-    const nombre = form.value.nombre.trim();
-    const codigo = form.value.codigo.trim();
+
+    if (!form.value.nombre || form.value.nombre.trim() === '') {
+        errors.nombre = 'El nombre del producto es obligatorio.';
+    }
+
+    if (!form.value.codigo || form.value.codigo.trim() === '') {
+        errors.codigo = 'El código SKU es obligatorio.';
+    }
+
     const catId = Number(form.value.id_categoria);
-    const precio = Number(form.value.precio);
-    const stock = Number(form.value.stock);
-
-    if (!nombre) errors.nombre = 'El nombre del producto es obligatorio.';
-    else if (nombre.length > 200) errors.nombre = 'Máximo 200 caracteres.';
-
-    if (!codigo) errors.codigo = 'El código SKU es obligatorio.';
-    else if (codigo.length > 100) errors.codigo = 'Máximo 100 caracteres.';
-
-    if (!form.value.id_categoria || !Number.isInteger(catId) || catId <= 0) {
-        errors.id_categoria = 'Seleccioná una categoría válida.';
+    if (!Number.isInteger(catId) || catId <= 0) {
+        errors.id_categoria = 'Seleccioná una categoría válida (entero mayor a 0).';
     }
 
-    if (form.value.precio === '' || isNaN(precio) || precio < 0 || precio > 9999999999.99) {
-        errors.precio = 'Ingresá un precio válido mayor o igual a 0.';
+    // H05: Permitir precio vacío solo si el producto original ya no tenía precio
+    const isOriginalPriceNull = isEditMode.value && (props.product?.precio === null || props.product?.precio === undefined);
+    const isPriceEmpty = form.value.precio === '' || form.value.precio === null || form.value.precio === undefined;
+
+    if (!isPriceEmpty) {
+        const precioNum = Number(form.value.precio);
+        if (isNaN(precioNum) || precioNum < 0) {
+            errors.precio = 'El precio debe ser un número mayor o igual a 0.';
+        }
+    } else if (!isOriginalPriceNull) {
+        errors.precio = 'El precio debe ser un número mayor o igual a 0.';
     }
 
-    if (form.value.stock === '' || !Number.isInteger(stock) || stock < 0 || stock > 2147483647) {
+    const stockNum = Number(form.value.stock);
+    if (
+        form.value.stock === '' ||
+        form.value.stock === null ||
+        !Number.isInteger(stockNum) ||
+        stockNum < 0 ||
+        stockNum > 2147483647
+    ) {
         errors.stock = 'El stock debe ser un entero mayor o igual a 0.';
     }
 
@@ -142,7 +196,7 @@ const validateForm = (): boolean => {
 };
 
 const handleSubmit = async () => {
-    if (formDisabled.value) return;
+    if (formDisabled.value || imageError.value) return;
     backendError.value = '';
     if (!validateForm()) return;
 
@@ -151,11 +205,13 @@ const handleSubmit = async () => {
 
     isSubmitting.value = true;
     try {
+        const isPriceEmpty = form.value.precio === '' || form.value.precio === null || form.value.precio === undefined;
+
         const payload = {
             nombre: form.value.nombre.trim(),
             codigo: form.value.codigo.trim(),
             id_categoria: Number(form.value.id_categoria),
-            precio: Number(form.value.precio),
+            ...(isPriceEmpty ? {} : { precio: Number(form.value.precio) }),
             stock: Number(form.value.stock),
             descripcion: form.value.descripcion.trim() || null,
             imagen: form.value.imagen.trim() || null,
@@ -163,13 +219,23 @@ const handleSubmit = async () => {
         };
 
         const original = props.product;
+        const priceUnchanged = original !== null && (
+            isPriceEmpty
+                ? (original.precio === null || original.precio === undefined)
+                : (original.precio !== null && original.precio !== undefined && payload.precio === Number(original.precio))
+        );
+
         const onlyStockChanged = original !== null && payload.stock !== Number(original.stock) &&
             payload.nombre === original.nombre.trim() && payload.codigo === original.codigo.trim() &&
-            payload.id_categoria === Number(original.id_categoria) && payload.precio === Number(original.precio) &&
+            payload.id_categoria === Number(original.id_categoria) && priceUnchanged &&
             payload.descripcion === (original.descripcion?.trim() || null) &&
             payload.imagen === (original.imagen?.trim() || null) && payload.activo === Boolean(original.activo);
-        if (onlyStockChanged) await updateAdminProductStock(original!.id_producto, payload.stock);
-        else await saveAdminProduct(payload, props.product?.id_producto);
+
+        const data = payload as Parameters<typeof saveAdminProduct>[0];
+        if (original && payload.imagen === (original.imagen?.trim() || null)) delete data.imagen;
+        if (imageFile.value) await saveAdminProductWithImage(data, imageFile.value, original?.id_producto);
+        else if (onlyStockChanged) await updateAdminProductStock(original!.id_producto, payload.stock);
+        else await saveAdminProduct(data, original?.id_producto);
 
         emit(
             'saved',
@@ -181,16 +247,18 @@ const handleSubmit = async () => {
     } catch (error: unknown) {
         let msg = 'Error al guardar el producto.';
         let status: number | undefined;
+        let imageRejected = false;
 
         if (axios.isAxiosError(error)) {
             status = error.response?.status;
             msg = error.response?.data?.message || error.response?.data?.error || error.message;
+            imageRejected = status === 413 || status === 415 || error.response?.data?.code === 'PRODUCT_IMAGE_REJECTED';
         } else if (error instanceof Error) {
             msg = error.message;
         }
 
         backendError.value = adminMutationErrorMessage(error);
-        if (isMutationResultUncertain(error)) {
+        if (!(imageFile.value && imageRejected) && isMutationResultUncertain(error)) {
             uncertain.value = true;
             backendError.value = uncertainMutationMessage;
             emit('uncertain');
@@ -331,12 +399,34 @@ const requestClose = () => {
                     </div>
 
                     <div>
-                        <label class="block text-xs font-semibold uppercase text-[#64748B] mb-1">URL de Imagen (Opcional)</label>
+                        <label for="producto-imagen-archivo" class="block text-xs font-semibold uppercase text-[#64748B] mb-1">
+                            Foto del producto (opcional)
+                        </label>
                         <input
+                            id="producto-imagen-archivo"
+                            ref="imageInput"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            :disabled="formDisabled"
+                            aria-describedby="producto-imagen-ayuda"
+                            class="box-border min-h-11 w-full min-w-0 rounded-md border border-[#E2E8F0] bg-white px-2 py-2 text-sm text-[#0B2438]"
+                            @change="selectImage"
+                        >
+                        <p id="producto-imagen-ayuda" class="mt-1 text-xs text-[#64748B]">JPEG, PNG o WebP, hasta 5 MiB.</p>
+                        <p v-if="imageError" role="alert" class="mt-1 text-sm text-red-700">{{ imageError }}</p>
+                        <img v-if="previewUrl" :src="previewUrl" alt="Vista previa de la foto"
+                            class="mt-2 h-28 max-w-full rounded-md object-contain" @error="rejectPreview">
+                        <button v-if="imageFile || imageError" type="button" :disabled="formDisabled" @click="clearImage()"
+                            class="min-h-11 border-0 bg-transparent text-sm text-[#103A5C] underline">Quitar selección</button>
+                        <ProductThumbnail v-if="product?.imagen" :image="product.imagen" alt="Foto actual del producto"
+                            image-class="mt-2 block h-20 max-w-full rounded-md object-contain" />
+                        <label for="producto-imagen-url" class="mt-2 block text-xs font-semibold uppercase text-[#64748B] mb-1">URL de Imagen (Opcional)</label>
+                        <input
+                            id="producto-imagen-url"
                             v-model="form.imagen"
                             type="text"
                             placeholder="https://..."
-                            :disabled="formDisabled"
+                            :disabled="formDisabled || Boolean(imageFile)"
                             class="box-border min-h-11 w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438]"
                         >
                     </div>
@@ -377,10 +467,10 @@ const requestClose = () => {
                     </button>
                     <button
                         type="submit"
-                        :disabled="formDisabled"
+                        :disabled="formDisabled || Boolean(imageError)"
                         class="box-border min-h-11 border-0 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
                     >
-                        {{ isSubmitting ? 'Guardando...' : (isEditMode ? 'Guardar Cambios' : 'Crear Producto') }}
+                        {{ isSubmitting ? (imageFile ? 'Subiendo foto...' : 'Guardando...') : (isEditMode ? 'Guardar Cambios' : 'Crear Producto') }}
                     </button>
                 </div>
             </form>

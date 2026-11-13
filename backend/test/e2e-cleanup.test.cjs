@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync, execFileSync } = require('node:child_process');
 
-for (const failure of ['run-confirmation', 'inspect']) {
+for (const failure of ['run-confirmation', 'inspect', 'connection', 'sql', 'end', 'interrupt']) {
   test(`elimina contenedor y volúmenes ante fallo de ${failure}`, () => {
     const runner = require.resolve('./helpers/run-e2e.cjs');
     const script = `
@@ -17,6 +17,7 @@ for (const failure of ['run-confirmation', 'inspect']) {
           console.log('TEST_RESOURCE=' + JSON.stringify({name,
             volumes: info.Mounts.filter(m => m.Type === 'volume').map(m => m.Name)}));
           if (${JSON.stringify(failure)} === 'run-confirmation') throw Error('TEST_LOST_CONFIRMATION');
+          if (${JSON.stringify(failure)} === 'interrupt') process.emit('SIGTERM');
         }
         if (command === 'docker' && args[0] === 'inspect' &&
             ${JSON.stringify(failure)} === 'inspect' && !injected) {
@@ -25,6 +26,24 @@ for (const failure of ['run-confirmation', 'inspect']) {
         }
         return result;
       };
+      const stage = ${JSON.stringify(failure)};
+      const modulePath = require.resolve('mariadb', { paths: [require('node:path').dirname(${JSON.stringify(runner)})] });
+      const mariadb = require(modulePath);
+      const create = mariadb.createConnection;
+      if (stage === 'connection' || stage === 'end') {
+        require.cache[modulePath].exports = { ...mariadb, createConnection: async (...args) => {
+          if (stage === 'connection') require('node:assert/strict').fail('TEST_CONNECTION_FAILURE');
+          const connection = await create(...args);
+          const end = connection.end.bind(connection);
+          connection.end = async () => { await end(); throw Error('TEST_END_FAILURE'); };
+          return connection;
+        } };
+      }
+      if (stage === 'sql') {
+        const invoke = cp.execFileSync;
+        cp.execFileSync = (command, args, options) => invoke(command, args,
+          command === 'docker' && args[0] === 'exec' ? { ...options, input: 'SELEC 1;' } : options);
+      }
       require(${JSON.stringify(runner)});
     `;
     const result = spawnSync(process.execPath, ['-e', script], {
@@ -43,9 +62,14 @@ for (const failure of ['run-confirmation', 'inspect']) {
     try {
       assert.ifError(result.error);
       assert.equal(result.status, 1, 'Conservar el fallo original');
-      assert.match(result.stderr, failure === 'inspect' ? /TEST_INSPECT_FAILURE/ : /TEST_LOST_CONFIRMATION/);
+      const expected = {
+        inspect: /TEST_INSPECT_FAILURE/, 'run-confirmation': /TEST_LOST_CONFIRMATION/,
+        connection: /TEST_CONNECTION_FAILURE/, end: /TEST_END_FAILURE/,
+        sql: /Command failed.*mariadb/s, interrupt: /Ejecución interrumpida/,
+      };
+      assert.match(result.stderr, expected[failure]);
       assert.match(result.stdout, /Limpieza E2E confirmada/);
-      assert.ok(resource.volumes.length > 0, 'La imagen debe crear su volumen anónimo');
+      assert.deepEqual(resource.volumes, [], 'La base debe usar tmpfs');
       assert.equal(find(), '');
       for (const volume of resource.volumes) {
         assert.ok(!volumes().includes(volume), 'El runner dejó un volumen anónimo');

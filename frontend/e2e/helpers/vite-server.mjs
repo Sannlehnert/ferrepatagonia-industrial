@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { fileURLToPath } from "node:url";
-import { createServer } from "vite";
+import { createServer, preview } from "vite";
 
 assert.equal(process.env.E2E_ISOLATED, "1");
 assert.ok(process.send, "Iniciar desde el ejecutor E2E.");
@@ -45,28 +45,54 @@ process.once("SIGINT", () => void stop());
 process.once("SIGTERM", () => void stop());
 
 async function main() {
-  server = await createServer({
+  const configFile = fileURLToPath(new URL("../../vite.config.ts", import.meta.url));
+  const proxy = {
+    "/api": {
+      target: apiURL.origin,
+      changeOrigin: true,
+    },
+    "/socket.io/": { target: apiURL.origin, ws: true },
+  };
+  const shared = {
     root: frontend,
-    configFile: fileURLToPath(new URL("../../vite.config.ts", import.meta.url)),
+    configFile,
     envDir: false,
     clearScreen: false,
-    server: {
-      host: "127.0.0.1",
-      port: webPort,
-      strictPort: true,
-      open: false,
-      proxy: {
-        "/api": {
-          target: apiURL.origin,
-          changeOrigin: true,
-        },
+  };
+
+  if (process.env.E2E_PRODUCTION_BUILD === "1") {
+    assert.ok(
+      process.env.NODE_ENV === "test",
+      "El preview de producción solo se permite en E2E aislado.",
+    );
+    server = await preview({
+      ...shared,
+      preview: {
+        host: "127.0.0.1",
+        port: webPort,
+        strictPort: true,
+        open: false,
+        proxy,
       },
-    },
-  });
+    });
+  } else {
+    server = await createServer({
+      ...shared,
+      server: {
+        host: "127.0.0.1",
+        port: webPort,
+        strictPort: true,
+        open: false,
+        proxy,
+      },
+    });
+  }
 
   if (stopping) return;
 
-  await server.listen();
+  if (process.env.E2E_PRODUCTION_BUILD !== "1") {
+    await server.listen();
+  }
 
   const address = server.httpServer.address();
 

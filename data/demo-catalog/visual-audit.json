@@ -1,0 +1,3378 @@
+{
+  "sku": 904,
+  "skuConFuente": 132,
+  "skuPendientes": 772,
+  "archivos": 19,
+  "grupos": [
+    {
+      "clave": "MAN-llave-combinada",
+      "modelo": "Llave combinada",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LLAVE-COMBINADA-6-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-8-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-9-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-10-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-11-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-12-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-13-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-17-MM",
+        "FP-DEMO-MAN-LLAVE-COMBINADA-19-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-prensa-c",
+      "modelo": "Prensa manual tipo C",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-PRENSA-C-25-MM",
+        "FP-DEMO-MAN-PRENSA-C-40-MM",
+        "FP-DEMO-MAN-PRENSA-C-50-MM",
+        "FP-DEMO-MAN-PRENSA-C-65-MM",
+        "FP-DEMO-MAN-PRENSA-C-75-MM",
+        "FP-DEMO-MAN-PRENSA-C-100-MM",
+        "FP-DEMO-MAN-PRENSA-C-125-MM",
+        "FP-DEMO-MAN-PRENSA-C-150-MM",
+        "FP-DEMO-MAN-PRENSA-C-200-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/5 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "5 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-5-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/6 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "6 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-6-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/7 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "7 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-7-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/8 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "8 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-8-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/9 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "9 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-9-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/10 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "10 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-10-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/12 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "12 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-12-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/15 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "15 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-15-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAN-limas/18 piezas",
+      "modelo": "Juego de limas para metal",
+      "criterioVisible": "18 piezas",
+      "familia": "Herramientas manuales",
+      "pendientes": [
+        "FP-DEMO-MAN-LIMAS-18-PIEZAS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/500 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "500 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-500-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/550 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "550 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-550-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/600 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "600 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-600-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/650 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "650 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-650-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/700 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "700 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-700-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/750 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "750 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-750-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/800 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "800 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-800-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/850 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "850 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-850-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-taladro/900 W",
+      "modelo": "Taladro percutor con cable",
+      "criterioVisible": "900 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-TALADRO-900-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/600 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "600 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-600-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/650 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "650 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-650-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/700 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "700 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-700-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/750 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "750 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-750-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/800 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "800 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-800-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/850 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "850 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-850-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/900 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "900 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-900-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/1000 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "1000 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-1000-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-amoladora/1200 W",
+      "modelo": "Amoladora angular con cable",
+      "criterioVisible": "1200 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-AMOLADORA-1200-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/350 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "350 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-350-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/400 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "400 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-400-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/450 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "450 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-450-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/550 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "550 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-550-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/600 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "600 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-600-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/650 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "650 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-650-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/700 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "700 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-700-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-caladora/750 W",
+      "modelo": "Sierra caladora con cable",
+      "criterioVisible": "750 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-CALADORA-750-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/150 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "150 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-150-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/180 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "180 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-180-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/200 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "200 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-200-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/220 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "220 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-220-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/240 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "240 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-240-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/260 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "260 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-260-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/280 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "280 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-280-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/300 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "300 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-300-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ELE-lijadora/350 W",
+      "modelo": "Lijadora orbital con cable",
+      "criterioVisible": "350 W",
+      "familia": "Herramientas eléctricas",
+      "pendientes": [
+        "FP-DEMO-ELE-LIJADORA-350-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manguera-pu",
+      "modelo": "Manguera neumática recta de poliuretano",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANGUERA-PU-3-5-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-4-6-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-5-8-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-6-8-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-6-10-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-8-10-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-8-12-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-10-12-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PU-12-16-MM-INTERIOR-EXTERIOR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manguera-pe",
+      "modelo": "Tubo de polietileno para aire",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANGUERA-PE-3-5-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-4-6-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-5-8-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-6-8-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-6-10-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-8-10-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-8-12-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-10-12-MM-INTERIOR-EXTERIOR",
+        "FP-DEMO-NEU-MANGUERA-PE-12-16-MM-INTERIOR-EXTERIOR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-sopladora",
+      "modelo": "Pistola sopladora con boquilla extendida",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-SOPLADORA-25-MM",
+        "FP-DEMO-NEU-SOPLADORA-50-MM",
+        "FP-DEMO-NEU-SOPLADORA-75-MM",
+        "FP-DEMO-NEU-SOPLADORA-100-MM",
+        "FP-DEMO-NEU-SOPLADORA-150-MM",
+        "FP-DEMO-NEU-SOPLADORA-200-MM",
+        "FP-DEMO-NEU-SOPLADORA-250-MM",
+        "FP-DEMO-NEU-SOPLADORA-300-MM",
+        "FP-DEMO-NEU-SOPLADORA-450-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 2",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 2",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-2"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 3",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 3",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-3"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 4",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 4",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-4"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 5",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 5",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-5"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 6",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 6",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-6"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 8",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 8",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-8"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 10",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 10",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-10"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 12",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 12",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-12"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "NEU-manifold/salidas 16",
+      "modelo": "Distribuidor neumático de aluminio",
+      "criterioVisible": "salidas 16",
+      "familia": "Herramientas neumáticas",
+      "pendientes": [
+        "FP-DEMO-NEU-MANIFOLD-SALIDAS-16"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/blanco",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "blanco",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-BLANCO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/amarillo",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "amarillo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-AMARILLO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/naranja",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "naranja",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/rojo",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "rojo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/azul",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "azul",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/verde",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "verde",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/gris",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "gris",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-GRIS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/negro",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "negro",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ala/celeste",
+      "modelo": "Casco industrial de ala completa",
+      "criterioVisible": "celeste",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-ALA-CELESTE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/blanco",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "blanco",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-BLANCO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/amarillo",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "amarillo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-AMARILLO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/naranja",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "naranja",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/rojo",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "rojo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/azul",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "azul",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/verde",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "verde",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/gris",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "gris",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-GRIS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/negro",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "negro",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-visera/celeste",
+      "modelo": "Casco industrial con visera frontal",
+      "criterioVisible": "celeste",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-VISERA-CELESTE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/blanco",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "blanco",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-BLANCO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/amarillo",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "amarillo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-AMARILLO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/naranja",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "naranja",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/rojo",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "rojo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/azul",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "azul",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/verde",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "verde",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/gris",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "gris",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-GRIS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/negro",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "negro",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-corto/celeste",
+      "modelo": "Casco industrial de visera corta",
+      "criterioVisible": "celeste",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-CORTO-CELESTE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/blanco",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "blanco",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-BLANCO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/amarillo",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "amarillo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-AMARILLO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/naranja",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "naranja",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/rojo",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "rojo",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/azul",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "azul",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/verde",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "verde",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/gris",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "gris",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-GRIS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/negro",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "negro",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAS-casco-ranuras/celeste",
+      "modelo": "Casco industrial con ranuras laterales",
+      "criterioVisible": "celeste",
+      "familia": "Cascos de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAS-CASCO-RANURAS-CELESTE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CHA-chaleco-naranja",
+      "modelo": "Chaleco reflectivo naranja con cierre",
+      "familia": "Chalecos reflectivos",
+      "pendientes": [
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-XS",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-S",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-M",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-L",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-XL",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-3XL",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-4XL",
+        "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CHA-chaleco-amarillo",
+      "modelo": "Chaleco reflectivo amarillo con cierre",
+      "familia": "Chalecos reflectivos",
+      "pendientes": [
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-XS",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-S",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-M",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-L",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-XL",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-3XL",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-4XL",
+        "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CHA-chaleco-malla",
+      "modelo": "Chaleco reflectivo naranja de malla",
+      "familia": "Chalecos reflectivos",
+      "pendientes": [
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-XS",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-S",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-M",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-L",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-XL",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-3XL",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-4XL",
+        "FP-DEMO-CHA-CHALECO-MALLA-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CHA-chaleco-bolsillo",
+      "modelo": "Chaleco reflectivo amarillo con bolsillos",
+      "familia": "Chalecos reflectivos",
+      "pendientes": [
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-XS",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-S",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-M",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-L",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-XL",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-3XL",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-4XL",
+        "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "GUA-guante-nitrilo",
+      "modelo": "Guante tejido con palma de nitrilo",
+      "familia": "Guantes de trabajo",
+      "pendientes": [
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-XS",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-S",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-M",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-L",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-XL",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-2XL",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-3XL",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-4XL",
+        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "GUA-guante-descarne",
+      "modelo": "Guante de cuero descarne de puño largo",
+      "familia": "Guantes de trabajo",
+      "pendientes": [
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-XS",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-S",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-M",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-L",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-XL",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-3XL",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-4XL",
+        "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "GUA-guante-pvc",
+      "modelo": "Guante de PVC con puño recto",
+      "familia": "Guantes de trabajo",
+      "pendientes": [
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-XS",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-S",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-M",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-L",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-XL",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-2XL",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-3XL",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-4XL",
+        "FP-DEMO-GUA-GUANTE-PVC-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "GUA-guante-algodon",
+      "modelo": "Guante de algodón tejido",
+      "familia": "Guantes de trabajo",
+      "pendientes": [
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-XS",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-S",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-M",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-L",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-XL",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-3XL",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-4XL",
+        "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "OCU-sobrelente",
+      "modelo": "Anteojo transparente para usar sobre lentes",
+      "familia": "Protección ocular",
+      "pendientes": [
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-5-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-10-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-15-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-20-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-25-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-40-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-50-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-75-UNIDADES",
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-tapon-cordon",
+      "modelo": "Tapón auditivo de espuma con cordón",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-5-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-10-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-15-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-20-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-25-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-40-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-50-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-75-UNIDADES",
+        "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/blanco",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "blanco",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-BLANCO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/amarillo",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "amarillo",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-AMARILLO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/naranja",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "naranja",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/rojo",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "rojo",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/azul",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "azul",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/verde",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "verde",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/gris",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "gris",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-GRIS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/negro",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "negro",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "AUD-orejera/celeste",
+      "modelo": "Orejera de copa con diadema",
+      "criterioVisible": "celeste",
+      "familia": "Protección auditiva",
+      "pendientes": [
+        "FP-DEMO-AUD-OREJERA-CELESTE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "RES-mascarilla-plana",
+      "modelo": "Mascarilla plegable con elásticos de cabeza",
+      "familia": "Protección respiratoria",
+      "pendientes": [
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-5-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-10-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-15-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-20-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-25-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-40-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-50-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-75-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "RES-mascarilla-copa",
+      "modelo": "Mascarilla moldeada tipo copa",
+      "familia": "Protección respiratoria",
+      "pendientes": [
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-5-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-10-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-15-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-20-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-25-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-40-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-50-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-75-UNIDADES",
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "RES-prefiltro",
+      "modelo": "Repuesto de prefiltro circular",
+      "familia": "Protección respiratoria",
+      "pendientes": [
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-5-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-10-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-15-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-20-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-25-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-40-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-50-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-75-UNIDADES",
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "RES-retenedor",
+      "modelo": "Retenedor de prefiltro circular",
+      "familia": "Protección respiratoria",
+      "pendientes": [
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-5-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-10-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-15-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-20-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-25-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-40-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-50-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-75-UNIDADES",
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAL-borcegui",
+      "modelo": "Borceguí de trabajo marrón con puntera",
+      "familia": "Calzado de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAL-BORCEGUI-38-AR",
+        "FP-DEMO-CAL-BORCEGUI-39-AR",
+        "FP-DEMO-CAL-BORCEGUI-40-AR",
+        "FP-DEMO-CAL-BORCEGUI-41-AR",
+        "FP-DEMO-CAL-BORCEGUI-42-AR",
+        "FP-DEMO-CAL-BORCEGUI-43-AR",
+        "FP-DEMO-CAL-BORCEGUI-44-AR",
+        "FP-DEMO-CAL-BORCEGUI-45-AR",
+        "FP-DEMO-CAL-BORCEGUI-46-AR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAL-bota-pvc",
+      "modelo": "Bota de trabajo de PVC con puntera",
+      "familia": "Calzado de seguridad",
+      "pendientes": [
+        "FP-DEMO-CAL-BOTA-PVC-38-AR",
+        "FP-DEMO-CAL-BOTA-PVC-39-AR",
+        "FP-DEMO-CAL-BOTA-PVC-40-AR",
+        "FP-DEMO-CAL-BOTA-PVC-41-AR",
+        "FP-DEMO-CAL-BOTA-PVC-42-AR",
+        "FP-DEMO-CAL-BOTA-PVC-43-AR",
+        "FP-DEMO-CAL-BOTA-PVC-44-AR",
+        "FP-DEMO-CAL-BOTA-PVC-45-AR",
+        "FP-DEMO-CAL-BOTA-PVC-46-AR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ROP-pantalon",
+      "modelo": "Pantalón de trabajo azul con bolsillos cargo",
+      "familia": "Ropa de trabajo",
+      "pendientes": [
+        "FP-DEMO-ROP-PANTALON-TALLE-XS",
+        "FP-DEMO-ROP-PANTALON-TALLE-S",
+        "FP-DEMO-ROP-PANTALON-TALLE-M",
+        "FP-DEMO-ROP-PANTALON-TALLE-L",
+        "FP-DEMO-ROP-PANTALON-TALLE-XL",
+        "FP-DEMO-ROP-PANTALON-TALLE-2XL",
+        "FP-DEMO-ROP-PANTALON-TALLE-3XL",
+        "FP-DEMO-ROP-PANTALON-TALLE-4XL",
+        "FP-DEMO-ROP-PANTALON-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ROP-camisa",
+      "modelo": "Camisa de trabajo de algodón manga larga",
+      "familia": "Ropa de trabajo",
+      "pendientes": [
+        "FP-DEMO-ROP-CAMISA-TALLE-XS",
+        "FP-DEMO-ROP-CAMISA-TALLE-S",
+        "FP-DEMO-ROP-CAMISA-TALLE-M",
+        "FP-DEMO-ROP-CAMISA-TALLE-L",
+        "FP-DEMO-ROP-CAMISA-TALLE-XL",
+        "FP-DEMO-ROP-CAMISA-TALLE-2XL",
+        "FP-DEMO-ROP-CAMISA-TALLE-3XL",
+        "FP-DEMO-ROP-CAMISA-TALLE-4XL",
+        "FP-DEMO-ROP-CAMISA-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ROP-mameluco",
+      "modelo": "Mameluco de trabajo de gabardina",
+      "familia": "Ropa de trabajo",
+      "pendientes": [
+        "FP-DEMO-ROP-MAMELUCO-TALLE-XS",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-S",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-M",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-L",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-XL",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-2XL",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-3XL",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-4XL",
+        "FP-DEMO-ROP-MAMELUCO-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ROP-campera",
+      "modelo": "Campera de trabajo con forro",
+      "familia": "Ropa de trabajo",
+      "pendientes": [
+        "FP-DEMO-ROP-CAMPERA-TALLE-XS",
+        "FP-DEMO-ROP-CAMPERA-TALLE-S",
+        "FP-DEMO-ROP-CAMPERA-TALLE-M",
+        "FP-DEMO-ROP-CAMPERA-TALLE-L",
+        "FP-DEMO-ROP-CAMPERA-TALLE-XL",
+        "FP-DEMO-ROP-CAMPERA-TALLE-2XL",
+        "FP-DEMO-ROP-CAMPERA-TALLE-3XL",
+        "FP-DEMO-ROP-CAMPERA-TALLE-4XL",
+        "FP-DEMO-ROP-CAMPERA-TALLE-5XL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/1 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "1 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-1-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/2 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "2 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-2-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/3 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "3 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-3-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/4 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "4 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-4-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/5 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "5 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-5-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/8 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "8 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-8-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/10 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "10 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-10-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/15 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "15 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-15-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-bolso-arnes/20 L",
+      "modelo": "Bolso para guardar arnés",
+      "criterioVisible": "20 L",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-BOLSO-ARNES-20-L"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-protector-cinta",
+      "modelo": "Funda para cinta de arnés",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-PROTECTOR-CINTA-150-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-180-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-200-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-220-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-250-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-280-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-300-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-320-MM",
+        "FP-DEMO-ALT-PROTECTOR-CINTA-350-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-etiqueta-arnes",
+      "modelo": "Etiqueta de identificación para inventario de arneses",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-5-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-10-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-15-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-20-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-25-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-40-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-50-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-75-UNIDADES",
+        "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-arnes/negro",
+      "modelo": "Arnés de cuerpo completo",
+      "criterioVisible": "negro",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-ARNES-TALLE-S-M-NEGRO",
+        "FP-DEMO-ALT-ARNES-TALLE-L-XL-NEGRO",
+        "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-arnes/azul",
+      "modelo": "Arnés de cuerpo completo",
+      "criterioVisible": "azul",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-ARNES-TALLE-S-M-AZUL",
+        "FP-DEMO-ALT-ARNES-TALLE-L-XL-AZUL",
+        "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ALT-arnes/rojo",
+      "modelo": "Arnés de cuerpo completo",
+      "criterioVisible": "rojo",
+      "familia": "Arnés y protección en altura",
+      "pendientes": [
+        "FP-DEMO-ALT-ARNES-TALLE-S-M-ROJO",
+        "FP-DEMO-ALT-ARNES-TALLE-L-XL-ROJO",
+        "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-cadena",
+      "modelo": "Cadena de balizamiento plástica",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-CADENA-5-M",
+        "FP-DEMO-CON-CADENA-10-M",
+        "FP-DEMO-CON-CADENA-15-M",
+        "FP-DEMO-CON-CADENA-20-M",
+        "FP-DEMO-CON-CADENA-25-M",
+        "FP-DEMO-CON-CADENA-30-M",
+        "FP-DEMO-CON-CADENA-50-M",
+        "FP-DEMO-CON-CADENA-75-M",
+        "FP-DEMO-CON-CADENA-100-M"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-barra-conos",
+      "modelo": "Barra de enlace para conos",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-BARRA-CONOS-0-6-M",
+        "FP-DEMO-CON-BARRA-CONOS-0-75-M",
+        "FP-DEMO-CON-BARRA-CONOS-0-9-M",
+        "FP-DEMO-CON-BARRA-CONOS-1-M",
+        "FP-DEMO-CON-BARRA-CONOS-1-2-M",
+        "FP-DEMO-CON-BARRA-CONOS-1-5-M",
+        "FP-DEMO-CON-BARRA-CONOS-1-8-M",
+        "FP-DEMO-CON-BARRA-CONOS-2-M",
+        "FP-DEMO-CON-BARRA-CONOS-2-5-M"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/blanco",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "blanco",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-BLANCO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/amarillo",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "amarillo",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-AMARILLO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/naranja",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "naranja",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/rojo",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "rojo",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-ROJO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/azul",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "azul",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/verde",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "verde",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/gris",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "gris",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-GRIS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/negro",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "negro",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-NEGRO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CON-poste/celeste",
+      "modelo": "Poste de delimitación con base",
+      "criterioVisible": "celeste",
+      "familia": "Conos y balizamiento",
+      "pendientes": [
+        "FP-DEMO-CON-POSTE-CELESTE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/roja y blanca",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "roja y blanca",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-ROJA-Y-BLANCA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/amarilla y negra",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "amarilla y negra",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA-Y-NEGRA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/blanca",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "blanca",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-BLANCA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/amarilla",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "amarilla",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/roja",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "roja",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-ROJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/azul",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "azul",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/verde",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "verde",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/naranja",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "naranja",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-delimitar/negra",
+      "modelo": "Cinta para delimitar sectores",
+      "criterioVisible": "negra",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-DELIMITAR-NEGRA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/roja y blanca",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "roja y blanca",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-ROJA-Y-BLANCA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/amarilla y negra",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "amarilla y negra",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-AMARILLA-Y-NEGRA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/blanca",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "blanca",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-BLANCA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/amarilla",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "amarilla",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-AMARILLA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/roja",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "roja",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-ROJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/azul",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "azul",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-AZUL"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/verde",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "verde",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-VERDE"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/naranja",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "naranja",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-NARANJA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-piso/negra",
+      "modelo": "Cinta adhesiva para demarcación de pisos",
+      "criterioVisible": "negra",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-PISO-NEGRA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-visual",
+      "modelo": "Cinta adhesiva reflectiva de señalización",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-VISUAL-12-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-15-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-18-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-20-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-24-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-30-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-36-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-48-MM",
+        "FP-DEMO-CIN-CINTA-VISUAL-50-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CIN-cinta-texto",
+      "modelo": "Cinta impresa de delimitación amarilla y negra",
+      "familia": "Cintas de seguridad",
+      "pendientes": [
+        "FP-DEMO-CIN-CINTA-TEXTO-5-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-10-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-15-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-20-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-25-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-30-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-50-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-75-M",
+        "FP-DEMO-CIN-CINTA-TEXTO-100-M"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Salida",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Salida",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-SALIDA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/No fumar",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "No fumar",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-NO-FUMAR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Piso mojado",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Piso mojado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-PISO-MOJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Acceso restringido",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Acceso restringido",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-ACCESO-RESTRINGIDO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Botiquín",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Botiquín",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-BOTIQUIN"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Extintor",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Extintor",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-EXTINTOR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Punto de reunión",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Punto de reunión",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-PUNTO-DE-REUNION"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Mantener despejado",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Mantener despejado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-MANTENER-DESPEJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-pvc/Solo personal autorizado",
+      "modelo": "Cartel de PVC 20 × 30 cm",
+      "criterioVisible": "Solo personal autorizado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-PVC-SOLO-PERSONAL-AUTORIZADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Salida",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Salida",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-SALIDA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/No fumar",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "No fumar",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-NO-FUMAR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Piso mojado",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Piso mojado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-PISO-MOJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Acceso restringido",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Acceso restringido",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-ACCESO-RESTRINGIDO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Botiquín",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Botiquín",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-BOTIQUIN"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Extintor",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Extintor",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-EXTINTOR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Punto de reunión",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Punto de reunión",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-PUNTO-DE-REUNION"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Mantener despejado",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Mantener despejado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-MANTENER-DESPEJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-aluminio/Solo personal autorizado",
+      "modelo": "Cartel de aluminio 30 × 40 cm",
+      "criterioVisible": "Solo personal autorizado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ALUMINIO-SOLO-PERSONAL-AUTORIZADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Salida",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Salida",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-SALIDA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/No fumar",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "No fumar",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-NO-FUMAR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Piso mojado",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Piso mojado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-PISO-MOJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Acceso restringido",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Acceso restringido",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-ACCESO-RESTRINGIDO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Botiquín",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Botiquín",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-BOTIQUIN"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Extintor",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Extintor",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-EXTINTOR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Punto de reunión",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Punto de reunión",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-PUNTO-DE-REUNION"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Mantener despejado",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Mantener despejado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-MANTENER-DESPEJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-vinilo/Solo personal autorizado",
+      "modelo": "Cartel autoadhesivo 15 × 20 cm",
+      "criterioVisible": "Solo personal autorizado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-VINILO-SOLO-PERSONAL-AUTORIZADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Salida",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Salida",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-SALIDA"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/No fumar",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "No fumar",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-NO-FUMAR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Piso mojado",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Piso mojado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-PISO-MOJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Acceso restringido",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Acceso restringido",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-ACCESO-RESTRINGIDO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Botiquín",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Botiquín",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-BOTIQUIN"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Extintor",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Extintor",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-EXTINTOR"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Punto de reunión",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Punto de reunión",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-PUNTO-DE-REUNION"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Mantener despejado",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Mantener despejado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-MANTENER-DESPEJADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SEN-cartel-acrilico/Solo personal autorizado",
+      "modelo": "Placa acrílica 15 × 25 cm",
+      "criterioVisible": "Solo personal autorizado",
+      "familia": "Señalización industrial",
+      "pendientes": [
+        "FP-DEMO-SEN-CARTEL-ACRILICO-SOLO-PERSONAL-AUTORIZADO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "TOR-tornillo-hex",
+      "modelo": "Tornillo cabeza hexagonal de acero",
+      "familia": "Tornillos, tuercas y arandelas",
+      "pendientes": [
+        "FP-DEMO-TOR-TORNILLO-HEX-M3",
+        "FP-DEMO-TOR-TORNILLO-HEX-M4",
+        "FP-DEMO-TOR-TORNILLO-HEX-M5",
+        "FP-DEMO-TOR-TORNILLO-HEX-M6",
+        "FP-DEMO-TOR-TORNILLO-HEX-M8",
+        "FP-DEMO-TOR-TORNILLO-HEX-M10",
+        "FP-DEMO-TOR-TORNILLO-HEX-M12",
+        "FP-DEMO-TOR-TORNILLO-HEX-M14",
+        "FP-DEMO-TOR-TORNILLO-HEX-M16"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "TOR-arandela-grower",
+      "modelo": "Arandela elástica partida de acero",
+      "familia": "Tornillos, tuercas y arandelas",
+      "pendientes": [
+        "FP-DEMO-TOR-ARANDELA-GROWER-M3",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M4",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M5",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M6",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M8",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M10",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M12",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M14",
+        "FP-DEMO-TOR-ARANDELA-GROWER-M16"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "FIJ-varilla",
+      "modelo": "Varilla roscada zincada de 1 m",
+      "familia": "Fijaciones y anclajes",
+      "pendientes": [
+        "FP-DEMO-FIJ-VARILLA-M3",
+        "FP-DEMO-FIJ-VARILLA-M4",
+        "FP-DEMO-FIJ-VARILLA-M5",
+        "FP-DEMO-FIJ-VARILLA-M6",
+        "FP-DEMO-FIJ-VARILLA-M8",
+        "FP-DEMO-FIJ-VARILLA-M10",
+        "FP-DEMO-FIJ-VARILLA-M12",
+        "FP-DEMO-FIJ-VARILLA-M14",
+        "FP-DEMO-FIJ-VARILLA-M16"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "FIJ-anclaje",
+      "modelo": "Anclaje metálico de expansión",
+      "familia": "Fijaciones y anclajes",
+      "pendientes": [
+        "FP-DEMO-FIJ-ANCLAJE-M6",
+        "FP-DEMO-FIJ-ANCLAJE-M8",
+        "FP-DEMO-FIJ-ANCLAJE-M10",
+        "FP-DEMO-FIJ-ANCLAJE-M12",
+        "FP-DEMO-FIJ-ANCLAJE-M14",
+        "FP-DEMO-FIJ-ANCLAJE-M16",
+        "FP-DEMO-FIJ-ANCLAJE-M18",
+        "FP-DEMO-FIJ-ANCLAJE-M20",
+        "FP-DEMO-FIJ-ANCLAJE-M24"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "FIJ-abrazadera",
+      "modelo": "Abrazadera de montaje para caño",
+      "familia": "Fijaciones y anclajes",
+      "pendientes": [
+        "FP-DEMO-FIJ-ABRAZADERA-12-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-15-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-16-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-20-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-22-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-25-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-28-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-32-MM",
+        "FP-DEMO-FIJ-ABRAZADERA-40-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAB-cable-negro",
+      "modelo": "Cable unipolar negro en rollo de 25 m",
+      "familia": "Cables eléctricos",
+      "pendientes": [
+        "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-0-75-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-1-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-1-5-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-2-5-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-4-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-6-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-10-MM2",
+        "FP-DEMO-CAB-CABLE-NEGRO-16-MM2"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAB-cable-azul",
+      "modelo": "Cable unipolar azul en rollo de 25 m",
+      "familia": "Cables eléctricos",
+      "pendientes": [
+        "FP-DEMO-CAB-CABLE-AZUL-0-5-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-0-75-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-1-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-1-5-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-2-5-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-4-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-6-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-10-MM2",
+        "FP-DEMO-CAB-CABLE-AZUL-16-MM2"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAB-cable-marron",
+      "modelo": "Cable unipolar marrón en rollo de 25 m",
+      "familia": "Cables eléctricos",
+      "pendientes": [
+        "FP-DEMO-CAB-CABLE-MARRON-0-5-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-0-75-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-1-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-1-5-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-2-5-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-4-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-6-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-10-MM2",
+        "FP-DEMO-CAB-CABLE-MARRON-16-MM2"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "CAB-cable-bipolar",
+      "modelo": "Cable bipolar negro en rollo de 10 m",
+      "familia": "Cables eléctricos",
+      "pendientes": [
+        "FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-0-75-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-1-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-1-5-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-2-5-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-4-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-6-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-10-MM2",
+        "FP-DEMO-CAB-CABLE-BIPOLAR-16-MM2"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-interruptor",
+      "modelo": "Interruptor modular unipolar blanco",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-5-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-10-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-15-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-20-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-25-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-40-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-50-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-75-UNIDADES",
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-caja-embutir",
+      "modelo": "Caja de paso para embutir",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-CAJA-EMBUTIR-4-4-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-5-5-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-6-6-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-7-7-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-8-8-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-10-10-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-12-12-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-15-15-CM",
+        "FP-DEMO-MAT-CAJA-EMBUTIR-20-20-CM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-caja-superficie",
+      "modelo": "Caja de paso de superficie con tapa",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-4-4-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-5-5-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-6-6-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-7-7-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-8-8-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-10-10-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-12-12-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-15-15-CM",
+        "FP-DEMO-MAT-CAJA-SUPERFICIE-20-20-CM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 1 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 1 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-1-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 2 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 2 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-2-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 3 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 3 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-3-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 4 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 4 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-4-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 5 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 5 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-5-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 6 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 6 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-6-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 8 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 8 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-8-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 10 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 10 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-10-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MAT-bornera/con 12 posiciones",
+      "modelo": "Bornera de tornillo para montaje",
+      "criterioVisible": "con 12 posiciones",
+      "familia": "Interruptores y materiales eléctricos",
+      "pendientes": [
+        "FP-DEMO-MAT-BORNERA-CON-12-POSICIONES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/10 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "10 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-10-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/15 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "15 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-15-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/20 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "20 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-20-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/30 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "30 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-30-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/40 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "40 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-40-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/50 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "50 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-50-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/70 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "70 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-70-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/100 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "100 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-100-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-reflector/150 W",
+      "modelo": "Reflector LED con soporte",
+      "criterioVisible": "150 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REFLECTOR-150-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/5 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "5 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-5-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/6 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "6 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-6-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/7 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "7 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-7-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/8 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "8 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-8-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/9 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "9 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-9-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/10 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "10 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-10-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/12 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "12 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-12-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/15 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "15 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-15-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-lampara-e27/18 W",
+      "modelo": "Lámpara LED rosca E27 luz fría",
+      "criterioVisible": "18 W",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-LAMPARA-E27-18-W"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-regleta-led",
+      "modelo": "Regleta LED lineal",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-REGLETA-LED-20-CM",
+        "FP-DEMO-ILU-REGLETA-LED-30-CM",
+        "FP-DEMO-ILU-REGLETA-LED-40-CM",
+        "FP-DEMO-ILU-REGLETA-LED-45-CM",
+        "FP-DEMO-ILU-REGLETA-LED-60-CM",
+        "FP-DEMO-ILU-REGLETA-LED-75-CM",
+        "FP-DEMO-ILU-REGLETA-LED-90-CM",
+        "FP-DEMO-ILU-REGLETA-LED-120-CM",
+        "FP-DEMO-ILU-REGLETA-LED-150-CM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ILU-portalamparas",
+      "modelo": "Portalámparas E27 de superficie",
+      "familia": "Iluminación de trabajo",
+      "pendientes": [
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-5-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-10-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-15-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-20-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-25-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-40-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-50-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-75-UNIDADES",
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "OBR-malla",
+      "modelo": "Malla de fibra de vidrio para juntas",
+      "familia": "Materiales de construcción",
+      "pendientes": [
+        "FP-DEMO-OBR-MALLA-48-MM",
+        "FP-DEMO-OBR-MALLA-50-MM",
+        "FP-DEMO-OBR-MALLA-60-MM",
+        "FP-DEMO-OBR-MALLA-75-MM",
+        "FP-DEMO-OBR-MALLA-80-MM",
+        "FP-DEMO-OBR-MALLA-90-MM",
+        "FP-DEMO-OBR-MALLA-100-MM",
+        "FP-DEMO-OBR-MALLA-125-MM",
+        "FP-DEMO-OBR-MALLA-150-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "OBR-perfil",
+      "modelo": "Perfil angular de aluminio de 1 m",
+      "familia": "Materiales de construcción",
+      "pendientes": [
+        "FP-DEMO-OBR-PERFIL-10-10-MM",
+        "FP-DEMO-OBR-PERFIL-12-12-MM",
+        "FP-DEMO-OBR-PERFIL-15-15-MM",
+        "FP-DEMO-OBR-PERFIL-20-20-MM",
+        "FP-DEMO-OBR-PERFIL-25-25-MM",
+        "FP-DEMO-OBR-PERFIL-30-30-MM",
+        "FP-DEMO-OBR-PERFIL-35-35-MM",
+        "FP-DEMO-OBR-PERFIL-40-40-MM",
+        "FP-DEMO-OBR-PERFIL-50-50-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "OBR-espaciador",
+      "modelo": "Separador en cruz para cerámica",
+      "familia": "Materiales de construcción",
+      "pendientes": [
+        "FP-DEMO-OBR-ESPACIADOR-1-MM",
+        "FP-DEMO-OBR-ESPACIADOR-1-5-MM",
+        "FP-DEMO-OBR-ESPACIADOR-2-MM",
+        "FP-DEMO-OBR-ESPACIADOR-2-5-MM",
+        "FP-DEMO-OBR-ESPACIADOR-3-MM",
+        "FP-DEMO-OBR-ESPACIADOR-4-MM",
+        "FP-DEMO-OBR-ESPACIADOR-5-MM",
+        "FP-DEMO-OBR-ESPACIADOR-6-MM",
+        "FP-DEMO-OBR-ESPACIADOR-8-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "OBR-malla-obra",
+      "modelo": "Malla plástica para revoco",
+      "familia": "Materiales de construcción",
+      "pendientes": [
+        "FP-DEMO-OBR-MALLA-OBRA-0-3-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-0-4-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-0-5-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-0-6-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-0-75-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-0-8-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-0-9-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-1-M-DE-ANCHO",
+        "FP-DEMO-OBR-MALLA-OBRA-1-2-M-DE-ANCHO"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/100 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "100 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-100-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/150 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "150 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-150-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/200 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "200 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-200-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/250 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "250 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-250-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/300 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "300 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-300-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/400 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "400 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-400-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/500 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "500 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-500-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/600 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "600 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-600-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cola/750 ml",
+      "modelo": "Cola vinílica para madera",
+      "criterioVisible": "750 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-COLA-750-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-sellador",
+      "modelo": "Sellador acrílico blanco",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-1-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-2-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-3-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-4-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-6-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-8-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-12-CARTUCHOS",
+        "FP-DEMO-ADH-SELLADOR-CAJA-DE-24-CARTUCHOS"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/100 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "100 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-100-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/150 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "150 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-150-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/200 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "200 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-200-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/250 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "250 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-250-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/300 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "300 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-300-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/400 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "400 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-400-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/500 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "500 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-500-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/600 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "600 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-600-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-contacto/750 ml",
+      "modelo": "Adhesivo de contacto",
+      "criterioVisible": "750 ml",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CONTACTO-750-ML"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ADH-cinta-doble",
+      "modelo": "Cinta de montaje doble faz",
+      "familia": "Adhesivos y selladores",
+      "pendientes": [
+        "FP-DEMO-ADH-CINTA-DOBLE-12-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-15-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-18-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-20-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-24-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-30-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-36-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-48-MM",
+        "FP-DEMO-ADH-CINTA-DOBLE-50-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal",
+      "modelo": "Disco de corte para metal",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-75-MM",
+        "FP-DEMO-ABR-DISCO-METAL-100-MM",
+        "FP-DEMO-ABR-DISCO-METAL-115-MM",
+        "FP-DEMO-ABR-DISCO-METAL-125-MM",
+        "FP-DEMO-ABR-DISCO-METAL-150-MM",
+        "FP-DEMO-ABR-DISCO-METAL-180-MM",
+        "FP-DEMO-ABR-DISCO-METAL-230-MM",
+        "FP-DEMO-ABR-DISCO-METAL-300-MM",
+        "FP-DEMO-ABR-DISCO-METAL-355-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 40",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 40",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-40"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 60",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 60",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-60"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 80",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 80",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-80"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 100",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 100",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-100"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 120",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 120",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-120"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 150",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 150",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-150"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 180",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 180",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-180"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 220",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 220",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-220"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-madera/grano 240",
+      "modelo": "Hoja de lija para madera 230 × 280 mm",
+      "criterioVisible": "grano 240",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-MADERA-GRANO-240"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 120",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 120",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-120"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 180",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 180",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-180"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 220",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 220",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-220"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 240",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 240",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-240"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 320",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 320",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-320"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 400",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 400",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-400"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 600",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 600",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-600"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 800",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 800",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-800"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-lija-agua/grano 1000",
+      "modelo": "Hoja de lija al agua 230 × 280 mm",
+      "criterioVisible": "grano 1000",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-LIJA-AGUA-GRANO-1000"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-lija",
+      "modelo": "Disco de lija con respaldo adhesivo",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-LIJA-75-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-100-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-115-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-125-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-150-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-180-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-200-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-230-MM",
+        "FP-DEMO-ABR-DISCO-LIJA-250-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MEC-mecha-hss",
+      "modelo": "Mecha HSS para metal",
+      "familia": "Brocas, mechas y accesorios",
+      "pendientes": [
+        "FP-DEMO-MEC-MECHA-HSS-2-MM",
+        "FP-DEMO-MEC-MECHA-HSS-2-5-MM",
+        "FP-DEMO-MEC-MECHA-HSS-3-5-MM",
+        "FP-DEMO-MEC-MECHA-HSS-4-MM",
+        "FP-DEMO-MEC-MECHA-HSS-5-MM",
+        "FP-DEMO-MEC-MECHA-HSS-6-MM",
+        "FP-DEMO-MEC-MECHA-HSS-8-MM",
+        "FP-DEMO-MEC-MECHA-HSS-10-MM"
+      ],
+      "archivos": [
+        "mecha-hss-3mm.webp"
+      ]
+    },
+    {
+      "clave": "MEC-mecha-madera",
+      "modelo": "Mecha de tres puntas para madera",
+      "familia": "Brocas, mechas y accesorios",
+      "pendientes": [
+        "FP-DEMO-MEC-MECHA-MADERA-3-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-4-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-5-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-6-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-7-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-8-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-10-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-12-MM",
+        "FP-DEMO-MEC-MECHA-MADERA-14-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MEC-mecha-mamposteria",
+      "modelo": "Mecha cilíndrica para mampostería",
+      "familia": "Brocas, mechas y accesorios",
+      "pendientes": [
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-4-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-5-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-6-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-7-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-8-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-9-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-10-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-12-MM",
+        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-14-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "MEC-copa",
+      "modelo": "Sierra copa bimetálica",
+      "familia": "Brocas, mechas y accesorios",
+      "pendientes": [
+        "FP-DEMO-MEC-COPA-19-MM",
+        "FP-DEMO-MEC-COPA-22-MM",
+        "FP-DEMO-MEC-COPA-25-MM",
+        "FP-DEMO-MEC-COPA-29-MM",
+        "FP-DEMO-MEC-COPA-32-MM",
+        "FP-DEMO-MEC-COPA-38-MM",
+        "FP-DEMO-MEC-COPA-44-MM",
+        "FP-DEMO-MEC-COPA-51-MM",
+        "FP-DEMO-MEC-COPA-64-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SUM-trapo",
+      "modelo": "Paño de algodón para taller 40 × 40 cm",
+      "familia": "Consumibles industriales",
+      "pendientes": [
+        "FP-DEMO-SUM-TRAPO-PACK-DE-5-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-10-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-15-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-20-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-25-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-40-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-50-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-75-UNIDADES",
+        "FP-DEMO-SUM-TRAPO-PACK-DE-100-UNIDADES"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "SUM-film",
+      "modelo": "Film de embalaje transparente en rollo",
+      "familia": "Consumibles industriales",
+      "pendientes": [
+        "FP-DEMO-SUM-FILM-50-MM",
+        "FP-DEMO-SUM-FILM-75-MM",
+        "FP-DEMO-SUM-FILM-100-MM",
+        "FP-DEMO-SUM-FILM-125-MM",
+        "FP-DEMO-SUM-FILM-150-MM",
+        "FP-DEMO-SUM-FILM-200-MM",
+        "FP-DEMO-SUM-FILM-250-MM",
+        "FP-DEMO-SUM-FILM-300-MM",
+        "FP-DEMO-SUM-FILM-500-MM"
+      ],
+      "archivos": []
+    }
+  ]
+}

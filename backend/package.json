@@ -7,11 +7,26 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs test/auth.rate-limit.test.cjs",
-    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs",
+    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/cart-admission.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/env-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs test/auth.rate-limit.test.cjs test/productImport.test.cjs test/pricing.test.cjs test/pricing.http.test.cjs test/account-order-request.test.cjs test/adminAccount.test.cjs test/order-sockets.test.cjs test/admin-orders.test.cjs",
+    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs && npm run test:pricing:mariadb && node test/helpers/run-cart-mariadb.cjs && npm run test:cuenta-corriente:safety && node test/helpers/run-cuenta-corriente-mariadb.cjs && npm run test:cuenta-corriente:client && npm run test:orders:isolated && npm run test:orders:sockets && npm run test:receipts:isolated && npm run test:admin-orders",
+    "test:receipts:isolated": "node test/helpers/run-cuenta-corriente-mariadb.cjs receipts",
+    "test:orders:isolated": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders",
     "test": "npm run build && npm run test:unit && npm run test:dto-source && npm run test:integration",
     "test:dto-source": "node --require ./test/helpers/test-env.cjs --import tsx --test test/dto-source.test.cjs test/auth.passport-source.test.cjs",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:pricing:mariadb": "node test/helpers/run-pricing-mariadb.cjs",
+    "test:cart:isolated": "node test/helpers/run-cart-mariadb.cjs",
+    "test:cuenta-corriente": "node test/helpers/run-cuenta-corriente-mariadb.cjs",
+    "test:cuenta-corriente:client": "node --test test/cc251.h05.test.cjs && node test/helpers/run-cuenta-corriente-client-mariadb.cjs",
+    "test:cuenta-corriente:safety": "node --test test/cc260.safety.test.cjs test/cc260.cleanup.test.cjs",
+    "test:account:safety": "node --test test/account.safety.test.cjs",
+    "test:account:cleanup": "node --test test/account.cleanup.test.cjs",
+    "test:account:isolated": "node test/helpers/run-account-mariadb.cjs",
+    "test:account:contract": "node test/helpers/run-account-mariadb.cjs contract",
+    "test:account:client": "node test/helpers/run-account-mariadb.cjs client",
+    "test:account-admin:isolated": "node test/helpers/run-admin-account-mariadb.cjs",
+    "test:orders:sockets": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders-sockets",
+    "test:admin-orders": "node test/helpers/run-admin-orders-mariadb.cjs"
   },
   "engines": {
     "node": ">=22"
@@ -25,12 +40,18 @@
     "dotenv": "^17.2.0",
     "express": "^5.1.0",
     "express-rate-limit": "8.7.1",
+    "joi": "^18.3.2",
     "jsonwebtoken": "^9.0.3",
     "mariadb": "^3.4.0",
+    "multer": "^2.5.0",
     "mysql2": "3.24.6",
+    "papaparse": "^5.7.0",
     "passport": "0.7.0",
     "passport-jwt": "4.0.1",
+    "pdf-lib": "1.17.1",
     "reflect-metadata": "0.2.2",
+    "sharp": "0.35.5",
+    "socket.io": "^4.8.4",
     "typeorm": "0.3.31"
   },
   "devDependencies": {
@@ -38,10 +59,18 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.3.0",
     "@types/node": "^24.0.0",
+    "@types/papaparse": "^5.5.2",
     "@types/passport": "1.0.17",
     "@types/passport-jwt": "4.0.1",
+    "socket.io-client": "^4.8.4",
     "tsx": "^4.20.0",
     "typescript": "~5.9.2"
+  },
+  "overrides": {
+    "glob": "^14.0.2",
+    "minimatch": "^11.0.1",
+    "uuid": "^11.1.1"
   }
 }

@@ -1,0 +1,12 @@
+codigo,nombre,id_categoria,precio_base_usd,stock,descripcion,imagen,activo,descuento_especial_pct
+,Producto de prueba,1,10.00,1,,,true,
+IMP234-STOCK,Producto de prueba,1,10.00,-1,,,true,
+IMP234-ESCALA,Producto de prueba,1,1.234,1,,,true,
+IMP234-DESCUENTO-100,Producto de prueba,1,10.00,1,,,true,100
+IMP234-URL,Producto de prueba,1,10.00,1,,file:///C:/imagen.png,true,
+IMP234-CATEGORIA,Producto de prueba,0,10.00,1,,,true,
+IMP234-ACTIVO,Producto de prueba,1,10.00,1,,,tal_vez,
+IMP234-NOMBRE,,1,10.00,1,,,true,
+IMP234-DUP,Producto de prueba,1,10.00,1,,,true,
+IMP234-DUP,Producto de prueba,1,10.00,1,,,true,
+IMP234-DESCUENTO-ESCALA,Producto de prueba,1,10.00,1,,,true,12.345

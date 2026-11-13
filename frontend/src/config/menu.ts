@@ -33,9 +33,8 @@ export const accountMenu: readonly MenuItem[] = [
     {
         id: 'account-credit',
         label: 'Cuenta corriente',
-        // Pendiente de implementar la pantalla de cuenta corriente.
-        routeName: null,
-        permission: PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT,
+        routeName: 'cuenta-corriente',
+        permission: PERMISSIONS.VIEW_OWN_ACCOUNT,
     },
     {
         id: 'account-details',
@@ -65,6 +64,12 @@ export const adminMenu: readonly MenuItem[] = [
         permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
     {
+        id: 'admin-receipts',
+        label: 'Comprobantes de pago',
+        routeName: 'admin-receipts',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
+    {
         id: 'admin-categories',
         label: 'Categorías',
         routeName: 'admin-categories',
@@ -76,6 +81,18 @@ export const adminMenu: readonly MenuItem[] = [
         label: 'Clientes',
         routeName: 'admin-clients',
         permission: PERMISSIONS.VIEW_CLIENTS,
+    },
+    {
+        id: 'admin-accounts',
+        label: 'Cuentas corrientes',
+        routeName: 'admin-accounts',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
+    },
+    {
+        id: 'admin-product-import',
+        label: 'Importar productos',
+        routeName: 'admin-product-import',
+        permission: PERMISSIONS.MANAGE_PRODUCTS,
     },
 ]
 
@@ -101,13 +118,13 @@ export const publicMenu: readonly MenuItem[] = [
     {
         id: 'public-about',
         label: 'Quiénes somos',
-        routeName: null,
+        routeName: 'public-about',
         permission: null,
     },
     {
         id: 'public-faq',
         label: 'Preguntas frecuentes',
-        routeName: null,
+        routeName: 'public-faq',
         permission: null,
     },
 ]

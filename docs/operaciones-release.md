@@ -42,8 +42,10 @@ el host accesible desde el backend es `127.0.0.1:3307`. Las demás variables y
 condiciones están documentadas en [backend/README.md](../backend/README.md#configuración).
 
 Para crear un esquema local nuevo, seguir una sola vez el orden
-`schema.sql`, `seed.sql`, `verify-seed.sql` de [database/README.md](../database/README.md#3-ejecutar-los-scripts-en-orden).
-No repetir esos scripts sobre una base cargada. Arrancar y verificar:
+`schema.sql`, `migrate-fer-20-account-movements.sql`, `seed.sql`, `verify-seed.sql`
+(junto con la verificación SQL de las 21 tablas y los 3 triggers FER-20) de
+[database/README.md](../database/README.md#3-ejecutar-los-scripts-en-orden).
+No repetir `schema.sql` ni `seed.sql` sobre una base cargada. Arrancar y verificar:
 
 ```powershell
 npm run build
@@ -86,6 +88,8 @@ No sustituirlos por la base compartida. La evidencia registrada para
 de una corrida anterior, no de esta rama ni de CI.
 
 ### Corte de integración — 28/10/2026, 17:47 ART
+
+> **Registro histórico anterior:** este corte documenta el estado de `develop` del 28/10/2026, previo a los Sprints 5–6 y al PR #105. Consultar también la sección siguiente para la preparación del release académico de Backend.
 
 Referencias remotas verificadas antes de estas correcciones: `develop`
 `ee5c1ff07bb6451cba7541551cbefae2ab68c558`, `main`
@@ -146,6 +150,31 @@ con cliente instalado en el host quedan **NO VERIFICADOS** en este ensayo.
 Se retiraron contenedores, volúmenes anónimos y archivos privados propios.
 Esta evidencia local no equivale a validar el entorno de destino ni una
 ejecución CI del HEAD final, que debe registrarse en el PR por su SHA exacto.
+
+### Preparación de release académico Backend — 13/11/2026
+
+Base verificada antes de iniciar esta preparación:
+
+- Rama base `develop`: `deb240a39d0b96611929851d92164567f93aac56` (merge del [PR #105](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/105), `fix/backend-joi-academic-compliance`).
+- Última corrida CI de `develop`: workflow [`ci.yml`](../.github/workflows/ci.yml), run [`43334459543`](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/43334459543), conclusión `success`.
+- Rama candidata creada desde `develop`: `release/robert-backend-2026-11-13`.
+- Referencia observada de `main`: `93b00b65f8767685757628b15c69198b0d5ac099` (merge de PR #57). Ambas ramas (`develop` y `main`) cuentan con protección activa.
+
+Cambios realizados en `release/robert-backend-2026-11-13`:
+
+1. Reescritura completa del [README principal](../README.md) según el código efectivo de `develop`, incluyendo módulos implementados, limitaciones conocidas, arquitectura, instalación real en 9 pasos y sección de cumplimiento académico de Programación Backend (JWT, Joi, TypeORM, Multer y Socket.IO).
+2. Auditoría y corrección de persistencia de confirmaciones de importación en [importConfirmationState.util.ts](../backend/src/utils/importConfirmationState.util.ts), [productImportConfirm.service.ts](../backend/src/services/productImportConfirm.service.ts), [productImportReconcile.util.service.ts](../backend/src/services/productImportReconcile.util.service.ts) y [productImport.repository.ts](../backend/src/repositories/productImport.repository.ts), con actualización de pruebas en [env-config.test.cjs](../backend/test/env-config.test.cjs) y [productImport.test.cjs](../backend/test/productImport.test.cjs). Cuando `IMPORT_STORAGE_DIR` está configurada explícitamente, no degrada silenciosamente a un directorio temporal y responde HTTP `503` controlado ante rutas inválidas, inexistentes, sin permisos o fallas de escritura en disco, manteniendo en memoria únicamente estado consistente con lo persistido.
+3. Ajustes mínimos de documentación en [backend/README.md](../backend/README.md) (aclarando que `orders:admin` permanece reservada y sin emisiones en `order-sockets.ts`, junto con el comportamiento de `IMPORT_STORAGE_DIR`), [backend/.env.example](../backend/.env.example) y [docs/README.md](README.md).
+4. Corrección final pre-release: precisión documental en el [README principal](../README.md) sobre carga, consulta y revisión documental de comprobantes de pago (sin acreditación automática ni modificación de saldos), preservación del rollback SQL pre-commit en estado `pendiente` reintentable con limpieza diferida/inmediata de vínculos provisionales en [importConfirmationState.util.ts](../backend/src/utils/importConfirmationState.util.ts), [productImportConfirm.service.ts](../backend/src/services/productImportConfirm.service.ts) y [productImportReconcile.util.service.ts](../backend/src/services/productImportReconcile.util.service.ts), regresión unitaria en [productImport.test.cjs](../backend/test/productImport.test.cjs) y nueva prueba transaccional contra MariaDB `11.4` real y almacenamiento descartable en [product-import-rollback.integration.test.cjs](../backend/test/product-import-rollback.integration.test.cjs) integrada en [run-admin-products-mariadb.cjs](../backend/test/helpers/run-admin-products-mariadb.cjs).
+
+Validación local ejecutada (Node `22.22.2` / npm `10.9.7`, Docker `29.9.1`, instancias MariaDB `11.4` descartables por suite):
+
+- **Backend:** `npm audit --audit-level=high`, `npm run type-check`, `npm run build`, `npm run test:unit`, `npm run test:dto-source`, `npm run test:integration`, `npm run test:account-admin:isolated`, `node --test test/e2e-cleanup.test.cjs`, `npm run test:account:safety`, `npm run test:account:cleanup` y `node test/helpers/run-account-mariadb.cjs all`.
+- **Smoke local:** arranque de `backend/dist/server.js` contra MariaDB de `compose.yml` con respuesta `GET /api/health` HTTP `200 {"api":"ok","database":"ok"}` (ejecutado sobre la candidata previa antes de la corrección final).
+- **Frontend:** `npm audit --audit-level=high`, `npm run type-check`, `npm test`, `npm run build`.
+- **E2E Playwright Chromium (`backend/test/helpers/run-e2e.cjs`):** suite integrada por defecto (`node backend/test/helpers/run-e2e.cjs`), perfil `--receipts` (`payment-receipts.real.spec.ts`) y `current-account.production.spec.ts` (`E2E_PRODUCTION_BUILD=1`), con limpieza confirmada de contenedores descartables.
+
+> **Nota de estado:** las pruebas locales previas al push validan esta candidata en entorno Windows/Docker local; tras publicar la rama y abrir el PR hacia `develop`, debe verificarse la corrida de GitHub Actions correspondiente al SHA final del PR antes de aprobar su integración.
 
 ## Runbooks
 
