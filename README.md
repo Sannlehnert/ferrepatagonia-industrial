@@ -119,6 +119,17 @@ flowchart LR
 
 > **Importante sobre Docker Compose:** [`compose.yml`](compose.yml) **únicamente** levanta el contenedor de **MariaDB 11.4** en `127.0.0.1:3307`. **No** levanta automáticamente el backend ni el frontend, y **no** ejecuta automáticamente los scripts de esquema ni de datos de prueba (`database/` se monta solo lectura en `/scripts`).
 
+> **Segunda instalación simultánea en el mismo equipo:** usar un checkout
+> separado, un nombre de proyecto Compose y un puerto libres para no reutilizar
+> la base existente. Por ejemplo, en PowerShell establecer
+> `$env:COMPOSE_PROJECT_NAME = "ferrepatagonia-otra"`, comprobar que ese
+> proyecto y su volumen no existan y que el puerto `3318` esté libre, y cambiar
+> **solo en la copia** el puerto publicado de `compose.yml` de
+> `127.0.0.1:3307:3306` a `127.0.0.1:3318:3306`. Configurar `DB_PORT=3318`
+> en el `.env` de esa copia. Mantener `COMPOSE_PROJECT_NAME` en la terminal
+> donde se ejecutan los comandos Compose, también durante el reinicio. Usar
+> directorios de archivos propios para la segunda instalación.
+
 1. **Clonar el repositorio:**
 
    ```bash
