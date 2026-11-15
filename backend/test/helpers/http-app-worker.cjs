@@ -14,7 +14,7 @@ const { app } = require('../../dist/app');
 let server;
 async function main() {
   if (process.env.HTTP_TEST_DATABASE === '1') {
-    assert.match(process.env.DB_NAME, /^(admin_products|categories)_test_[a-f0-9]{32}$/);
+    assert.match(process.env.DB_NAME, /^(?:(?:admin_products|categories)_test_|cc260_test_)[a-f0-9]{32}$/);
     assert.equal(process.env.DB_HOST, '127.0.0.1');
     await initializeDatabase();
   }
