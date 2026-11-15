@@ -1,0 +1,61 @@
+
+> ferrepatagonia-backend@0.1.0 test:pricing:mariadb
+> node test/helpers/run-pricing-mariadb.cjs
+
+Migration #241 twice: legacy 173.12 preserved, no USD evidence fabricated.
+Clean install: 21 tables + 3 FER-20 triggers verified twice.
+✔ H02 evidencia tabulación no acredita base legacy 173.12 por HTTP productivo (468.8271ms)
+✔ H02 evidencia salto de línea no acredita base legacy 173.12 por HTTP productivo (64.5243ms)
+✔ H02 evidencia CRLF no acredita base legacy 173.12 por HTTP productivo (56.875ms)
+database.query.failed
+✔ H02 evidencia espacios no acredita base legacy 173.12 por HTTP productivo (58.5785ms)
+database.query.failed
+✔ H02 evidencia vacía no acredita base legacy 173.12 por HTTP productivo (62.9533ms)
+database.query.failed
+✔ H02 evidencia NULL no acredita base legacy 173.12 por HTTP productivo (141.9235ms)
+✔ H02 evidencia ausente no acredita base legacy 173.12 por HTTP productivo (50.9213ms)
+✔ H02 evidencia documental con espacios exteriores conserva acreditación y cálculo (38.1836ms)
+✔ HTTP productivo ARS: calendario y tasa de ocho decimales verificados en MariaDB (47.3546ms)
+✔ calendario SQL de fin de semana y feriado sintético selecciona cierre anterior (47.1768ms)
+✔ HTTP real recorre fin de semana y secuencia de feriados sintéticos (46.7917ms)
+✔ ARS suma líneas redondeadas, no convierte el total una sola vez (54.6192ms)
+✔ cotización ausente no habilita ARS (50.081ms)
+✔ cotización invalidada no habilita ARS (42.9557ms)
+✔ cotización no-verificada no habilita ARS (45.1956ms)
+✔ cotización tasa-editada no habilita ARS (47.8876ms)
+✔ cotización desactualizada no habilita ARS (46.5636ms)
+✔ cotización cronologia-imposible no habilita ARS (46.7441ms)
+✔ cotización futura no habilita ARS (45.2114ms)
+database.query.failed
+✔ auditoría hace rollback si falla cálculo; error de persistencia bloquea respuesta (91.2012ms)
+✔ cambio de precio invalida evidencia; nuevo importe requiere revisión explícita (42.3511ms)
+✔ calendario futuro o incompleto bloquea solo ARS, no USD (53.5873ms)
+✔ evidencia de precio futura/invalidada o actor no ADMIN no habilita la base (51.963ms)
+✔ carga civil legacy y UTC de verificación deben concordar en Buenos Aires (54.8439ms)
+✔ catálogo conserva precio nulo y FER-17 entrega el importe con su marca de procedencia (44.0552ms)
+✔ usuario 901 resuelve cliente 301 y lista activa real (34.455ms)
+✔ cliente sin lista no obtiene descuento por fidelidad (32.3855ms)
+✔ lista inactiva conserva promoción y persiste observación diaria deduplicada (59.1816ms)
+✔ especial mayor gana; lista mayor gana; cambios se ven en la siguiente consulta (44.3185ms)
+✔ asignar y cambiar lista actualiza solo el precio del cliente asignado (97.6558ms)
+✔ HTTP con JWT y lookup reales aísla clientes, público y caché (145.8987ms)
+✔ HTTP rechaza lista/cliente/precio en body y query sin aplicar valores ajenos (63.9873ms)
+✔ producto ausente/cero/final cero conserva estados y no fabrica total (48.2546ms)
+✔ productos o categorías inactivos no exponen precio (41.5789ms)
+✔ redondeo HALF_UP después de lectura DECIMAL exacta (33.251ms)
+✔ ARS con fila COTIZACION ausente permanece bloqueado por calendario/verificación ausentes (33.0051ms)
+✔ ARS con fila COTIZACION valida permanece bloqueado por calendario/verificación ausentes (34.6607ms)
+✔ ARS con fila COTIZACION invalidada permanece bloqueado por calendario/verificación ausentes (35.9945ms)
+✔ sin sesión, ADMIN, usuario desactivado y cliente inactivo (45.5467ms)
+✔ unidad legacy sin evidencia permanece visible con estado propio y sin importe USD (43.7783ms)
+database.query.failed
+✔ fallo SQL real se sanitiza y la siguiente solicitud puede resolver (66.9727ms)
+✔ snapshot REPEATABLE READ no mezcla lista anterior y producto posterior a commit concurrente (41.8091ms)
+ℹ tests 42
+ℹ suites 0
+ℹ pass 42
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3212.9292

@@ -1,0 +1,6 @@
+LEGACY {"tables":["CARRITO","CATEGORIA","CLIENTE","COMPROBANTE_PAGO","CONFIRMACION_PEDIDO_CC","COTIZACION","CUENTA_CORRIENTE","DETALLE_PEDIDO","DETALLE_PEDIDO_CC_PRECIO","IMPUTACION_MOVIMIENTO_CUENTA","ITEM_CARRITO","LISTA_PRECIO","MOVIMIENTO_CUENTA_CORRIENTE","PAGO","PEDIDO","PRODUCTO","USUARIO"],"count":17}
+database.query.failed
+LEGACY HTTP /precios {"status":500,"body":{"message":"Error interno del servidor."}}
+database.query.failed
+LEGACY HTTP /precios/mios {"status":500,"body":{"message":"Error interno del servidor."}}
+LEGACY HTTP /catalogo/701 {"status":200,"body":{"data":{"producto":{"id":701,"nombre":"legacy 100","codigo":"legacy-701","descripcion":null,"imagen":null,"stock":10,"categoria":{"id":201,"nombre":"legacy"},"precio":null,"estadoPrecio":"PENDIENTE_DEFINICION","disponible":true}}}}
