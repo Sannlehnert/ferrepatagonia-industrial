@@ -161,6 +161,18 @@ flowchart LR
 
    Pegar el resultado en `JWT_SECRET=<valor-generado>` dentro de `backend/.env` (nunca dejar vacío ni versionar `.env`).
 
+   Para conservar archivos, crear tres directorios **separados**, existentes y
+   escribibles fuera del repositorio y configurar sus rutas absolutas en
+   `backend/.env`: `PRODUCT_IMAGE_STORAGE_DIR` (fotos),
+   `RECEIPT_STORAGE_DIR` (comprobantes privados) e `IMPORT_STORAGE_DIR`
+   (importaciones). Ninguno debe contener a otro. Mantener los comprobantes
+   privados, con permisos restringidos al usuario que ejecuta la API. Por
+   ejemplo, en Windows se pueden usar directorios hermanos bajo
+   `C:\Datos\ferrepatagonia`; en Linux, bajo `/var/lib/ferrepatagonia`, con
+   permisos adecuados. No usar directorios temporales si se requiere persistencia.
+   Estos directorios y el volumen de MariaDB deben incluirse en la estrategia
+   de respaldo del entorno.
+
 6. **Inicializar esquema, triggers FER-20 y datos de prueba (solo sobre una base nueva/vacía):**
 
    > `database/schema.sql` crea las **21 tablas** base, pero **no incluye los 3 triggers FER-20** de cuenta corriente e imputaciones (`fer260_cuenta_revision`, `fer260_imputacion_insert`, `fer260_imputacion_update`). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
@@ -179,6 +191,11 @@ flowchart LR
    ```
 
    La salida debe informar `21` tablas y exactamente los triggers `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, `migrate-fer-20-account-movements.sql` y esta comprobación SQL.)*
+
+   **Limitación de la base sin fixtures:** el registro público crea clientes,
+   no administradores. Actualmente esta guía no documenta una provisión segura
+   del primer administrador; el usuario del seed es un fixture sin login y no
+   resuelve esa necesidad.
 
 7. **Arrancar el backend (en una terminal desde `backend/`):**
 
@@ -209,6 +226,17 @@ flowchart LR
      Respuesta esperada: HTTP `200` con `{"api":"ok","database":"ok"}`.
 
    - Abrir en el navegador `http://localhost:5173`.
+
+### Reinicio sin borrar datos
+
+Detener la API y la web en sus terminales. Desde la raíz, ejecutar
+`docker compose restart mariadb`, esperar a que MariaDB esté saludable con
+`docker compose ps` y volver a iniciar la API y la web como en los pasos 7 y 8.
+Comprobar salud, inicio de sesión y acceso a los datos y archivos existentes.
+Conservar el mismo volumen, `JWT_SECRET` y directorios de almacenamiento; no
+ejecutar `schema.sql` ni `seed.sql` de nuevo sobre la base existente y no
+eliminar el volumen. Este reinicio no sustituye un respaldo ni una prueba de
+restauración. El ensayo y sus limitaciones se registran en [#308](docs/308/README.md).
 
 ---
 
