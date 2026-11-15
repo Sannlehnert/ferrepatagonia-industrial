@@ -23,7 +23,7 @@ before(async()=>{
   url=`http://127.0.0.1:${server.address().port}/api`;
 });
 beforeEach(async()=>{
-  for(const table of ['FER17_LISTA_INACTIVA_EVENTO','FER17_COTIZACION_VERIFICACION','FER17_CALENDARIO','PRECIO_USD_EVIDENCIA','USUARIO','CLIENTE','PRODUCTO','LISTA_PRECIO','CATEGORIA','COTIZACION']) await dataSource.query(`DELETE FROM ${table}`);
+  for(const table of ['FER17_PRECIO_EVENTO','FER17_LISTA_INACTIVA_EVENTO','FER17_COTIZACION_VERIFICACION','FER17_CALENDARIO','PRECIO_USD_EVIDENCIA','USUARIO','CLIENTE','PRODUCTO','LISTA_PRECIO','CATEGORIA','COTIZACION']) await dataSource.query(`DELETE FROM ${table}`);
   const fixture=fs.readFileSync(path.join(__dirname,'../../database/fixtures/fer17-demo.sql'),'utf8');
   for(const sql of fixture.split(';').filter(s=>s.trim()))await dataSource.query(sql);
 });
@@ -67,7 +67,8 @@ for(const [label,evidence,rejectedByDatabase] of [
 test('H02 evidencia documental con espacios exteriores conserva acreditación y cálculo',async()=>{
   const evidence=' \tDOC-USD-VERIFICADO\n ';
   await dataSource.query('UPDATE PRODUCTO SET precio=173.12 WHERE id_producto=701');
-  await dataSource.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=173.12,evidencia=? WHERE id_producto=701',[evidence]);
+  // Simula una revisión nueva tras el cambio: la evidencia anterior ya fue invalidada por el trigger.
+  await dataSource.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=173.12,evidencia=?,valida=1 WHERE id_producto=701',[evidence]);
   const r=await http('/precios',undefined);
   assert.equal(r.status,200);assert.equal(r.body.data.totalUSD,'164.46');
   const line=r.body.data.productos[0];
@@ -330,7 +331,7 @@ test('snapshot REPEATABLE READ no mezcla lista anterior y producto posterior a c
         try{await writer.connect();await writer.startTransaction();
           await writer.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=40 WHERE id_lista_precio=401');
           await writer.query('UPDATE PRODUCTO SET precio=200 WHERE id_producto=701');
-          await writer.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=200 WHERE id_producto=701');
+          await writer.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=200,valida=1 WHERE id_producto=701');
           await writer.commitTransaction();
         }finally{await writer.release();}
       }

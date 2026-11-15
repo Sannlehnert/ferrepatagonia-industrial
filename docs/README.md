@@ -24,6 +24,9 @@
   MariaDB 11.4 con Compose, esquema y triggers FER-20 en una base vacía,
   configuración mínima de `backend/.env`, arranque de backend y frontend, salud
   y advertencias de persistencia.
+- [Verificación de precios posterior al alta o edición (T-S7-05.2)](s7-05/T-S7-05.2-verificacion-precios.md):
+  procedimiento local autorizado, evidencia comercial, invalidación por cambio
+  de precio, historial append-only y migración FER-17 de auditoría.
 
 ## Contratos de autenticación en Taiga
 

@@ -34,6 +34,9 @@ async function main() {
     await connection.query("INSERT INTO PRODUCTO(id_producto,id_categoria,codigo,nombre,precio,stock,activo) VALUES(991,990,'legacy-probe','legacy',173.12,1,1)");
     const extension=fs.readFileSync(path.join(backend,'../database/migrate-fer-17-pricing-evidence.sql'),'utf8');
     for(let n=0;n<2;n++) for(const sql of extension.split(';').filter(s=>s.trim())) await connection.query(sql);
+    const verification=fs.readFileSync(path.join(backend,'../database/migrate-fer-17-price-verification.sql'),'utf8')
+      .replace(/^SET NAMES\s+\S+;\s*$/gim,'').replace(/^DELIMITER\s+\S+\s*$/gim,'').replace(/END\s*\/\//g,'END;').trim();
+    for(let n=0;n<2;n++) await connection.query(verification);
     const [legacy]=await connection.query('SELECT precio FROM PRODUCTO WHERE id_producto=991');
     assert.equal(legacy.precio,'173.12');
     assert.equal(Number((await connection.query('SELECT COUNT(*) AS n FROM PRECIO_USD_EVIDENCIA'))[0].n),0);

@@ -32,6 +32,12 @@ async function main() {
     if (!connection) throw Error('MariaDB desechable no disponible');
     const schema = fs.readFileSync(path.join(backend, '../database/schema.sql'), 'utf8');
     for (const statement of schema.split(';').filter(s => s.trim())) await connection.query(statement);
+    const verificationMigration = fs.readFileSync(
+      path.join(backend, '../database/migrate-fer-17-price-verification.sql'), 'utf8');
+    const applyMigration = statement => execFileSync('docker',
+      ['exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, database],
+      { input: statement, stdio: 'pipe', timeout: 60000 });
+    applyMigration(verificationMigration);
     console.log(JSON.stringify({ database, port, version: await connection.query('SELECT VERSION() AS version'), image: info.Image }));
     const fingerprint = async () => {
       const tables = await connection.query('SHOW TABLES');
