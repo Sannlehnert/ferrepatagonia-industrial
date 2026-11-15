@@ -6,6 +6,7 @@ import { accountReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import { useCuentaCorrienteStore } from '@/stores/cuentaCorriente'
 import type { CuentaCorrienteVencimiento } from '@/types/cuentaCorriente'
+import { creditMessage } from '@/utils/companyStatus'
 import {
     coverageMessage,
     formatCivilDate,
@@ -125,6 +126,10 @@ onBeforeRouteLeave(() => cuenta.clear())
             <p v-if="resumen.estado === 'INHABILITADA'" role="status"
                 class="mb-5 rounded-md border border-amber-300 bg-amber-50 p-4">
                 La cuenta está inhabilitada. Podés consultar el saldo acreditado y su historial, pero no operar a crédito.
+            </p>
+
+            <p v-else role="status" class="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+                {{ creditMessage(resumen) }}
             </p>
 
             <p v-if="resumen.origen === 'DEMO'" role="note"

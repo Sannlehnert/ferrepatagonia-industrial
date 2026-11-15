@@ -134,6 +134,7 @@ function loadAccountView(account) {
         '@/stores/cuentaCorriente': { useCuentaCorrienteStore: () => account },
         '@/components/PaymentReceipts.vue': { default: {} },
         '@/services/paymentReceiptService': { accountReceiptsPath: '/cuenta-corriente/comprobantes' },
+        '@/utils/companyStatus': loadTypeScript('utils/companyStatus.ts'),
         '@/utils/cuentaCorriente': {
             coverageMessage: () => '',
             formatCivilDate,

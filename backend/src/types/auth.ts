@@ -8,5 +8,7 @@ export interface AuthContext {
 export interface SessionUser extends AuthContext {
   email: string;
   tipo_cliente: 'PARTICULAR' | 'EMPRESA' | null;
+  estadoAprobacionEmpresa: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | null;
+  cuentaCorrienteHabilitada: boolean | null;
   nombre: string;
 }
