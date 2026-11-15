@@ -128,7 +128,9 @@ flowchart LR
 > `127.0.0.1:3307:3306` a `127.0.0.1:3318:3306`. Configurar `DB_PORT=3318`
 > en el `.env` de esa copia. Mantener `COMPOSE_PROJECT_NAME` en la terminal
 > donde se ejecutan los comandos Compose, también durante el reinicio. Usar
-> directorios de archivos propios para la segunda instalación.
+> directorios de archivos propios para la segunda instalación. Coordinar con
+> el equipo cualquier cambio de puerto del entorno compartido; esta excepción
+> es solo para una copia aislada.
 
 1. **Clonar el repositorio:**
 
@@ -186,7 +188,7 @@ flowchart LR
 
 6. **Inicializar esquema, triggers FER-20 y datos de prueba (solo sobre una base nueva/vacía):**
 
-   > `database/schema.sql` crea las **21 tablas** base, pero **no incluye los 3 triggers FER-20** de cuenta corriente e imputaciones (`fer260_cuenta_revision`, `fer260_imputacion_insert`, `fer260_imputacion_update`). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
+   > `database/schema.sql` crea las **21 tablas** base, pero **no incluye los 3 triggers FER-20** de cuenta corriente e imputaciones (`fer260_cuenta_revision`, `fer260_imputacion_insert`, `fer260_imputacion_update`). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Si la base tiene tablas pero no cumple el esquema vigente, detenerse, respaldar y acordar su actualización con el equipo; no borrar el volumen. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
 
    ```bash
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
@@ -203,10 +205,12 @@ flowchart LR
 
    La salida debe informar `21` tablas y exactamente los triggers `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, `migrate-fer-20-account-movements.sql` y esta comprobación SQL.)*
 
-   **Limitación de la base sin fixtures:** el registro público crea clientes,
-   no administradores. Actualmente esta guía no documenta una provisión segura
-   del primer administrador; el usuario del seed es un fixture sin login y no
-   resuelve esa necesidad.
+   **Usuarios locales:** el registro público crea clientes, no administradores;
+   el usuario del seed es un fixture sin login. Para preparar usuarios locales
+   de prueba, incluido ADMIN, usar el bootstrap documentado en
+   [T-S7-01.2](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/5a19b6508670934bc6bc7140c9e712d612fd7be2/docs/sprint7/T-S7-01.2-usuarios-y-almacenamiento-local.md)
+   ([PR #111](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/111)).
+   Es un procedimiento para desarrollo local, no para producción.
 
 7. **Arrancar el backend (en una terminal desde `backend/`):**
 

@@ -18,7 +18,12 @@ prueba. La guía principal ahora explica esa adaptación para instalaciones
 simultáneas.
 
 Para comprobar la persistencia se registró un cliente por API y se creó un
-administrador **solo como dato de prueba** en la base aislada. Con este se
+administrador **solo como dato de prueba** mediante SQL en la base aislada.
+Esto describe el ensayo histórico y **no es un procedimiento de instalación**.
+El bootstrap local de ADMIN integrado posteriormente se documenta en
+[T-S7-01.2](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/5a19b6508670934bc6bc7140c9e712d612fd7be2/docs/sprint7/T-S7-01.2-usuarios-y-almacenamiento-local.md)
+([PR #111](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/111)).
+Con el administrador de prueba se
 crearon una categoría y un producto con imagen. Se detuvieron los procesos de
 API y web, se reinició la MariaDB aislada conservando el volumen y se volvieron
 a iniciar los procesos con los mismos comandos y configuración:
@@ -77,23 +82,66 @@ La comparación verificó el código, el stock y la referencia de imagen del
 producto y el hash de la imagen servida y almacenada. Se detuvieron los
 procesos y el contenedor de prueba; no se eliminó su volumen.
 
+## MariaDB original
+
+Al comenzar el ensayo el contenedor `ferrepatagonia-dev-mariadb-1` estaba
+activo; luego se observó detenido. En la consulta de eventos del 15/11/2026 se
+registró su detención a las 11:06:35, antes del reinicio del contenedor aislado
+a las 11:07:44. Los eventos no identificaron al responsable.
+
+El 15/11/2026 se confirmó que el volumen
+`ferrepatagonia-dev_mariadb_data`, creado el 21/10/2026, sigue montado en
+`/var/lib/mysql` del contenedor original y es distinto de los volúmenes de los
+ensayos aislados. Con autorización, se inició temporalmente el contenedor
+original, alcanzó `healthy` y se ejecutaron exclusivamente consultas `SELECT`:
+
+```text
+MariaDB 11.4.13; base ferrepatagonia_dev
+Tablas: 8; triggers: 0
+Usuarios: 4; clientes: 3; productos: 3
+```
+
+El contenedor volvió a quedar detenido, como estaba antes de esta comprobación.
+El volumen existe y la base y esos registros son accesibles, pero sin un
+recuento o respaldo anterior no se puede certificar la integridad completa ni
+la ausencia de pérdidas. La base no cumple el esquema vigente de 21 tablas y
+3 triggers: según la [guía T-S7-01.1](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/d4224607390017f6bf28af98f3f5558c547b89fa/docs/sprint7/T-S7-01.1-instalacion-local.md),
+no se debe reinicializar ni borrar su volumen; corresponde respaldarla y acordar
+su actualización con el equipo.
+
+## Evidencia complementaria de archivos
+
+[T-S7-01.2](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/5a19b6508670934bc6bc7140c9e712d612fd7be2/docs/sprint7/T-S7-01.2-usuarios-y-almacenamiento-local.md)
+documenta la preparación de los tres directorios, las comprobaciones de
+aislamiento y permisos privados de comprobantes, y la escritura y lectura del
+estado de importación desde procesos diferentes. Son pruebas complementarias,
+no una prueba de descarga de comprobantes tras reiniciar MariaDB.
+
+Además, el 15/11/2026 se ejecutaron `npm run build` y
+`npm run test:receipts:isolated` en backend: **5 pruebas aprobadas**, incluida
+la carga, lectura y descarga privada de comprobantes, con contenedor descartable
+en tmpfs y limpieza confirmada. Esa suite no reinicia MariaDB ni comprueba
+persistencia después del reinicio. El contrato y los comandos de comprobantes
+están documentados en [#275](../275-payment-receipts.md).
+
+La [guía T-S7-01.1](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/d4224607390017f6bf28af98f3f5558c547b89fa/docs/sprint7/T-S7-01.1-instalacion-local.md)
+([PR #110](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/110))
+advierte que `/api/health` no verifica archivos y remite a T-S7-01.2 para
+configurar sus rutas; no se atribuye a esa guía una prueba de almacenamiento
+que no realizó.
+
 ## Incidencias y límites
 
 - La guía previa no indicaba crear y configurar los directorios persistentes.
   Se añadió esa indicación y el procedimiento de reinicio al README principal.
-- En una base sin fixtures la guía no explica cómo provisionar el primer
-  administrador. El alta SQL de prueba no es un procedimiento de instalación
-  ni debe copiarse a un entorno compartido. Queda pendiente definir una
-  provisión segura.
+- El bootstrap de T-S7-01.2 está destinado a desarrollo local. El alta SQL
+  usada en el ensayo no es un procedimiento de instalación ni debe copiarse
+  a un entorno compartido.
 - Las instalaciones aisladas se realizaron en el **mismo equipo**, no en otra
   máquina. Se utilizó Node 24/npm 11, no las versiones de referencia Node
   22.22.2/npm 10.9.7. El administrador se creó como dato de prueba, fuera de
   los pasos de instalación.
-- Se verificó una imagen de producto, no la carga y recuperación de
-  comprobantes ni de archivos de importación. No se probó restauración de
+- El ensayo de reinicio de esta tarea verificó una imagen de producto, no
+  comprobantes ni archivos de importación. No se probó restauración de
   respaldos, reinicio del host ni persistencia en otra máquina.
-- La MariaDB preexistente estaba activa al comenzar y se observó detenida
-  después. Los eventos Docker registran su detención a las 11:06:35, antes del
-  reinicio del contenedor de prueba a las 11:07:44, pero no identifican el
-  responsable. No se volvió a iniciar un servicio ajeno sin confirmación.
 - Esta evidencia local no equivale a revisión cruzada ni a CI en verde.
