@@ -18,6 +18,13 @@
   [spike FER-15](spikes/fer-15-modelo-listas-precios.md): modelo y propuesta
   comercial; esta última sigue sujeta a validación del cliente.
 
+## Sprint 7
+
+- [Instalación local normal (T-S7-01.1)](sprint7/T-S7-01.1-instalacion-local.md):
+  MariaDB 11.4 con Compose, esquema y triggers FER-20 en una base vacía,
+  configuración mínima de `backend/.env`, arranque de backend y frontend, salud
+  y advertencias de persistencia.
+
 ## Contratos de autenticación en Taiga
 
 Los contratos y mock originales se mantienen como adjuntos en sus tareas:
