@@ -35,6 +35,7 @@ const db = require('../dist/config/database.config');
 const { pool } = require('../dist/config/catalog-snapshot.config');
 const { signToken } = require('../dist/services/token.service');
 const ledger = require('../dist/repositories/cuentaCorriente.repository');
+const { verifyProductPrice } = require('../dist/services/pricing/price-verification');
 
 const state = {
   server: null,
@@ -222,6 +223,20 @@ test('S7-09.1 PARTICULAR no puede solicitar ni elegir empresa', async () => {
   assert.equal(Number(count.c), 0);
 });
 
+test('S7-09.1 la clave de creación no revela una solicitud de la empresa anterior', async () => {
+  const previous = await createUser('CLIENTE');
+  const current = await createUser('CLIENTE');
+  const created = await requestFor(previous);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  await db.dataSource.query("UPDATE USUARIO SET rol = 'ADMIN', id_cliente = NULL WHERE id_usuario = ?", [current.id]);
+  await db.dataSource.query('UPDATE USUARIO SET id_cliente = ? WHERE id_usuario = ?', [current.clientId, previous.id]);
+  const retry = await requestFor(previous, '1500.00', 30, created.key);
+  assert.equal(retry.status, 409);
+  assert.equal(retry.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  assert.equal(retry.body.data, undefined);
+  assert.deepEqual(await eventsFor(current.clientId), []);
+});
+
 test('S7-09.1 consulta propia y rechazo IDOR', async () => {
   const list = await api('/cuenta-corriente/solicitudes', { token: state.approved.token });
   assert.equal(list.status, 200);
@@ -368,6 +383,14 @@ test('S7-09.1 aprobación crea cuenta inhabilitada con límite, plazo y evidenci
   assert.equal(retry.status, 200, JSON.stringify(retry.body));
   assert.equal(retry.body.meta.replay, true);
 
+  const differentTerm = await api(`/admin/solicitudes-credito/${state.requestId}/aprobar`, {
+    method: 'POST', token: state.admin.token, key,
+    body: { limiteAutorizado: '2000.00', plazoDias: 60,
+      evidencia: 'ACTA-CREDITO-2026-001', motivo: 'Aprobación comercial' },
+  });
+  assert.equal(differentTerm.status, 409, JSON.stringify(differentTerm.body));
+  assert.equal(differentTerm.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
   const resolveAgain = await api(`/admin/solicitudes-credito/${state.requestId}/aprobar`, {
     method: 'POST', token: state.admin.token, key: idem(),
     body: {
@@ -406,6 +429,26 @@ test('S7-09.1 rechazo no crea cuenta y una rechazada no se aprueba después', as
   assert.equal(event.motivo, 'Antecedentes comerciales insuficientes');
 });
 
+test('S7-09.1 rechazar con la misma clave y distinta evidencia devuelve 409', async () => {
+  const company = await createUser('CLIENTE');
+  const request = await requestFor(company);
+  assert.equal(request.status, 201, JSON.stringify(request.body));
+  const reject = (key, body) => api(`/admin/solicitudes-credito/${request.body.data.solicitud.id}/rechazar`, {
+    method: 'POST', token: state.admin.token, key, body,
+  });
+  const key = idem();
+  const original = await reject(key, { motivo: 'Rechazo auditado' });
+  assert.equal(original.status, 200, JSON.stringify(original.body));
+  const retry = await reject(key, { motivo: 'Rechazo auditado' });
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.meta.replay, true);
+  const changed = await reject(key, { motivo: 'Rechazo auditado', evidencia: 'ACTA NUEVA' });
+  assert.equal(changed.status, 409);
+  assert.equal(changed.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  assert.deepEqual((await eventsFor(company.clientId)).map(event => event.tipo_evento),
+    ['SOLICITUD_CREADA', 'SOLICITUD_RECHAZADA']);
+});
+
 test('S7-09.1 habilitación y deshabilitación inmediatas, idempotentes y auditadas', async () => {
   const enableKey = idem();
   const enable = await api(`/admin/clientes/${state.approved.clientId}/cuenta-corriente/habilitar`, {
@@ -430,19 +473,34 @@ test('S7-09.1 habilitación y deshabilitación inmediatas, idempotentes y audita
   assert.equal(retry.status, 200);
   assert.equal(retry.body.meta.replay, true);
 
+  const changedReason = await api(`/admin/clientes/${state.approved.clientId}/cuenta-corriente/habilitar`, {
+    method: 'POST', token: state.admin.token, key: enableKey,
+    body: { evidencia: 'ACTA-HABILITACION' },
+  });
+  assert.equal(changedReason.status, 409);
+  assert.equal(changedReason.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
   const already = await api(`/admin/clientes/${state.approved.clientId}/cuenta-corriente/habilitar`, {
     method: 'POST', token: state.admin.token, key: idem(), body: { evidencia: 'ACTA-HABILITACION' },
   });
   assert.equal(already.status, 409);
   assert.equal(already.body.code, 'CUENTA_YA_HABILITADA');
 
+  const disableKey = idem();
   const disable = await api(`/admin/clientes/${state.approved.clientId}/cuenta-corriente/deshabilitar`, {
-    method: 'POST', token: state.admin.token, key: idem(),
+    method: 'POST', token: state.admin.token, key: disableKey,
     body: { motivo: 'Revisión comercial', evidencia: 'ACTA-BAJA' },
   });
   assert.equal(disable.status, 200, JSON.stringify(disable.body));
   assert.equal(disable.body.data.cuenta.habilitada, false);
   assert.equal((await accountRow(state.approved.clientId)).id_cuenta_corriente, state.accountId);
+
+  const changedEvidence = await api(`/admin/clientes/${state.approved.clientId}/cuenta-corriente/deshabilitar`, {
+    method: 'POST', token: state.admin.token, key: disableKey,
+    body: { motivo: 'Revisión comercial' },
+  });
+  assert.equal(changedEvidence.status, 409);
+  assert.equal(changedEvidence.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
 
   const stateAfterDisable = await ledger.calcularEstadoCuenta(state.accountId);
   assert.equal(stateAfterDisable.habilitada, false);
@@ -680,6 +738,72 @@ test('S7-09.1 auditoría reconstruible y sin datos internos para el cliente', as
   assert.equal(own.status, 200);
   const serialized = JSON.stringify(own.body);
   assert.doesNotMatch(serialized, /ACTA-CREDITO-2026-001|Aprobación comercial|id_actor_usuario/);
+});
+
+test('S7-09.1 checkout exige cuenta habilitada, empresa aprobada y precio FER-17 verificado', async () => {
+  const company = await createUser('CLIENTE', { estadoEmpresa: 'PENDIENTE' });
+  const request = await requestFor(company);
+  assert.equal(request.status, 201, JSON.stringify(request.body));
+  const resolutionPath = `/admin/solicitudes-credito/${request.body.data.solicitud.id}/aprobar`;
+  const companyPath = `/admin/clientes/${company.clientId}`;
+  const admin = (path, body, method = 'POST') => api(path, {
+    method, token: state.admin.token, key: idem(), body,
+  });
+  const setCompany = estado => admin(`${companyPath}/estado-empresa`, { estado }, 'PATCH');
+  assert.equal((await setCompany('APROBADA')).status, 200);
+  const approved = await admin(resolutionPath, { limiteAutorizado: '500.00', plazoDias: 30,
+    evidencia: 'ACTA-CREDITO-7841', motivo: 'Crédito operativo' });
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  const accountId = approved.body.data.cuenta.cuentaId;
+  assert.equal(approved.body.data.cuenta.habilitada, false);
+  const retry = await requestFor(company, '1500.00', 30, request.key);
+  assert.equal(retry.status, 200);
+  assert.deepEqual(retry.body.data, request.body.data, 'la creación devuelve su resultado persistido');
+  assert.equal(retry.body.meta.eventoId, request.body.meta.eventoId);
+
+  const category = await db.dataSource.query("INSERT INTO CATEGORIA (nombre, activo) VALUES ('Crédito FER-17', 1)");
+  const product = await db.dataSource.query(`
+    INSERT INTO PRODUCTO (id_categoria, codigo, nombre, precio, stock, activo)
+    VALUES (?, 'CREDITO-FER17', 'Producto de crédito', 100.00, 10, 1)
+  `, [Number(category.insertId)]);
+  const productId = Number(product.insertId);
+  const cart = await db.dataSource.query('INSERT INTO CARRITO (id_cliente) VALUES (?)', [company.clientId]);
+  await db.dataSource.query('INSERT INTO ITEM_CARRITO (id_carrito, id_producto, cantidad) VALUES (?, ?, 1)',
+    [Number(cart.insertId), productId]);
+  const quote = () => api('/pedidos/cuenta-corriente/eligibilidad', { token: company.token });
+  const checkout = cotizacion => api('/pedidos/cuenta-corriente', {
+    method: 'POST', token: company.token, key: idem(), body: { cotizacion },
+  });
+  assert.equal((await quote()).body.data.codigo, 'CUENTA_NO_HABILITADA');
+  const enabled = await admin(`${companyPath}/cuenta-corriente/habilitar`, { evidencia: 'ACTA-HABILITACION-7841' });
+  assert.equal(enabled.status, 200, JSON.stringify(enabled.body));
+  const noPrice = await quote();
+  assert.equal(noPrice.body.data.elegible, false);
+  assert.equal(noPrice.body.data.cotizacion, null);
+
+  const verify = expectedPrice => verifyProductPrice({ productId, expectedPrice,
+    evidence: 'FACTURA-COMERCIAL-7841', adminId: state.admin.id, confirmed: true });
+  assert.equal((await verify('100.00')).ok, true);
+  const valid = await quote();
+  assert.equal(valid.body.data.elegible, true, JSON.stringify(valid.body));
+  for (const estado of ['PENDIENTE', 'RECHAZADA']) {
+    assert.equal((await setCompany(estado)).status, 200);
+    const rejected = await checkout(valid.body.data.cotizacion);
+    assert.equal(rejected.status, 403, JSON.stringify(rejected.body));
+    assert.equal(rejected.body.code, 'EMPRESA_NO_HABILITADA');
+    assert.equal(Number((await accountRow(company.clientId)).habilitada), 1);
+  }
+  assert.equal((await setCompany('APROBADA')).status, 200);
+  await db.dataSource.query('UPDATE PRODUCTO SET precio = 120.00 WHERE id_producto = ?', [productId]);
+  assert.equal((await quote()).body.data.elegible, false);
+  assert.equal((await snapshotLedger(accountId)).count, 0);
+  assert.equal((await verify('120.00')).ok, true);
+  const newPrice = await quote();
+  assert.equal(newPrice.body.data.totalUSD, '120.00');
+  const confirmed = await checkout(newPrice.body.data.cotizacion);
+  assert.equal(confirmed.status, 201, JSON.stringify(confirmed.body));
+  assert.equal((await snapshotLedger(accountId)).count, 1);
+  assert.equal((await ledger.calcularEstadoCuenta(accountId)).credito_disponible, '380.00');
 });
 
 test('S7-09.1 persistencia tras reinicio del pool de datos', async () => {

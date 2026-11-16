@@ -210,7 +210,7 @@ async function resolveClientForRead(manager: EntityManager, auth: AuthContext) {
 function replay<T>(
   event: CreditEventRow,
   expectedType: string,
-  target: { requestId?: number; accountId?: number; limit?: string; motivo?: string; evidencia?: string },
+  target: { requestId?: number; accountId?: number; limit?: string; motivo?: string | null; evidencia?: string | null },
 ): CreditWorkflowResult<T> {
   const matches = event.tipo_evento === expectedType
     && (target.requestId === undefined || event.id_solicitud_credito === target.requestId)
@@ -229,6 +229,26 @@ function replay<T>(
   } catch {
     throw conflictoConcurrencia();
   }
+}
+
+async function replayClientCreation(
+  manager: EntityManager,
+  clientId: number,
+  userId: number,
+  key: string,
+  monto: string,
+  plazoDias: number,
+  observaciones: string | null,
+): Promise<CreditWorkflowResult | null> {
+  const request = await findRequestByClientKey(manager, userId, key);
+  const event = await findEventByKey(manager, userId, key);
+  if (!request && !event) return null;
+  if (!request || request.id_cliente !== clientId || request.monto_solicitado !== monto
+    || request.plazo_solicitado !== plazoDias || request.observaciones !== observaciones) {
+    throw claveIdempotenciaReutilizada();
+  }
+  if (!event || event.id_cliente !== clientId) throw conflictoConcurrencia();
+  return replay(event, 'SOLICITUD_CREADA', { requestId: request.id_solicitud_credito });
 }
 
 function missingAccreditation(account: CreditAccountRow): string[] {
@@ -262,20 +282,10 @@ export async function createCreditRequest(
   try {
     return await inTransaction(async (manager) => {
       const context = await lockClientContext(manager, auth);
-      const sameKey = await findRequestByClientKey(manager, auth.id, key);
-      if (sameKey) {
-        if (sameKey.monto_solicitado !== monto || sameKey.plazo_solicitado !== input.plazoDias
-          || sameKey.observaciones !== observaciones) {
-          throw claveIdempotenciaReutilizada();
-        }
-        return {
-          data: { solicitud: clientView(sameKey) },
-          eventoId: '',
-          replay: true,
-        };
-      }
-      const replayEvent = await findEventByKey(manager, auth.id, key, true);
-      if (replayEvent) return replay(replayEvent, 'SOLICITUD_CREADA', {});
+      const previous = await replayClientCreation(
+        manager, context.client.id_cliente, auth.id, key, monto, input.plazoDias, observaciones,
+      );
+      if (previous) return previous;
 
       const pending = await findPendingRequestForClient(manager, context.client.id_cliente, true);
       if (pending) throw solicitudPendienteDuplicada(pending.id_solicitud_credito);
@@ -337,16 +347,10 @@ async function recoverClientRequest(
 ): Promise<CreditWorkflowResult> {
   return inTransaction(async (manager) => {
     const context = await lockClientContext(manager, auth);
-    const sameKey = await findRequestByClientKey(manager, auth.id, key);
-    if (sameKey) {
-      if (sameKey.monto_solicitado !== monto || sameKey.plazo_solicitado !== plazoDias
-        || sameKey.observaciones !== observaciones) {
-        throw claveIdempotenciaReutilizada();
-      }
-      return { data: { solicitud: clientView(sameKey) }, eventoId: '', replay: true };
-    }
-    const event = await findEventByKey(manager, auth.id, key);
-    if (event) return replay(event, 'SOLICITUD_CREADA', {});
+    const previous = await replayClientCreation(
+      manager, context.client.id_cliente, auth.id, key, monto, plazoDias, observaciones,
+    );
+    if (previous) return previous;
     const pending = await findPendingRequestForClient(manager, context.client.id_cliente);
     if (pending) throw solicitudPendienteDuplicada(pending.id_solicitud_credito);
     throw conflictoConcurrencia();
@@ -432,9 +436,12 @@ export async function approveCreditRequest(
     if (!request || request.id_cliente !== clientId) throw solicitudNoEncontrada();
 
     const replayEvent = await findEventByKey(manager, auth.id, key, true);
-    if (replayEvent) return replay(replayEvent, 'SOLICITUD_APROBADA', {
-      requestId, limit, motivo: input.motivo, evidencia: input.evidencia,
-    });
+    if (replayEvent) {
+      if (request.plazo_autorizado !== input.plazoDias) throw claveIdempotenciaReutilizada();
+      return replay(replayEvent, 'SOLICITUD_APROBADA', {
+        requestId, limit, motivo: input.motivo, evidencia: input.evidencia,
+      });
+    }
 
     if (request.estado !== 'PENDIENTE') throw solicitudNoPendiente();
     if (client.activo !== 1 || client.tipo_cliente !== 'EMPRESA'
@@ -539,7 +546,7 @@ export async function rejectCreditRequest(
 
     const replayEvent = await findEventByKey(manager, auth.id, key, true);
     if (replayEvent) return replay(replayEvent, 'SOLICITUD_RECHAZADA', {
-      requestId, motivo: input.motivo,
+      requestId, motivo: input.motivo, evidencia: input.evidencia ?? null,
     });
 
     if (request.estado !== 'PENDIENTE') throw solicitudNoPendiente();
@@ -596,7 +603,7 @@ export async function enableCreditAccount(
     const replayEvent = await findEventByKey(manager, auth.id, key, true);
     if (replayEvent) {
       return replay(replayEvent, 'CUENTA_HABILITADA', {
-        accountId: account.id_cuenta_corriente, evidencia: input.evidencia,
+        accountId: account.id_cuenta_corriente, evidencia: input.evidencia, motivo: input.motivo ?? null,
       });
     }
 
@@ -661,7 +668,7 @@ export async function disableCreditAccount(
     const replayEvent = await findEventByKey(manager, auth.id, key, true);
     if (replayEvent) {
       return replay(replayEvent, 'CUENTA_DESHABILITADA', {
-        accountId: account.id_cuenta_corriente, motivo: input.motivo,
+        accountId: account.id_cuenta_corriente, motivo: input.motivo, evidencia: input.evidencia ?? null,
       });
     }
 
