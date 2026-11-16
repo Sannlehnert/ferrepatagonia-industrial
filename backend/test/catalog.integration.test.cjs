@@ -208,6 +208,118 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
       }
     });
 
+    await t.test('orden configurable: predeterminado, nombre asc/desc, desempate y paginación estable', async () => {
+      const orderCategory = Number((await pool.query(
+        'INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 1)', [`${prefix}-orden`])).insertId);
+      categories.push(orderCategory);
+      const inactiveOrderCategory = Number((await pool.query(
+        'INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 0)', [`${prefix}-orden-inactiva`])).insertId);
+      categories.push(inactiveOrderCategory);
+
+      const ordered = [];
+      const addOrdered = async (nombre, { category = orderCategory, active = 1, stock = 1 } = {}) => {
+        const codigo = `${prefix}-orden-${ordered.length + 1}`;
+        const result = await pool.query(`INSERT INTO PRODUCTO
+          (id_categoria, codigo, nombre, precio, stock, activo) VALUES (?, ?, ?, 1234.56, ?, ?)`,
+          [category, codigo, nombre, stock, active]);
+        const id = Number(result.insertId);
+        products.push(id);
+        ordered.push({ id, nombre, category, active, stock });
+      };
+      await addOrdered('Alfa');
+      await addOrdered('Bravo');
+      await addOrdered('Bravo');
+      await addOrdered('Charlie', { stock: 0 });
+      await addOrdered('Delta');
+      await addOrdered('Echo');
+      await addOrdered('AAA producto inactivo', { active: 0 });
+      await addOrdered('AAA categoría inactiva', { category: inactiveOrderCategory });
+      // Coincide por nombre y por búsqueda, pero fuera de la categoría solicitada.
+      await addOrdered('Bravo externo', { category: categories[4] });
+
+      const visible = ordered.filter(p => p.active && p.category === orderCategory);
+      const defaultExpected = visible.map(p => p.id).sort((a, b) => a - b);
+      const dbOrder = async direction => (await pool.query(`
+        SELECT p.id_producto FROM PRODUCTO p
+        INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
+        WHERE p.id_categoria = ? AND p.activo = 1 AND c.activo = 1
+        ORDER BY p.nombre ${direction}, p.id_producto ASC`, [orderCategory]))
+        .map(p => Number(p.id_producto));
+      const nameAscExpected = await dbOrder('ASC');
+      const nameDescExpected = await dbOrder('DESC');
+      const bravoIds = visible.filter(p => p.nombre === 'Bravo').map(p => p.id).sort((a, b) => a - b);
+      assert.equal(bravoIds.length, 2);
+      assert.deepEqual(nameAscExpected.filter(id => bravoIds.includes(id)), bravoIds);
+      assert.deepEqual(nameDescExpected.filter(id => bravoIds.includes(id)), bravoIds);
+
+      for (const [label, orden, expected] of [
+        ['predeterminado omitido', undefined, defaultExpected],
+        ['predeterminado explícito', 'predeterminado', defaultExpected],
+        ['nombre ascendente', 'nombre_asc', nameAscExpected],
+        ['nombre descendente', 'nombre_desc', nameDescExpected],
+      ]) {
+        const totalPages = Math.ceil(expected.length / 2);
+        const collected = [];
+        for (const page of [...Array.from({ length: totalPages + 2 }, (_, i) => i + 1), 1000000]) {
+          const response = await fetch(url + '?' + new URLSearchParams({
+            categoria: String(orderCategory), limit: '2', page: String(page),
+            ...(orden === undefined ? {} : { orden }),
+          }));
+          assert.equal(response.status, 200, label);
+          const { data } = await response.json();
+          assert.deepEqual(data.productos.map(p => p.id), expected.slice((page - 1) * 2, page * 2), label);
+          assert.deepEqual(data.pagination, { page, limit: 2, total: expected.length, totalPages,
+            hasNext: page < totalPages, hasPrevious: page > 1 && page <= totalPages + 1 }, label);
+          for (const product of data.productos) {
+            assert.ok(!product.nombre.startsWith('AAA'), 'no expone inactivos');
+            assert.equal(product.precio, null);
+            assert.equal(product.estadoPrecio, 'PENDIENTE_DEFINICION');
+            if (product.id === visible.find(p => p.nombre === 'Charlie').id) {
+              assert.equal(product.disponible, false);
+            }
+          }
+          collected.push(...data.productos.map(p => p.id));
+        }
+        assert.deepEqual(collected, expected, label);
+        assert.equal(collected.length, expected.length, label);
+      }
+
+      for (const orden of ['nombre_asc', 'nombre_desc']) {
+        const expected = [];
+        for (const page of [1, 2]) {
+          const response = await fetch(url + '?' + new URLSearchParams({
+            busqueda: 'ravo', categoria: String(orderCategory), orden,
+            limit: '1', page: String(page),
+          }));
+          assert.equal(response.status, 200);
+          const { data } = await response.json();
+          assert.equal(data.pagination.total, 2);
+          assert.equal(data.pagination.totalPages, 2);
+          assert.equal(data.pagination.hasNext, page === 1);
+          assert.equal(data.pagination.hasPrevious, page === 2);
+          expected.push(...data.productos.map(p => p.id));
+        }
+        assert.deepEqual(expected, bravoIds, 'empate y búsqueda conservan desempate por id');
+      }
+
+      const empty = await fetch(url + '?' + new URLSearchParams({
+        categoria: String(categories[2]), orden: 'nombre_desc', limit: '2', page: '2',
+      }));
+      assert.equal(empty.status, 200);
+      assert.deepEqual(await empty.json(), { data: { productos: [], pagination: {
+        page: 2, limit: 2, total: 0, totalPages: 0, hasNext: false, hasPrevious: false } } });
+
+      for (const query of ['orden=', 'orden=nombre', 'orden=NOMBRE_ASC',
+        'orden=precio_asc', 'orden=id_asc', 'orden=nombre%20asc',
+        'orden=nombre_asc&orden=nombre_desc', 'orden=nombre_asc&orden=nombre_asc',
+        'orden[]=nombre_asc', 'orden[x]=nombre_asc',
+        'orden=nombre_asc&categoria=0', 'orden=nombre_asc&page=0']) {
+        const response = await fetch(url + '?' + query);
+        assert.equal(response.status, 400, query);
+        assert.deepEqual(Object.keys(await response.json()), ['message'], query);
+      }
+    });
+
     for (const categoria of [undefined, categories[0]]) {
       for (const busqueda of [undefined, prefix]) {
         await t.test(`inserción concurrente conserva snapshot, categoría ${categoria}, búsqueda ${busqueda}`, async t => {
