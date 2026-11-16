@@ -211,7 +211,7 @@ async function main(signal) {
 
     const apply = file => execFileSync(
       'docker',
-      ['exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, database],
+      ['exec', '-i', container, 'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, database],
       { input: fs.readFileSync(path.join(backend, '../database', file)), stdio: 'pipe', timeout: 60000 },
     );
 

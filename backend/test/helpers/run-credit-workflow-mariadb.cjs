@@ -38,7 +38,7 @@ const docker = (...args) => execFileSync(dockerBin, args, {
 
 function applySql(file, { target = database, contents = fs.readFileSync(file) } = {}) {
   const result = spawnSync(dockerBin, [
-    'exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, target,
+    'exec', '-i', container, 'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, target,
   ], {
     input: contents,
     encoding: 'utf8',
@@ -67,7 +67,7 @@ async function snapshot(query, tables) {
 async function checkUpgrade(port) {
   // Base anterior a crédito, con las migraciones FER-20 y FER-17 ya aplicadas.
   const target = `${database}_upgrade`;
-  docker('exec', container, 'mariadb', '-uroot', `-p${password}`, '-e', `CREATE DATABASE ${target}`);
+  docker('exec', container, 'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, '-e', `CREATE DATABASE ${target}`);
   const schema = fs.readFileSync(file('schema.sql'), 'utf8');
   const previous = schema.split(';').filter(statement =>
     !creditTables.some(table => statement.includes(`CREATE TABLE IF NOT EXISTS ${table} (`)),
@@ -100,7 +100,8 @@ async function main() {
   let started = false;
   let connection;
   let interrupted = false;
-  const signal = () => { interrupted = true; };
+  let child;
+  const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
   process.on('SIGINT', signal);
   process.on('SIGTERM', signal);
 
@@ -147,7 +148,7 @@ async function main() {
       database, host: '127.0.0.1', port, container, ...inventory }));
 
     const code = await new Promise((resolve, reject) => {
-      const child = spawn(process.execPath, [
+      child = spawn(process.execPath, [
         '--require', './test/helpers/test-env.cjs',
         '--test', '--test-concurrency=1', 'test/credit-workflow.mariadb.test.cjs',
       ], {
@@ -173,15 +174,18 @@ async function main() {
         child.kill('SIGTERM');
       }, 240000);
       child.on('error', error => { clearTimeout(timeout); reject(error); });
-      child.on('exit', exitCode => { clearTimeout(timeout); resolve(exitCode); });
+      child.on('exit', exitCode => { clearTimeout(timeout); child = null; resolve(exitCode); });
     });
     assert.equal(code, 0, `Suite T-S7-09.1 falló (exit ${code})`);
     assert.equal(interrupted, false);
-    const populated = await snapshot(query, creditTables);
-    assert.ok(populated.every(({ rows }) => rows.length > 0));
+    const { tables } = await readSchemaInventory(query);
+    const populated = await snapshot(query, tables);
+    for (const table of [...creditTables, 'MOVIMIENTO_CUENTA_CORRIENTE']) {
+      assert.ok(populated.some(entry => entry.table === table && entry.rows.length > 0), table);
+    }
     applySql(file(creditMigration));
-    assert.deepEqual(await snapshot(query, creditTables), populated);
-    console.log('Reaplicación verificada: solicitudes y eventos existentes preservados.');
+    assert.deepEqual(await snapshot(query, tables), populated);
+    console.log('Reaplicación verificada: filas de las 24 tablas preservadas, incluidos solicitudes, eventos y movimientos.');
   } finally {
     process.off('SIGINT', signal);
     process.off('SIGTERM', signal);
@@ -200,8 +204,7 @@ async function main() {
 }
 
 main().catch(error => {
-  if (process.env.DEBUG_CREDIT_RUNNER) console.error(error);
-  console.error(error instanceof assert.AssertionError ? error.message
-    : 'Falló la preparación o limpieza de MariaDB de T-S7-09.1.');
+  const message = error.stderr?.toString().trim() || error.message;
+  console.error(message.replaceAll(password, '[oculto]'));
   process.exitCode = 1;
 });

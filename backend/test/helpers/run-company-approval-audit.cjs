@@ -47,7 +47,7 @@ const docker = (...args) => execFileSync(dockerBin, args, {
 function applySql(sqlFile) {
     const result = spawnSync(dockerBin, [
         'exec', '-i', container,
-        'mariadb', '-uroot', `-p${password}`, database,
+        'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, database,
     ], {
         input: fs.readFileSync(sqlFile),
         encoding: 'utf8',
