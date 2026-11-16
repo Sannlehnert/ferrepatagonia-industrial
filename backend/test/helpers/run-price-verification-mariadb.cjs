@@ -11,6 +11,189 @@ const container = `price-verification-test-${token}`;
 const password = randomUUID();
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', timeout: 180000 }).trim();
 
+const CONTAINER_PORT_KEY = '3306/tcp';
+const DEFAULT_ATTEMPTS = 60;
+const RETRY_DELAY_MS = 1000;
+const PORT_CONNECTION_ERRORS = new Set(['ECONNREFUSED', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH']);
+
+const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+class MariaDbContainerError extends Error {
+  constructor(code, message, diagnostics) {
+    super(message);
+    this.name = 'MariaDbContainerError';
+    this.code = code;
+    this.diagnostics = diagnostics;
+  }
+}
+
+function sanitize(value, secrets = []) {
+  let text = String(value ?? '');
+  for (const secret of secrets) {
+    if (secret) text = text.split(String(secret)).join('[oculto]');
+  }
+  return text;
+}
+
+function sanitizeDiagnostics(diagnostics, secrets = []) {
+  return JSON.parse(sanitize(JSON.stringify(diagnostics), secrets));
+}
+
+function inspectContainer(dockerClient, name) {
+  const [info] = JSON.parse(dockerClient('inspect', '--type', 'container', name));
+  if (!info) throw Error('docker inspect no devolvió información del contenedor');
+  return info;
+}
+
+function publishedPort(info) {
+  const binding = info?.NetworkSettings?.Ports?.[CONTAINER_PORT_KEY]?.[0];
+  const port = Number(binding?.HostPort);
+  return Number.isInteger(port) && port > 0 ? port : null;
+}
+
+function containerDiagnostics(info, name) {
+  return {
+    container: name,
+    status: info?.State?.Status ?? null,
+    running: info?.State?.Running === true,
+    exitCode: Number.isInteger(info?.State?.ExitCode) ? info.State.ExitCode : null,
+    stateError: info?.State?.Error || null,
+    restartCount: Number.isInteger(info?.RestartCount) ? info.RestartCount : null,
+    publishedPort: publishedPort(info),
+  };
+}
+
+function connectionErrorSummary(error, attempt, port, secrets) {
+  const cause = error?.cause ?? error?.errors?.[0] ?? error;
+  return {
+    attempt,
+    port,
+    code: cause?.code ?? error?.code ?? null,
+    errno: cause?.errno ?? error?.errno ?? null,
+    sqlState: cause?.sqlState ?? error?.sqlState ?? null,
+    message: sanitize(cause?.message ?? error, secrets).slice(0, 500),
+  };
+}
+
+function connectionFailure({ action, container: name, attempts, info, inspectError, lastPort, errors, secrets }) {
+  const diagnostics = sanitizeDiagnostics({
+    ...containerDiagnostics(info, name),
+    action,
+    attempts,
+    lastPort: lastPort ?? null,
+    connectionErrors: errors,
+    inspectError: inspectError ? inspectError.message ?? inspectError : null,
+  }, secrets);
+  const help = `Diagnóstico: ${JSON.stringify(diagnostics)}`;
+
+  if (inspectError && !info) {
+    return new MariaDbContainerError('MARIADB_INSPECT_FAILED',
+      `${action}: no se pudo inspeccionar el contenedor ${name} tras ${attempts} intentos. ${help}`,
+      diagnostics);
+  }
+  if (info?.State?.Running !== true || info?.State?.Status !== 'running') {
+    return new MariaDbContainerError('MARIADB_NOT_RUNNING',
+      `${action}: MariaDB no está en ejecución (estado: ${diagnostics.status ?? 'desconocido'}, `
+      + `exitCode: ${diagnostics.exitCode ?? 'desconocido'}). ${help}`,
+      diagnostics);
+  }
+  if (!lastPort) {
+    return new MariaDbContainerError('MARIADB_PORT_UNAVAILABLE',
+      `${action}: MariaDB está en ejecución pero Docker no publicó un puerto válido para `
+      + `${CONTAINER_PORT_KEY}. ${help}`,
+      diagnostics);
+  }
+
+  const lastCode = errors.at(-1)?.code;
+  if (PORT_CONNECTION_ERRORS.has(lastCode)) {
+    return new MariaDbContainerError('MARIADB_PORT_MISMATCH',
+      `${action}: MariaDB está en ejecución pero 127.0.0.1:${lastPort} no acepta conexiones tras `
+      + `${attempts} intentos; el puerto publicado puede haber cambiado o no ser accesible `
+      + `(${lastCode}). ${help}`,
+      diagnostics);
+  }
+  return new MariaDbContainerError('MARIADB_CONNECTION_FAILED',
+    `${action}: MariaDB está en ejecución pero la conexión en 127.0.0.1:${lastPort} falló tras `
+    + `${attempts} intentos con un error distinto de puerto (${lastCode ?? 'sin código'}). ${help}`,
+    diagnostics);
+}
+
+async function connectToMariaDb({
+  docker: dockerClient = docker,
+  container: name = container,
+  database: databaseName = database,
+  password: secret = password,
+  connect = mariadb.createConnection,
+  attempts = DEFAULT_ATTEMPTS,
+  retryDelayMs = RETRY_DELAY_MS,
+  waitForRetry = delay,
+  previousPort,
+  onPortChange,
+  action = 'conexión con MariaDB',
+} = {}) {
+  const secrets = [secret];
+  const errors = [];
+  let info;
+  let inspectError;
+  let lastPort;
+  let announcedPort = previousPort;
+
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    info = undefined;
+    inspectError = undefined;
+    try {
+      info = inspectContainer(dockerClient, name);
+    } catch (error) {
+      inspectError = error;
+    }
+
+    const port = publishedPort(info);
+    if (port) {
+      if (announcedPort !== undefined && port !== announcedPort) {
+        onPortChange?.(announcedPort, port);
+      }
+      announcedPort = port;
+      lastPort = port;
+      try {
+        const connection = await connect({
+          host: '127.0.0.1',
+          port,
+          user: 'root',
+          password: secret,
+          database: databaseName,
+          connectTimeout: 1000,
+        });
+        return { connection, port, info };
+      } catch (error) {
+        errors.push(connectionErrorSummary(error, attempt, port, secrets));
+        if (errors.length > 10) errors.shift();
+      }
+    }
+
+    if (attempt < attempts) await waitForRetry(retryDelayMs);
+  }
+
+  throw connectionFailure({
+    action, container: name, attempts, info, inspectError, lastPort, errors, secrets,
+  });
+}
+
+async function restartMariaDb(options = {}) {
+  const dockerClient = options.docker ?? docker;
+  const name = options.container ?? container;
+  dockerClient('restart', name);
+  return connectToMariaDb({ ...options, docker: dockerClient, container: name });
+}
+
+function updateDatabasePort(env, port) {
+  const value = Number(port);
+  if (!Number.isInteger(value) || value <= 0 || value > 65535) {
+    throw Error(`Puerto MariaDB inválido para DB_PORT: ${String(port)}`);
+  }
+  env.DB_PORT = String(value);
+  return env;
+}
+
 async function main() {
   let started = false;
   let connection;
@@ -18,19 +201,9 @@ async function main() {
     docker('run', '--rm', '-d', '--name', container, '-p', '127.0.0.1::3306',
       '-e', `MARIADB_ROOT_PASSWORD=${password}`, '-e', `MARIADB_DATABASE=${database}`, 'mariadb:11.4');
     started = true;
-    const info = JSON.parse(docker('inspect', container))[0];
-    const port = Number(info.NetworkSettings.Ports['3306/tcp'][0].HostPort);
-    for (let i = 0; i < 60; i++) {
-      try {
-        connection = await mariadb.createConnection({
-          host: '127.0.0.1', port, user: 'root', password, database, connectTimeout: 1000,
-        });
-        break;
-      } catch {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    if (!connection) throw Error('MariaDB desechable no disponible');
+    const initial = await connectToMariaDb({ action: 'inicio de MariaDB desechable' });
+    connection = initial.connection;
+    let port = initial.port;
 
     const apply = file => execFileSync(
       'docker',
@@ -69,11 +242,12 @@ async function main() {
       ...process.env,
       DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
       JWT_SECRET: randomUUID(),
-      DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: database,
+      DB_HOST: '127.0.0.1', DB_NAME: database,
       DB_USER: 'root', DB_PASSWORD: password,
       PRICE_VERIFICATION_TEST_DATABASE: database,
       PRICE_VERIFICATION_RUN_ID: token,
     };
+    updateDatabasePort(env, port);
     const runSuite = file => spawnSync(
       process.execPath,
       ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', file],
@@ -86,18 +260,17 @@ async function main() {
     // Requirement: evidence and audit survive a MariaDB restart.
     await connection.end().catch(() => undefined);
     connection = undefined;
-    docker('restart', container);
-    for (let i = 0; i < 60; i++) {
-      try {
-        connection = await mariadb.createConnection({
-          host: '127.0.0.1', port, user: 'root', password, database, connectTimeout: 1000,
-        });
-        break;
-      } catch {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    if (!connection) throw Error('MariaDB no volvió tras el reinicio');
+    const restarted = await restartMariaDb({
+      previousPort: port,
+      action: 'reinicio de MariaDB',
+      onPortChange: (previous, current) => {
+        console.log(`T-S7-05.2: Docker reasignó el puerto publicado de MariaDB ${previous} → ${current}.`);
+      },
+    });
+    connection = restarted.connection;
+    port = restarted.port;
+    // The restart suite must reconnect through the port published after the restart.
+    updateDatabasePort(env, port);
 
     const restartResult = runSuite('test/price-verification.restart.test.cjs');
     if (restartResult.error) throw restartResult.error;
@@ -109,7 +282,26 @@ async function main() {
   }
 }
 
-main().catch(error => {
-  console.error(error.stderr?.toString?.().trim() || error.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch(error => {
+    console.error(sanitize(error.stderr?.toString?.().trim() || error.message, [password]));
+    if (error.diagnostics) {
+      console.error('Diagnóstico:', JSON.stringify(sanitizeDiagnostics(error.diagnostics, [password]), null, 2));
+    }
+    process.exitCode = 1;
+  });
+}
+
+module.exports = {
+  CONTAINER_PORT_KEY,
+  DEFAULT_ATTEMPTS,
+  MariaDbContainerError,
+  connectToMariaDb,
+  containerDiagnostics,
+  inspectContainer,
+  publishedPort,
+  restartMariaDb,
+  sanitize,
+  sanitizeDiagnostics,
+  updateDatabasePort,
+};
