@@ -131,19 +131,31 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
   }
 
   const verified = await inTransaction(async manager => {
-    const [admin] = await manager.query<AdminRow[]>(
-      `SELECT id_usuario,email,rol,activo FROM USUARIO WHERE id_usuario = ? FOR UPDATE`,
-      [adminId],
-    );
-    if (!admin || admin.rol !== 'ADMIN' || admin.activo !== 1) {
-      throw new PriceVerificationError('ACTOR_NO_AUTORIZADO', 403,
-        'El operador no existe, no está activo o no tiene rol ADMIN.');
-    }
+    const readAdmin = async (lock: boolean): Promise<AdminRow> => {
+      const [admin] = await manager.query<AdminRow[]>(
+        `SELECT id_usuario,email,rol,activo FROM USUARIO WHERE id_usuario = ?${lock ? ' LOCK IN SHARE MODE' : ''}`,
+        [adminId],
+      );
+      if (!admin || admin.rol !== 'ADMIN' || admin.activo !== 1) {
+        throw new PriceVerificationError('ACTOR_NO_AUTORIZADO', 403,
+          'El operador no existe, no está activo o no tiene rol ADMIN.');
+      }
+      return admin;
+    };
 
+    // Reject unauthorized actors before touching a product, without a row lock.
+    await readAdmin(false);
+    // Match checkout: product -> evidence -> evidence operator.
     const [product] = await manager.query<ProductRow[]>(
       `SELECT id_producto,precio,activo FROM PRODUCTO WHERE id_producto = ? FOR UPDATE`,
       [productId],
     );
+    const [previous] = product ? await manager.query<EvidenceRow[]>(
+      `SELECT precio_verificado,evidencia,id_admin,valida,sintetica
+       FROM PRECIO_USD_EVIDENCIA WHERE id_producto = ? FOR UPDATE`,
+      [productId],
+    ) : [];
+    const admin = await readAdmin(true);
     if (!product) {
       throw new PriceVerificationError('PRODUCTO_INEXISTENTE', 404, 'El producto no existe.');
     }
@@ -166,12 +178,6 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
         eventId,
       };
     }
-
-    const [previous] = await manager.query<EvidenceRow[]>(
-      `SELECT precio_verificado,evidencia,id_admin,valida,sintetica
-       FROM PRECIO_USD_EVIDENCIA WHERE id_producto = ? FOR UPDATE`,
-      [productId],
-    );
 
     await manager.query(
       `INSERT INTO PRECIO_USD_EVIDENCIA
@@ -206,7 +212,9 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
       verifiedAt: stored.verifiedAt,
       eventId: String(event.insertId),
     };
-  });
+  // PRODUCTO serializes first attestations of the same product. READ COMMITTED
+  // avoids gap locks for missing evidence on unrelated products.
+  }, { isolation: 'READ COMMITTED', lockWaitSeconds: 5 });
 
   if (!verified.ok) return verified;
   const estadoFer17 = await readFer17State(productId);

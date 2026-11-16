@@ -2,6 +2,8 @@ require('./helpers/integration-lifecycle.cjs');
 const { test, describe, before, after } = require('node:test');
 const assert = require('node:assert/strict');
 const { once } = require('node:events');
+const { randomUUID } = require('node:crypto');
+const { setTimeout: delay } = require('node:timers/promises');
 const { spawnSync } = require('node:child_process');
 const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const { createAuthUser } = require('./helpers/auth-user.cjs');
@@ -28,8 +30,7 @@ let client;
 let categoryId;
 let productId;
 
-const api = async (method, route, body, cookie) => {
-  const headers = {};
+const api = async (method, route, body, cookie, headers = {}) => {
   if (cookie) headers.Cookie = cookie;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   return fetch(`${baseUrl}${route}`, {
@@ -71,6 +72,35 @@ const rejectCode = code => error => {
   assert.equal(error.code, code);
   return true;
 };
+
+function instrumentQueries(intercept) {
+  const original = dataSource.createQueryRunner;
+  dataSource.createQueryRunner = function (...args) {
+    const runner = original.apply(this, args);
+    const query = runner.query.bind(runner);
+    runner.query = (sql, ...params) => intercept(runner, () => query(sql, ...params), sql, params[0]);
+    return runner;
+  };
+  return () => { dataSource.createQueryRunner = original; };
+}
+
+async function waitFor(description, predicate) {
+  const deadline = Date.now() + 3000;
+  do {
+    if (await predicate()) return;
+    await delay(20);
+  } while (Date.now() < deadline);
+  assert.fail(`No se observó a tiempo: ${description}`);
+}
+
+async function lockWait(waiter, holder) {
+  const [row] = await pool.query(`SELECT 1 AS waiting
+    FROM information_schema.INNODB_LOCK_WAITS w
+    JOIN information_schema.INNODB_TRX r ON r.trx_id = w.requesting_trx_id
+    JOIN information_schema.INNODB_TRX b ON b.trx_id = w.blocking_trx_id
+    WHERE r.trx_mysql_thread_id = ? AND b.trx_mysql_thread_id = ?`, [waiter, holder]);
+  return row?.waiting === 1;
+}
 
 describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
   before(async () => {
@@ -240,6 +270,8 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
       rejectCode('ACTOR_NO_AUTORIZADO'));
     await assert.rejects(verify(productId, '100.12', `Factura FER-320-E-${RUN_ID}`, 2147483647),
       rejectCode('ACTOR_NO_AUTORIZADO'));
+    await assert.rejects(verify(2147483647, '100.12', `Factura FER-320-E-${RUN_ID}`, client.id),
+      rejectCode('ACTOR_NO_AUTORIZADO'));
     assert.equal((await evidenceRow(productId)).valida, 1);
   });
 
@@ -275,6 +307,108 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     assert.equal(history.filter(event =>
       event.tipo === 'VERIFICACION' && event.evidencia === evidence).length, 2);
     assert.equal((await priceLine(productId)).estadoPrecio, 'DEFINIDO');
+  });
+
+  test('Checkout CC y verificación contienden por el mismo producto con el mismo operador de evidencia', { timeout: 15000 }, async () => {
+    const id = await createProduct(`FER320-CHECKOUT-${RUN_ID}`, 25);
+    const buyer = await createAuthUser(pool, 'CLIENTE');
+    await pool.query(`UPDATE CLIENTE SET tipo_cliente='EMPRESA', estado_aprobacion_empresa='APROBADA'
+      WHERE id_cliente=?`, [buyer.clientId]);
+    await pool.query(`INSERT INTO CUENTA_CORRIENTE
+      (id_cliente,limite_credito,habilitada,cobertura,plazo_dias,moneda_limite,
+       evidencia_limite,evidencia_plazo,evidencia_cobertura,cobertura_desde_utc,origen_datos)
+      VALUES (?,1000,1,'COMPLETA',30,'USD','Crédito 1','Acuerdo 2','Extracto 3',
+        UTC_TIMESTAMP(3) - INTERVAL 1 DAY,'DEMO')`, [buyer.clientId]);
+    const cart = await pool.query('INSERT INTO CARRITO(id_cliente) VALUES (?)', [buyer.clientId]);
+    await pool.query('INSERT INTO ITEM_CARRITO(id_carrito,id_producto,cantidad) VALUES (?,?,2)',
+      [Number(cart.insertId), id]);
+    assert.equal((await verify(id, '25.00', 'Factura Andes 001-240, revisión original')).ok, true);
+    const eligibility = await api('GET', '/api/pedidos/cuenta-corriente/eligibilidad', undefined, buyer.cookie);
+    assert.equal(eligibility.status, 200);
+    const quote = (await eligibility.json()).data.cotizacion;
+    assert.ok(quote);
+
+    let checkoutThread, verificationThread;
+    const gate = Promise.withResolvers();
+    const restore = instrumentQueries(async (runner, query, sql, params) => {
+      if (params?.[0] === id && /SELECT id_admin AS adminId/.test(sql)) {
+        const result = await query();
+        checkoutThread = (await runner.connect()).threadId;
+        await gate.promise; // Checkout holds PRODUCTO and evidence, and has not read the ADMIN yet.
+        return result;
+      }
+      if (params?.[0] === id && /SELECT id_producto,precio,activo FROM PRODUCTO/.test(sql)) {
+        verificationThread = (await runner.connect()).threadId;
+      }
+      return query();
+    });
+    const checkout = api('POST', '/api/pedidos/cuenta-corriente', { cotizacion: quote },
+      buyer.cookie, { 'Idempotency-Key': randomUUID() });
+    checkout.catch(() => {});
+    const reference = 'Factura Andes 001-240, revisión independiente';
+    let verification;
+    try {
+      await waitFor('checkout con los bloqueos previos al ADMIN', () => checkoutThread);
+      verification = verify(id, '25.00', reference);
+      verification.catch(() => {});
+      await waitFor('espera real de InnoDB por el producto', () =>
+        verificationThread && lockWait(verificationThread, checkoutThread));
+      gate.resolve();
+      const [response, verified] = await Promise.all([checkout, verification]);
+      const body = await response.json();
+      assert.equal(response.status, 201, JSON.stringify(body));
+      assert.equal(verified.ok, true);
+      assert.equal(body.data.totalUSD, '50.00');
+      const [order] = await pool.query('SELECT total,modalidad_pago FROM PEDIDO WHERE id_pedido=?', [body.data.pedidoId]);
+      assert.equal(order.total, '50.00');
+      assert.equal(order.modalidad_pago, 'CUENTA_CORRIENTE');
+      const [product] = await pool.query('SELECT stock FROM PRODUCTO WHERE id_producto=?', [id]);
+      assert.equal(product.stock, 8);
+      assert.equal((await evidenceRow(id)).evidencia, reference);
+      assert.equal((await evidenceRow(id)).id_admin, admin.id);
+      const history = await listPriceHistory(id);
+      assert.deepEqual(history.map(event => event.tipo), ['VERIFICACION', 'VERIFICACION', 'ALTA']);
+      assert.equal(history[0].evidenciaAnterior, 'Factura Andes 001-240, revisión original');
+    } finally {
+      gate.resolve();
+      await Promise.allSettled([checkout, verification]);
+      restore();
+    }
+  });
+
+  test('El mismo ADMIN puede verificar dos productos todavía sin evidencia al mismo tiempo', { timeout: 15000 }, async () => {
+    const first = await createProduct(`FER320-PAR-A-${RUN_ID}`, 22);
+    const second = await createProduct(`FER320-PAR-B-${RUN_ID}`, 33);
+    const threads = new Set();
+    const gate = Promise.withResolvers();
+    const restore = instrumentQueries(async (runner, query, sql, params) => {
+      if ([first, second].includes(params?.[0]) && /INSERT INTO PRECIO_USD_EVIDENCIA/.test(sql)) {
+        threads.add((await runner.connect()).threadId);
+        await gate.promise;
+      }
+      return query();
+    });
+    const pending = [
+      verify(first, '22.00', 'Factura Sur 001-101, folio 2'),
+      verify(second, '33.00', 'Factura Sur 001-102, folio 3'),
+    ];
+    pending.forEach(work => work.catch(() => {}));
+    try {
+      await waitFor('dos transacciones con el mismo ADMIN bloqueado en lectura', () => threads.size === 2);
+      gate.resolve();
+      assert.ok((await Promise.all(pending)).every(result => result.ok));
+      for (const [id, price] of [[first, '22.00'], [second, '33.00']]) {
+        const row = await evidenceRow(id);
+        assert.equal(row.id_admin, admin.id);
+        assert.equal(row.valida, 1);
+        assert.equal(row.precio_verificado, price);
+        assert.deepEqual((await listPriceHistory(id)).map(event => event.tipo), ['VERIFICACION', 'ALTA']);
+      }
+    } finally {
+      gate.resolve();
+      await Promise.allSettled(pending);
+      restore();
+    }
   });
 
   test('14. Concurrencia precio/verificación: no se aprueba un importe ya modificado', async () => {
