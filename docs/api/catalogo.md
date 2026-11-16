@@ -1,4 +1,4 @@
-# Catálogo público — FER-12 (#189, #190) y FER-13 (#193, #194)
+# Catálogo público — FER-12 (#189, #190), FER-13 (#193, #194) y ordenamiento (#349)
 
 ## Detalle público — FER-23 (#272)
 
@@ -39,6 +39,8 @@ GET /api/catalogo?categoria=2&page=1&limit=20
 GET /api/catalogo?busqueda=taladro&page=1&limit=20
 GET /api/catalogo?busqueda=T-7
 GET /api/catalogo?busqueda=taladro&categoria=2&page=1&limit=20
+GET /api/catalogo?orden=nombre_asc&page=1&limit=20
+GET /api/catalogo?orden=nombre_desc&categoria=2&page=1&limit=20
 ```
 
 | Parámetro | Predeterminado | Valores aceptados |
@@ -47,6 +49,7 @@ GET /api/catalogo?busqueda=taladro&categoria=2&page=1&limit=20
 | limit | 20 | Entero de 1 a 100 |
 | categoria | Sin filtro | ID entero de 1 a 2147483647 (INT con signo de MariaDB) |
 | busqueda | Sin búsqueda | Una cadena no vacía de hasta 200 puntos de código Unicode antes de trim |
+| orden | predeterminado | `predeterminado`, `nombre_asc` o `nombre_desc` |
 
 page, limit y categoria se aceptan únicamente como cadenas de dígitos decimales positivos, sin
 ceros iniciales. Se rechazan vacíos, negativos, fracciones, exponentes, espacios,
@@ -58,7 +61,7 @@ no incluye subcategorías. Sin categoría ni búsqueda se conserva el catálogo 
 Una categoría inexistente, inactiva, sin productos o con solo productos inactivos
 devuelve 200 con lista vacía, total y totalPages en 0, hasNext y hasPrevious en false.
 Se conservan el page solicitado y el limit, incluso en resultados vacíos.
-Los máximos son límites operativos, no reglas de negocio. No hay orden configurable.
+Los máximos son límites operativos, no reglas de negocio.
 
 ### Búsqueda por nombre o código (#193)
 
@@ -92,6 +95,42 @@ validaciones individuales; la combinación válida ya no es motivo de 400.
 Sin `busqueda` se conserva el comportamiento anterior. Sin coincidencias responde
 **200**, con productos `[]`, total y totalPages en 0 y ambos indicadores en false;
 se conservan page y limit. Un producto que coincide en ambos campos aparece una vez.
+
+### Ordenamiento configurable (#349)
+
+`orden` es opcional. Si se omite, se aplica el orden predeterminado histórico:
+`p.id_producto ASC`. Los únicos valores aceptados son:
+
+| `orden` | Cláusula interna | Resultado |
+| --- | --- | --- |
+| `predeterminado` | `p.id_producto ASC` | Equivalente a omitir el parámetro |
+| `nombre_asc` | `p.nombre ASC, p.id_producto ASC` | Alfabético ascendente |
+| `nombre_desc` | `p.nombre DESC, p.id_producto ASC` | Alfabético descendente |
+
+La comparación alfabética usa la collation de `PRODUCTO.nombre`
+(`utf8mb4_unicode_ci`), la misma que la búsqueda: no distingue mayúsculas ni
+acentos. Ante nombres equivalentes, **ambos** órdenes alfabéticos desempatan por
+`p.id_producto ASC`; el orden descendente no invierte el desempate. Esto mantiene
+la paginación determinista y evita duplicados u omisiones entre páginas cuando
+hay nombres repetidos.
+
+Los valores son exactos y sensibles a mayúsculas: `NOMBRE_ASC`, `nombre-asc`,
+`precio_asc`, `id_asc`, vacíos, espacios o valores repetidos
+(`orden=nombre_asc&orden=nombre_desc`) devuelven **400**. No hay alias `sort`,
+`order` ni `orderBy`; son parámetros desconocidos. El valor se valida contra una
+lista blanca y el repositorio solo interpola una cláusula interna constante en
+`ORDER BY`; nunca se concatena el texto recibido.
+
+El orden se combina con `categoria`, `busqueda`, page y limit sin cambiar sus
+validaciones ni el predicado de COUNT. El total y totalPages son independientes
+del orden; dentro de cada página cambia únicamente la secuencia de productos.
+Productos o categorías inactivos siguen excluidos. Un catálogo vacío devuelve
+200 con `productos: []` y los mismos metadatos, cualquiera sea `orden`.
+
+No se implementa orden por precio: los precios públicos y personalizados
+provienen de FER-17 y su contrato debe resolverse antes de exponer un criterio
+comercial. La interfaz «Ordenar por» corresponde a #350 y no forma parte de este
+contrato.
 
 ## Response 200
 
@@ -129,8 +168,11 @@ categoria contiene exclusivamente id y nombre; disponible es booleano.
 Se mapean explícitamente estos campos; no se exponen columnas adicionales,
 descripciones, flags internos, fechas, cantidades, precios almacenados ni datos de clientes.
 
-Orden estable: `PRODUCTO.id_producto ASC`. `total` cuenta únicamente productos
-elegibles para la búsqueda, categoría o intersección solicitada, o todo el catálogo sin filtros;
+Orden estable: sin `orden`, o con `orden=predeterminado`, se mantiene
+`PRODUCTO.id_producto ASC`. Con `nombre_asc` o `nombre_desc` se ordena por
+`PRODUCTO.nombre` y se desempata por `id_producto ASC`. `total` cuenta únicamente
+productos elegibles para la búsqueda, categoría o intersección solicitada, o todo
+el catálogo sin filtros;
 `totalPages = ceil(total / limit)`. `hasNext = page < totalPages`.
 `hasPrevious = page > 1 && page - 1 <= totalPages` indica que la página
 inmediatamente anterior existe entre 1 y totalPages. En la página 1 es false;
@@ -157,7 +199,7 @@ Ambos casos responden 200, no 404 ni 204. El GET no necesita body.
 
 | HTTP | Situación | Respuesta |
 | --- | --- | --- |
-| 400 | Query inválida | `{"message":"Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. No se admiten parámetros desconocidos ni repetidos."}` |
+| 400 | Query inválida | `{"message":"Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. orden debe ser predeterminado, nombre_asc o nombre_desc. No se admiten parámetros desconocidos ni repetidos."}` |
 | 500 | Fallo interno, incluido error de BD | `{"message":"Error interno del servidor."}` |
 
 Los errores del driver no determinan el HTTP ni se exponen en el body o log del
@@ -180,7 +222,10 @@ Para búsqueda se agrega `(p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE 
 a ambas consultas, con el mismo patrón parametrizado `%texto_escapado%` dos veces.
 El OR está agrupado para mantener ambas reglas de actividad. La búsqueda con `%`
 inicial puede requerir recorrer filas; no se promete uso de índices ni rendimiento
-medido para catálogos grandes. Se mantienen snapshot y orden por ID.
+medido para catálogos grandes. Se mantienen snapshot y orden estable por ID por
+defecto. Con `nombre_asc` o `nombre_desc` cambia solo la cláusula `ORDER BY`, que
+se selecciona de un mapa interno de constantes; el valor de `orden` no se concatena
+en SQL. Ambas modalidades alfabéticas agregan `p.id_producto ASC` como desempate.
 Las dos consultas de datos tienen timeout de 5 segundos. Se hace commit antes
 de devolver el resultado y se libera la conexión. Ante errores se intenta rollback
 y se destruye la conexión para no reutilizar una sesión incierta.
@@ -197,8 +242,8 @@ Desde `backend/`, con dependencias instaladas:
 ```powershell
 npm.cmd run build
 node --test test/catalog.test.cjs
-$env:CATALOG_TEST_DATABASE = 'ferrepatagonia_dev'
-node --test test/catalog.integration.test.cjs
+# Integración real en un contenedor MariaDB desechable, sin .env ni base local:
+node test/helpers/run-admin-products-mariadb.cjs test/catalog.integration.test.cjs
 # Todas las suites, incluidas las cuatro integraciones (base local de desarrollo):
 $env:AUTH_ME_TEST_DATABASE = 'ferrepatagonia_dev'
 $env:CLIENTES_TEST_DATABASE = 'ferrepatagonia_dev'
@@ -206,14 +251,18 @@ $env:REGISTER_TEST_DATABASE = 'ferrepatagonia_dev'
 node --test --test-concurrency=1 test/*.test.cjs
 ```
 
-La integración requiere esquema existente, configuración `.env` y coincidencia
-entre CATALOG_TEST_DATABASE y DB_NAME. Sin esa variable se omite. Usar desarrollo,
-nunca producción. Inserta fixtures identificados, elimina solamente sus IDs al
-terminar y puede avanzar AUTO_INCREMENT. No borra ni cambia productos existentes.
+La integración aislada crea una base con el esquema real, ejecuta el test y
+destruye el contenedor. También puede ejecutarse con `CATALOG_TEST_DATABASE` y
+`DB_NAME` apuntando a una base descartable ya preparada; sin esa variable el test
+se omite. Nunca usar producción. Inserta fixtures identificados, elimina solamente
+sus IDs al terminar y puede avanzar AUTO_INCREMENT. No borra ni cambia productos
+existentes.
 Incluye HTTP real, paginación completa contra un oráculo independiente, estados
 de producto/categoría, stock cero y una escritura concurrente entre COUNT y SELECT.
 También cubre paginación de una categoría con exclusión de otras, categoría inactiva,
 vacía, con solo productos inactivos e inexistente; defaults e inputs inválidos.
+El ordenamiento se contrasta con consultas reales `ORDER BY` sobre MariaDB aislada,
+incluidos empates, navegación de todas las páginas y filtros combinados.
 La escritura concurrente se prueba sin filtros, con cada filtro y con ambos.
 Verifica página 1, última, totalPages+1, totalPages+2 y 1000000. El caso vacío
 usa tablas temporales en una conexión dedicada, sin alterar tablas existentes;
@@ -232,6 +281,12 @@ literales, comillas/inyección, búsqueda vacía, páginas fuera de rango, inact
 metadatos y tipos inválidos. #194 agrega combinación válida, paginación y vacíos
 con categorías activas, inactivas, vacías, inexistentes o con solo productos inactivos;
 exclusión de coincidencias por nombre/código de otra categoría, literales e inyección.
+#349 agrega orden predeterminado omitido y explícito, `nombre_asc`, `nombre_desc`,
+empates de nombre con desempate por ID, paginación estable, combinación con
+búsqueda y categoría, catálogo vacío, inactivos, consistencia de total/páginas y
+rechazo de valores vacíos, desconocidos, con mayúsculas o repetidos. Las pruebas
+de repositorio verifican que cada valor produce únicamente la cláusula interna
+esperada y que un valor no reconocido no se interpola.
 
 ## Prueba manual
 
@@ -250,13 +305,20 @@ curl.exe -i 'http://localhost:3000/api/catalogo?categoria=1&page=2&limit=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?categoria=0'
 curl.exe -i 'http://localhost:3000/api/catalogo?busqueda=taladro&categoria=2&page=1&limit=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?busqueda=taladro&categoria=0'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=nombre_asc&page=1&limit=2'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=nombre_desc&page=1&limit=2'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=predeterminado&page=1&limit=2'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=precio_asc'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=nombre_asc&orden=nombre_desc'
 curl.exe -i -H 'Cookie: jwt_token=invalido' 'http://localhost:3000/api/catalogo'
 curl.exe -i 'http://localhost:3000/api/health'
 ```
 
 Esperar 200 en consultas válidas, incluso con página vacía o cookie inválida;
-400 en inputs inválidos o parámetros no admitidos. Verificar orden ascendente de IDs,
-metadatos, ausencia de duplicados con datos estables, precio nulo y ausencia de moneda/stock.
+400 en inputs inválidos o parámetros no admitidos. Sin `orden` verificar orden
+ascendente de IDs; con `nombre_asc`/`nombre_desc`, orden alfabético y desempate
+por ID ascendente ante nombres iguales. Comprobar metadatos, ausencia de duplicados
+con datos estables, precio nulo y ausencia de moneda/stock.
 Para estados activo/inactivo y concurrencia usar la integración automatizada,
 que prepara y limpia sus propios datos. Si el catálogo superase 99999900 productos,
 la request de página 1000000 y limit 100 podría tener resultados válidos.
