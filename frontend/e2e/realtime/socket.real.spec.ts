@@ -410,7 +410,7 @@ test('historial invalida solo las lecturas activas y descarta respuestas de otra
     await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
     await expect(page).toHaveURL(/\/login$/)
     await submitLogin(page, 'cliente-nuevo@e2e.test', 'E2eLocal-214!')
-    await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+    await expect(page).toHaveURL(/\/mi-cuenta$/)
     await historyLink.click()
     await expect(page.getByText('Todavía no tenés pedidos.')).toBeVisible()
     releaseDetail.resolve()
