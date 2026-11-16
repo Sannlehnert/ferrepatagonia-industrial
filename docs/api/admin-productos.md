@@ -75,6 +75,14 @@ debe ser booleano estricto; al crear, el valor predeterminado es activo.
 Actualización admite cualquier subconjunto no vacío de esos campos. Campos
 desconocidos, tipos inválidos y body que no sea un objeto se rechazan.
 
+`precio` es el importe base USD que consume FER-17. Un alta no crea evidencia
+comercial. Modificar realmente el importe invalida la evidencia vigente dentro de
+la misma transacción y registra el cambio en `FER17_PRECIO_EVENTO`; cambiar solo
+nombre, descripción, stock, imagen, categoría o estado no invalida la evidencia.
+La verificación posterior se realiza con el procedimiento local autorizado
+documentado en [T-S7-05.2](../s7-05/T-S7-05.2-verificacion-precios.md), no con un
+endpoint HTTP de evidencias.
+
 Ejemplo de ajuste parcial:
 
 ```json

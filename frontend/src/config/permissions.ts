@@ -49,8 +49,6 @@ export function getPermissionsForRole(
 export interface MenuUser {
     rol: Role
     tipoCliente: 'PARTICULAR' | 'EMPRESA' | null
-    estadoAprobacionEmpresa?: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'
-    cuentaCorrienteHabilitada?: boolean
 }
 
 export function getPermissionsForUser(
@@ -60,22 +58,12 @@ export function getPermissionsForUser(
         getPermissionsForRole(user?.rol ?? null),
     )
 
-    // La empresa conserva el historial aunque pierda la habilitación.
+    // Consultar la cuenta y su historial no autoriza compras a crédito.
     if (
         user?.rol === 'CLIENTE' &&
         user.tipoCliente === 'EMPRESA'
     ) {
         permissions.add(PERMISSIONS.VIEW_OWN_CREDIT_ORDERS)
-    }
-
-    // La habilitación comercial debe provenir del backend.
-    // Si todavía no se recibió, no se concede este permiso.
-    if (
-        user?.rol === 'CLIENTE' &&
-        user.tipoCliente === 'EMPRESA' &&
-        user.estadoAprobacionEmpresa === 'APROBADA' &&
-        user.cuentaCorrienteHabilitada === true
-    ) {
         permissions.add(PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT)
     }
 

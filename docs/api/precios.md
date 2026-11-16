@@ -102,6 +102,10 @@ Solicitudes repetidas o simultáneas no producen duplicaciones diarias innecesar
 La evidencia USD está vinculada al importe exacto actual, un ADMIN y un instante
 no futuro. Cambiar el precio invalida esa evidencia hasta nueva revisión. No hay
 evidencia global de dataset que habilite importes arbitrarios por configuración.
+El procedimiento local autorizado para verificar un alta o una edición, con
+historial append-only y rechazos auditados, está en
+[T-S7-05.2](../s7-05/T-S7-05.2-verificacion-precios.md). No existe endpoint HTTP
+para escribir evidencias.
 
 ARS exige calendario activo/verificado/versionado con cobertura explícita de cada
 fecha recorrida. Nunca presume feriados. Referencia = mayor hábil estrictamente

@@ -7,7 +7,7 @@ const { signToken } = require('../../dist/services/token.service');
 // disposable runners, and never expose fixture credentials in test diagnostics.
 exports.createAuthUser = async (pool, rol = 'ADMIN') => {
   const [identity] = await pool.query('SELECT DATABASE() AS name');
-  assert.match(identity.name, /^(admin_products|categories)_test_[a-f0-9]{32}$/);
+  assert.match(identity.name, /^(admin_products|categories|price_verification)_test_[a-f0-9]{32}$/);
   assert.ok(['ADMIN', 'CLIENTE'].includes(rol));
   const email = `session-${randomUUID()}@example.test`;
   const password = randomBytes(24).toString('hex');

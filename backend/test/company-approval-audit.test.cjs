@@ -190,11 +190,23 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             await dataSource.initialize();
         }
 
-        const [tableCountRow] = await dataSource.query(`
-            SELECT COUNT(*) AS c FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = DATABASE()
+        const tables = await dataSource.query(`
+            SELECT TABLE_NAME FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+            ORDER BY TABLE_NAME
         `);
-        assert.equal(Number(tableCountRow.c), 21, 'La base aislada debe tener exactamente 21 tablas');
+        assert.deepEqual(
+            tables.map(row => row.TABLE_NAME),
+            [
+                'CARRITO', 'CATEGORIA', 'CLIENTE', 'COMPROBANTE_PAGO', 'CONFIRMACION_PEDIDO_CC',
+                'COTIZACION', 'CUENTA_CORRIENTE', 'DETALLE_PEDIDO', 'DETALLE_PEDIDO_CC_PRECIO',
+                'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION', 'FER17_LISTA_INACTIVA_EVENTO',
+                'FER17_PRECIO_EVENTO', 'IMPUTACION_MOVIMIENTO_CUENTA', 'ITEM_CARRITO', 'LISTA_PRECIO',
+                'MOVIMIENTO_CUENTA_CORRIENTE', 'PAGO', 'PEDIDO', 'PRECIO_USD_EVIDENCIA', 'PRODUCTO',
+                'USUARIO',
+            ],
+            'La base aislada debe tener exactamente las 22 tablas vigentes, incluida FER17_PRECIO_EVENTO',
+        );
 
         const triggers = await dataSource.query(`
             SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
@@ -311,6 +323,8 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             const meBody = await me.json();
             assert.equal(meBody.user.email, email);
             assert.equal(meBody.user.rol, 'CLIENTE');
+            assert.equal(meBody.user.estadoAprobacionEmpresa, 'PENDIENTE');
+            assert.equal(meBody.user.cuentaCorrienteHabilitada, null);
 
             for (const endpoint of ['/cuenta-corriente', '/cuenta-corriente/movimientos', '/cuenta-corriente/vencimientos']) {
                 const res = await apiRequest(endpoint, { token });
