@@ -74,7 +74,7 @@ test('producción no muestra crédito calculado con movimientos de demostración
       ? { estado: 'HABILITADA', estadoCredito: 'DISPONIBLE', origen: 'REAL', revision: 'r' }
       : { estado: 'HABILITADA', revision: 'r', items: [{ origen: 'DEMO' }] } } })
   })
-  await page.goto('/mi-cuenta/datos')
+  await page.goto('/mi-cuenta/cuenta-corriente')
   const status = page.getByRole('region', { name: 'Estado comercial' })
   await expect(status).toContainText('no se mostrará fuera del entorno de pruebas')
   await expect(status).not.toContainText('crédito está disponible')
