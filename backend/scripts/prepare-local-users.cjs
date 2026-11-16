@@ -6,7 +6,7 @@
 //
 // Reglas de seguridad:
 // - Solo NODE_ENV=development. Nunca test ni production.
-// - Identifica la base antes de escribir: exige exactamente las 21 tablas del
+// - Identifica la base antes de escribir: exige exactamente las 22 tablas del
 //   esquema vigente y los 3 triggers FER-20. Con una base anterior (por ejemplo
 //   14 tablas) aborta sin mutar nada.
 // - Nunca actualiza ni borra filas existentes: si el email ya tiene USUARIO lo
@@ -40,7 +40,7 @@ const EXPECTED_TABLES = new Set([
     'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
     'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
     'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
-    'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
+    'FER17_LISTA_INACTIVA_EVENTO', 'FER17_PRECIO_EVENTO', 'CARRITO', 'ITEM_CARRITO',
     'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
 ]);
 
@@ -306,7 +306,8 @@ async function main() {
         const loaded = loadCredentials(DB_NAME);
 
         const identity = await identifyDatabase(connection);
-        console.log(`Base: ${identity.base} (${identity.version}) en ${DB_HOST}:${DB_PORT}. Tablas: ${identity.tables.size}, triggers FER-20: ${identity.triggers.size}.`);
+        const fer20Count = [...EXPECTED_TRIGGERS].filter(t => identity.triggers.has(t)).length;
+        console.log(`Base: ${identity.base} (${identity.version}) en ${DB_HOST}:${DB_PORT}. Tablas: ${identity.tables.size}, triggers FER-20 requeridos: ${fer20Count}/${EXPECTED_TRIGGERS.size}.`);
         const schemaError = verifySchema(identity) ?? verifyTriggers(identity);
         if (schemaError) return fail(schemaError);
 

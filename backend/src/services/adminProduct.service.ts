@@ -43,7 +43,8 @@ function validateImageUrl(value: string | null | undefined, current?: string | n
     }
 }
 
-export const createAdminProduct = async (payload: CreateProductDTO, file?: Express.Multer.File) => {
+export const createAdminProduct = async (payload: CreateProductDTO, file?: Express.Multer.File,
+    actorId?: number | null) => {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new ValidationError('El cuerpo de la solicitud es obligatorio y debe ser un objeto JSON válido.');
     }
@@ -70,7 +71,7 @@ export const createAdminProduct = async (payload: CreateProductDTO, file?: Expre
 
         const insertId = await withProductImage(file, imagen => {
             if (imagen) normalizedPayload.imagen = imagen;
-            return create(normalizedPayload);
+            return create(normalizedPayload, actorId);
         });
 
         // Si el INSERT fue exitoso pero falla el SELECT posterior, devolvemos un fallback consistente con MariaDB
@@ -99,6 +100,7 @@ export const createAdminProduct = async (payload: CreateProductDTO, file?: Expre
 
 export const updateAdminProduct = async (
     id: number, payload: UpdateProductDTO, notify?: NotifyCommittedChange, file?: Express.Multer.File,
+    actorId?: number | null,
 ) => {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
         throw new ValidationError('El cuerpo de la solicitud es obligatorio y debe ser un objeto JSON válido.');
@@ -121,7 +123,7 @@ export const updateAdminProduct = async (
     if (normalizedPayload.imagen === existing.imagen) delete normalizedPayload.imagen;
     const result = await withProductImage(file, async imagen => {
         if (imagen) normalizedPayload.imagen = imagen;
-        const result = await update(id, normalizedPayload, notify);
+        const result = await update(id, normalizedPayload, notify, actorId);
         if (imagen && !result.updated) throw new ValidationError('Producto no encontrado.', 404);
         return result;
     });

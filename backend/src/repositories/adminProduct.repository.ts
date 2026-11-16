@@ -62,21 +62,30 @@ export const findByCodigo = async (codigo: string, excludeId?: number): Promise<
 export const categoryExists = (id_categoria: number): Promise<boolean> =>
     dataSource.getRepository(CategoriaSchema).existsBy({ id_categoria });
 
-export const create = async (data: CreateProductDTO): Promise<number> => {
-    const result = await inTransaction(manager => manager.getRepository(ProductoSchema).insert({
-        id_categoria: data.id_categoria,
-        codigo: data.codigo.trim(),
-        nombre: data.nombre.trim(),
-        descripcion: data.descripcion ?? null,
-        precio: String(data.precio),
-        stock: data.stock,
-        imagen: data.imagen ?? null,
-        activo: data.activo === undefined ? 1 : Number(data.activo),
-    }));
+export const create = async (data: CreateProductDTO, actorId?: number | null): Promise<number> => {
+    const result = await inTransaction(async manager => {
+        // The FER-17 trigger validates this id again against an active ADMIN.
+        await manager.query('SET @fer17_actor_id = ?', [actorId ?? null]);
+        try {
+            return await manager.getRepository(ProductoSchema).insert({
+                id_categoria: data.id_categoria,
+                codigo: data.codigo.trim(),
+                nombre: data.nombre.trim(),
+                descripcion: data.descripcion ?? null,
+                precio: String(data.precio),
+                stock: data.stock,
+                imagen: data.imagen ?? null,
+                activo: data.activo === undefined ? 1 : Number(data.activo),
+            });
+        } finally {
+            await manager.query('SET @fer17_actor_id = NULL').catch(() => undefined);
+        }
+    });
     return Number(result.identifiers[0].id_producto);
 };
 
-export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange) => {
+export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange,
+    actorId?: number | null) => {
     // Never spread HTTP input into an entity; ignored keys stay ignored.
     const values: Record<string, string | number | null> = {};
     for (const field of ['id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo'] as const) {
@@ -87,20 +96,26 @@ export const update = async (id: number, data: UpdateProductDTO, notify?: Notify
     }
     if (!Object.keys(values).length) return { updated: false, replacedImage: null };
     const { updated, stockChanged, replacedImage } = await inTransaction(async manager => {
-        // Compare under the same row lock as the update, including a PUT with other fields.
-        const [before] = data.imagen !== undefined || (notify && data.stock !== undefined)
-            ? await manager.query<{ stock: number; imagen: string | null }[]>(
-                'SELECT stock, imagen FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
-            )
-            : [];
-        const result = await manager.getRepository(ProductoSchema).update({ id_producto: id }, values);
-        const updated = (result.affected ?? 0) > 0;
-        return {
-            updated,
-            stockChanged: updated && before !== undefined && data.stock !== undefined && before.stock !== data.stock,
-            replacedImage: updated && before && data.imagen !== undefined && before.imagen !== data.imagen
-                ? before.imagen : null,
-        };
+        // The trigger reads this only inside this transaction and revalidates ADMIN.
+        await manager.query('SET @fer17_actor_id = ?', [actorId ?? null]);
+        try {
+            // Compare under the same row lock as the update, including a PUT with other fields.
+            const [before] = data.imagen !== undefined || data.precio !== undefined || (notify && data.stock !== undefined)
+                ? await manager.query<{ stock: number; imagen: string | null }[]>(
+                    'SELECT stock, imagen FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
+                )
+                : [];
+            const result = await manager.getRepository(ProductoSchema).update({ id_producto: id }, values);
+            const updated = (result.affected ?? 0) > 0;
+            return {
+                updated,
+                stockChanged: updated && before !== undefined && data.stock !== undefined && before.stock !== data.stock,
+                replacedImage: updated && before && data.imagen !== undefined && before.imagen !== data.imagen
+                    ? before.imagen : null,
+            };
+        } finally {
+            await manager.query('SET @fer17_actor_id = NULL').catch(() => undefined);
+        }
     });
     if (stockChanged) notifyAfterCommit(notify, { kind: 'stock', productIds: [id] });
     return { updated, replacedImage };

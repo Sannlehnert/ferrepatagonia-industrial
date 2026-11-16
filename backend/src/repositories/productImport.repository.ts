@@ -264,13 +264,17 @@ const isDuplicateEntryError = (error: any): boolean =>
 
 export const insertImportedProductsBatch = async (
     rows: InsertProductRowInput[],
-    previewToken?: string
+    previewToken?: string,
+    actorId?: number | string | null
 ): Promise<{
     outcomes: Map<number, InsertProductRowResult>;
     uncertainRowNumbers: Set<number>;
 }> => {
     const outcomes = new Map<number, InsertProductRowResult>();
     const uncertainRowNumbers = new Set<number>();
+    const numericActor = Number(actorId);
+    const auditActor = Number.isSafeInteger(numericActor) && numericActor > 0 && numericActor <= 2147483647
+        ? numericActor : null;
 
     if (rows.length === 0) {
         return { outcomes, uncertainRowNumbers };
@@ -295,86 +299,91 @@ export const insertImportedProductsBatch = async (
 
     try {
         await dataSource.transaction(async (manager) => {
-            // H05: Revalidación protegida de categorías con LOCK IN SHARE MODE
-            const uniqueCategoryIds = Array.from(new Set(rows.map((r) => r.id_categoria)));
-            const activeCategoryRows = await manager.query(
-                `SELECT id_categoria FROM CATEGORIA WHERE id_categoria IN (${uniqueCategoryIds.map(() => '?').join(',')}) AND activo = 1 LOCK IN SHARE MODE`,
-                uniqueCategoryIds
-            );
-            const activeCategoryIds = new Set<number>(
-                activeCategoryRows.map((r: any) => Number(r.id_categoria))
-            );
+            await manager.query('SET @fer17_actor_id = ?', [auditActor]);
+            try {
+                // H05: Revalidación protegida de categorías con LOCK IN SHARE MODE
+                const uniqueCategoryIds = Array.from(new Set(rows.map((r) => r.id_categoria)));
+                const activeCategoryRows = await manager.query(
+                    `SELECT id_categoria FROM CATEGORIA WHERE id_categoria IN (${uniqueCategoryIds.map(() => '?').join(',')}) AND activo = 1 LOCK IN SHARE MODE`,
+                    uniqueCategoryIds
+                );
+                const activeCategoryIds = new Set<number>(
+                    activeCategoryRows.map((r: any) => Number(r.id_categoria))
+                );
 
-            for (let idx = 0; idx < rows.length; idx++) {
-                const row = rows[idx];
-                const rowNumber = row.rowNumber ?? idx + 1;
+                for (let idx = 0; idx < rows.length; idx++) {
+                    const row = rows[idx];
+                    const rowNumber = row.rowNumber ?? idx + 1;
 
-                if (!activeCategoryIds.has(row.id_categoria)) {
-                    provisionalOutcomes.set(rowNumber, {
-                        success: false,
-                        codigo: row.codigo,
-                        nombre: row.nombre,
-                        error: `La categoría con ID ${row.id_categoria} no existe o no se encuentra activa.`,
-                        isCategoryInactive: true
-                    });
-                    continue;
-                }
-
-                const rawPrice = row.precio_base_usd !== undefined ? row.precio_base_usd : row.precio;
-                const exactPrice = resolveExactDecimalOrNull(rawPrice);
-                const exactDiscount = resolveExactDecimalOrNull(row.descuento_especial_pct);
-
-                try {
-                    const insertResult = await manager.query(
-                        `INSERT INTO PRODUCTO (
-                            codigo, nombre, descripcion, precio, descuento_especial_pct,
-                            stock, id_categoria, imagen, activo
-                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                        [
-                            row.codigo.trim(),
-                            row.nombre.trim(),
-                            row.descripcion ? row.descripcion.trim() : null,
-                            exactPrice,
-                            exactDiscount,
-                            row.stock,
-                            row.id_categoria,
-                            row.imagen ? row.imagen.trim() : null,
-                            row.activo === undefined ? 1 : Number(Boolean(row.activo))
-                        ]
-                    );
-
-                    const generatedId =
-                        insertResult?.insertId !== undefined
-                            ? Number(insertResult.insertId)
-                            : insertResult?.identifiers?.[0]?.id_producto;
-
-                    const validId =
-                        typeof generatedId === 'number' && generatedId > 0 ? generatedId : undefined;
-
-                    // H04: Vincular el alta al lote dentro de la misma transacción
-                    if (previewToken && validId) {
-                        recordBatchProvisionalProductLink(previewToken, row.codigo, validId);
-                    }
-
-                    provisionalOutcomes.set(rowNumber, {
-                        success: true,
-                        id_producto: validId,
-                        codigo: row.codigo,
-                        nombre: row.nombre
-                    });
-                } catch (rowError: any) {
-                    if (isDuplicateEntryError(rowError)) {
+                    if (!activeCategoryIds.has(row.id_categoria)) {
                         provisionalOutcomes.set(rowNumber, {
                             success: false,
                             codigo: row.codigo,
                             nombre: row.nombre,
-                            error: 'El SKU ya existe en el catálogo',
-                            isDuplicateConflict: true
+                            error: `La categoría con ID ${row.id_categoria} no existe o no se encuentra activa.`,
+                            isCategoryInactive: true
                         });
-                    } else {
-                        throw rowError;
+                        continue;
+                    }
+
+                    const rawPrice = row.precio_base_usd !== undefined ? row.precio_base_usd : row.precio;
+                    const exactPrice = resolveExactDecimalOrNull(rawPrice);
+                    const exactDiscount = resolveExactDecimalOrNull(row.descuento_especial_pct);
+
+                    try {
+                        const insertResult = await manager.query(
+                            `INSERT INTO PRODUCTO (
+                                codigo, nombre, descripcion, precio, descuento_especial_pct,
+                                stock, id_categoria, imagen, activo
+                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                            [
+                                row.codigo.trim(),
+                                row.nombre.trim(),
+                                row.descripcion ? row.descripcion.trim() : null,
+                                exactPrice,
+                                exactDiscount,
+                                row.stock,
+                                row.id_categoria,
+                                row.imagen ? row.imagen.trim() : null,
+                                row.activo === undefined ? 1 : Number(Boolean(row.activo))
+                            ]
+                        );
+
+                        const generatedId =
+                            insertResult?.insertId !== undefined
+                                ? Number(insertResult.insertId)
+                                : insertResult?.identifiers?.[0]?.id_producto;
+
+                        const validId =
+                            typeof generatedId === 'number' && generatedId > 0 ? generatedId : undefined;
+
+                        // H04: Vincular el alta al lote dentro de la misma transacción
+                        if (previewToken && validId) {
+                            recordBatchProvisionalProductLink(previewToken, row.codigo, validId);
+                        }
+
+                        provisionalOutcomes.set(rowNumber, {
+                            success: true,
+                            id_producto: validId,
+                            codigo: row.codigo,
+                            nombre: row.nombre
+                        });
+                    } catch (rowError: any) {
+                        if (isDuplicateEntryError(rowError)) {
+                            provisionalOutcomes.set(rowNumber, {
+                                success: false,
+                                codigo: row.codigo,
+                                nombre: row.nombre,
+                                error: 'El SKU ya existe en el catálogo',
+                                isDuplicateConflict: true
+                            });
+                        } else {
+                            throw rowError;
+                        }
                     }
                 }
+            } finally {
+                await manager.query('SET @fer17_actor_id = NULL').catch(() => undefined);
             }
         });
 
