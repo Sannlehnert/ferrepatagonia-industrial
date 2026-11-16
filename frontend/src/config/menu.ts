@@ -34,7 +34,7 @@ export const accountMenu: readonly MenuItem[] = [
         id: 'account-credit',
         label: 'Cuenta corriente',
         routeName: 'cuenta-corriente',
-        permission: PERMISSIONS.VIEW_OWN_ACCOUNT,
+        permission: PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT,
     },
     {
         id: 'account-details',

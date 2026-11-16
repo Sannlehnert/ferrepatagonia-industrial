@@ -42,6 +42,8 @@ export async function lockAccountOrderPriceInputs(
     `, [owner.listId]);
   }
 
+  // El carrito ya tomó PRODUCTO FOR UPDATE. Mantener el orden compartido
+  // con la verificación: producto -> evidencia -> operador de la evidencia.
   const adminIds = new Set<number>();
 
   for (const id of [...new Set(productIds)].sort((a, b) => a - b)) {

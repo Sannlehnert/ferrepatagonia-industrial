@@ -32,14 +32,21 @@ async function main() {
     if (!connection) throw Error('MariaDB desechable no disponible');
     const schema = fs.readFileSync(path.join(backend, '../database/schema.sql'), 'utf8');
     for (const statement of schema.split(';').filter(s => s.trim())) await connection.query(statement);
+    const verificationMigration = fs.readFileSync(
+      path.join(backend, '../database/migrate-fer-17-price-verification.sql'), 'utf8');
+    const applyMigration = statement => execFileSync('docker',
+      ['exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, database],
+      { input: statement, stdio: 'pipe', timeout: 60000 });
+    applyMigration(verificationMigration);
     console.log(JSON.stringify({ database, port, version: await connection.query('SELECT VERSION() AS version'), image: info.Image }));
     const fingerprint = async () => {
-      const tables = await connection.query('SHOW TABLES');
+      const objects = await connection.query(`SELECT TABLE_NAME AS name, TABLE_TYPE AS type
+        FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()`);
       const definitions = [];
-      for (const row of tables) {
-        const table = Object.values(row)[0];
-        const [ddl] = await connection.query('SHOW CREATE TABLE ' + table);
-        definitions.push(ddl['Create Table'].replace(/AUTO_INCREMENT=\d+ /g, ''));
+      for (const { name, type } of objects) {
+        const identifier = '`' + name.replaceAll('`', '``') + '`';
+        const [ddl] = await connection.query(`SHOW CREATE ${type === 'VIEW' ? 'VIEW' : 'TABLE'} ${identifier}`);
+        definitions.push(type === 'VIEW' ? ddl['Create View'] : ddl['Create Table'].replace(/AUTO_INCREMENT=\d+ /g, ''));
       }
       return require('node:crypto').createHash('sha256').update(definitions.sort().join('\n')).digest('hex');
     };

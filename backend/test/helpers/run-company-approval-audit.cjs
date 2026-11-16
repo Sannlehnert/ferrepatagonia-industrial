@@ -15,6 +15,17 @@ const labelKey = 'ferrepatagonia.s7-03-1-audit';
 const labelValue = token;
 const image = 'mariadb:11.4';
 
+// Inventario exacto de database/schema.sql. FER17_PRECIO_EVENTO es la extensión
+// legítima de #320; cualquier tabla faltante o adicional invalida la auditoría.
+const expectedTables = [
+    'CARRITO', 'CATEGORIA', 'CLIENTE', 'COMPROBANTE_PAGO', 'CONFIRMACION_PEDIDO_CC',
+    'COTIZACION', 'CUENTA_CORRIENTE', 'DETALLE_PEDIDO', 'DETALLE_PEDIDO_CC_PRECIO',
+    'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION', 'FER17_LISTA_INACTIVA_EVENTO',
+    'FER17_PRECIO_EVENTO', 'IMPUTACION_MOVIMIENTO_CUENTA', 'ITEM_CARRITO', 'LISTA_PRECIO',
+    'MOVIMIENTO_CUENTA_CORRIENTE', 'PAGO', 'PEDIDO', 'PRECIO_USD_EVIDENCIA', 'PRODUCTO',
+    'USUARIO',
+];
+
 // Permite ejecutar el runner tanto desde Linux/WSL (docker) como desde
 // Windows (docker.exe). Solo se acepta un motor con daemon disponible.
 function resolveDocker() {
@@ -114,11 +125,19 @@ async function main() {
         applySql(path.join(backend, '../database/schema.sql'));
         applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
 
-        const [tableCount] = await connection.query(`
-            SELECT COUNT(*) AS c FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = ?
+        const [identity] = await connection.query('SELECT DATABASE() AS base');
+        assert.equal(identity.base, database, 'La auditoría debe ejecutarse sobre la base aislada creada');
+
+        const tables = await connection.query(`
+            SELECT TABLE_NAME FROM information_schema.TABLES
+            WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'
+            ORDER BY TABLE_NAME
         `, [database]);
-        assert.equal(Number(tableCount.c), 21, 'El esquema aislado debe tener 21 tablas');
+        assert.deepEqual(
+            tables.map(row => row.TABLE_NAME),
+            expectedTables,
+            'El esquema aislado debe tener exactamente las 22 tablas vigentes, incluida FER17_PRECIO_EVENTO',
+        );
 
         const triggers = await connection.query(`
             SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
@@ -131,7 +150,7 @@ async function main() {
             'El esquema aislado debe tener los 3 triggers FER-20',
         );
 
-        console.log('[T-S7-03.1] Esquema verificado: 21 tablas y 3 triggers FER-20.');
+        console.log('[T-S7-03.1] Esquema verificado: 22 tablas y 3 triggers FER-20.');
         console.log('[T-S7-03.1] Ejecutando company-approval-audit.test.cjs...');
 
         const result = spawnSync(process.execPath, [

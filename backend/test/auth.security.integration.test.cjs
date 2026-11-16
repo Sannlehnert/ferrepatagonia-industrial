@@ -136,7 +136,7 @@ test('real login/me/logout preserve cookie flags, TTL, public JSON and no refres
     try {
       const login = await call({ method: 'POST', path: '/api/auth/login', body: { email: admin.email, password: admin.password } });
       assert.equal(login.status, 200);
-      assert.deepEqual(login.body, { message: 'Login exitoso', user: { id: admin.id, email: admin.email, rol: 'ADMIN', tipo_cliente: null, nombre: 'Administrador' } });
+      assert.deepEqual(login.body, { message: 'Login exitoso', user: { id: admin.id, email: admin.email, rol: 'ADMIN', tipo_cliente: null, nombre: 'Administrador', estadoAprobacionEmpresa: null, cuentaCorrienteHabilitada: null } });
       const set = login.headers.get('set-cookie');
       for (const pattern of [/HttpOnly/, /SameSite=Strict/, /Path=\//, /Max-Age=7200/]) assert.ok(pattern.test(set), 'Required cookie flag missing');
       assert.equal(/; Secure/i.test(set), mode === 'production'); assert.equal(/Domain=/i.test(set), false);
