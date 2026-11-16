@@ -63,13 +63,14 @@ registra `CAMBIO_PRECIO` e `INVALIDACION` en la misma transacción. El actor se
 toma de `@fer17_actor_id`, fijado por el backend, y se revalida como ADMIN activo.
 No convierte precios, no crea evidencia y no borra datos históricos.
 
-**Debe ejecutarse después de `schema.sql` y de `migrate-fer-17-pricing-evidence.sql`**
-en instalaciones nuevas y existentes. Reejecutarla no duplica triggers. Para
-rollback de código, conservar tabla y triggers.
+Requiere el esquema de evidencia FER-17. En una base nueva, `schema.sql` ya
+lo crea; en una base existente que aún no lo tiene, aplicar antes
+`migrate-fer-17-pricing-evidence.sql`. Reejecutar la migración de verificación
+no duplica triggers. Para revertir el código, conservar tabla, vista y triggers.
 
 ### `migrate-s7-09-1-credit-workflow.sql`
 
-Migración aditiva e idempotente de T-S7-09.1. Crea `SOLICITUD_CREDITO` y `EVENTO_CREDITO` sin instalar triggers, sin tocar movimientos, pagos, imputaciones ni vencimientos y sin convertir datos históricos. Ejecutarla después de `schema.sql` y de `migrate-fer-20-account-movements.sql`; es segura de repetir. En una instalación nueva `schema.sql` ya contiene las tablas, por lo que `CREATE TABLE IF NOT EXISTS` no modifica las tablas existentes.
+Migración aditiva e idempotente de T-S7-09.1. Crea `SOLICITUD_CREDITO` y `EVENTO_CREDITO` sin instalar triggers, sin tocar movimientos, pagos, imputaciones ni vencimientos y sin convertir datos históricos. En una base nueva, aplicarla al final de la secuencia de instalación. En una base existente, comprobar que FER-20 y FER-17 estén instalados y aplicar solo la migración aditiva de crédito. Es segura de repetir. En una instalación nueva `schema.sql` ya contiene las tablas, por lo que `CREATE TABLE IF NOT EXISTS` no modifica las tablas existentes.
 
 ### `seed.sql`
 
