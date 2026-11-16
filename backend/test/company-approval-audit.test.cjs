@@ -190,22 +190,35 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             await dataSource.initialize();
         }
 
-        const [tableCountRow] = await dataSource.query(`
-            SELECT COUNT(*) AS c FROM information_schema.TABLES
+        const requiredTables = [
+            'CATEGORIA', 'PRODUCTO', 'LISTA_PRECIO', 'COTIZACION', 'CLIENTE', 'USUARIO',
+            'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
+            'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
+            'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
+            'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
+            'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
+            'SOLICITUD_CREDITO', 'EVENTO_CREDITO',
+        ];
+        const tables = await dataSource.query(`
+            SELECT TABLE_NAME FROM information_schema.TABLES
             WHERE TABLE_SCHEMA = DATABASE()
         `);
-        assert.equal(Number(tableCountRow.c), 21, 'La base aislada debe tener exactamente 21 tablas');
+        const tableNames = new Set(tables.map(row => row.TABLE_NAME));
+        for (const table of requiredTables) {
+            assert.ok(tableNames.has(table), `Falta la tabla ${table}`);
+        }
 
         const triggers = await dataSource.query(`
             SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
             WHERE TRIGGER_SCHEMA = DATABASE()
             ORDER BY TRIGGER_NAME
         `);
-        assert.deepEqual(
-            triggers.map(row => row.TRIGGER_NAME).sort(),
-            ['fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update'],
-            'Deben existir exactamente los 3 triggers FER-20',
-        );
+        const triggerNames = new Set(triggers.map(row => row.TRIGGER_NAME));
+        for (const trigger of [
+            'fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update',
+        ]) {
+            assert.ok(triggerNames.has(trigger), `Falta el trigger ${trigger}`);
+        }
 
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');

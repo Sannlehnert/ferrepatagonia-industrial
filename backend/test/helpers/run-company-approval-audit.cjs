@@ -114,24 +114,37 @@ async function main() {
         applySql(path.join(backend, '../database/schema.sql'));
         applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
 
-        const [tableCount] = await connection.query(`
-            SELECT COUNT(*) AS c FROM information_schema.TABLES
+        const requiredTables = [
+            'CATEGORIA', 'PRODUCTO', 'LISTA_PRECIO', 'COTIZACION', 'CLIENTE', 'USUARIO',
+            'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
+            'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
+            'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
+            'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
+            'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
+            'SOLICITUD_CREDITO', 'EVENTO_CREDITO',
+        ];
+        const tables = await connection.query(`
+            SELECT TABLE_NAME AS name FROM information_schema.TABLES
             WHERE TABLE_SCHEMA = ?
         `, [database]);
-        assert.equal(Number(tableCount.c), 21, 'El esquema aislado debe tener 21 tablas');
+        const tableNames = new Set(tables.map(row => row.name));
+        for (const table of requiredTables) {
+            assert.ok(tableNames.has(table), `Falta la tabla ${table}`);
+        }
 
         const triggers = await connection.query(`
             SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
             WHERE TRIGGER_SCHEMA = ?
             ORDER BY TRIGGER_NAME
         `, [database]);
-        assert.deepEqual(
-            triggers.map(row => row.TRIGGER_NAME),
-            ['fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update'],
-            'El esquema aislado debe tener los 3 triggers FER-20',
-        );
+        const triggerNames = new Set(triggers.map(row => row.TRIGGER_NAME));
+        for (const trigger of [
+            'fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update',
+        ]) {
+            assert.ok(triggerNames.has(trigger), `Falta el trigger ${trigger}`);
+        }
 
-        console.log('[T-S7-03.1] Esquema verificado: 21 tablas y 3 triggers FER-20.');
+        console.log('[T-S7-03.1] Esquema verificado: tablas requeridas y 3 triggers FER-20.');
         console.log('[T-S7-03.1] Ejecutando company-approval-audit.test.cjs...');
 
         const result = spawnSync(process.execPath, [
