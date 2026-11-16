@@ -182,6 +182,6 @@ for (const type of ['PARTICULAR', 'EMPRESA'] as const) {
       direccion: 'Calle de prueba 100',
       ...(type === 'EMPRESA' ? { cuit: '30-71234567-1' } : {}),
     })
-    await expect(page).toHaveURL(/\/mi-cuenta$/)
+    await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
   })
 }

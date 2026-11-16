@@ -27,7 +27,7 @@ async function signIn(page: Page, email: string) {
 test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ page }) => {
   await page.goto('/')
   const search = header(page).getByRole('searchbox', { name: 'Buscar productos por nombre o código' })
-  await expect(header(page).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login')
+  await expect(header(page).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login?redirect=/')
   await expect(header(page).getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/registro')
   await expect(header(page).getByRole('button', { name: 'Carrito', exact: true })).toHaveCount(0)
   await expect(header(page).getByRole('link', { name: 'Panel de administración' })).toHaveCount(0)
