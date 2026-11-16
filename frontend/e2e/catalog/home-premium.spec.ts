@@ -83,14 +83,13 @@ test('Home de administración muestra solo accesos de su rol', async ({ page }) 
 
 test('empresa aprobada sin cuenta en la base aislada recibe un acceso de consulta', async ({ page }) => {
   await signIn(page, 'empresa-cuenta@e2e.test')
-  const summary = page.waitForResponse(response => response.url().endsWith('/api/cuenta-corriente'))
   await page.goto('/')
-  expect((await (await summary).json()).data.estado).toBe('SIN_CUENTA')
-  await expect(business(page).getByRole('link', { name: 'Consultar estado de cuenta' })).toHaveAttribute('href', '/mi-cuenta/cuenta-corriente')
+  await expect(business(page).getByRole('link', { name: 'Consultar estado comercial' })).toHaveAttribute('href', '/mi-cuenta')
+  await expect(business(page)).toContainText('empresa está aprobada')
   await expect(business(page)).not.toContainText('Tu cuenta corriente está habilitada')
 })
 
-test('empresa con cuenta habilitada recibe el acceso directo sin importes', async ({ page }) => {
+test('empresa con cuenta habilitada no recibe una promesa de crédito en Home', async ({ page }) => {
   const profile = process.env.CCE2E_TEST_PROFILE
   if (!profile) throw new Error('Ejecutá las pruebas con el runner E2E aislado')
   const { connection } = await connectOwned(JSON.parse(profile), 'E2E')
@@ -110,8 +109,9 @@ test('empresa con cuenta habilitada recibe el acceso directo sin importes', asyn
 
     await signIn(page, 'empresa-cuenta@e2e.test')
     await page.goto('/')
-    await expect(business(page).getByRole('link', { name: 'Ver cuenta corriente' })).toHaveAttribute('href', '/mi-cuenta/cuenta-corriente')
-    await expect(business(page)).toContainText('Tu cuenta corriente está habilitada')
+    await expect(business(page).getByRole('link', { name: 'Consultar estado comercial' })).toHaveAttribute('href', '/mi-cuenta')
+    await expect(business(page)).toContainText('autorización de crédito se evalúa por separado')
+    await expect(business(page)).not.toContainText('crédito está disponible')
     await expect(business(page)).not.toContainText('1337.00')
   } finally {
     try {

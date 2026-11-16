@@ -346,7 +346,9 @@ respuesta JSON no contiene el token:
     "email": "cliente@example.test",
     "rol": "CLIENTE",
     "tipo_cliente": "PARTICULAR",
-    "nombre": "Cliente de prueba"
+    "nombre": "Cliente de prueba",
+    "estadoAprobacionEmpresa": null,
+    "cuentaCorrienteHabilitada": null
   }
 }
 ```
@@ -359,7 +361,7 @@ API para que `/me` y las rutas protegidas reciban la sesión.
 **Diferencia pendiente con #155:** el PDF acuerda éxito
 `{ "message": "...", "data": { "user": { "id", "email", "rol", "tipoCliente" } } }`.
 El código actual devuelve `{ "message": "...", "user": { "id", "email", "rol",
-"tipo_cliente", "nombre" } }`. El ejemplo del PDF se sanitiza aquí; no representa
+"tipo_cliente", "nombre", "estadoAprobacionEmpresa", "cuentaCorrienteHabilitada" } }`. El ejemplo del PDF se sanitiza aquí; no representa
 una respuesta verificada de `develop`.
 
 ### Logout
@@ -404,6 +406,11 @@ vigente; deben actualizarse cuando se resuelva la alineación.
 
 `GET /api/auth/me` requiere la cookie y devuelve el usuario autenticado; el
 detalle del comportamiento vigente está en [Restauración de sesión](#restauración-de-sesión--fer-3).
+Login y restauración incluyen `estadoAprobacionEmpresa` (PENDIENTE, APROBADA o
+RECHAZADA) y `cuentaCorrienteHabilitada` (true, false o null cuando no existe
+cuenta). Ambos son null para particulares y administradores. Se consultan en cada
+restauración y no conceden por sí solos crédito: el estado de crédito se consulta
+en `GET /api/cuenta-corriente`, y cada compra requiere validar su elegibilidad.
 
 ### Hash de contraseña — #165
 
@@ -607,7 +614,7 @@ El endpoint es `GET /api/auth/me` (prefijo de aplicación `/api`), usa
 `authenticate` y la cookie HttpOnly `jwt_token`. Responde **200** con:
 
 ```json
-{ "user": { "id": 12, "nombre": "Cliente", "email": "cliente@example.test", "rol": "CLIENTE", "tipo_cliente": "PARTICULAR" } }
+{ "user": { "id": 12, "nombre": "Cliente", "email": "cliente@example.test", "rol": "CLIENTE", "tipo_cliente": "PARTICULAR", "estadoAprobacionEmpresa": null, "cuentaCorrienteHabilitada": null } }
 ```
 
 `id` corresponde a `USUARIO.id_usuario`; `tipo_cliente` conserva snake_case y
@@ -623,7 +630,7 @@ No se emiten ni renuevan tokens o cookies; no se devuelven secretos.
 **Diferencia pendiente con [Taiga #157](https://taiga.hvdevs.com/project/ferrepatagonia-industrial/t/157):**
 el PDF acuerda éxito `{ "data": { "user": { "id", "email", "rol", "tipoCliente" } } }`
 y error 401 `{ "message": "Sesión expirada o no válida" }`. `develop` devuelve
-`{ "user": { "id", "nombre", "email", "rol", "tipo_cliente" } }` y
+`{ "user": { "id", "nombre", "email", "rol", "tipo_cliente", "estadoAprobacionEmpresa", "cuentaCorrienteHabilitada" } }` y
 `{ "message": "No autenticado." }`. La prueba de regresión compara `/me` con el
 usuario devuelto por login; no confirma conformidad con el formato del PDF.
 

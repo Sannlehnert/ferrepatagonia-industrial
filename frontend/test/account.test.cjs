@@ -24,7 +24,8 @@ test('account menu only exposes permitted controlled routes',()=>{
  const permissions=config('permissions');const menu=config('menu',{'./permissions':permissions});
  for(const tipoCliente of ['PARTICULAR','EMPRESA']) {
   const visible=menu.getNavigableMenu(menu.accountMenu,permissions.getPermissionsForUser({rol:'CLIENTE',tipoCliente}));
-  assert.deepEqual(visible.map(item=>item.routeName),['cuenta-pedidos','cuenta-corriente','cuenta-datos']);
+  assert.deepEqual(visible.map(item=>item.routeName),tipoCliente === 'EMPRESA'
+   ? ['cuenta-pedidos','cuenta-corriente','cuenta-datos'] : ['cuenta-pedidos','cuenta-datos']);
  }
  for(const user of [null,{rol:'ADMIN',tipoCliente:null}]) assert.deepEqual(menu.getNavigableMenu(menu.accountMenu,permissions.getPermissionsForUser(user)),[]);
 });

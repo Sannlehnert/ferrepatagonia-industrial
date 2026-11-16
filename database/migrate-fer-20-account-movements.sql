@@ -1,5 +1,5 @@
 -- #260. Run with application writers stopped and backup verified. No data is deleted or converted.
--- Missing historical evidence stays NULL; coverage/limit are not implicitly accredited.
+-- Missing historical evidence stays NULL. Coverage and limits are not implicitly accredited.
 SET NAMES utf8mb4;
 DELIMITER //
 BEGIN NOT ATOMIC

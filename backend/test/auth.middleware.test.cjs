@@ -199,7 +199,7 @@ test('login emite JWT verificable sin cambiar sus datos públicos', async (t) =>
     const result = await loginUsuario('login@example.test', 'password');
     assert.deepEqual(verifyToken(result.token), { id: 7, rol: 'CLIENTE' });
     assert.deepEqual(result.user, {
-      id: 7, email: 'login@example.test', rol: 'CLIENTE', tipo_cliente: 'PARTICULAR', nombre: 'Cliente',
+      id: 7, email: 'login@example.test', rol: 'CLIENTE', tipo_cliente: 'PARTICULAR', nombre: 'Cliente', estadoAprobacionEmpresa: null, cuentaCorrienteHabilitada: null,
     });
   } finally {
     await pool.end();
