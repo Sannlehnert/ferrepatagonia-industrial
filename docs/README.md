@@ -43,6 +43,7 @@ No mantener copias paralelas de esos PDFs en el repositorio.
 
 ## Evidencia existente
 
+- [#308: instalación aislada y reinicio de MariaDB, API y web](308/README.md).
 - [#221: resumen y reproducción de persistencia y pruebas locales](221/README.md).
 - [#221: informe de bloqueantes y resultados adversos](221/FIXES-PR44.md).
 - [Resultados MariaDB de #221](221/evidence/full-validation.txt) y

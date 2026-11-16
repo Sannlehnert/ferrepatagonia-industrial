@@ -119,6 +119,19 @@ flowchart LR
 
 > **Importante sobre Docker Compose:** [`compose.yml`](compose.yml) **únicamente** levanta el contenedor de **MariaDB 11.4** en `127.0.0.1:3307`. **No** levanta automáticamente el backend ni el frontend, y **no** ejecuta automáticamente los scripts de esquema ni de datos de prueba (`database/` se monta solo lectura en `/scripts`).
 
+> **Segunda instalación simultánea en el mismo equipo:** usar un checkout
+> separado, un nombre de proyecto Compose y un puerto libres para no reutilizar
+> la base existente. Por ejemplo, en PowerShell establecer
+> `$env:COMPOSE_PROJECT_NAME = "ferrepatagonia-otra"`, comprobar que ese
+> proyecto y su volumen no existan y que el puerto `3318` esté libre, y cambiar
+> **solo en la copia** el puerto publicado de `compose.yml` de
+> `127.0.0.1:3307:3306` a `127.0.0.1:3318:3306`. Configurar `DB_PORT=3318`
+> en el `.env` de esa copia. Mantener `COMPOSE_PROJECT_NAME` en la terminal
+> donde se ejecutan los comandos Compose, también durante el reinicio. Usar
+> directorios de archivos propios para la segunda instalación. Coordinar con
+> el equipo cualquier cambio de puerto del entorno compartido; esta excepción
+> es solo para una copia aislada.
+
 1. **Clonar el repositorio:**
 
    ```bash
@@ -161,9 +174,21 @@ flowchart LR
 
    Pegar el resultado en `JWT_SECRET=<valor-generado>` dentro de `backend/.env` (nunca dejar vacío ni versionar `.env`).
 
+   Para conservar archivos, crear tres directorios **separados**, existentes y
+   escribibles fuera del repositorio y configurar sus rutas absolutas en
+   `backend/.env`: `PRODUCT_IMAGE_STORAGE_DIR` (fotos),
+   `RECEIPT_STORAGE_DIR` (comprobantes privados) e `IMPORT_STORAGE_DIR`
+   (importaciones). Ninguno debe contener a otro. Mantener los comprobantes
+   privados, con permisos restringidos al usuario que ejecuta la API. Por
+   ejemplo, en Windows se pueden usar directorios hermanos bajo
+   `C:\Datos\ferrepatagonia`; en Linux, bajo `/var/lib/ferrepatagonia`, con
+   permisos adecuados. No usar directorios temporales si se requiere persistencia.
+   Estos directorios y el volumen de MariaDB deben incluirse en la estrategia
+   de respaldo del entorno.
+
 6. **Inicializar esquema, triggers y datos de prueba (solo sobre una base nueva/vacía):**
 
-   > `database/schema.sql` crea las **22 tablas** base, pero **no incluye los 5 triggers** (3 FER-20 de cuenta corriente y 2 FER-17 de precio). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` y `database/migrate-fer-17-price-verification.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
+   > `database/schema.sql` crea las **22 tablas** base, pero **no incluye los 5 triggers** (3 FER-20 de cuenta corriente y 2 FER-17 de precio). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` y `database/migrate-fer-17-price-verification.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Si la base tiene tablas pero no cumple el esquema vigente, detenerse, respaldar y acordar su actualización con el equipo; no borrar el volumen. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
 
    ```bash
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
@@ -180,6 +205,13 @@ flowchart LR
    ```
 
    La salida debe informar `22` tablas base y exactamente los triggers `fer17_producto_alta_evento`, `fer17_producto_precio_evento`, `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, ambas migraciones y esta comprobación SQL.)*
+
+   **Usuarios locales:** el registro público crea clientes, no administradores;
+   el usuario del seed es un fixture sin login. Para preparar usuarios locales
+   de prueba, incluido ADMIN, usar el bootstrap documentado en
+   [T-S7-01.2](https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/5a19b6508670934bc6bc7140c9e712d612fd7be2/docs/sprint7/T-S7-01.2-usuarios-y-almacenamiento-local.md)
+   ([PR #111](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/111)).
+   Es un procedimiento para desarrollo local, no para producción.
 
 7. **Arrancar el backend (en una terminal desde `backend/`):**
 
@@ -210,6 +242,17 @@ flowchart LR
      Respuesta esperada: HTTP `200` con `{"api":"ok","database":"ok"}`.
 
    - Abrir en el navegador `http://localhost:5173`.
+
+### Reinicio sin borrar datos
+
+Detener la API y la web en sus terminales. Desde la raíz, ejecutar
+`docker compose restart mariadb`, esperar a que MariaDB esté saludable con
+`docker compose ps` y volver a iniciar la API y la web como en los pasos 7 y 8.
+Comprobar salud, inicio de sesión y acceso a los datos y archivos existentes.
+Conservar el mismo volumen, `JWT_SECRET` y directorios de almacenamiento; no
+ejecutar `schema.sql` ni `seed.sql` de nuevo sobre la base existente y no
+eliminar el volumen. Este reinicio no sustituye un respaldo ni una prueba de
+restauración. El ensayo y sus limitaciones se registran en [#308](docs/308/README.md).
 
 ---
 
