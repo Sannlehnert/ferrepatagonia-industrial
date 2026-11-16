@@ -1,5 +1,6 @@
 // Public response contract from docs/api/precios.md (FER17-v1).
 export type PriceState = 'DEFINIDO' | 'PRECIO_AUSENTE' | 'BASE_CERO' | 'BASE_NO_VERIFICADA' | 'FINAL_CERO' | 'ARS_CERO'
+export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' | 'VERIFICADO' | 'SINTETICO'
 export interface PriceLine {
   compraAcademica?: true
   productoId: number

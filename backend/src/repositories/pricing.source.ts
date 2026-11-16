@@ -4,13 +4,14 @@ import { ProductoSchema, UsuarioSchema } from '../entities/active.schemas';
 import { PricingError } from '../services/pricing/money';
 import { civilDate, resolveReference } from '../services/pricing/pricing.quote';
 import type { CommercialSnapshot, PricingClient, PricingSource, VerifiedCalendar } from '../services/pricing/pricing.types';
+import { hasPriceEvidence, priceEvidenceAdminJoin, priceEvidenceJoin, pricingTimestamp } from './priceEvidence';
 
 type IdentityRow = {
   usuarioId: number; clienteId: number | null; usuarioActivo: number; rol: string;
   clienteActivo: number | null; assignedListId: number | null;
   listaId: number | null; listaActiva: number | null; porcentaje: string | null;
 };
-const sqlUTC = (at: Date) => at.toISOString().slice(0, 23).replace('T', ' ');
+const sqlUTC = pricingTimestamp;
 const utc = (column: string) => `DATE_FORMAT(${column}, '%Y-%m-%dT%H:%i:%s.%fZ')`;
 function civilTimestamp(at: string): string {
   const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Argentina/Buenos_Aires',
@@ -74,8 +75,8 @@ export class MariaDbPricingSource implements PricingSource {
     }
     const rawProducts = await manager.getRepository(ProductoSchema).createQueryBuilder('p')
       .innerJoin('p.categoria', 'c')
-      .leftJoin('PRECIO_USD_EVIDENCIA', 'e', 'e.id_producto=p.id_producto AND e.valida=1 AND e.precio_verificado=p.precio AND e.verificado_utc<=:at', { at: sqlUTC(at) })
-      .leftJoin('USUARIO', 'ea', "ea.id_usuario=e.id_admin AND ea.rol='ADMIN'")
+      .leftJoin('PRECIO_USD_EVIDENCIA', 'e', priceEvidenceJoin, { at: sqlUTC(at) })
+      .leftJoin('USUARIO', 'ea', priceEvidenceAdminJoin)
       .select('p.id_producto', 'id').addSelect('p.precio', 'baseUSD').addSelect('p.descuento_especial_pct', 'specialPercent')
       .addSelect('ea.id_usuario', 'verifiedBy').addSelect('e.evidencia', 'evidence')
       .addSelect(utc('e.verificado_utc'), 'verifiedAt').addSelect('e.sintetica', 'synthetic')
@@ -83,7 +84,7 @@ export class MariaDbPricingSource implements PricingSource {
       .getRawMany<{ id: number; baseUSD: string | null; specialPercent: string | null; verifiedBy: number | null;
         evidence: string | null; verifiedAt: string; synthetic: number }>();
     const products = rawProducts.map(p => {
-      const baseVerified = p.verifiedBy !== null && typeof p.evidence === 'string' && p.evidence.trim().length > 0;
+      const baseVerified = hasPriceEvidence(p.verifiedBy, p.evidence);
       return { id: p.id, baseUSD: p.baseUSD, specialPercent: p.specialPercent, baseVerified,
         ...(baseVerified ? { evidence: { reference: p.evidence!, verifiedAt: p.verifiedAt, synthetic: p.synthetic === 1 } } : {}) };
     });

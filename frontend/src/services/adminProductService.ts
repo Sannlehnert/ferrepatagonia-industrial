@@ -1,5 +1,6 @@
 import type { AxiosRequestConfig } from 'axios';
 import api from '@/services/api';
+import type { AdminBasePriceState } from '@/types/pricing';
 
 export interface AdminProduct {
     id_producto: number;
@@ -9,6 +10,7 @@ export interface AdminProduct {
     nombre: string;
     descripcion: string | null;
     precio: number | string | null; // <-- Permitir null y string además de number
+    estado_precio_base?: AdminBasePriceState;
     stock: number;
     imagen: string | null;
     activo: number | boolean;

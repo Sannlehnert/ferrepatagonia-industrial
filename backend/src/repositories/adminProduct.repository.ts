@@ -1,6 +1,7 @@
 import { dataSource, inTransaction } from '../config/database.config';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
+import { hasPriceEvidence, priceEvidenceAdminJoin, priceEvidenceJoin, pricingTimestamp } from './priceEvidence';
 
 export interface ProductRecord {
     id_producto: number;
@@ -8,7 +9,7 @@ export interface ProductRecord {
     codigo: string;
     nombre: string;
     descripcion: string | null;
-    precio: string;
+    precio: string | null;
     stock: number;
     imagen: string | null;
     activo: number | boolean;
@@ -46,9 +47,26 @@ function productQuery() {
     return query;
 }
 
-export const findAllAdmin = async (): Promise<ProductRecord[]> => productQuery()
-    .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
-    .orderBy('p.id_producto', 'DESC').getRawMany<ProductRecord>();
+export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' | 'VERIFICADO' | 'SINTETICO';
+
+export const findAllAdmin = async (): Promise<(ProductRecord & { estado_precio_base: AdminBasePriceState })[]> => {
+    const rows = await productQuery()
+        .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
+        .leftJoin('PRECIO_USD_EVIDENCIA', 'e', priceEvidenceJoin, { at: pricingTimestamp(new Date()) })
+        .leftJoin('USUARIO', 'ea', priceEvidenceAdminJoin)
+        .addSelect('ea.id_usuario', 'price_verifier')
+        .addSelect('e.evidencia', 'price_evidence')
+        .addSelect('e.sintetica', 'price_synthetic')
+        .orderBy('p.id_producto', 'DESC')
+        .getRawMany<ProductRecord & { price_verifier: number | null; price_evidence: string | null; price_synthetic: number | null }>();
+    return rows.map(({ price_verifier, price_evidence, price_synthetic, ...product }) => ({
+        ...product,
+        estado_precio_base: product.precio === null ? 'SIN_PRECIO'
+            : Number(product.precio) === 0 ? 'BASE_CERO'
+            : !hasPriceEvidence(price_verifier, price_evidence) ? 'NO_VERIFICADO'
+            : price_synthetic === 1 ? 'SINTETICO' : 'VERIFICADO',
+    }));
+};
 
 export const findById = async (id: number): Promise<ProductRecord | null> =>
     await productQuery().where('p.id_producto = :id', { id }).getRawOne<ProductRecord>() ?? null;

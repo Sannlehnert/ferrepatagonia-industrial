@@ -25,6 +25,22 @@ const currentItem = computed(() =>
 )
 
 const message = computed(() => {
+  if (props.loading) {
+    return 'Consultando precio…'
+  }
+
+  if (props.error) {
+    return 'No se pudo consultar el precio. Reintentá la consulta.'
+  }
+
+  if (props.line?.estadoPrecio === 'BASE_NO_VERIFICADA') {
+    return 'El precio está pendiente de verificación y no se puede agregar.'
+  }
+
+  if (!precioComprable(props.line)) {
+    return 'Precio no disponible para agregar.'
+  }
+
   if (!auth.isAuthenticated) {
     return 'Iniciá sesión para agregar productos.'
   }
@@ -35,14 +51,6 @@ const message = computed(() => {
 
   if (!props.product.disponible) {
     return 'Producto sin stock disponible.'
-  }
-
-  if (props.loading) {
-    return 'Consultando precio…'
-  }
-
-  if (props.error || !precioComprable(props.line)) {
-    return 'Precio no disponible para agregar.'
   }
 
   if (

@@ -105,13 +105,23 @@ for(const [state,label] of [['PRECIO_AUSENTE','Precio a confirmar'],['BASE_CERO'
    const s=await setup(page);s.changes={estadoPrecio:state,precioComprable:false,precioUnitarioUSD:null};await page.goto('/catalogo')
    await expect(page.getByText(label,{exact:true})).toBeVisible();await expect(page.getByText(/USD \d/)).toHaveCount(0)
    await expect(page.getByRole('button',{name:'Agregar',exact:true})).toBeDisabled()
+   if (state === 'BASE_NO_VERIFICADA') await expect(page.getByRole('button',{name:'Agregar',exact:true})).toHaveAccessibleDescription('El precio está pendiente de verificación y no se puede agregar.')
  })
 }
 for(const status of [404,422,500]) test(`contrato interceptado: error ${status} conserva productos y reintenta`,async({page})=>{
  const s=await setup(page);s.failure=status;await page.goto('/catalogo')
  await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('heading',{name:'Producto 1',exact:true})).toBeVisible()
+ await expect(page.getByText('No se pudo consultar el precio',{exact:true})).toBeVisible()
+ await expect(page.getByRole('button',{name:'Agregar',exact:true})).toHaveAccessibleDescription('No se pudo consultar el precio. Reintentá la consulta.')
  await expect(page.getByText('Todavía no hay productos en el catálogo.')).toHaveCount(0)
  s.failure=0;await page.getByRole('button',{name:'Reintentar precios'}).click();await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
+})
+test('al recuperar foco se consulta nuevamente el precio sin conservar el importe anterior',async({page})=>{
+ const s=await setup(page);await page.goto('/catalogo');await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
+ s.changes={estadoPrecio:'BASE_NO_VERIFICADA',precioComprable:false,precioUnitarioUSD:null}
+ await page.evaluate('window.dispatchEvent(new Event("focus"))')
+ await expect(page.getByText('Precio pendiente de verificación',{exact:true})).toBeVisible()
+ await expect(page.getByText('USD 95.00',{exact:true})).toHaveCount(0)
 })
 test('contrato interceptado: cambio A → B y logout limpian los precios de la sesión anterior',async({page})=>{
  const s=await setup(page,user(1));await page.goto('/catalogo');await expect(page.getByText('USD 90.00',{exact:true})).toBeVisible()

@@ -74,6 +74,14 @@ siendo cero, no un centinela. Si una línea no tiene precio USD positivo no hay
 total USD parcial. ARS cero bloquea su total, conservando consulta USD.
 `precioComprable` describe precio, no stock reservado ni autorización de compra.
 
+En `GET /api/admin/productos`, `estado_precio_base` describe el importe cargado:
+`SIN_PRECIO`, `BASE_CERO`, `NO_VERIFICADO`, `VERIFICADO` o `SINTETICO`.
+Utiliza los mismos criterios de evidencia que la consulta pública, incluso para
+productos inactivos. Un precio base verificado no garantiza un precio final
+comprable: también intervienen descuentos, disponibilidad y autorización.
+Guardar o cambiar un importe no genera evidencia. Catálogo y detalle reconsultan
+los precios al recuperar el foco de la ventana; no ofrecen actualización en tiempo real.
+
 ## Persistencia y transacción
 
 [Operación, migraciones y carga manual](../operaciones-precios.md).

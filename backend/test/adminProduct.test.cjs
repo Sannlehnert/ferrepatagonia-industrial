@@ -81,6 +81,46 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(Array.isArray(body), true);
     });
 
+    it('reports the base price evidence state without verifying saved prices', async () => {
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
+        const inserted = await pool.query(
+            "INSERT INTO PRODUCTO (id_categoria, codigo, nombre, precio, stock, activo) VALUES (1, ?, 'Evidence fixture', 150, 5, 1)",
+            [`${TEST_PREFIX}EVIDENCE`]);
+        const id = Number(inserted.insertId);
+        createdProductIds.push(id);
+        const admin = authUsers.find(user => user.rol === 'ADMIN');
+        const state = async () => {
+            const response = await fetch(`${BASE_URL}/admin/productos`, { headers: { Cookie: adminCookie } });
+            assert.equal(response.status, 200);
+            return (await response.json()).find(product => product.id_producto === id).estado_precio_base;
+        };
+        try {
+            assert.equal(await state(), 'NO_VERIFICADO');
+            await pool.query(`INSERT INTO PRECIO_USD_EVIDENCIA
+                (id_producto, precio_verificado, evidencia, id_admin, verificado_utc, valida, sintetica)
+                VALUES (?, 150, 'test evidence', ?, UTC_TIMESTAMP(), 1, 0)`, [id, admin.id]);
+            assert.equal(await state(), 'VERIFICADO');
+            await pool.query('UPDATE PRODUCTO SET activo=0 WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'VERIFICADO');
+            await pool.query('UPDATE PRODUCTO SET activo=1, precio=160 WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'NO_VERIFICADO');
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=160, verificado_utc=UTC_TIMESTAMP() + INTERVAL 1 DAY WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'NO_VERIFICADO');
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET verificado_utc=UTC_TIMESTAMP(), evidencia=CHAR(9) WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'NO_VERIFICADO');
+            await pool.query("UPDATE PRECIO_USD_EVIDENCIA SET evidencia='test evidence', valida=0 WHERE id_producto=?", [id]);
+            assert.equal(await state(), 'NO_VERIFICADO');
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET valida=1, sintetica=1 WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'SINTETICO');
+            await pool.query('UPDATE PRODUCTO SET precio=0 WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'BASE_CERO');
+            await pool.query('UPDATE PRODUCTO SET precio=NULL WHERE id_producto=?', [id]);
+            assert.equal(await state(), 'SIN_PRECIO');
+        } finally {
+            await pool.query('DELETE FROM PRECIO_USD_EVIDENCIA WHERE id_producto=?', [id]);
+        }
+    });
+
     it('should return 400 on invalid product creation data, missing body, or fields exceeding max length', async () => {
         const res = await fetch(`${BASE_URL}/admin/productos`, {
             method: 'POST',

@@ -380,6 +380,7 @@ const requestClose = () => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.precio ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
+                            <p class="mt-1 text-xs text-[#64748B]">Guardar o cambiar el importe no verifica el precio. Requiere evidencia antes de ofrecerlo en el catálogo.</p>
                             <p v-if="fieldErrors.precio" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.precio }}</p>
                         </div>
 

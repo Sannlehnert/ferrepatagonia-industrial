@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
 import { getPrices, priceErrorMessage } from '@/services/pricingService'
@@ -47,7 +47,15 @@ export function useProductPrices(products: Ref<CatalogProduct[]>, catalogLoading
   watch(() => [products.value, catalogLoading.value, auth.sessionVersion, auth.user?.id,
     auth.user?.rol, auth.sessionChecked, auth.loggingIn, auth.loggingOut, auth.sessionError],
   () => { void retry() }, { immediate: true, flush: 'sync' })
-  onScopeDispose(() => { controller?.abort(); prices.value = {} })
+  const refreshOnFocus = () => { void retry() }
+  onMounted(() => {
+    if (typeof window !== 'undefined') window.addEventListener('focus', refreshOnFocus)
+  })
+  onScopeDispose(() => {
+    if (typeof window !== 'undefined') window.removeEventListener('focus', refreshOnFocus)
+    controller?.abort()
+    prices.value = {}
+  })
   async function retryPrices() {
     if (auth.sessionError) {
       try { await auth.fetchSession() } catch { return }
