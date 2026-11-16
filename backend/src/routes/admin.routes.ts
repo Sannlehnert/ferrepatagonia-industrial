@@ -11,8 +11,16 @@ import { priceListPolicy } from '../dtos/clients/price-list.dto';
 import { companyApprovalPolicy } from '../dtos/clients/company-approval.dto';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 import { adminAccountHandler } from '../controllers/adminAccount.controller';
+import { getAdminDashboardMetrics } from '../controllers/adminDashboard.controller';
 
 export const adminRouter = Router();
+
+adminRouter.use('/dashboard/metricas', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Pragma', 'no-cache');
+  res.vary('Cookie');
+  next();
+});
 
 adminRouter.use(authenticate, authorizeRoles('ADMIN'));
 
@@ -20,6 +28,7 @@ adminRouter.get('/cuentas-corrientes', adminAccountHandler('listado'));
 adminRouter.get('/clientes/:clienteId/cuenta-corriente', adminAccountHandler('resumen'));
 adminRouter.get('/clientes/:clienteId/cuenta-corriente/movimientos', adminAccountHandler('movimientos'));
 adminRouter.get('/clientes/:clienteId/cuenta-corriente/vencimientos', adminAccountHandler('vencimientos'));
+adminRouter.get('/dashboard/metricas', getAdminDashboardMetrics);
 
 adminRouter.get('/clientes', getClientes);
 adminRouter.patch(
@@ -33,6 +42,13 @@ adminRouter.put(
   validateDto('params', clientIdPolicy),
   validateDto('body', companyApprovalPolicy),
   patchClientCompanyApproval,
+);
+adminRouter.get('/dashboard/metricas',(_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    next();
+  },
+  getAdminDashboardMetrics,
 );
 
 adminRouter.get('/listas-precio', getAdminPriceLists);
