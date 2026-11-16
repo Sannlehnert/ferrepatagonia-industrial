@@ -11,7 +11,7 @@ export function rutaPorRol(rol: Rol | null): RouteLocationRaw {
     case 'ADMIN':
       return { name: 'admin-dashboard' }
     case 'CLIENTE':
-      return { name: 'cuenta-datos' }
+      return { name: 'cuenta-dashboard' }
     default:
       return { name: 'login' }
   }
