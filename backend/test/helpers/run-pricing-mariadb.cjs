@@ -1,10 +1,11 @@
-const { execFileSync, spawnSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const mariadb = require('mariadb');
 const assert = require('node:assert/strict');
 const { applySql } = require('./mariadb-cli.cjs');
+const { withTestSignals, runTestProcess } = require('./disposable-test-process.cjs');
 
 const backend = path.resolve(__dirname, '../..');
 const databaseDir = path.join(backend, '../database');
@@ -14,7 +15,7 @@ const container = `pricing-test-${token}`;
 const password = randomUUID();
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', timeout: 180000 }).trim();
 
-async function main() {
+async function main(signal) {
   let started = false, connection;
   try {
     docker('run', '--rm', '-d', '--name', container, '-p', '127.0.0.1::3306',
@@ -23,6 +24,7 @@ async function main() {
     const info = JSON.parse(docker('inspect', container))[0];
     const port = Number(info.NetworkSettings.Ports['3306/tcp'][0].HostPort);
     for (let i = 0; i < 60; i++) {
+      signal.throwIfAborted();
       try { connection = await mariadb.createConnection({ host:'127.0.0.1', port, user:'root', password, database, connectTimeout:1000 }); break; }
       catch { await new Promise(resolve => setTimeout(resolve,1000)); }
     }
@@ -65,7 +67,7 @@ async function main() {
 
     // 3. Verificar estado final: 22 tablas y 7 triggers (3 FER-20 + 4 FER-17)
     const [schemaState] = await connection.query(`SELECT
-      (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()) AS tables,
+      (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE') AS tables,
       (SELECT GROUP_CONCAT(TRIGGER_NAME ORDER BY TRIGGER_NAME) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()) AS triggers`);
     assert.equal(Number(schemaState.tables), 22);
     assert.equal(
@@ -75,16 +77,19 @@ async function main() {
     assert.match((await connection.query('SELECT VERSION() AS v'))[0].v, /^11\.4\.\d+-MariaDB\b/);
     console.log('Full schema: 22 tables + 7 triggers (3 FER-20 + 4 FER-17).');
 
-    const result = spawnSync(process.execPath,['--require','./test/helpers/test-env.cjs','--test','--test-concurrency=1','test/pricing.mariadb.test.cjs'],{
-      cwd:backend,stdio:'inherit',env:{...process.env,DOTENV_CONFIG_PATH:path.join(backend,'test/helpers/nonexistent.env'),
+    const status = await runTestProcess(['--require','./test/helpers/test-env.cjs','--test','--test-concurrency=1','test/pricing.mariadb.test.cjs'],{
+      cwd:backend,env:{...process.env,DOTENV_CONFIG_PATH:path.join(backend,'test/helpers/nonexistent.env'),
         JWT_SECRET:randomUUID(),DB_HOST:'127.0.0.1',DB_PORT:String(port),DB_NAME:database,DB_USER:'root',DB_PASSWORD:password,
         PRICING_TEST_DATABASE:database},
-    });
-    if (result.error) throw result.error;
-    process.exitCode = result.status === 0 ? 0 : 1;
+    }, signal);
+    if (status !== 0) throw Error('La suite MariaDB de precios falló');
   } finally {
     try { if (connection) await connection.end(); }
     finally { if (started) docker('rm','-f','-v',container); }
   }
 }
-main().catch(error=>{console.error(error.stderr?.toString?.().trim() || error.message);process.exitCode=1;});
+withTestSignals(main).catch(error=>{
+  const message = error.stderr?.toString?.().trim() || error.message;
+  console.error(message.split(password).join('[oculto]'));
+  process.exitCode ||= 1;
+});

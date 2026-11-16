@@ -1,9 +1,10 @@
-const { execFileSync, spawnSync } = require('node:child_process');
+const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const mariadb = require('mariadb');
 const assert = require('node:assert/strict');
+const { withTestSignals, runTestProcess } = require('./disposable-test-process.cjs');
 const backend = path.resolve(__dirname, '../..');
 const token = randomUUID().replaceAll('-', '');
 const database = `price_verification_test_${token}`;
@@ -130,6 +131,7 @@ async function connectToMariaDb({
   previousPort,
   onPortChange,
   action = 'conexión con MariaDB',
+  signal,
 } = {}) {
   const secrets = [secret];
   const errors = [];
@@ -139,6 +141,7 @@ async function connectToMariaDb({
   let announcedPort = previousPort;
 
   for (let attempt = 1; attempt <= attempts; attempt++) {
+    signal?.throwIfAborted();
     info = undefined;
     inspectError = undefined;
     try {
@@ -194,14 +197,14 @@ function updateDatabasePort(env, port) {
   return env;
 }
 
-async function main() {
+async function main(signal) {
   let started = false;
   let connection;
   try {
     docker('run', '--rm', '-d', '--name', container, '-p', '127.0.0.1::3306',
       '-e', `MARIADB_ROOT_PASSWORD=${password}`, '-e', `MARIADB_DATABASE=${database}`, 'mariadb:11.4');
     started = true;
-    const initial = await connectToMariaDb({ action: 'inicio de MariaDB desechable' });
+    const initial = await connectToMariaDb({ action: 'inicio de MariaDB desechable', signal });
     connection = initial.connection;
     let port = initial.port;
 
@@ -233,11 +236,14 @@ async function main() {
       'fer260_imputacion_insert',
       'fer260_imputacion_update',
     ], 'La instalación limpia debe tener 3 triggers FER-20 y 4 triggers FER-17');
+    const metadata = await connection.query('SELECT nombre, vigente FROM FER17_AUDITORIA_TRIGGERS ORDER BY nombre');
+    assert.deepEqual(metadata.map(row => row.nombre), triggerRows.slice(0, 4).map(row => row.TRIGGER_NAME));
+    assert.ok(metadata.every(row => Number(row.vigente) === 1));
 
     console.log(JSON.stringify({
       database, container, port,
       version: (await connection.query('SELECT VERSION() AS version'))[0].version,
-      tables: Number(tables.n), triggers: triggerRows.length,
+      tables: Number(tables.n), triggers: triggerRows.length, view: 'FER17_AUDITORIA_TRIGGERS',
     }));
 
     const env = {
@@ -250,14 +256,13 @@ async function main() {
       PRICE_VERIFICATION_RUN_ID: token,
     };
     updateDatabasePort(env, port);
-    const runSuite = file => spawnSync(
-      process.execPath,
+    const runSuite = file => runTestProcess(
       ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', file],
-      { cwd: backend, stdio: 'inherit', env },
+      { cwd: backend, env }, signal,
     );
-    const mainResult = runSuite('test/price-verification.mariadb.test.cjs');
-    if (mainResult.error) throw mainResult.error;
-    if (mainResult.status !== 0) throw Error('La suite principal de verificación de precios falló');
+    if (await runSuite('test/price-verification.mariadb.test.cjs') !== 0) {
+      throw Error('La suite principal de verificación de precios falló');
+    }
 
     // Reapply over historical data, not just over the empty schema.
     const evidenceSql = 'SELECT * FROM PRECIO_USD_EVIDENCIA ORDER BY id_producto';
@@ -273,6 +278,7 @@ async function main() {
     await connection.end().catch(() => undefined);
     connection = undefined;
     const restarted = await restartMariaDb({
+      signal,
       previousPort: port,
       action: 'reinicio de MariaDB',
       onPortChange: (previous, current) => {
@@ -284,9 +290,9 @@ async function main() {
     // The restart suite must reconnect through the port published after the restart.
     updateDatabasePort(env, port);
 
-    const restartResult = runSuite('test/price-verification.restart.test.cjs');
-    if (restartResult.error) throw restartResult.error;
-    if (restartResult.status !== 0) throw Error('La verificación de persistencia tras reinicio falló');
+    if (await runSuite('test/price-verification.restart.test.cjs') !== 0) {
+      throw Error('La verificación de persistencia tras reinicio falló');
+    }
     console.log('T-S7-05.2: evidencia, auditoría y FER17 conservados tras reiniciar MariaDB.');
   } finally {
     try { if (connection) await connection.end(); }
@@ -295,12 +301,12 @@ async function main() {
 }
 
 if (require.main === module) {
-  main().catch(error => {
+  withTestSignals(main).catch(error => {
     console.error(sanitize(error.stderr?.toString?.().trim() || error.message, [password]));
     if (error.diagnostics) {
       console.error('Diagnóstico:', JSON.stringify(sanitizeDiagnostics(error.diagnostics, [password]), null, 2));
     }
-    process.exitCode = 1;
+    process.exitCode ||= 1;
   });
 }
 
