@@ -53,6 +53,9 @@ Extensión aditiva e idempotente de T-S7-05.2. Crea la tabla append-only
 - `fer17_precio_evento_no_update` (`BEFORE UPDATE` en `FER17_PRECIO_EVENTO`).
 - `fer17_precio_evento_no_delete` (`BEFORE DELETE` en `FER17_PRECIO_EVENTO`).
 
+También crea la vista `FER17_AUDITORIA_TRIGGERS`, que permite al CLI verificar
+el inventario FER-17 sin conceder privilegios DDL al operador.
+
 El trigger de edición invalida la evidencia cuando cambia realmente el precio y
 registra `CAMBIO_PRECIO` e `INVALIDACION` en la misma transacción. El actor se
 toma de `@fer17_actor_id`, fijado por el backend, y se revalida como ADMIN activo.

@@ -411,15 +411,51 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     }
   });
 
+  test('Revocar al ADMIN entre la consulta inicial y la revalidación impide cualquier escritura', { timeout: 15000 }, async () => {
+    const id = await createProduct(`FER320-REVOKED-${RUN_ID}`, 46);
+    const operator = await createAuthUser(pool);
+    const gate = Promise.withResolvers();
+    let reachedRevalidation = false;
+    const restore = instrumentQueries(async (_runner, query, sql, params) => {
+      if (params?.[0] === operator.id && /FROM USUARIO.*LOCK IN SHARE MODE/.test(sql)) {
+        reachedRevalidation = true;
+        await gate.promise;
+      }
+      return query();
+    });
+    const pending = verify(id, '46.00', 'Factura Andes 001-283, folio 4', operator.id);
+    pending.catch(() => {});
+    try {
+      await waitFor('revalidación sin un bloqueo previo del operador', () => reachedRevalidation);
+      await dataSource.query('UPDATE USUARIO SET activo=0 WHERE id_usuario=?', [operator.id]);
+      gate.resolve();
+      await assert.rejects(pending, rejectCode('ACTOR_NO_AUTORIZADO'));
+      assert.equal(await evidenceRow(id), undefined);
+      assert.deepEqual((await listPriceHistory(id)).map(event => event.tipo), ['ALTA']);
+    } finally {
+      gate.resolve();
+      await Promise.allSettled([pending]);
+      restore();
+    }
+  });
+
   test('14. Concurrencia precio/verificación: no se aprueba un importe ya modificado', async () => {
     const runner = dataSource.createQueryRunner();
-    await runner.connect();
+    const { threadId: writerThread } = await runner.connect();
     await runner.startTransaction();
+    let readerThread, pending;
+    const restore = instrumentQueries(async (verificationRunner, query, sql, params) => {
+      if (params?.[0] === productId && /SELECT id_producto,precio,activo FROM PRODUCTO/.test(sql)) {
+        readerThread = (await verificationRunner.connect()).threadId;
+      }
+      return query();
+    });
     try {
       await runner.query('SELECT id_producto FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [productId]);
       await runner.query('UPDATE PRODUCTO SET precio = 140.00 WHERE id_producto = ?', [productId]);
-      const pending = verify(productId, '100.12', `Factura FER-320-I-${RUN_ID} carrera`);
-      await new Promise(resolve => setTimeout(resolve, 150));
+      pending = verify(productId, '100.12', `Factura FER-320-I-${RUN_ID} carrera`);
+      pending.catch(() => {});
+      await waitFor('verificación esperando al escritor', () => readerThread && lockWait(readerThread, writerThread));
       await runner.commitTransaction();
       const result = await pending;
       assert.equal(result.ok, false);
@@ -427,6 +463,8 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     } finally {
       if (runner.isTransactionActive) await runner.rollbackTransaction();
       await runner.release();
+      await Promise.allSettled([pending]);
+      restore();
     }
     const row = await evidenceRow(productId);
     assert.equal(row.precio_verificado, '100.12');
@@ -551,16 +589,59 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
   test('18. Procedimiento local autorizado (CLI) e historial consultable', async () => {
     const cliProduct = await createProduct(`T-S7-05-2-CLI-${RUN_ID}`, 60);
     const evidence = `Factura FER-320-L-${RUN_ID} operación CLI aislada`;
-    const verifyRun = spawnSync(process.execPath, [
-      'scripts/verify-product-price.cjs',
+    const destination = `${process.env.DB_HOST}:${process.env.DB_PORT}/${process.env.DB_NAME}`;
+    const args = [
       '--producto', String(cliProduct),
-      '--importe', '60.00',
       '--evidencia', evidence,
       '--admin', String(admin.id),
-      '--confirmar',
-    ], { cwd: process.cwd(), env: process.env, encoding: 'utf8', timeout: 60000 });
-    assert.equal(verifyRun.status, 0, verifyRun.stderr);
-    assert.match(verifyRun.stdout, /FER17-v1: DEFINIDO/);
+      '--confirmar', '--json',
+    ];
+    const cli = (target, amount, env = process.env) => {
+      const result = spawnSync(process.execPath, ['scripts/verify-product-price.cjs', ...args,
+        '--importe', amount, '--confirmar-destino', target],
+      { cwd: process.cwd(), env, encoding: 'utf8', timeout: 15000 });
+      assert.equal(result.error, undefined);
+      return { status: result.status, body: JSON.parse(result.stdout), stderr: result.stderr };
+    };
+    const wrong = cli(`${destination}_otra`, '60.00');
+    assert.equal(wrong.status, 1);
+    assert.equal(wrong.body.code, 'DESTINO_NO_COINCIDE');
+    assert.equal(wrong.body.destino, destination);
+
+    // Change trigger metadata only in the disposable schema; restore even on failure.
+    await pool.query('DROP TRIGGER fer17_precio_evento_no_delete');
+    try {
+      const incomplete = cli(destination, '60.00');
+      assert.equal(incomplete.status, 1);
+      assert.equal(incomplete.body.code, 'ESQUEMA_INCOMPATIBLE');
+      assert.match(incomplete.body.message, /fer17_precio_evento_no_delete/);
+      assert.equal(await evidenceRow(cliProduct), undefined);
+      assert.deepEqual((await listPriceHistory(cliProduct)).map(event => event.tipo), ['ALTA']);
+    } finally {
+      await pool.query(`CREATE TRIGGER fer17_precio_evento_no_delete BEFORE DELETE ON FER17_PRECIO_EVENTO
+        FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'FER17_PRECIO_EVENTO: DELETE no permitido'`);
+    }
+
+    const dbUser = 'fer320_cli_test';
+    const dbPassword = randomUUID();
+    const grantee = "'fer320_cli_test'@'%'";
+    const schema = '`' + process.env.DB_NAME + '`';
+    await pool.query(`CREATE USER ${grantee} IDENTIFIED BY ?`, [dbPassword]);
+    try {
+      for (const table of ['PRODUCTO', 'CATEGORIA', 'USUARIO']) {
+        await pool.query(`GRANT SELECT ON ${schema}.${table} TO ${grantee}`);
+      }
+      await pool.query(`GRANT SELECT, INSERT, UPDATE ON ${schema}.PRECIO_USD_EVIDENCIA TO ${grantee}`);
+      await pool.query(`GRANT SELECT, INSERT ON ${schema}.FER17_PRECIO_EVENTO TO ${grantee}`);
+      await pool.query(`GRANT SELECT ON ${schema}.FER17_AUDITORIA_TRIGGERS TO ${grantee}`);
+      const verifyRun = cli(destination, '60.00', { ...process.env, DB_USER: dbUser, DB_PASSWORD: dbPassword });
+      assert.equal(verifyRun.status, 0, JSON.stringify(verifyRun));
+      assert.equal(verifyRun.body.estadoFer17, 'DEFINIDO');
+      assert.equal(verifyRun.body.destino, destination);
+      assert.equal(verifyRun.stderr, '');
+    } finally {
+      await pool.query(`DROP USER ${grantee}`);
+    }
     const row = await evidenceRow(cliProduct);
     assert.equal(row.valida, 1);
     assert.equal(row.evidencia, evidence);
@@ -575,6 +656,29 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     assert.equal(history.eventos[0].evidencia, evidence);
     assert.equal(history.eventos.some(event => event.tipo === 'ALTA'), true);
     assert.equal((await priceLine(cliProduct)).estadoPrecio, 'DEFINIDO');
+
+    const rejected = cli(destination, '59.99');
+    assert.equal(rejected.status, 1);
+    assert.equal(rejected.body.code, 'IMPORTE_NO_COINCIDE');
+    assert.equal(rejected.stderr, '');
+    const [audit] = await listPriceHistory(cliProduct);
+    assert.equal(audit.idEvento, rejected.body.eventId);
+    assert.equal(audit.tipo, 'RECHAZO');
+    assert.deepEqual(await evidenceRow(cliProduct), row);
+  });
+
+  test('Un precio base cero nunca genera una verificación aplicada y su historial permanece legible', async () => {
+    const result = await pool.query(`INSERT INTO PRODUCTO(id_categoria,codigo,nombre,precio,stock,activo)
+      VALUES (?, ?, 'Base cero', 0, 1, 1)`, [categoryId, `FER320-ZERO-${RUN_ID}`]);
+    const id = Number(result.insertId);
+    const reference = 'Factura Valle A-002-140, folio 9';
+    await assert.rejects(verify(id, '0.00', reference), rejectCode('IMPORTE_INVALIDO'));
+    assert.equal((await verify(id, '0.01', reference)).code, 'PRECIO_BASE_CERO');
+    assert.equal(await evidenceRow(id), undefined);
+    const history = await listPriceHistory(id);
+    assert.deepEqual(history.map(event => event.tipo), ['RECHAZO', 'ALTA']);
+    assert.equal(history[0].precioAnterior, '0.00');
+    assert.equal(history[1].precioNuevo, '0.00');
   });
 
   test('19. Historial completo y persistencia preparada para reinicio', async () => {

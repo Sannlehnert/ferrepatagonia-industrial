@@ -40,12 +40,13 @@ async function main() {
     applyMigration(verificationMigration);
     console.log(JSON.stringify({ database, port, version: await connection.query('SELECT VERSION() AS version'), image: info.Image }));
     const fingerprint = async () => {
-      const tables = await connection.query('SHOW TABLES');
+      const objects = await connection.query(`SELECT TABLE_NAME AS name, TABLE_TYPE AS type
+        FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()`);
       const definitions = [];
-      for (const row of tables) {
-        const table = Object.values(row)[0];
-        const [ddl] = await connection.query('SHOW CREATE TABLE ' + table);
-        definitions.push(ddl['Create Table'].replace(/AUTO_INCREMENT=\d+ /g, ''));
+      for (const { name, type } of objects) {
+        const identifier = '`' + name.replaceAll('`', '``') + '`';
+        const [ddl] = await connection.query(`SHOW CREATE ${type === 'VIEW' ? 'VIEW' : 'TABLE'} ${identifier}`);
+        definitions.push(type === 'VIEW' ? ddl['Create View'] : ddl['Create Table'].replace(/AUTO_INCREMENT=\d+ /g, ''));
       }
       return require('node:crypto').createHash('sha256').update(definitions.sort().join('\n')).digest('hex');
     };

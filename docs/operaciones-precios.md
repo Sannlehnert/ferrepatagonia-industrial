@@ -17,8 +17,9 @@ Una base nueva usa `database/schema.sql`, que incluye las 22 tablas (la nueva es
 verificación para instalar los 7 triggers (3 FER-20 + 4 FER-17). TypeORM
 mantiene synchronize/dropSchema/migrationsRun desactivados; la aplicación no hace
 DDL ni verifica datos por su cuenta. La migración nueva es aditiva e idempotente:
-un `CREATE TABLE IF NOT EXISTS` y cuatro declaraciones `CREATE OR REPLACE TRIGGER`,
-sin UPDATE de datos comerciales ni conversiones.
+un `CREATE TABLE IF NOT EXISTS`, cuatro declaraciones `CREATE OR REPLACE TRIGGER`
+y la vista de metadatos `FER17_AUDITORIA_TRIGGERS`, sin UPDATE de datos comerciales
+ni conversiones.
 El usuario de aplicación requiere SELECT en evidencias y SELECT/INSERT/UPDATE en
 eventos de lista inactiva (el UPDATE solo resuelve deduplicación), además de los
 permisos existentes. La carga de evidencia/calendario/verificación usa una
@@ -54,9 +55,18 @@ npm run build
 npm run precio:verificar -- \
   --producto <id> --importe <USD> \
   --evidencia "<documento, origen y localizador verificable>" \
-  --admin <id_admin_activo> --confirmar
+  --admin <id_admin_activo> --confirmar \
+  --confirmar-destino <DB_HOST:DB_PORT/DB_NAME>
 npm run precio:historial -- --producto <id>
 ```
+
+Pasá el destino exacto que revisaste, por ejemplo
+`--confirmar-destino 127.0.0.1:3307/ferrepatagonia_dev`. El CLI compara la
+configuración, consulta `DATABASE()` y comprueba las tablas y los cuatro
+triggers FER-17 antes de escribir. La credencial operativa necesita `SELECT` en
+`FER17_AUDITORIA_TRIGGERS`, que expone los metadatos de esos cuatro triggers con
+privilegios del definidor. Conservá la cuenta definidora de la migración y sus
+permisos sobre los triggers. `--json` emite un objeto JSON también en rechazos.
 
 El servicio bloquea el producto y su evidencia con `FOR UPDATE`, luego revalida
 `rol='ADMIN'` y `activo=1` con `LOCK IN SHARE MODE`, compara el importe como decimal exacto y solo entonces

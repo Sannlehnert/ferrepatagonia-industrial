@@ -6,6 +6,7 @@ import { PricingError } from './money';
 import { PricingService } from './pricing.service';
 import {
   normalizeExpectedPrice,
+  normalizePriceAmount,
   parsePositiveId,
   PriceVerificationError,
   validateEvidenceReference,
@@ -84,10 +85,6 @@ type EvidenceRow = {
   sintetica: number;
 };
 
-function normalizeDatabasePrice(value: string): string {
-  return normalizeExpectedPrice(value);
-}
-
 async function recordRejection(manager: EntityManager, input: {
   productId: number;
   currentPrice: string | null;
@@ -160,12 +157,17 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
       throw new PriceVerificationError('PRODUCTO_INEXISTENTE', 404, 'El producto no existe.');
     }
 
-    const currentPrice = product.precio === null ? null : normalizeDatabasePrice(product.precio);
+    const currentPrice = product.precio === null ? null : normalizePriceAmount(product.precio);
     if (currentPrice === null) {
       const eventId = await recordRejection(manager, {
         productId, currentPrice: null, expectedPrice, evidence, adminId, code: 'PRECIO_AUSENTE',
       });
       return { ok: false as const, code: 'PRECIO_AUSENTE', message: 'El producto no tiene precio para verificar.', eventId };
+    }
+    if (currentPrice === '0.00') {
+      const code = 'PRECIO_BASE_CERO';
+      const eventId = await recordRejection(manager, { productId, currentPrice, expectedPrice, evidence, adminId, code });
+      return { ok: false as const, code, message: 'El precio base es cero y no puede verificarse.', eventId };
     }
     if (currentPrice !== expectedPrice) {
       const eventId = await recordRejection(manager, {
@@ -248,8 +250,8 @@ export async function listPriceHistory(productId: number, limit = 50): Promise<P
     idEvento: String(row.id_evento),
     productId: Number(row.id_producto),
     tipo: row.tipo,
-    precioAnterior: row.precio_anterior === null ? null : normalizeDatabasePrice(String(row.precio_anterior)),
-    precioNuevo: row.precio_nuevo === null ? null : normalizeDatabasePrice(String(row.precio_nuevo)),
+    precioAnterior: row.precio_anterior === null ? null : normalizePriceAmount(String(row.precio_anterior)),
+    precioNuevo: row.precio_nuevo === null ? null : normalizePriceAmount(String(row.precio_nuevo)),
     evidencia: row.evidencia,
     evidenciaAnterior: row.evidencia_anterior,
     adminId: row.id_admin === null ? null : Number(row.id_admin),

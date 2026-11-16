@@ -98,3 +98,19 @@ BEGIN
 END//
 
 DELIMITER ;
+
+-- The CLI needs live metadata even when it has only SELECT on PRODUCTO.
+-- Expose the FER-17 inventory, without granting DDL or exposing trigger bodies.
+CREATE OR REPLACE SQL SECURITY DEFINER VIEW FER17_AUDITORIA_TRIGGERS AS
+SELECT TRIGGER_SCHEMA AS esquema, TRIGGER_NAME AS nombre, EVENT_OBJECT_TABLE AS tabla,
+       ACTION_TIMING AS momento, EVENT_MANIPULATION AS operacion,
+       CASE TRIGGER_NAME
+         WHEN 'fer17_precio_evento_no_update' THEN UPPER(ACTION_STATEMENT) LIKE '%SIGNAL SQLSTATE ''45000''%'
+         WHEN 'fer17_precio_evento_no_delete' THEN UPPER(ACTION_STATEMENT) LIKE '%SIGNAL SQLSTATE ''45000''%'
+         WHEN 'fer17_producto_precio_evento' THEN UPPER(ACTION_STATEMENT) LIKE '%FOR UPDATE%'
+         WHEN 'fer17_producto_alta_evento' THEN UPPER(ACTION_STATEMENT) LIKE '%INSERT INTO FER17_PRECIO_EVENTO%'
+       END AS vigente
+FROM information_schema.TRIGGERS
+WHERE TRIGGER_SCHEMA = DATABASE()
+  AND TRIGGER_NAME IN ('fer17_precio_evento_no_update','fer17_precio_evento_no_delete',
+                       'fer17_producto_precio_evento','fer17_producto_alta_evento');
