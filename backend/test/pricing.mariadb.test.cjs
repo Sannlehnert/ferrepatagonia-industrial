@@ -176,6 +176,19 @@ test('carga civil legacy y UTC de verificación deben concordar en Buenos Aires'
   await dataSource.query("UPDATE COTIZACION SET fecha_carga=DATE_SUB(fecha_carga,INTERVAL 1 HOUR),actor=UPPER(actor)");
   assert.equal((await http('/precios',undefined,{...request,moneda:'ARS'})).body.code,'COTIZACION_INVALIDA');
 });
+test('catálogo conserva precio nulo y FER-17 entrega el importe con su marca de procedencia',async()=>{
+  const detail=await fetch(url+'/catalogo/701',{headers:{Origin:process.env.APP_PUBLIC_ORIGIN}});
+  assert.equal(detail.status,200);
+  const product=(await detail.json()).data.producto;
+  assert.equal(product.precio,null);
+  assert.equal(product.estadoPrecio,'PENDIENTE_DEFINICION');
+  assert.equal(product.disponible,true);
+  const price=await http('/precios');
+  assert.equal(price.status,200);
+  assert.equal(price.body.data.datosSinteticos,true);
+  assert.equal(price.body.data.totalUSD,'95.00');
+  assert.equal(price.body.data.productos[0].estadoPrecio,'DEFINIDO');
+});
 test('usuario 901 resuelve cliente 301 y lista activa real',async()=>{
   const snapshot=await source.load(901,[701],new Date());
   assert.equal(snapshot.client.clienteId,301); assert.equal(snapshot.client.list.percent,'10.00');
