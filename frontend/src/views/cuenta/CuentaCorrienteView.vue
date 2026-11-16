@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
+import CompanyStatus from '@/components/CompanyStatus.vue'
 import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { accountReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import { useCuentaCorrienteStore } from '@/stores/cuentaCorriente'
-import type { CuentaCorrienteVencimiento } from '@/types/cuentaCorriente'
+import type { CuentaCorrienteResumen, CuentaCorrienteVencimiento } from '@/types/cuentaCorriente'
 import { creditMessage } from '@/utils/companyStatus'
 import {
     coverageMessage,
@@ -70,6 +71,12 @@ function dueLabel(item: CuentaCorrienteVencimiento): string {
     return 'Por vencer'
 }
 
+function creditStatusClasses(estadoCredito: CuentaCorrienteResumen['estadoCredito']): string {
+    if (estadoCredito === 'BLOQUEADO') return 'border-[#FECACA] bg-[#FEE2E2]/40'
+    if (estadoCredito === 'DISPONIBLE') return 'border-[#BBF7D0] bg-[#DCFCE7]/40'
+    return 'border-slate-200 bg-slate-50'
+}
+
 function emptyMessage(coverage: string): string {
     return coverage === 'COMPLETA'
         ? 'No hay movimientos registrados en esta cuenta.'
@@ -93,6 +100,8 @@ onBeforeRouteLeave(() => cuenta.clear())
                 {{ cuenta.consultaCargando ? 'Actualizando…' : 'Actualizar' }}
             </button>
         </header>
+
+        <CompanyStatus class="mb-6" />
 
         <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando ||
             cuenta.movimientosMasCargando || cuenta.vencimientosMasCargando" role="status"
@@ -128,7 +137,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                 La cuenta está inhabilitada. Podés consultar el saldo acreditado y su historial, pero no operar a crédito.
             </p>
 
-            <p v-else role="status" class="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+            <p v-else role="status" class="mb-5 rounded-md border p-4" :class="creditStatusClasses(resumen.estadoCredito)">
                 {{ creditMessage(resumen) }}
             </p>
 

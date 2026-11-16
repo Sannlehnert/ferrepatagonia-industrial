@@ -2,7 +2,6 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AccountMenu from '@/components/AccountMenu.vue'
-import CompanyStatus from '@/components/CompanyStatus.vue'
 import PublicHeader from '@/components/PublicHeader.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
 import CartDrawer from '@/components/CartDrawer.vue'
@@ -253,7 +252,6 @@ async function logout() {
       </aside>
 
       <main class="min-w-0 flex-1 overflow-hidden sm:overflow-visible p-4 sm:p-6 md:p-8 max-w-full box-border">
-        <CompanyStatus v-if="route.name !== 'cuenta-corriente'" class="mb-6" />
         <RouterView />
       </main>
     </div>

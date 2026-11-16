@@ -18,6 +18,38 @@ const demoDataBlocked = computed(() => data.value?.hasDemo && !import.meta.env.D
 const refreshing = ref(false)
 const sessionError = ref('')
 
+const BADGE_CLASSES = {
+  positive: 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]',
+  warning: 'bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]',
+  danger: 'bg-[#FEE2E2] text-[#DC2626] border-[#FECACA]',
+  neutral: 'bg-[#F1F5F9] text-[#64748B] border-[#E2E8F0]',
+} as const
+
+const approvalBadge = computed(() => {
+  const status = auth.user?.estadoAprobacionEmpresa
+  if (status === 'APROBADA') return { label: 'Aprobada', classes: BADGE_CLASSES.positive }
+  if (status === 'PENDIENTE') return { label: 'Pendiente', classes: BADGE_CLASSES.warning }
+  if (status === 'RECHAZADA') return { label: 'Rechazada', classes: BADGE_CLASSES.danger }
+  return { label: 'No determinable', classes: BADGE_CLASSES.neutral }
+})
+
+const creditBadge = computed(() => {
+  const summary = data.value?.summary
+  if (!summary || summary.estado === 'SIN_CUENTA') {
+    return { label: 'Sin cuenta', classes: BADGE_CLASSES.neutral }
+  }
+  if (summary.estado === 'INHABILITADA') {
+    return { label: 'Inhabilitada', classes: BADGE_CLASSES.warning }
+  }
+  if (summary.estadoCredito === 'DISPONIBLE') {
+    return { label: 'Disponible', classes: BADGE_CLASSES.positive }
+  }
+  if (summary.estadoCredito === 'BLOQUEADO') {
+    return { label: 'Bloqueado', classes: BADGE_CLASSES.danger }
+  }
+  return { label: 'No determinable', classes: BADGE_CLASSES.neutral }
+})
+
 async function readStatus(signal: AbortSignal) {
   const summary = await getCuentaCorriente(signal)
   if (summary.estado === 'SIN_CUENTA') return { summary, hasDemo: false }
@@ -53,16 +85,38 @@ async function refresh() {
 </script>
 
 <template>
-  <section v-if="allowed()" aria-labelledby="company-status-title" class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 shadow-sm">
-    <h3 id="company-status-title" class="m-0 text-lg font-bold text-[#0B2438]">Estado comercial</h3>
-    <p>{{ approvalMessage(auth.user?.estadoAprobacionEmpresa) }}</p>
-    <p v-if="loading" role="status">Consultando el estado de la cuenta corriente…</p>
-    <p v-else-if="error" role="alert">No se pudo consultar el estado de la cuenta corriente.</p>
-    <p v-else-if="demoDataBlocked" role="alert">Se recibió información de demostración y no se mostrará fuera del entorno de pruebas.</p>
-    <p v-else-if="data">{{ creditMessage(data.summary) }}</p>
-    <p v-if="sessionError" role="alert">{{ sessionError }}</p>
-    <button type="button" class="min-h-11 rounded-md border border-slate-300 px-4 py-2 hover:bg-slate-50"
-      :disabled="refreshing" @click="refresh">
+  <section v-if="allowed()" aria-labelledby="company-status-title" class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 shadow-sm space-y-3">
+    <h2 id="company-status-title" class="m-0 text-lg font-bold text-[#0B2438]">Estado comercial</h2>
+    <div class="space-y-2">
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border" :class="approvalBadge.classes">
+          {{ approvalBadge.label }}
+        </span>
+        <p class="m-0 text-sm text-[#0B2438]">{{ approvalMessage(auth.user?.estadoAprobacionEmpresa) }}</p>
+      </div>
+      <p v-if="loading" role="status" class="m-0 text-sm text-[#64748B]">Consultando el estado de la cuenta corriente…</p>
+      <p v-else-if="error" role="alert" class="m-0 rounded-[8px] border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm text-[#DC2626]">
+        No se pudo consultar el estado de la cuenta corriente.
+      </p>
+      <p v-else-if="demoDataBlocked" role="alert" class="m-0 rounded-[8px] border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm text-[#DC2626]">
+        Se recibió información de demostración y no se mostrará fuera del entorno de pruebas.
+      </p>
+      <div v-else-if="data" class="flex flex-wrap items-center gap-2">
+        <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border" :class="creditBadge.classes">
+          {{ creditBadge.label }}
+        </span>
+        <p class="m-0 text-sm text-[#0B2438]">{{ creditMessage(data.summary) }}</p>
+      </div>
+      <p v-if="sessionError" role="alert" class="m-0 rounded-[8px] border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm text-[#DC2626]">
+        {{ sessionError }}
+      </p>
+    </div>
+    <button
+      type="button"
+      class="min-h-[44px] rounded-[8px] border border-[#CBD5E1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2438] hover:bg-[#F8FAFC] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] transition-colors"
+      :disabled="refreshing"
+      @click="refresh"
+    >
       {{ refreshing ? 'Actualizando…' : 'Actualizar estado comercial' }}
     </button>
   </section>
