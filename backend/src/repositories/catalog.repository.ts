@@ -1,5 +1,18 @@
 import { pool } from '../config/catalog-snapshot.config';
+import type { CatalogOrder } from '../dtos/catalog/catalog-query.dto';
 import { CatalogPagination } from '../validators/catalog.validator';
+
+// Solo estas cláusulas internas llegan a ORDER BY; nunca se interpola el query string.
+const ORDER_BY: Readonly<Record<CatalogOrder, string>> = Object.freeze({
+  predeterminado: 'p.id_producto ASC',
+  nombre_asc: 'p.nombre ASC, p.id_producto ASC',
+  nombre_desc: 'p.nombre DESC, p.id_producto ASC',
+});
+
+function resolveOrderBy(orden: CatalogOrder | undefined): string {
+  return orden !== undefined && Object.hasOwn(ORDER_BY, orden)
+    ? ORDER_BY[orden] : ORDER_BY.predeterminado;
+}
 
 type CatalogRow = {
   id_producto: number;
@@ -43,7 +56,7 @@ export async function findCatalogProductById(id: number): Promise<CatalogProduct
   }
 }
 
-export async function findCatalogPage({ limit, offset, categoria, busqueda }: CatalogPagination) {
+export async function findCatalogPage({ limit, offset, categoria, busqueda, orden }: CatalogPagination) {
   const where = 'p.activo = 1 AND c.activo = 1'
     + (categoria === undefined ? '' : ' AND p.id_categoria = ?')
     + (busqueda === undefined ? '' : " AND (p.nombre LIKE ? ESCAPE '!' OR p.codigo LIKE ? ESCAPE '!')");
@@ -69,7 +82,7 @@ export async function findCatalogPage({ limit, offset, categoria, busqueda }: Ca
              c.nombre AS categoria_nombre, (p.stock > 0) AS disponible
       FROM PRODUCTO p INNER JOIN CATEGORIA c ON c.id_categoria = p.id_categoria
       WHERE ${where}
-      ORDER BY p.id_producto ASC
+      ORDER BY ${resolveOrderBy(orden)}
       LIMIT ? OFFSET ?
     `, timeout: 5000 }, [...parameters, limit, offset]);
     await connection.commit();
