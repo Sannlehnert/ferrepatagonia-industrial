@@ -7,4 +7,6 @@ export interface UsuarioSesion {
   email: string
   rol: Rol
   tipo_cliente: TipoCliente | null // null para ADMIN
+  estadoAprobacionEmpresa: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | null
+  cuentaCorrienteHabilitada: boolean | null
 }

@@ -311,6 +311,8 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             const meBody = await me.json();
             assert.equal(meBody.user.email, email);
             assert.equal(meBody.user.rol, 'CLIENTE');
+            assert.equal(meBody.user.estadoAprobacionEmpresa, 'PENDIENTE');
+            assert.equal(meBody.user.cuentaCorrienteHabilitada, null);
 
             for (const endpoint of ['/cuenta-corriente', '/cuenta-corriente/movimientos', '/cuenta-corriente/vencimientos']) {
                 const res = await apiRequest(endpoint, { token });

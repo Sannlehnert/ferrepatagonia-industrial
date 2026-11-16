@@ -5,7 +5,7 @@ import AccountMenu from '@/components/AccountMenu.vue'
 import PublicHeader from '@/components/PublicHeader.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
 import CartDrawer from '@/components/CartDrawer.vue'
-import { getPermissionsForUser } from '@/config/permissions'
+import { getPermissionsForUser, PERMISSIONS } from '@/config/permissions'
 import { useAuthStore } from '@/stores/auth'
 import { useCartPanelStore } from '@/stores/cartPanel'
 
@@ -18,20 +18,12 @@ const logoutError = ref('')
 const isMobileMenuOpen = ref(false)
 
 const permissions = computed(() => {
-  const u = auth.user as Record<string, any> | null | undefined
+  const u = auth.user
   if (!u) return getPermissionsForUser(null)
   return getPermissionsForUser({
     rol: u.rol,
-    tipoCliente: u.tipoCliente ?? u.tipo_cliente ?? u.cliente?.tipoCliente ?? null,
-    estadoAprobacionEmpresa: u.estadoAprobacionEmpresa,
-    cuentaCorrienteHabilitada: u.cuentaCorrienteHabilitada,
+    tipoCliente: u.tipo_cliente,
   })
-})
-
-const isParticular = computed(() => {
-  const u = auth.user as Record<string, any> | null | undefined
-  const tipo = u?.tipoCliente ?? u?.tipo_cliente ?? u?.cliente?.tipoCliente ?? u?.cliente?.tipo_cliente
-  return tipo === 'PARTICULAR'
 })
 
 function handleGoBack() {
@@ -49,7 +41,7 @@ function handleGoBack() {
   void router.push(fallback)
 }
 
-function isActive(target: 'pedidos' | 'sin-comprobante' | 'cuenta-corriente' | 'datos'): boolean {
+function isActive(target: 'pedidos' | 'sin-comprobante' | 'cuenta-corriente' | 'cuenta' | 'datos'): boolean {
   if (!route) return false
   const path = (route.path || '').replace(/\/$/, '')
   const query = route.query || {}
@@ -63,6 +55,7 @@ function isActive(target: 'pedidos' | 'sin-comprobante' | 'cuenta-corriente' | '
   if (target === 'cuenta-corriente') {
     return path === '/mi-cuenta/pedidos' && query.filtro === 'cuenta-corriente'
   }
+  if (target === 'cuenta') return path === '/mi-cuenta/cuenta-corriente'
   if (target === 'datos') {
     return path === '/mi-cuenta/datos'
   }
@@ -177,7 +170,7 @@ async function logout() {
       </RouterLink>
 
       <RouterLink
-        v-if="!isParticular"
+        v-if="permissions.has(PERMISSIONS.VIEW_OWN_CREDIT_ORDERS)"
         :to="{ name: 'cuenta-pedidos', query: { filtro: 'cuenta-corriente' } }"
         aria-label="Pedidos con cuenta corriente"
         class="box-border flex min-h-[44px] items-center px-3 py-2 rounded-[8px] no-underline text-sm transition-colors"
@@ -186,6 +179,17 @@ async function logout() {
         @click="isMobileMenuOpen = false"
       >
         Pedidos con cuenta corriente
+      </RouterLink>
+
+      <RouterLink
+        v-if="permissions.has(PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT)"
+        :to="{ name: 'cuenta-corriente' }"
+        class="box-border flex min-h-[44px] items-center px-3 py-2 rounded-[8px] no-underline text-sm transition-colors"
+        :class="isActive('cuenta') ? 'bg-[#103A5C] text-white font-semibold' : 'text-[#A7B6C4] hover:text-white hover:bg-[#103A5C]/40'"
+        :aria-current="isActive('cuenta') ? 'page' : undefined"
+        @click="isMobileMenuOpen = false"
+      >
+        Cuenta corriente
       </RouterLink>
 
       <RouterLink
