@@ -98,6 +98,7 @@ test('A.3 empresa pendiente sin cuenta puede consultar pero no operar a crédito
   await login(page, email, password, '/mi-cuenta/datos')
   const session = await (await page.request.get('/api/auth/me')).json()
   expect(session.user).toMatchObject({ estadoAprobacionEmpresa: 'PENDIENTE', cuentaCorrienteHabilitada: null })
+  await page.goto('/mi-cuenta')
   const commercial = page.getByRole('region', { name: 'Estado comercial' })
   await expect(commercial).toContainText('aprobación de tu empresa está pendiente')
   await expect(commercial).toContainText('No tenés una cuenta corriente asociada')
