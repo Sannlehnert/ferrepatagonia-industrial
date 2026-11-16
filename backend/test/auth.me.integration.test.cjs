@@ -35,7 +35,8 @@ test('/auth/me en MariaDB: login, restauración, estado persistido y logout', {
           (id_cliente, email, password_hash, rol, activo) VALUES (?, ?, ?, ?, 1)`,
           [clienteId, email, await bcrypt.hash(password, 4), rol]);
         const id = Number(inserted.insertId);
-        const expected = { id, nombre: tipo ? 'Prueba sesión' : 'Administrador', email, rol, tipo_cliente: tipo };
+        const expected = { id, nombre: tipo ? 'Prueba sesión' : 'Administrador', email, rol, tipo_cliente: tipo,
+          estadoAprobacionEmpresa: tipo === 'EMPRESA' ? 'PENDIENTE' : null, cuentaCorrienteHabilitada: null };
         const login = await fetch(`${base}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, password }) });
         assert.equal(login.status, 200);
@@ -46,6 +47,19 @@ test('/auth/me en MariaDB: login, restauración, estado persistido y logout', {
         assert.equal(restored.status, 200);
         assert.equal(restored.headers.get('set-cookie'), null);
         assert.deepEqual(await restored.json(), { user: expected });
+        if (tipo === 'EMPRESA') {
+          for (const estado of ['APROBADA', 'RECHAZADA']) {
+            await pool.query('UPDATE CLIENTE SET estado_aprobacion_empresa = ? WHERE id_cliente = ?', [estado, clienteId]);
+            assert.deepEqual(await (await me()).json(), { user: { ...expected, estadoAprobacionEmpresa: estado } });
+          }
+          await pool.query(`INSERT INTO CUENTA_CORRIENTE
+            (id_cliente, limite_credito, habilitada, cobertura, plazo_dias, moneda_limite, origen_datos)
+            VALUES (?, 0, 1, 'NO_ACREDITADA', NULL, 'USD', 'REAL')`, [clienteId]);
+          assert.deepEqual(await (await me()).json(), { user: { ...expected, estadoAprobacionEmpresa: 'RECHAZADA', cuentaCorrienteHabilitada: true } });
+          await pool.query('UPDATE CUENTA_CORRIENTE SET habilitada = 0 WHERE id_cliente = ?', [clienteId]);
+          assert.deepEqual(await (await me()).json(), { user: { ...expected, estadoAprobacionEmpresa: 'RECHAZADA', cuentaCorrienteHabilitada: false } });
+          await pool.query('DELETE FROM CUENTA_CORRIENTE WHERE id_cliente = ?', [clienteId]);
+        }
         await pool.query('UPDATE USUARIO SET activo = 0 WHERE id_usuario = ?', [id]);
         const inactive = await me();
         assert.equal(inactive.status, 401);

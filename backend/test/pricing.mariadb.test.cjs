@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict');
 const { test, before, beforeEach, after } = require('node:test');
 const { once } = require('node:events');
+const { randomUUID } = require('node:crypto');
 const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const { dataSource, initializeDatabase, destroyDatabase } = require('../dist/config/database.config');
 const { MariaDbPricingSource } = require('../dist/repositories/pricing.source');
@@ -23,13 +24,15 @@ before(async()=>{
   url=`http://127.0.0.1:${server.address().port}/api`;
 });
 beforeEach(async()=>{
-  for(const table of ['FER17_LISTA_INACTIVA_EVENTO','FER17_COTIZACION_VERIFICACION','FER17_CALENDARIO','PRECIO_USD_EVIDENCIA','USUARIO','CLIENTE','PRODUCTO','LISTA_PRECIO','CATEGORIA','COTIZACION']) await dataSource.query(`DELETE FROM ${table}`);
+  // The disposable container keeps the append-only audit until teardown.
+  // No assertion in this suite requires an empty price audit between fixtures.
+  for(const table of ['CONFIRMACION_PEDIDO_CC','FER17_LISTA_INACTIVA_EVENTO','FER17_COTIZACION_VERIFICACION','FER17_CALENDARIO','PRECIO_USD_EVIDENCIA','USUARIO','CLIENTE','PRODUCTO','LISTA_PRECIO','CATEGORIA','COTIZACION']) await dataSource.query(`DELETE FROM ${table}`);
   const fixture=fs.readFileSync(path.join(__dirname,'../../database/fixtures/fer17-demo.sql'),'utf8');
   for(const sql of fixture.split(';').filter(s=>s.trim()))await dataSource.query(sql);
 });
 after(async()=>{try{if(server)await new Promise(resolve=>server.close(resolve));}finally{await destroyDatabase();}});
-const http=async(path,id,body=request)=>{
-  const headers={'Content-Type':'application/json'};
+const http=async(path,id,body=request,extraHeaders={})=>{
+  const headers={'Content-Type':'application/json',...extraHeaders};
   if(id!==undefined)headers.Cookie=`jwt_token=${signToken({id,rol:id===999?'ADMIN':'CLIENTE'})}`;
   const response=await fetch(url+path,{method:'POST',headers,body:JSON.stringify(body)});
   return {status:response.status,headers:response.headers,body:await response.json()};
@@ -67,12 +70,69 @@ for(const [label,evidence,rejectedByDatabase] of [
 test('H02 evidencia documental con espacios exteriores conserva acreditación y cálculo',async()=>{
   const evidence=' \tDOC-USD-VERIFICADO\n ';
   await dataSource.query('UPDATE PRODUCTO SET precio=173.12 WHERE id_producto=701');
-  await dataSource.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=173.12,evidencia=? WHERE id_producto=701',[evidence]);
+  // Simula una revisión nueva tras el cambio: la evidencia anterior ya fue invalidada por el trigger.
+  await dataSource.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=173.12,evidencia=?,valida=1 WHERE id_producto=701',[evidence]);
   const r=await http('/precios',undefined);
   assert.equal(r.status,200);assert.equal(r.body.data.totalUSD,'164.46');
   const line=r.body.data.productos[0];
   assert.equal(line.estadoPrecio,'DEFINIDO');assert.equal(line.precioComprable,true);
   assert.equal(line.evidenciaBaseUSD.reference,evidence);
+});
+
+const commercialEvidence = 'Factura Andes A-0002-001231, folio 8, lista mayorista 2026-11';
+async function installCommercialEvidence() {
+  await dataSource.query('UPDATE PRODUCTO SET precio=173.12 WHERE id_producto=701');
+  await dataSource.query(`UPDATE PRECIO_USD_EVIDENCIA
+    SET precio_verificado=173.12, evidencia=?, valida=1, sintetica=0 WHERE id_producto=701`, [commercialEvidence]);
+}
+
+test('F-02: HTTP personalizado publica evidencia documental real e importes exactos', async () => {
+  await installCommercialEvidence();
+  const result = await http('/precios/mios', 901, { ...request, productos: [{ productoId: 701, cantidad: 2 }] });
+  assert.equal(result.status, 200);
+  const quote = result.body.data;
+  const [line] = quote.productos;
+  assert.equal(quote.datosSinteticos, false);
+  assert.equal(line.estadoPrecio, 'DEFINIDO');
+  assert.equal(line.precioComprable, true);
+  assert.equal(line.evidenciaBaseUSD.synthetic, false);
+  assert.equal(line.evidenciaBaseUSD.reference, commercialEvidence);
+  assert.equal(line.precioBaseUSD, '173.12');
+  assert.equal(line.descuentoAplicado, '10.00');
+  assert.equal(line.origenDescuento, 'LISTA');
+  assert.equal(line.precioUnitarioUSD, '155.81');
+  assert.equal(line.subtotalUSD, '311.62');
+  assert.equal(quote.totalUSD, '311.62');
+});
+
+test('F-01: EMPRESA en los tres estados consulta su lista en SQL, sin ganar acceso al checkout CC', async () => {
+  await installCommercialEvidence();
+  for (const state of ['APROBADA', 'PENDIENTE', 'RECHAZADA']) {
+    for (const listId of [401, null]) {
+      // Same authenticated user; changes to commercial identity come only from MariaDB.
+      await dataSource.query(`UPDATE CLIENTE SET tipo_cliente='EMPRESA',
+        estado_aprobacion_empresa=?, id_lista_precio=? WHERE id_cliente=301`, [state, listId]);
+      const context = `${state}, ${listId === null ? 'sin lista' : 'con lista'}`;
+      const prices = await http('/precios/mios', 901);
+      assert.equal(prices.status, 200, context);
+      const [line] = prices.body.data.productos;
+      assert.equal(line.estadoPrecio, 'DEFINIDO', context);
+      assert.equal(line.precioComprable, true, context);
+      assert.equal(line.descuentoAplicado, listId ? '10.00' : '5.00', context);
+      assert.equal(line.origenDescuento, listId ? 'LISTA' : 'ESPECIAL_PUBLICO', context);
+      assert.equal(prices.body.data.totalUSD, listId ? '155.81' : '164.46', context);
+
+      const order = await http('/pedidos/cuenta-corriente', 901,
+        { cotizacion: 'cotizacion-no-emitida-por-el-servidor' }, { 'Idempotency-Key': randomUUID() });
+      assert.equal(order.status, 403, context);
+      assert.equal(order.body.code, 'CUENTA_NO_HABILITADA', context);
+    }
+  }
+  const [counts] = await dataSource.query(`SELECT
+    (SELECT COUNT(*) FROM CUENTA_CORRIENTE WHERE id_cliente=301) AS accounts,
+    (SELECT COUNT(*) FROM PEDIDO WHERE id_cliente=301) AS orders`);
+  assert.equal(Number(counts.accounts), 0);
+  assert.equal(Number(counts.orders), 0);
 });
 async function verifiedARS(at=new Date(),daysOverride){
   const day=new Date(civilDate(at)+'T12:00:00Z'),days={};
@@ -343,7 +403,7 @@ test('snapshot REPEATABLE READ no mezcla lista anterior y producto posterior a c
         try{await writer.connect();await writer.startTransaction();
           await writer.query('UPDATE LISTA_PRECIO SET porcentaje_descuento=40 WHERE id_lista_precio=401');
           await writer.query('UPDATE PRODUCTO SET precio=200 WHERE id_producto=701');
-          await writer.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=200 WHERE id_producto=701');
+          await writer.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=200,valida=1 WHERE id_producto=701');
           await writer.commitTransaction();
         }finally{await writer.release();}
       }

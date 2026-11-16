@@ -133,7 +133,7 @@ test('CLIENTE muestra carga mientras MariaDB está bloqueada y luego presenta la
     await connection.query('LOCK TABLES CUENTA_CORRIENTE WRITE')
     try {
       await clientAccount(page)
-      await expect(page.getByRole('status')).toContainText('Consultando la cuenta corriente')
+      await expect(page.getByRole('status').filter({ hasText: 'Consultando la cuenta corriente' })).toBeVisible()
       await expect(page.getByRole('region', { name: 'Resumen de la cuenta' })).toHaveCount(0)
     } finally {
       await connection.query('UNLOCK TABLES')
