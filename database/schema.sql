@@ -299,7 +299,7 @@ CREATE TABLE IF NOT EXISTS PRECIO_USD_EVIDENCIA (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- #320: append-only commercial price audit. Intentionally no FK to PRODUCTO/USUARIO
--- so the history survives catalog/user maintenance; the application validates both.
+-- so the history survives catalog/user maintenance. The application validates both.
 CREATE TABLE IF NOT EXISTS FER17_PRECIO_EVENTO (
   id_evento BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   id_producto INT NOT NULL,

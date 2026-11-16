@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS FER17_PRECIO_EVENTO (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- The actor is set by the backend on its own transaction connection via
--- @fer17_actor_id. The trigger revalidates it as an active ADMIN; it never trusts
+-- @fer17_actor_id. The trigger revalidates it as an active ADMIN. It never trusts
 -- the identifier without that check. Direct DB writers without the variable are
 -- audited with id_admin NULL instead of inventing an operator.
 DELIMITER //
