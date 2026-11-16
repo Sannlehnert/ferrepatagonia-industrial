@@ -296,24 +296,24 @@ async function submitModalReceipt() {
     <!-- Filter Bar -->
     <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
       <div class="flex flex-wrap items-center gap-3 min-w-0">
-        <div class="flex items-center gap-2">
+        <div class="flex w-full min-w-0 flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label for="filtro-fecha" class="text-xs font-semibold text-slate-600">Fecha:</label>
           <input
             id="filtro-fecha"
             v-model="filtroFecha"
             type="date"
             aria-label="Filtrar por fecha"
-            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+            class="box-border min-h-[44px] w-full min-w-0 rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
           />
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex w-full min-w-0 flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label for="filtro-comprobante" class="text-xs font-semibold text-slate-600">Comprobante:</label>
           <select
             id="filtro-comprobante"
             v-model="filtroComprobante"
             aria-label="Estado del Comprobante"
-            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Comprobante (Todos)</option>
             <option value="SUBIDO">Subido</option>
@@ -323,13 +323,13 @@ async function submitModalReceipt() {
           </select>
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex w-full min-w-0 flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
           <select
             id="filtro-estado"
             v-model="filtroEstado"
             aria-label="Estado del Pedido"
-            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Pedido (Todos)</option>
             <option value="PENDIENTE">Pendiente</option>

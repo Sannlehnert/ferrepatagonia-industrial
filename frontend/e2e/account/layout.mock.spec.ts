@@ -35,7 +35,7 @@ async function signIn(page: Page) {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
 }
 
-for (const width of [360, 1280]) {
+for (const width of [320, 360, 1280]) {
   for (const tipo of ['PARTICULAR', 'EMPRESA'] as const) {
     test(`${tipo} ${width}px: layout, navegación y scroll`, async ({ page }) => {
       await page.setViewportSize({ width, height: 700 })
@@ -53,6 +53,7 @@ for (const width of [360, 1280]) {
         .toHaveCount(tipo === 'EMPRESA' ? 1 : 0)
       await menu.getByRole('link', { name: 'Pedidos sin comprobante' }).click()
       await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+      expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
       if (width < 768) await toggle.click()
       await expect(menu.getByRole('link', { name: 'Pedidos sin comprobante' })).toHaveAttribute('aria-current', 'page')
       await expect(menu.getByRole('link', { name: 'Historial de pedidos' })).not.toHaveAttribute('aria-current', 'page')
@@ -95,6 +96,55 @@ test('volver a tienda conserva el origen y usa catálogo ante acceso directo', a
   await page.getByRole('button', { name: 'Volver a tienda' }).click()
   await expect(page).toHaveURL('/catalogo')
 })
+
+for (const width of [320, 360]) {
+  test(`detalle de pedido de empresa sin desborde a ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 })
+    await mockApi(page, 'EMPRESA')
+    const order = {
+      pedidoId: 1, numero: 'PED-000001', fecha: '2026-11-16T12:00:00.000Z',
+      estado: 'EN_PREPARACION', modalidadPago: 'CUENTA_CORRIENTE', moneda: 'USD',
+      subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+      cantidadLineas: 1, cantidadUnidades: 2,
+    }
+    await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+      const path = new URL(route.request().url()).pathname
+      if (path === '/api/pedidos') {
+        return route.fulfill({ json: { data: { items: [order] } } })
+      }
+      if (path === '/api/pedidos/1') {
+        return route.fulfill({ json: { data: { ...order, items: [{
+          detalleId: 1, productoId: 1, codigo: 'E2E-01',
+          nombre: 'Llave industrial para taller ' + 'EXTRALARGA'.repeat(8),
+          cantidad: 2, precioUnitario: '10.00', descuento: '0.00', subtotal: '20.00',
+        }] } } })
+      }
+      if (path === '/api/pedidos/1/comprobantes') {
+        return route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
+      }
+      return route.continue()
+    })
+    await page.goto('/mi-cuenta/pedidos')
+    const toggle = page.getByRole('button', { name: 'Ver detalle de PED-000001' })
+    await toggle.click()
+    await expect(page.getByText('EXTRALARGA'.repeat(8), { exact: false })).toBeVisible()
+    const dimensions = await page.locator('html').evaluate(html => ({
+      scrollWidth: html.scrollWidth,
+      width: html.clientWidth,
+    }))
+    const overflow = await page.evaluate<string>(
+      `JSON.stringify(Array.from(document.querySelectorAll('body *'))
+        .filter(element => element.getBoundingClientRect().right > window.innerWidth + 1)
+        .slice(0, 8)
+        .map(element => ({
+          tag: element.tagName,
+          className: element.getAttribute('class'),
+          right: element.getBoundingClientRect().right,
+        })))`,
+    )
+    expect(dimensions.scrollWidth, overflow).toBeLessThanOrEqual(dimensions.width)
+  })
+}
 
 test('login respeta contexto público, protegido y destino inválido', async ({ page }) => {
   await mockApi(page, 'PARTICULAR', false)
