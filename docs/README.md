@@ -24,6 +24,10 @@
   MariaDB 11.4 con Compose, esquema y triggers FER-20 en una base vacía,
   configuración mínima de `backend/.env`, arranque de backend y frontend, salud
   y advertencias de persistencia.
+- [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
+  matriz P0/P1/P2, cobertura existente frente a brechas, escenarios de
+  seguridad y persistencia, separación API/MariaDB/navegador y orden de
+  ejecución con los comandos y perfiles vigentes.
 
 ## Contratos de autenticación en Taiga
 
