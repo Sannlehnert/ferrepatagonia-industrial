@@ -24,6 +24,10 @@
   MariaDB 11.4 con Compose, esquema y triggers FER-20 en una base vacía,
   configuración mínima de `backend/.env`, arranque de backend y frontend, salud
   y advertencias de persistencia.
+- [Solicitud y habilitación de crédito (T-S7-09.1)](s7-09/T-S7-09.1-solicitud-habilitacion-credito.md):
+  flujo de solicitud, aprobación/rechazo, habilitación/deshabilitación y
+  modificación de límite, con auditoría append-only y separación entre
+  aprobación empresarial, crédito, habilitación y elegibilidad de compra.
 
 ## Contratos de autenticación en Taiga
 
