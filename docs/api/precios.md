@@ -81,6 +81,9 @@ productos inactivos. Un precio base verificado no garantiza un precio final
 comprable: también intervienen descuentos, disponibilidad y autorización.
 Guardar o cambiar un importe no genera evidencia. Catálogo y detalle reconsultan
 los precios al recuperar el foco de la ventana; no ofrecen actualización en tiempo real.
+En consultas USD mixtas, el catálogo conserva las líneas reales verificadas y
+oculta los importes de líneas sintéticas no habilitadas para compra académica;
+estas se identifican como sintéticas y no bloquean los demás precios.
 
 ## Persistencia y transacción
 

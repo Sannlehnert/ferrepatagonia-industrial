@@ -24,6 +24,6 @@ const labels: Record<PriceState, string> = {
         <span v-if="['ESPECIAL_PUBLICO', 'AMBOS'].includes(line!.origenDescuento)"> · Promoción especial</span>
       </p>
     </template>
-    <p v-else class="m-0 text-slate-600">{{ line ? labels[line.estadoPrecio] : 'Precio a confirmar' }}</p>
+    <p v-else class="m-0 text-slate-600">{{ line?.estadoPrecio === 'DEFINIDO' && line.evidenciaBaseUSD?.synthetic ? 'Precio sintético no disponible' : line ? labels[line.estadoPrecio] : 'Precio a confirmar' }}</p>
   </div>
 </template>
