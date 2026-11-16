@@ -29,6 +29,7 @@ try {
 }
 
 const assert = require('node:assert/strict');
+const { assertSchemaInventory } = require('./helpers/schema-inventory.cjs');
 const { describe, test, before, after } = require('node:test');
 const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
@@ -190,35 +191,8 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             await dataSource.initialize();
         }
 
-        const requiredTables = [
-            'CATEGORIA', 'PRODUCTO', 'LISTA_PRECIO', 'COTIZACION', 'CLIENTE', 'USUARIO',
-            'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
-            'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
-            'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
-            'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
-            'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
-            'SOLICITUD_CREDITO', 'EVENTO_CREDITO',
-        ];
-        const tables = await dataSource.query(`
-            SELECT TABLE_NAME FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = DATABASE()
-        `);
-        const tableNames = new Set(tables.map(row => row.TABLE_NAME));
-        for (const table of requiredTables) {
-            assert.ok(tableNames.has(table), `Falta la tabla ${table}`);
-        }
+        await assertSchemaInventory(sql => dataSource.query(sql), 'complete');
 
-        const triggers = await dataSource.query(`
-            SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
-            WHERE TRIGGER_SCHEMA = DATABASE()
-            ORDER BY TRIGGER_NAME
-        `);
-        const triggerNames = new Set(triggers.map(row => row.TRIGGER_NAME));
-        for (const trigger of [
-            'fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update',
-        ]) {
-            assert.ok(triggerNames.has(trigger), `Falta el trigger ${trigger}`);
-        }
 
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');
@@ -324,6 +298,8 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             const meBody = await me.json();
             assert.equal(meBody.user.email, email);
             assert.equal(meBody.user.rol, 'CLIENTE');
+            assert.equal(meBody.user.estadoAprobacionEmpresa, 'PENDIENTE');
+            assert.equal(meBody.user.cuentaCorrienteHabilitada, null);
 
             for (const endpoint of ['/cuenta-corriente', '/cuenta-corriente/movimientos', '/cuenta-corriente/vencimientos']) {
                 const res = await apiRequest(endpoint, { token });

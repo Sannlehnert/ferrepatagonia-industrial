@@ -15,6 +15,8 @@ const labelKey = 'ferrepatagonia.s7-03-1-audit';
 const labelValue = token;
 const image = 'mariadb:11.4';
 
+const { assertSchemaInventory } = require('./schema-inventory.cjs');
+
 // Permite ejecutar el runner tanto desde Linux/WSL (docker) como desde
 // Windows (docker.exe). Solo se acepta un motor con daemon disponible.
 function resolveDocker() {
@@ -113,38 +115,14 @@ async function main() {
 
         applySql(path.join(backend, '../database/schema.sql'));
         applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+        applySql(path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
+        applySql(path.join(backend, '../database/migrate-s7-09-1-credit-workflow.sql'));
 
-        const requiredTables = [
-            'CATEGORIA', 'PRODUCTO', 'LISTA_PRECIO', 'COTIZACION', 'CLIENTE', 'USUARIO',
-            'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
-            'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
-            'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
-            'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
-            'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
-            'SOLICITUD_CREDITO', 'EVENTO_CREDITO',
-        ];
-        const tables = await connection.query(`
-            SELECT TABLE_NAME AS name FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = ?
-        `, [database]);
-        const tableNames = new Set(tables.map(row => row.name));
-        for (const table of requiredTables) {
-            assert.ok(tableNames.has(table), `Falta la tabla ${table}`);
-        }
+        const [identity] = await connection.query('SELECT DATABASE() AS base');
+        assert.equal(identity.base, database, 'La auditoría debe ejecutarse sobre la base aislada creada');
 
-        const triggers = await connection.query(`
-            SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
-            WHERE TRIGGER_SCHEMA = ?
-            ORDER BY TRIGGER_NAME
-        `, [database]);
-        const triggerNames = new Set(triggers.map(row => row.TRIGGER_NAME));
-        for (const trigger of [
-            'fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update',
-        ]) {
-            assert.ok(triggerNames.has(trigger), `Falta el trigger ${trigger}`);
-        }
-
-        console.log('[T-S7-03.1] Esquema verificado: tablas requeridas y 3 triggers FER-20.');
+        const inventory = await assertSchemaInventory(sql => connection.query(sql), 'complete');
+        console.log('[T-S7-03.1] Instalación completa verificada:', inventory);
         console.log('[T-S7-03.1] Ejecutando company-approval-audit.test.cjs...');
 
         const result = spawnSync(process.execPath, [

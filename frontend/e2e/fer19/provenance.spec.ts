@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+﻿import { expect, test } from '@playwright/test'
 import type { AccountList, AccountQuery } from '../../src/types/adminAccount'
 import { adminAccounts, adminDetail, adminList, apiError, clientAccount, data, fixture, login, logout, own } from './support'
 
@@ -17,7 +17,7 @@ test('build de producción muestra datos REAL del backend y bloquea DEMO y el li
   await login(page, client('empresa30'))
   await clientAccount(page)
   await apiError(await page.request.get(own), 500)
-  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByRole('alert').filter({ hasText: 'No pudimos consultar tu cuenta corriente' })).toBeVisible()
   await expect(cards).toHaveCount(0)
   await expect(page.getByRole('table')).toHaveCount(0)
   await logout(page)
@@ -26,7 +26,7 @@ test('build de producción muestra datos REAL del backend y bloquea DEMO y el li
   const rejection = page.waitForResponse(r => new URL(r.url()).pathname === own)
   await clientAccount(page)
   await apiError(await rejection, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE')
-  await expect(page.getByRole('alert')).toHaveText('No pudimos consultar tu cuenta corriente. Intentá nuevamente.')
+  await expect(page.getByRole('alert').filter({ hasText: 'No pudimos consultar tu cuenta corriente' })).toHaveText('No pudimos consultar tu cuenta corriente. Intentá nuevamente.')
   await expect(page.getByRole('button', { name: 'Reintentar', exact: true })).toBeVisible()
   await expect(cards).toHaveCount(0)
   await expect(page.getByRole('table')).toHaveCount(0)

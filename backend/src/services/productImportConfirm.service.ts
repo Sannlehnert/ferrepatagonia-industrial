@@ -248,7 +248,7 @@ export const confirmProductImport = async (
                     activo: entry.dto.activo
                 }));
 
-                batchResult = await insertImportedProductsBatch(batchInputs, token);
+                batchResult = await insertImportedProductsBatch(batchInputs, token, adminId);
             }
         } catch (batchError) {
             if (batchError instanceof FileImportValidationError) {

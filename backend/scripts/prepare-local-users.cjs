@@ -6,10 +6,9 @@
 //
 // Reglas de seguridad:
 // - Solo NODE_ENV=development. Nunca test ni production.
-// - Identifica la base antes de escribir: exige las 23 tablas del esquema
-//   vigente (21 base + T-S7-09.1) y los 3 triggers FER-20. Admite las
-//   extensiones FER-17 de T-S7-05.2 cuando esten integradas. Con una base
-//   anterior (por ejemplo 14 tablas) aborta sin mutar nada.
+// - Identifica la instalacion completa antes de escribir: 24 tablas,
+//   siete triggers y la vista de auditoria FER-17. Las bases parciales
+//   o anteriores se rechazan sin mutaciones.
 // - Nunca actualiza ni borra filas existentes: si el email ya tiene USUARIO lo
 //   omite y conserva su contrasena y estado.
 // - No crea cuenta corriente, movimientos ni credito.
@@ -36,25 +35,7 @@ const SALT_ROUNDS = 12;
 // Tiempo maximo de espera por el bloqueo cooperativo entre bootstraps.
 const LOCK_TIMEOUT_SECONDS = 30;
 
-const REQUIRED_TABLES = new Set([
-    'CATEGORIA', 'PRODUCTO', 'LISTA_PRECIO', 'COTIZACION', 'CLIENTE', 'USUARIO',
-    'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
-    'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
-    'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
-    'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
-    'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
-    'SOLICITUD_CREDITO', 'EVENTO_CREDITO',
-]);
-
-// Extensiones opcionales de otras ramas. No se exigen para no imponer el orden
-// de merge; si estan presentes, se reconocen como parte del esquema.
-const OPTIONAL_TABLES = new Set(['FER17_PRECIO_EVENTO']);
-const KNOWN_TABLES = new Set([...REQUIRED_TABLES, ...OPTIONAL_TABLES]);
-
-const EXPECTED_TRIGGERS = new Set([
-    'fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update',
-]);
-const OPTIONAL_TRIGGERS = new Set(['fer17_producto_alta_evento', 'fer17_producto_precio_evento']);
+const { readSchemaInventory, schemaErrors } = require('./lib/schema-inventory.cjs');
 
 // Emails fijos del bootstrap local; el dominio .test es ficticio.
 // Distintos de los usuarios de seed.sql (example.test) para no tocarlos nunca.
@@ -93,40 +74,8 @@ function fail(message) {
 
 async function identifyDatabase(connection) {
     const [[identity]] = await connection.query('SELECT DATABASE() AS base, VERSION() AS version');
-    const [tables] = await connection.query(
-        "SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'",
-    );
-    const [triggers] = await connection.query(
-        'SELECT TRIGGER_NAME AS name FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE()',
-    );
-    return {
-        base: identity.base, version: identity.version,
-        tables: new Set(tables.map(row => row.name)),
-        triggers: new Set(triggers.map(row => row.name)),
-    };
-}
-
-function verifySchema(identity) {
-    const missing = [...REQUIRED_TABLES].filter(t => !identity.tables.has(t));
-    const extra = [...identity.tables].filter(t => !KNOWN_TABLES.has(t));
-    if (missing.length === 0 && extra.length === 0) return null;
-    if (missing.length > 0 && identity.tables.size <= 20) {
-        return `La base "${identity.base}" no tiene el esquema vigente (${identity.tables.size} tablas; faltan ${missing.length}).`
-            + ' Puede ser un volumen anterior a FER-17/18/19/20. No se modifico nada.'
-            + ' Acordar con el equipo una actualizacion o sustitucion controlada antes de usar este script.';
-    }
-    return `La base "${identity.base}" no coincide con el esquema vigente.`
-        + (missing.length ? ` Tablas faltantes: ${missing.join(', ')}.` : '')
-        + (extra.length ? ` Tablas no reconocidas: ${extra.join(', ')}.` : '');
-}
-
-function verifyTriggers(identity) {
-    const missing = [...EXPECTED_TRIGGERS].filter(t => !identity.triggers.has(t));
-    const extra = [...identity.triggers].filter(t => !EXPECTED_TRIGGERS.has(t) && !OPTIONAL_TRIGGERS.has(t));
-    if (missing.length === 0 && extra.length === 0) return null;
-    return `La base "${identity.base}" no tiene los triggers esperados.`
-        + (missing.length ? ` Faltan FER-20: ${missing.join(', ')}. Aplicar database/migrate-fer-20-account-movements.sql.` : '')
-        + (extra.length ? ` Triggers no reconocidos: ${extra.join(', ')}.` : '');
+    const inventory = await readSchemaInventory(async sql => (await connection.query(sql))[0]);
+    return { ...identity, inventory };
 }
 
 function credentialsPath(database) {
@@ -315,9 +264,10 @@ async function main() {
         const loaded = loadCredentials(DB_NAME);
 
         const identity = await identifyDatabase(connection);
-        console.log(`Base: ${identity.base} (${identity.version}) en ${DB_HOST}:${DB_PORT}. Tablas: ${identity.tables.size}, triggers FER-20: ${identity.triggers.size}.`);
-        const schemaError = verifySchema(identity) ?? verifyTriggers(identity);
-        if (schemaError) return fail(schemaError);
+        const { tables, triggers, views } = identity.inventory;
+        console.log(`Base: ${identity.base} (${identity.version}) en ${DB_HOST}:${DB_PORT}. Tablas: ${tables.length}, triggers: ${triggers.length}, vistas: ${views.length}.`);
+        const errors = schemaErrors(identity.inventory, 'complete');
+        if (errors.length) return fail(`La base "${identity.base}" no tiene el esquema completo. ${errors.join(' ')} Revisar database/README.md antes de continuar.`);
 
         const plans = [];
         for (const account of ACCOUNTS) {

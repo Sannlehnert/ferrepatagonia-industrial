@@ -298,6 +298,31 @@ CREATE TABLE IF NOT EXISTS PRECIO_USD_EVIDENCIA (
   CONSTRAINT chk_precio_evidencia CHECK (precio_verificado >= 0 AND valida IN (0,1) AND sintetica IN (0,1) AND CHAR_LENGTH(TRIM(evidencia)) > 0)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- #320: append-only commercial price audit. Intentionally no FK to PRODUCTO/USUARIO
+-- so the history survives catalog/user maintenance. The application validates both.
+CREATE TABLE IF NOT EXISTS FER17_PRECIO_EVENTO (
+  id_evento BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  id_producto INT NOT NULL,
+  tipo VARCHAR(20) COLLATE utf8mb4_bin NOT NULL,
+  precio_anterior DECIMAL(12,2) NULL,
+  precio_nuevo DECIMAL(12,2) NULL,
+  evidencia VARCHAR(1000) NULL,
+  evidencia_anterior VARCHAR(1000) NULL,
+  id_admin INT NULL,
+  ocurrido_utc DATETIME(3) NOT NULL,
+  resultado VARCHAR(20) COLLATE utf8mb4_bin NOT NULL,
+  motivo VARCHAR(80) COLLATE utf8mb4_bin NULL,
+  PRIMARY KEY (id_evento),
+  KEY idx_precio_evento_producto (id_producto, ocurrido_utc),
+  KEY idx_precio_evento_tipo (tipo, ocurrido_utc),
+  CONSTRAINT chk_precio_evento_tipo CHECK (tipo IN ('ALTA','CAMBIO_PRECIO','VERIFICACION','INVALIDACION','RECHAZO')),
+  CONSTRAINT chk_precio_evento_resultado CHECK (resultado IN ('APLICADO','RECHAZADO')),
+  CONSTRAINT chk_precio_evento_importes CHECK ((precio_anterior IS NULL OR precio_anterior >= 0) AND (precio_nuevo IS NULL OR precio_nuevo >= 0)),
+  CONSTRAINT chk_precio_evento_admin CHECK (id_admin IS NULL OR id_admin > 0),
+  CONSTRAINT chk_precio_evento_evidencia CHECK (evidencia IS NULL OR CHAR_LENGTH(TRIM(evidencia)) > 0),
+  CONSTRAINT chk_precio_evento_evidencia_anterior CHECK (evidencia_anterior IS NULL OR CHAR_LENGTH(TRIM(evidencia_anterior)) > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS FER17_CALENDARIO (
   version VARCHAR(80) COLLATE utf8mb4_bin NOT NULL PRIMARY KEY,
   dias_json LONGTEXT NOT NULL,

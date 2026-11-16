@@ -1,12 +1,13 @@
 // Runner aislado de T-S7-09.1: MariaDB 11.4 descartable (tmpfs, auto-remove).
-// Aplica schema.sql, FER-20, y la migración de crédito dos veces para verificar
-// idempotencia. Nunca usa la base persistente ni puertos fijos.
+// Valida instalación completa y actualización de una base con datos.
 const { execFileSync, spawn, spawnSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const assert = require('node:assert/strict');
 const mariadb = require('mariadb');
+const { creditTables, readSchemaInventory } = require('../../scripts/lib/schema-inventory.cjs');
+const { assertSchemaInventory } = require('./schema-inventory.cjs');
 
 const backend = path.resolve(__dirname, '../..');
 const token = randomUUID().replaceAll('-', '');
@@ -35,11 +36,11 @@ const docker = (...args) => execFileSync(dockerBin, args, {
   encoding: 'utf8', stdio: 'pipe', timeout: 180000, windowsHide: true,
 }).trim();
 
-function applySql(file) {
+function applySql(file, { target = database, contents = fs.readFileSync(file) } = {}) {
   const result = spawnSync(dockerBin, [
-    'exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, database,
+    'exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, target,
   ], {
-    input: fs.readFileSync(file),
+    input: contents,
     encoding: 'utf8',
     timeout: 120000,
     maxBuffer: 20 * 1024 * 1024,
@@ -48,6 +49,50 @@ function applySql(file) {
   if (result.error) throw result.error;
   if (result.status !== 0) {
     throw new Error(`Falló ${path.basename(file)}: ${result.stderr || result.stdout}`);
+  }
+}
+
+const file = name => path.join(backend, '../database', name);
+const creditMigration = 'migrate-s7-09-1-credit-workflow.sql';
+
+async function snapshot(query, tables) {
+  return Promise.all(tables.map(async table => ({
+    table,
+    rows: (await query(`SELECT * FROM ${table}`))
+      .map(row => JSON.stringify(row, (_, value) => typeof value === 'bigint' ? value.toString() : value))
+      .sort(),
+  })));
+}
+
+async function checkUpgrade(port) {
+  // Base anterior a crédito, con las migraciones FER-20 y FER-17 ya aplicadas.
+  const target = `${database}_upgrade`;
+  docker('exec', container, 'mariadb', '-uroot', `-p${password}`, '-e', `CREATE DATABASE ${target}`);
+  const schema = fs.readFileSync(file('schema.sql'), 'utf8');
+  const previous = schema.split(';').filter(statement =>
+    !creditTables.some(table => statement.includes(`CREATE TABLE IF NOT EXISTS ${table} (`)),
+  ).join(';');
+  applySql(file('schema.sql'), { target, contents: previous });
+  for (const name of ['migrate-fer-20-account-movements.sql', 'migrate-fer-17-price-verification.sql', 'seed.sql', 'verify-seed.sql']) {
+    applySql(file(name), { target });
+  }
+  const db = await mariadb.createConnection({ host: '127.0.0.1', port, user: 'root',
+    password, database: target, timezone: 'Z', dateStrings: true });
+  try {
+    const query = sql => db.query(sql);
+    await assertSchemaInventory(query, 'before-credit');
+    const { tables } = await readSchemaInventory(query);
+    const before = await snapshot(query, tables);
+    assert.ok(before.some(({ table, rows }) => table === 'PAGO' && rows.length));
+    assert.ok(before.some(({ table, rows }) => table === 'FER17_PRECIO_EVENTO' && rows.length));
+    for (let i = 0; i < 2; i += 1) {
+      applySql(file(creditMigration), { target });
+      await assertSchemaInventory(query, 'complete');
+      assert.deepEqual(await snapshot(query, tables), before, 'la migración conserva todas las filas previas');
+    }
+    console.log('Migración aditiva: filas de las 22 tablas previas preservadas en ambas ejecuciones.');
+  } finally {
+    await db.end();
   }
 }
 
@@ -90,44 +135,16 @@ async function main() {
     }
     assert.ok(connection && !interrupted, 'MariaDB descartable no disponible');
 
-    applySql(path.join(backend, '../database/schema.sql'));
-    applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
-    for (let i = 0; i < 2; i++) {
-      applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
-      applySql(path.join(backend, '../database/migrate-s7-09-1-credit-workflow.sql'));
+    const [version] = await connection.query('SELECT VERSION() AS version');
+    assert.match(version.version, /^11\.4\..*MariaDB/i);
+    for (const name of ['schema.sql', 'migrate-fer-20-account-movements.sql', 'migrate-fer-17-price-verification.sql', creditMigration]) {
+      applySql(file(name));
     }
-
-    const requiredTables = [
-      'CATEGORIA', 'PRODUCTO', 'LISTA_PRECIO', 'COTIZACION', 'CLIENTE', 'USUARIO',
-      'PEDIDO', 'DETALLE_PEDIDO', 'CUENTA_CORRIENTE', 'PAGO',
-      'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA',
-      'PRECIO_USD_EVIDENCIA', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
-      'FER17_LISTA_INACTIVA_EVENTO', 'CARRITO', 'ITEM_CARRITO',
-      'CONFIRMACION_PEDIDO_CC', 'DETALLE_PEDIDO_CC_PRECIO', 'COMPROBANTE_PAGO',
-      'SOLICITUD_CREDITO', 'EVENTO_CREDITO',
-    ];
-    const tables = await connection.query(`
-      SELECT TABLE_NAME AS name FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?
-    `, [database]);
-    const tableNames = new Set(tables.map(row => row.name));
-    for (const table of requiredTables) {
-      assert.ok(tableNames.has(table), `Falta la tabla ${table}`);
-    }
-    const triggers = await connection.query(`
-      SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
-      WHERE TRIGGER_SCHEMA = ? ORDER BY TRIGGER_NAME
-    `, [database]);
-    const triggerNames = new Set(triggers.map(row => row.TRIGGER_NAME));
-    for (const trigger of [
-      'fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update',
-    ]) {
-      assert.ok(triggerNames.has(trigger), `Falta el trigger ${trigger}`);
-    }
-
-    console.log(JSON.stringify({
-      mode: 'credit-workflow', database, host: '127.0.0.1', port,
-      container, tables: tableNames.size, triggers: triggerNames.size,
-    }));
+    const query = sql => connection.query(sql);
+    const inventory = await assertSchemaInventory(query, 'complete');
+    await checkUpgrade(port);
+    console.log(JSON.stringify({ mode: 'credit-workflow', version: version.version,
+      database, host: '127.0.0.1', port, container, ...inventory }));
 
     const code = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, [
@@ -160,6 +177,11 @@ async function main() {
     });
     assert.equal(code, 0, `Suite T-S7-09.1 falló (exit ${code})`);
     assert.equal(interrupted, false);
+    const populated = await snapshot(query, creditTables);
+    assert.ok(populated.every(({ rows }) => rows.length > 0));
+    applySql(file(creditMigration));
+    assert.deepEqual(await snapshot(query, creditTables), populated);
+    console.log('Reaplicación verificada: solicitudes y eventos existentes preservados.');
   } finally {
     process.off('SIGINT', signal);
     process.off('SIGTERM', signal);
