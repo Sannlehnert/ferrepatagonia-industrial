@@ -306,7 +306,8 @@ async function main() {
         const loaded = loadCredentials(DB_NAME);
 
         const identity = await identifyDatabase(connection);
-        console.log(`Base: ${identity.base} (${identity.version}) en ${DB_HOST}:${DB_PORT}. Tablas: ${identity.tables.size}, triggers FER-20: ${identity.triggers.size}.`);
+        const fer20Count = [...EXPECTED_TRIGGERS].filter(t => identity.triggers.has(t)).length;
+        console.log(`Base: ${identity.base} (${identity.version}) en ${DB_HOST}:${DB_PORT}. Tablas: ${identity.tables.size}, triggers FER-20 requeridos: ${fer20Count}/${EXPECTED_TRIGGERS.size}.`);
         const schemaError = verifySchema(identity) ?? verifyTriggers(identity);
         if (schemaError) return fail(schemaError);
 

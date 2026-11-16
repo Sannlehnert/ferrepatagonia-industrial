@@ -32,11 +32,13 @@ test('el runner de pricing usa el cargador sin transformar los delimitadores', (
   assert.doesNotMatch(runner, /\.replace\s*\(/, 'El runner no debe transformar el SQL de las migraciones');
 });
 
-test('la migración FER-17 conserva sus delimitadores y DROP TRIGGER originales', () => {
+test('la migración FER-17 declara los cuatro triggers completos con delimitadores nativos', () => {
   const sql = fs.readFileSync(migrationFile, 'utf8');
   assert.match(sql, /^DELIMITER \/\/$/m);
-  assert.match(sql, /^DROP TRIGGER IF EXISTS fer17_producto_alta_evento\/\/$/m);
-  assert.match(sql, /^DROP TRIGGER IF EXISTS fer17_producto_precio_evento\/\/$/m);
-  assert.equal((sql.match(/^END\/\/$/gm) ?? []).length, 2);
+  assert.match(sql, /^CREATE OR REPLACE TRIGGER fer17_producto_alta_evento\r?\nAFTER INSERT ON PRODUCTO$/m);
+  assert.match(sql, /^CREATE OR REPLACE TRIGGER fer17_producto_precio_evento\r?\nAFTER UPDATE ON PRODUCTO$/m);
+  assert.match(sql, /^CREATE OR REPLACE TRIGGER fer17_precio_evento_no_update\r?\nBEFORE UPDATE ON FER17_PRECIO_EVENTO$/m);
+  assert.match(sql, /^CREATE OR REPLACE TRIGGER fer17_precio_evento_no_delete\r?\nBEFORE DELETE ON FER17_PRECIO_EVENTO$/m);
+  assert.equal((sql.match(/^END\/\/$/gm) ?? []).length, 4);
   assert.match(sql, /^DELIMITER ;$/m);
 });

@@ -455,6 +455,61 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     assert.equal((await priceLine(rollbackProduct)).estadoPrecio, 'BASE_NO_VERIFICADA');
   });
 
+  test('Un snapshot antiguo no oculta la evidencia recién confirmada al trigger de precio', { timeout: 15000 }, async () => {
+    const id = await createProduct(`FER320-SNAPSHOT-${RUN_ID}`, 100);
+    const reference = 'Factura Andes 001-255, folio 8';
+    const writer = dataSource.createQueryRunner();
+    try {
+      await writer.connect();
+      await writer.startTransaction('REPEATABLE READ');
+      const snapshotSql = 'SELECT evidencia FROM PRECIO_USD_EVIDENCIA WHERE id_producto=?';
+      assert.deepEqual(await writer.query(snapshotSql, [id]), []);
+      assert.equal((await verify(id, '100.00', reference)).ok, true);
+      assert.deepEqual(await writer.query(snapshotSql, [id]), [], 'El snapshot sigue siendo anterior a la verificación');
+      await writer.query('UPDATE PRODUCTO SET precio=120.00 WHERE id_producto=?', [id]);
+      await writer.commitTransaction();
+    } finally {
+      if (writer.isTransactionActive) await writer.rollbackTransaction();
+      await writer.release();
+    }
+    await dataSource.query('UPDATE PRODUCTO SET precio=100.00 WHERE id_producto=?', [id]);
+    assert.equal((await evidenceRow(id)).valida, 0);
+    const history = await listPriceHistory(id);
+    assert.deepEqual(history.map(event => event.tipo),
+      ['CAMBIO_PRECIO', 'INVALIDACION', 'CAMBIO_PRECIO', 'VERIFICACION', 'ALTA']);
+    assert.equal(history[1].evidencia, reference);
+    assert.equal(history[1].precioAnterior, '100.00');
+    assert.equal(history[1].precioNuevo, '120.00');
+    assert.equal((await priceLine(id)).estadoPrecio, 'BASE_NO_VERIFICADA');
+  });
+
+  test('MariaDB rechaza UPDATE y DELETE del historial; permite INSERT y respeta ROLLBACK', async () => {
+    const id = await createProduct(`FER320-APPEND-${RUN_ID}`, 42);
+    const before = await listPriceHistory(id);
+    assert.equal(before.length, 1);
+    const ref = 'Factura Valle 002-114, folio 9';
+    const runner = dataSource.createQueryRunner();
+    try {
+      await runner.connect();
+      await runner.startTransaction();
+      await runner.query(`INSERT INTO FER17_PRECIO_EVENTO
+        (id_producto,tipo,precio_nuevo,evidencia,id_admin,ocurrido_utc,resultado)
+        VALUES (?, 'VERIFICACION', 42.00, ?, ?, UTC_TIMESTAMP(3),'APLICADO')`, [id, ref, admin.id]);
+      const denied = statement => error => error.driverError?.sqlState === '45000'
+        && error.driverError?.sqlMessage.includes(`${statement} no permitido`);
+      await assert.rejects(runner.query("UPDATE FER17_PRECIO_EVENTO SET motivo='alterado' WHERE id_producto=?", [id]), denied('UPDATE'));
+      await assert.rejects(runner.query('DELETE FROM FER17_PRECIO_EVENTO WHERE id_producto=?', [id]), denied('DELETE'));
+      assert.equal((await runner.query('SELECT id_evento FROM FER17_PRECIO_EVENTO WHERE id_producto=?', [id])).length, 2);
+      await runner.rollbackTransaction();
+    } finally {
+      if (runner.isTransactionActive) await runner.rollbackTransaction();
+      await runner.release();
+    }
+    assert.deepEqual(await listPriceHistory(id), before);
+    assert.equal((await verify(id, '42.00', ref)).ok, true);
+    assert.deepEqual((await listPriceHistory(id)).map(event => event.tipo), ['VERIFICACION', 'ALTA']);
+  });
+
   test('16. Evidencia sintética: no se promociona sola; la revisión manual la reemplaza', async () => {
     const syntheticProduct = await createProduct(`T-S7-05-2-SYNTH-${RUN_ID}`, 70);
     await pool.query(

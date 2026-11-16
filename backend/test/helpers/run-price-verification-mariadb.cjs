@@ -225,12 +225,14 @@ async function main() {
       'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() ORDER BY TRIGGER_NAME',
     );
     assert.deepEqual(triggerRows.map(row => row.TRIGGER_NAME), [
+      'fer17_precio_evento_no_delete',
+      'fer17_precio_evento_no_update',
       'fer17_producto_alta_evento',
       'fer17_producto_precio_evento',
       'fer260_cuenta_revision',
       'fer260_imputacion_insert',
       'fer260_imputacion_update',
-    ], 'La instalación limpia debe tener 3 triggers FER-20 y 2 triggers FER-17');
+    ], 'La instalación limpia debe tener 3 triggers FER-20 y 4 triggers FER-17');
 
     console.log(JSON.stringify({
       database, container, port,
@@ -256,6 +258,16 @@ async function main() {
     const mainResult = runSuite('test/price-verification.mariadb.test.cjs');
     if (mainResult.error) throw mainResult.error;
     if (mainResult.status !== 0) throw Error('La suite principal de verificación de precios falló');
+
+    // Reapply over historical data, not just over the empty schema.
+    const evidenceSql = 'SELECT * FROM PRECIO_USD_EVIDENCIA ORDER BY id_producto';
+    const eventSql = 'SELECT * FROM FER17_PRECIO_EVENTO ORDER BY id_evento';
+    const [evidence, events] = await Promise.all([connection.query(evidenceSql), connection.query(eventSql)]);
+    assert.ok(evidence.length > 0 && events.length > 0);
+    apply('migrate-fer-17-price-verification.sql');
+    assert.deepEqual(await connection.query(evidenceSql), evidence);
+    assert.deepEqual(await connection.query(eventSql), events);
+    console.log('Migración FER-17 reaplicada con evidencia y eventos históricos intactos.');
 
     // Requirement: evidence and audit survive a MariaDB restart.
     await connection.end().catch(() => undefined);

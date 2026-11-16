@@ -44,7 +44,7 @@ condiciones están documentadas en [backend/README.md](../backend/README.md#conf
 Para crear un esquema local nuevo, seguir una sola vez el orden
 `schema.sql`, `migrate-fer-20-account-movements.sql`,
 `migrate-fer-17-price-verification.sql`, `seed.sql`, `verify-seed.sql`
-(junto con la verificación SQL de las 22 tablas y los 5 triggers) de
+(junto con la verificación SQL de las 22 tablas y los 7 triggers) de
 [database/README.md](../database/README.md#3-ejecutar-los-scripts-en-orden).
 No repetir `schema.sql` ni `seed.sql` sobre una base cargada. Arrancar y verificar:
 

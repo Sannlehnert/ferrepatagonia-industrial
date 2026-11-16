@@ -63,17 +63,17 @@ async function main() {
     apply('migrate-fer-20-account-movements.sql');
     apply('migrate-fer-20-account-movements.sql');
 
-    // 3. Verificar estado final de instalación limpia: 22 tablas y 5 triggers (3 FER-20 + 2 FER-17)
+    // 3. Verificar estado final: 22 tablas y 7 triggers (3 FER-20 + 4 FER-17)
     const [schemaState] = await connection.query(`SELECT
       (SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()) AS tables,
       (SELECT GROUP_CONCAT(TRIGGER_NAME ORDER BY TRIGGER_NAME) FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE()) AS triggers`);
     assert.equal(Number(schemaState.tables), 22);
     assert.equal(
       schemaState.triggers,
-      'fer17_producto_alta_evento,fer17_producto_precio_evento,fer260_cuenta_revision,fer260_imputacion_insert,fer260_imputacion_update',
+      'fer17_precio_evento_no_delete,fer17_precio_evento_no_update,fer17_producto_alta_evento,fer17_producto_precio_evento,fer260_cuenta_revision,fer260_imputacion_insert,fer260_imputacion_update',
     );
     assert.match((await connection.query('SELECT VERSION() AS v'))[0].v, /^11\.4\.\d+-MariaDB\b/);
-    console.log('Clean install: 22 tables + 5 triggers (3 FER-20 + 2 FER-17) verified twice.');
+    console.log('Full schema: 22 tables + 7 triggers (3 FER-20 + 4 FER-17).');
 
     const result = spawnSync(process.execPath,['--require','./test/helpers/test-env.cjs','--test','--test-concurrency=1','test/pricing.mariadb.test.cjs'],{
       cwd:backend,stdio:'inherit',env:{...process.env,DOTENV_CONFIG_PATH:path.join(backend,'test/helpers/nonexistent.env'),

@@ -188,7 +188,7 @@ flowchart LR
 
 6. **Inicializar esquema, triggers y datos de prueba (solo sobre una base nueva/vacía):**
 
-   > `database/schema.sql` crea las **22 tablas** base, pero **no incluye los 5 triggers** (3 FER-20 de cuenta corriente y 2 FER-17 de precio). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` y `database/migrate-fer-17-price-verification.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Si la base tiene tablas pero no cumple el esquema vigente, detenerse, respaldar y acordar su actualización con el equipo; no borrar el volumen. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
+   > `database/schema.sql` crea las **22 tablas** base, pero **no incluye los 7 triggers** (3 FER-20 de cuenta corriente y 4 FER-17 de precio). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` y `database/migrate-fer-17-price-verification.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Si la base tiene tablas pero no cumple el esquema vigente, detenerse, respaldar y acordar su actualización con el equipo; no borrar el volumen. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
 
    ```bash
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
@@ -198,13 +198,13 @@ flowchart LR
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/verify-seed.sql'
    ```
 
-   `verify-seed.sql` debe mostrar `PASS: conteos, relaciones, importes y destinos de pago` (pero no comprueba la existencia de los triggers). Verificar explícitamente mediante SQL las **22 tablas** y los **5 triggers**:
+   `verify-seed.sql` debe mostrar `PASS: conteos, relaciones, importes y destinos de pago` (pero no comprueba la existencia de los triggers). Verificar explícitamente mediante SQL las **22 tablas** y los **7 triggers**:
 
    ```bash
    docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'; SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME;"
    ```
 
-   La salida debe informar `22` tablas base y exactamente los triggers `fer17_producto_alta_evento`, `fer17_producto_precio_evento`, `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, ambas migraciones y esta comprobación SQL.)*
+   La salida debe informar `22` tablas base y exactamente los triggers `fer17_precio_evento_no_delete`, `fer17_precio_evento_no_update`, `fer17_producto_alta_evento`, `fer17_producto_precio_evento`, `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, ambas migraciones y esta comprobación SQL.)*
 
    **Usuarios locales:** el registro público crea clientes, no administradores;
    el usuario del seed es un fixture sin login. Para preparar usuarios locales

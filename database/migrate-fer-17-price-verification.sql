@@ -34,8 +34,7 @@ CREATE TABLE IF NOT EXISTS FER17_PRECIO_EVENTO (
 -- audited with id_admin NULL instead of inventing an operator.
 DELIMITER //
 
-DROP TRIGGER IF EXISTS fer17_producto_alta_evento//
-CREATE TRIGGER fer17_producto_alta_evento
+CREATE OR REPLACE TRIGGER fer17_producto_alta_evento
 AFTER INSERT ON PRODUCTO
 FOR EACH ROW
 BEGIN
@@ -51,8 +50,7 @@ BEGIN
     (NEW.id_producto,'ALTA',NULL,NEW.precio,NULL,NULL,v_actor,UTC_TIMESTAMP(3),'APLICADO',NULL);
 END//
 
-DROP TRIGGER IF EXISTS fer17_producto_precio_evento//
-CREATE TRIGGER fer17_producto_precio_evento
+CREATE OR REPLACE TRIGGER fer17_producto_precio_evento
 AFTER UPDATE ON PRODUCTO
 FOR EACH ROW
 BEGIN
@@ -67,7 +65,7 @@ BEGIN
     SET v_evidencia = (
       SELECT e.evidencia FROM PRECIO_USD_EVIDENCIA e
       WHERE e.id_producto = NEW.id_producto AND e.valida = 1
-      LIMIT 1
+      LIMIT 1 FOR UPDATE
     );
     UPDATE PRECIO_USD_EVIDENCIA
     SET valida = 0
@@ -83,6 +81,20 @@ BEGIN
         (NEW.id_producto,'INVALIDACION',OLD.precio,NEW.precio,v_evidencia,NULL,v_actor,UTC_TIMESTAMP(3),'APLICADO','CAMBIO_PRECIO');
     END IF;
   END IF;
+END//
+
+CREATE OR REPLACE TRIGGER fer17_precio_evento_no_update
+BEFORE UPDATE ON FER17_PRECIO_EVENTO
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'FER17_PRECIO_EVENTO: UPDATE no permitido';
+END//
+
+CREATE OR REPLACE TRIGGER fer17_precio_evento_no_delete
+BEFORE DELETE ON FER17_PRECIO_EVENTO
+FOR EACH ROW
+BEGIN
+  SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'FER17_PRECIO_EVENTO: DELETE no permitido';
 END//
 
 DELIMITER ;

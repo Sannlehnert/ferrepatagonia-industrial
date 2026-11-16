@@ -23,7 +23,9 @@ before(async()=>{
   url=`http://127.0.0.1:${server.address().port}/api`;
 });
 beforeEach(async()=>{
-  for(const table of ['FER17_PRECIO_EVENTO','FER17_LISTA_INACTIVA_EVENTO','FER17_COTIZACION_VERIFICACION','FER17_CALENDARIO','PRECIO_USD_EVIDENCIA','USUARIO','CLIENTE','PRODUCTO','LISTA_PRECIO','CATEGORIA','COTIZACION']) await dataSource.query(`DELETE FROM ${table}`);
+  // The disposable container keeps the append-only audit until teardown.
+  // No assertion in this suite requires an empty price audit between fixtures.
+  for(const table of ['FER17_LISTA_INACTIVA_EVENTO','FER17_COTIZACION_VERIFICACION','FER17_CALENDARIO','PRECIO_USD_EVIDENCIA','USUARIO','CLIENTE','PRODUCTO','LISTA_PRECIO','CATEGORIA','COTIZACION']) await dataSource.query(`DELETE FROM ${table}`);
   const fixture=fs.readFileSync(path.join(__dirname,'../../database/fixtures/fer17-demo.sql'),'utf8');
   for(const sql of fixture.split(';').filter(s=>s.trim()))await dataSource.query(sql);
 });
