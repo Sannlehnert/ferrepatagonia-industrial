@@ -50,7 +50,7 @@ test.setTimeout(60_000)
 async function login(page: Page, email: string, password: string, admin = false) {
   await page.goto('/login')
   await submitLogin(page, email, password)
-  await expect(page).toHaveURL(admin ? /\/admin(?:\/|$)/ : /\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(admin ? /\/admin(?:\/|$)/ : /\/mi-cuenta$/)
 }
 
 async function submitLogin(page: Page, email: string, password: string) {
