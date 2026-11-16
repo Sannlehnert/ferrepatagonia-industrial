@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { RouterLink } from 'vue-router'
+import CompanyStatus from '@/components/CompanyStatus.vue'
 import DatosClientes from '@/views/cuenta/DatosClientes.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
@@ -64,6 +65,8 @@ const isParticular = computed(() => {
     <h2 class="text-2xl font-bold text-[#0B2438] text-center my-6">
       {{ auth.user?.nombre || 'Mi Cuenta' }}
     </h2>
+
+    <CompanyStatus />
 
     <!-- Error State -->
     <div v-if="error" class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 text-center shadow-sm space-y-3">

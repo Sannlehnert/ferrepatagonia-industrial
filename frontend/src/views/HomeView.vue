@@ -1,35 +1,14 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 import CommerceIcon from '@/components/CommerceIcon.vue'
 import HomeHero from '@/components/HomeHero.vue'
 import HomeCategories from '@/components/HomeCategories.vue'
 import HomeRecommended from '@/components/HomeRecommended.vue'
-import { getCuentaCorriente } from '@/services/cuentaCorrienteService'
 import { useAuthStore } from '@/stores/auth'
-import type { CuentaCorrienteConsulta } from '@/types/cuentaCorriente'
+import { approvalMessage } from '@/utils/companyStatus'
 
 const auth = useAuthStore()
 const company = computed(() => auth.rol === 'CLIENTE' && auth.user?.tipo_cliente === 'EMPRESA')
-const accountStatus = ref<CuentaCorrienteConsulta['estado'] | null>(null)
-
-watch(
-  [company, () => auth.sessionVersion],
-  async ([isCompany], _previous, onCleanup) => {
-    accountStatus.value = null
-    if (!isCompany) return
-
-    const controller = new AbortController()
-    onCleanup(() => controller.abort())
-    try {
-      const summary = await getCuentaCorriente(controller.signal)
-      if (!controller.signal.aborted) accountStatus.value = summary.estado
-    } catch {
-      // El acceso a la cuenta sigue disponible si el resumen no pudo verificarse.
-    }
-  },
-  { immediate: true },
-)
-
 const business = computed(() => {
   if (auth.rol === 'ADMIN') {
     return {
@@ -39,19 +18,10 @@ const business = computed(() => {
     }
   }
   if (company.value) {
-    if (accountStatus.value === 'HABILITADA') {
-      return {
-        route: 'cuenta-corriente',
-        label: 'Ver cuenta corriente',
-        description: 'Tu cuenta corriente está habilitada. Consultá su estado y movimientos desde tu cuenta.',
-      }
-    }
     return {
-      route: 'cuenta-corriente',
-      label: 'Consultar estado de cuenta',
-      description: accountStatus.value === 'INHABILITADA'
-        ? 'Tu cuenta corriente está inhabilitada. Podés consultar su estado desde tu cuenta.'
-        : 'Las condiciones comerciales para empresas se evalúan por separado. Consultá el estado de tu cuenta corriente.',
+      route: 'cuenta-dashboard',
+      label: 'Consultar estado comercial',
+      description: approvalMessage(auth.user?.estadoAprobacionEmpresa),
     }
   }
   if (auth.rol === 'CLIENTE') {

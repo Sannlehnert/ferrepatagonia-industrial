@@ -18,7 +18,8 @@ before(async () => {
 });
 after(async () => { await new Promise(resolve => server.close(resolve)); });
 const row = (changes = {}) => ({ id_usuario: 12, email: 'cliente@example.test', rol: 'CLIENTE', activo: 1,
-  nombre_razon_social: 'Cliente', tipo_cliente: 'PARTICULAR', password_hash: 'secreto', ...changes });
+  nombre_razon_social: 'Cliente', tipo_cliente: 'PARTICULAR', estado_aprobacion_empresa: 'PENDIENTE',
+  cuenta_corriente_habilitada: 1, password_hash: 'secreto', ...changes });
 const get = (token = signToken({ id: 12, rol: 'CLIENTE' })) => fetch(`${base}/me`, {
   headers: token === null ? {} : { Cookie: `jwt_token=${token}` },
 });
@@ -30,6 +31,7 @@ for (const [rol, tipo] of [['CLIENTE', 'PARTICULAR'], ['CLIENTE', 'EMPRESA'], ['
       assert.match(sql, /LEFT JOIN `CLIENTE`/);
       assert.match(sql, /WHERE `u`\.`id_usuario` = \?/);
       assert.doesNotMatch(sql, /password_hash|SELECT\s+\*/i);
+      assert.equal(/LEFT JOIN `CUENTA_CORRIENTE`/.test(sql), tipo === 'EMPRESA' && calls === 2);
       assert.deepEqual(values, [12]);
       return [row({ rol, tipo_cliente: tipo, nombre_razon_social: rol === 'ADMIN' ? null : 'Cliente' })];
     });
@@ -39,10 +41,22 @@ for (const [rol, tipo] of [['CLIENTE', 'PARTICULAR'], ['CLIENTE', 'EMPRESA'], ['
     assert.deepEqual(await response.json(), { user: {
       id: 12, nombre: rol === 'ADMIN' ? 'Administrador' : 'Cliente',
       email: 'cliente@example.test', rol, tipo_cliente: tipo,
+      estadoAprobacionEmpresa: tipo === 'EMPRESA' ? 'PENDIENTE' : null,
+      cuentaCorrienteHabilitada: tipo === 'EMPRESA' ? true : null,
     } });
-    assert.equal(calls, 1);
+    assert.equal(calls, tipo === 'EMPRESA' ? 2 : 1);
   });
 }
+test('error al consultar la cuenta de empresa no devuelve una sesión parcial', async t => {
+  let calls = 0;
+  t.mock.method(pool, 'query', async () => {
+    if (++calls === 2) throw Error('Cuenta no disponible');
+    return [row({ tipo_cliente: 'EMPRESA' })];
+  });
+  const response = await get();
+  assert.equal(response.status, 500);
+  assert.deepEqual(await response.json(), { message: 'Error interno del servidor.' });
+});
 for (const [label, token] of [
   ['sin cookie', null], ['JWT inválido', 'invalid'],
   ['JWT expirado', jwt.sign({ id: 12, rol: 'CLIENTE' }, process.env.JWT_SECRET, { expiresIn: -1 })],
@@ -78,7 +92,8 @@ for (const tipo of ['PARTICULAR', 'EMPRESA', null]) {
     const response = await fetch(`${base}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'cliente@example.test', password: 'clave' }) });
     assert.equal(response.status, 200);
-    const expected = { id: 12, email: 'cliente@example.test', rol, tipo_cliente: tipo, nombre: tipo ? 'Cliente' : 'Administrador' };
+    const expected = { id: 12, email: 'cliente@example.test', rol, tipo_cliente: tipo, nombre: tipo ? 'Cliente' : 'Administrador',
+      estadoAprobacionEmpresa: tipo === 'EMPRESA' ? 'PENDIENTE' : null, cuentaCorrienteHabilitada: tipo === 'EMPRESA' ? true : null };
     assert.deepEqual(await response.json(), { message: 'Login exitoso', user: expected });
     const cookie = response.headers.get('set-cookie').split(';')[0];
     const restored = await fetch(`${base}/me`, { headers: { Cookie: cookie } });
