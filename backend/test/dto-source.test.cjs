@@ -40,3 +40,28 @@ test('tsx: decorated DTOs validate, transform and reject without emitted design 
     }
   } finally {await new Promise(r=>server.close(r));}
 });
+
+test('tsx: lista blanca exacta de orden en el DTO de query del catálogo', async () => {
+  const app = express();
+  app.get('/catalogo', validateDto('query', policies.catalogPolicy), (_req, res) => {
+    assert.ok(res.locals.dto.query instanceof policies.catalogPolicy.type);
+    res.json(res.locals.dto.query);
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const url = `http://127.0.0.1:${server.address().port}/catalogo`;
+  try {
+    for (const orden of ['predeterminado', 'nombre_asc', 'nombre_desc', 'precio_asc', 'precio_desc']) {
+      const response = await fetch(`${url}?orden=${orden}&page=2&limit=1&categoria=3`);
+      assert.equal(response.status, 200, orden);
+      assert.deepEqual(await response.json(), { orden, page: 2, limit: 1, categoria: 3 });
+    }
+    for (const query of ['orden=', 'orden=PRECIO_ASC', 'orden=precio_desc%20', 'orden=precio',
+      'orden=precio_asc&orden=precio_desc', 'orden[]=precio_asc', 'orden[x]=precio_desc',
+      'orden=precio_desc%2Cnombre_asc', 'sort=precio_asc', 'orden=nombre_asc&lista=2']) {
+      assert.equal((await fetch(`${url}?${query}`)).status, 400, query);
+    }
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
