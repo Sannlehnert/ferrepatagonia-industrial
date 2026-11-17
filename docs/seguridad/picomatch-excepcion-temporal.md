@@ -1,0 +1,9 @@
+# Excepción temporal de auditoría del frontend
+
+**Advisory:** [GHSA-fc5q-39xc-vjpf / CVE-2026-112366](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) · **Vencimiento:** 24/11/2026 a las 00:00 UTC · **Responsable de seguimiento:** Santiago Agustín Lehnert (Sannlehnert, mantenedor del repositorio).
+
+La excepción permite los diez hallazgos altos derivados del advisory para la única instalación de `picomatch@4.0.7`. Las rutas revisadas provienen de Vite, Vue DevTools, `vue-tsc` y `npm-run-all2`. `npm audit --omit=dev --audit-level=high` sigue siendo obligatorio y bloqueante. El riesgo residual es la denegación de servicio del proceso Node que ejecuta herramientas de desarrollo o CI si llegan a procesar patrones no confiables.
+
+Desde `frontend/`, ejecutar `npm ci`, `npm run audit:ci` y `node --test test/audit-ci.test.cjs`. El control imprime ambos informes npm y enumera los hallazgos exceptuados. Bloquea hallazgos altos o críticos fuera del alcance, cambios del árbol autorizado, informes incompletos y errores de auditoría. Mientras haga falta usar la excepción, cualquier hallazgo nuevo del informe completo invalida la autorización. Al vencer, cualquier informe que siga necesitando la excepción bloquea el CI.
+
+El responsable debe revisar el [seguimiento upstream](https://github.com/micromatch/picomatch/issues/247), el advisory y el registro npm antes del vencimiento. Cuando se publique una versión corregida, actualizar las dependencias compatibles y el lockfile, ejecutar las dos auditorías sin excepción, y retirar en el mismo cambio el verificador temporal, sus pruebas y este documento. Restablecer la auditoría completa bloqueante por npm en CI y conservar el paso separado de producción. Si para el vencimiento aún no hay versión corregida, cualquier extensión requiere otra aprobación explícita.
