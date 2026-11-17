@@ -10,9 +10,11 @@ import { useAuthStore } from '@/stores/auth'
 import { formatInstant } from '@/utils/cuentaCorriente'
 
 const props = defineProps<{ path: string; mode: 'pedido' | 'cuenta' | 'admin' }>()
+const emit = defineEmits<{ updated: [] }>()
 const auth = useAuthStore()
 const identity = () => [auth.user?.id, auth.rol, auth.sessionVersion, props.path].join(':')
-const allowed = () => auth.isAuthenticated && auth.rol === (props.mode === 'admin' ? 'ADMIN' : 'CLIENTE')
+const allowed = () => auth.isAuthenticated && !auth.loggingIn && !auth.loggingOut
+  && auth.rol === (props.mode === 'admin' ? 'ADMIN' : 'CLIENTE')
 const { data, loading, error, load } = usePrivateAccountRead<ReceiptPage>(identity, allowed)
 const page = ref(1)
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -48,25 +50,22 @@ function reset() {
   clearFile()
 }
 
-watch(identity, () => {
+watch([identity, allowed], () => {
   reset()
   void reload()
 }, { flush: 'sync', immediate: true })
 onBeforeUnmount(reset)
 
 function selectFile(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  failure.value = ''
-  notice.value = ''
-  selectedFile.value = file ?? null
-  if (file && (file.size === 0 || file.size > 5 * 1024 * 1024 || !Object.hasOwn(typeLabels, file.type))) {
-    failure.value = 'Seleccioná un PDF, JPG o PNG con contenido y de hasta 5 MB.'
-    clearFile()
-  }
+  setFile((event.target as HTMLInputElement).files?.[0])
 }
 
 function handleDrop(event: DragEvent) {
-  const file = event.dataTransfer?.files?.[0]
+  setFile(event.dataTransfer?.files?.[0])
+}
+
+function setFile(file?: File) {
+  if (!allowed() || busy.value) return
   failure.value = ''
   notice.value = ''
   selectedFile.value = file ?? null
@@ -90,10 +89,8 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
     if (!valid()) return
     notice.value = message
     clearFile()
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('ferrepatagonia:receipt-uploaded', { detail: { path: props.path } }))
-    }
     await reload(props.mode === 'admin' ? page.value : 1)
+    if (valid()) emit('updated')
   } catch (cause) {
     if (!valid()) return
     const code: unknown = isAxiosError(cause) ? cause.response?.data?.code : undefined
@@ -136,7 +133,7 @@ function operation(receipt: PaymentReceipt) {
 
     <form v-if="mode !== 'admin'" class="space-y-4" @submit.prevent="upload">
       <label
-        class="border-2 border-dashed border-[#CBD5E1] rounded-[10px] p-6 sm:p-8 w-full flex flex-col items-center justify-center gap-3 bg-[#F8FAFC] hover:bg-slate-50 transition cursor-pointer text-center"
+        class="box-border focus-within:outline-2 focus-within:outline-[#145A8D] border-2 border-dashed border-[#CBD5E1] rounded-[10px] p-6 sm:p-8 w-full flex flex-col items-center justify-center gap-3 bg-[#F8FAFC] hover:bg-slate-50 transition cursor-pointer text-center"
         @dragover.prevent
         @drop.prevent="handleDrop"
       >
@@ -154,7 +151,7 @@ function operation(receipt: PaymentReceipt) {
           type="file"
           aria-label="Archivo (PDF, JPG o PNG, hasta 5 MB)"
           accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
-          class="hidden"
+          class="sr-only"
           :disabled="busy"
           @change="selectFile"
         />
