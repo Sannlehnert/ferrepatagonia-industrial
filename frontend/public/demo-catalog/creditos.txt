@@ -108,3 +108,27 @@ Fotografía de DJSparky.
 Original: https://commons.wikimedia.org/wiki/File:Safety_Goggles.jpg
 Permiso: CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/
 Preparada en WebP a 760 × 437. Recorte de la antiparra superior para mostrar su lente transparente y banda elástica.
+
+disco-corte-metal.webp
+Fotografía «Winkelschleifer Trennscheibe Metall» de Ralf Pfeifer.
+Original: https://commons.wikimedia.org/wiki/File:Winkelschleifer_Trennscheibe_Metall.jpg
+Licencia del original y de esta copia: CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/
+Cambios: redimensionada a 960 × 480 y convertida a WebP.
+
+borcegui-marron.webp
+Fotografía «Caterpillar Outline steel toe work boots» de Best For My Feet.
+Original: https://commons.wikimedia.org/wiki/File:Caterpillar_Outline_steel_toe_work_boots.jpg
+Licencia: CC BY 3.0, https://creativecommons.org/licenses/by/3.0/
+Cambios: redimensionada a 960 × 1707 y convertida a WebP.
+
+casco-ala-completa-amarillo.webp
+Fotografía «Yellow hard hat» de רנדום.
+Original: https://commons.wikimedia.org/wiki/File:Yellow_hard_hat.jpg
+Licencia del original y de esta copia: CC BY-SA 3.0, https://creativecommons.org/licenses/by-sa/3.0/
+Cambios: redimensionada a 960 × 639 y convertida a WebP.
+
+casco-visera-corta-amarillo.webp
+Fotografía «Hard hat 20111111» de Batholith.
+Original: https://commons.wikimedia.org/wiki/File:Hard_hat_20111111.jpg
+Licencia: dominio público según la ficha de Commons, https://commons.wikimedia.org/wiki/File:Hard_hat_20111111.jpg#Licensing
+Cambios: redimensionada a 960 × 720 y convertida a WebP.

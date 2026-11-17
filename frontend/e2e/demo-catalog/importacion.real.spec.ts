@@ -353,9 +353,9 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
     }
-    expect(imagenes).toHaveLength(132)
+    expect(imagenes).toHaveLength(152)
     const sinImagen = dbFilas.filter(p => !p.imagen)
-    expect(sinImagen).toHaveLength(772)
+    expect(sinImagen).toHaveLength(752)
     const muestra = sinImagen[0]!
     const listado = `/catalogo?busqueda=${encodeURIComponent(muestra.codigo)}&categoria=${muestra.id_categoria}`
     await page.goto(listado)

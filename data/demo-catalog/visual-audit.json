@@ -1,8 +1,8 @@
 {
   "sku": 904,
-  "skuConFuente": 132,
-  "skuPendientes": 772,
-  "archivos": 19,
+  "skuConFuente": 152,
+  "skuPendientes": 752,
+  "archivos": 23,
   "grupos": [
     {
       "clave": "MAN-llave-combinada",
@@ -630,16 +630,6 @@
       "archivos": []
     },
     {
-      "clave": "CAS-casco-ala/amarillo",
-      "modelo": "Casco industrial de ala completa",
-      "criterioVisible": "amarillo",
-      "familia": "Cascos de seguridad",
-      "pendientes": [
-        "FP-DEMO-CAS-CASCO-ALA-AMARILLO"
-      ],
-      "archivos": []
-    },
-    {
       "clave": "CAS-casco-ala/naranja",
       "modelo": "Casco industrial de ala completa",
       "criterioVisible": "naranja",
@@ -806,16 +796,6 @@
       "familia": "Cascos de seguridad",
       "pendientes": [
         "FP-DEMO-CAS-CASCO-CORTO-BLANCO"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "CAS-casco-corto/amarillo",
-      "modelo": "Casco industrial de visera corta",
-      "criterioVisible": "amarillo",
-      "familia": "Cascos de seguridad",
-      "pendientes": [
-        "FP-DEMO-CAS-CASCO-CORTO-AMARILLO"
       ],
       "archivos": []
     },
@@ -1304,23 +1284,6 @@
         "FP-DEMO-RES-RETENEDOR-PACK-DE-50-UNIDADES",
         "FP-DEMO-RES-RETENEDOR-PACK-DE-75-UNIDADES",
         "FP-DEMO-RES-RETENEDOR-PACK-DE-100-UNIDADES"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "CAL-borcegui",
-      "modelo": "Borceguí de trabajo marrón con puntera",
-      "familia": "Calzado de seguridad",
-      "pendientes": [
-        "FP-DEMO-CAL-BORCEGUI-38-AR",
-        "FP-DEMO-CAL-BORCEGUI-39-AR",
-        "FP-DEMO-CAL-BORCEGUI-40-AR",
-        "FP-DEMO-CAL-BORCEGUI-41-AR",
-        "FP-DEMO-CAL-BORCEGUI-42-AR",
-        "FP-DEMO-CAL-BORCEGUI-43-AR",
-        "FP-DEMO-CAL-BORCEGUI-44-AR",
-        "FP-DEMO-CAL-BORCEGUI-45-AR",
-        "FP-DEMO-CAL-BORCEGUI-46-AR"
       ],
       "archivos": []
     },
@@ -3054,23 +3017,6 @@
         "FP-DEMO-ADH-CINTA-DOBLE-36-MM",
         "FP-DEMO-ADH-CINTA-DOBLE-48-MM",
         "FP-DEMO-ADH-CINTA-DOBLE-50-MM"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "ABR-disco-metal",
-      "modelo": "Disco de corte para metal",
-      "familia": "Discos de corte y abrasivos",
-      "pendientes": [
-        "FP-DEMO-ABR-DISCO-METAL-75-MM",
-        "FP-DEMO-ABR-DISCO-METAL-100-MM",
-        "FP-DEMO-ABR-DISCO-METAL-115-MM",
-        "FP-DEMO-ABR-DISCO-METAL-125-MM",
-        "FP-DEMO-ABR-DISCO-METAL-150-MM",
-        "FP-DEMO-ABR-DISCO-METAL-180-MM",
-        "FP-DEMO-ABR-DISCO-METAL-230-MM",
-        "FP-DEMO-ABR-DISCO-METAL-300-MM",
-        "FP-DEMO-ABR-DISCO-METAL-355-MM"
       ],
       "archivos": []
     },
