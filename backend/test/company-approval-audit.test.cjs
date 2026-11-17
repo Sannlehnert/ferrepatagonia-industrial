@@ -29,6 +29,7 @@ try {
 }
 
 const assert = require('node:assert/strict');
+const { assertSchemaInventory } = require('./helpers/schema-inventory.cjs');
 const { describe, test, before, after } = require('node:test');
 const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
@@ -190,22 +191,8 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             await dataSource.initialize();
         }
 
-        const [tableCountRow] = await dataSource.query(`
-            SELECT COUNT(*) AS c FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = DATABASE()
-        `);
-        assert.equal(Number(tableCountRow.c), 21, 'La base aislada debe tener exactamente 21 tablas');
+        await assertSchemaInventory(sql => dataSource.query(sql), 'complete');
 
-        const triggers = await dataSource.query(`
-            SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
-            WHERE TRIGGER_SCHEMA = DATABASE()
-            ORDER BY TRIGGER_NAME
-        `);
-        assert.deepEqual(
-            triggers.map(row => row.TRIGGER_NAME).sort(),
-            ['fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update'],
-            'Deben existir exactamente los 3 triggers FER-20',
-        );
 
         server = app.listen(0, '127.0.0.1');
         await once(server, 'listening');
@@ -311,6 +298,8 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
             const meBody = await me.json();
             assert.equal(meBody.user.email, email);
             assert.equal(meBody.user.rol, 'CLIENTE');
+            assert.equal(meBody.user.estadoAprobacionEmpresa, 'PENDIENTE');
+            assert.equal(meBody.user.cuentaCorrienteHabilitada, null);
 
             for (const endpoint of ['/cuenta-corriente', '/cuenta-corriente/movimientos', '/cuenta-corriente/vencimientos']) {
                 const res = await apiRequest(endpoint, { token });

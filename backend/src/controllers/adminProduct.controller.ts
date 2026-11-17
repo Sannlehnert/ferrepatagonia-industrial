@@ -35,7 +35,7 @@ export const getProductById = async (req: Request, res: Response) => {
 
 export const createProduct = async (req: Request, res: Response) => {
     try {
-        const newProduct = await createAdminProduct(res.locals.dto.body, req.file);
+        const newProduct = await createAdminProduct(res.locals.dto.body, req.file, req.auth?.id);
         return res.status(201).json(newProduct);
     } catch (error: any) {
         if (error instanceof ProductImageError) return res.status(error.statusCode).json({ message: error.message, code: error.code });
@@ -53,7 +53,7 @@ export const updateProduct = async (req: Request, res: Response) => {
     try {
         const { id } = res.locals.dto.params;
 
-        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body, (req as RealtimeRequest).notifyCommittedChange, req.file);
+        const updatedProduct = await updateAdminProduct(id, res.locals.dto.body, (req as RealtimeRequest).notifyCommittedChange, req.file, req.auth?.id);
         return res.status(200).json(updatedProduct);
     } catch (error: any) {
         if (error instanceof ProductImageError) return res.status(error.statusCode).json({ message: error.message, code: error.code });

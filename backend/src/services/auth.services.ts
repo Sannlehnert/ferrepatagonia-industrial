@@ -19,33 +19,45 @@ export const loginUsuario = async (email: string, password: string) => {
         return { error: "Credenciales inválidas", status: 401 };
     }
 
+    const companySession = user.rol === 'CLIENTE' && user.tipo_cliente === 'EMPRESA'
+        ? await restoreUsuario({ id: user.id_usuario, rol: user.rol }, undefined, true) : null;
+    if (user.rol === 'CLIENTE' && user.tipo_cliente === 'EMPRESA' && !companySession) {
+        return { error: "Credenciales inválidas", status: 401 };
+    }
+
     // Firmamos el JWT
     const token = signToken({ id: user.id_usuario, rol: user.rol });
 
     // Preparamos los datos públicos para Pinia
-    const userPublic = {
+    const userPublic: SessionUser = companySession ?? {
         id: user.id_usuario,
         email: user.email,
         rol: user.rol,
         tipo_cliente: user.tipo_cliente,
+        estadoAprobacionEmpresa: null,
+        cuentaCorrienteHabilitada: null,
         nombre: user.nombre_razon_social || "Administrador"
     };
 
     return { token, user: userPublic };
 };
 
-export const restoreUsuario = async (auth: AuthContext, runner?: QueryRunner): Promise<SessionUser | null> => {
-    const user = await (runner ? findUsuarioById(auth.id, runner) : findUsuarioById(auth.id));
+export const restoreUsuario = async (auth: AuthContext, runner?: QueryRunner, includeAccount = false): Promise<SessionUser | null> => {
+    const user = await (includeAccount ? findUsuarioById(auth.id, runner, true)
+        : runner ? findUsuarioById(auth.id, runner) : findUsuarioById(auth.id));
     if (!user || !user.activo || user.rol !== auth.rol) {
         return null;
     }
 
-    // Conservar el criterio público del login sin modificar su contrato.
     return {
         id: user.id_usuario,
         email: user.email,
         rol: user.rol,
         tipo_cliente: user.rol === 'ADMIN' ? null : user.tipo_cliente,
+        estadoAprobacionEmpresa: user.rol === 'CLIENTE' && user.tipo_cliente === 'EMPRESA'
+            ? user.estado_aprobacion_empresa ?? null : null,
+        cuentaCorrienteHabilitada: user.rol === 'CLIENTE' && user.tipo_cliente === 'EMPRESA'
+            && user.cuenta_corriente_habilitada != null ? user.cuenta_corriente_habilitada === 1 : null,
         nombre: user.nombre_razon_social || 'Administrador',
     };
 };

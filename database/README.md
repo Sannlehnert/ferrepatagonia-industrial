@@ -10,6 +10,8 @@ El motor utilizado actualmente es **MariaDB**.
 database/
 ├── schema.sql
 ├── migrate-fer-20-account-movements.sql
+├── migrate-fer-17-price-verification.sql
+├── migrate-s7-09-1-credit-workflow.sql
 ├── seed.sql
 ├── verify-seed.sql
 ├── migrate-uq-producto-codigo.sql
@@ -20,7 +22,8 @@ database/
 
 ### `schema.sql`
 
-Crea las **21 tablas** base de la base de datos:
+Crea las **24 tablas** base, incluidas `SOLICITUD_CREDITO`,
+`EVENTO_CREDITO` y `FER17_PRECIO_EVENTO`, con sus:
 
 - tablas;
 - claves primarias;
@@ -30,7 +33,7 @@ Crea las **21 tablas** base de la base de datos:
 - restricciones `CHECK`;
 - relaciones definidas en el MER vigente.
 
-Debe ejecutarse sobre una base de datos vacía. **No incluye los 3 triggers FER-20** de cuenta corriente e imputaciones, que se instalan en el paso siguiente con `migrate-fer-20-account-movements.sql`.
+Debe ejecutarse sobre una base de datos vacía. **No incluye los triggers FER-20** de cuenta corriente e imputaciones ni los **4 triggers FER-17** de auditoría de precios, que se instalan en los pasos siguientes con `migrate-fer-20-account-movements.sql` y `migrate-fer-17-price-verification.sql`.
 
 ### `migrate-fer-20-account-movements.sql`
 
@@ -41,6 +44,33 @@ Completa e instala de forma idempotente las guardias de cuenta corriente FER-20 
 - `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`).
 
 **Debe ejecutarse inmediatamente después de `schema.sql` en toda instalación desde cero** (incluidas instalaciones nuevas sin `seed.sql`) y antes de cargar datos o iniciar la aplicación. Sobre bases existentes previas al corte FER-20, debe aplicarse con aplicación detenida y respaldo previo verificado.
+
+### `migrate-fer-17-price-verification.sql`
+
+Extensión aditiva e idempotente de T-S7-05.2. Crea la tabla append-only
+`FER17_PRECIO_EVENTO` y los triggers:
+
+- `fer17_producto_alta_evento` (`AFTER INSERT` en `PRODUCTO`);
+- `fer17_producto_precio_evento` (`AFTER UPDATE` en `PRODUCTO`).
+- `fer17_precio_evento_no_update` (`BEFORE UPDATE` en `FER17_PRECIO_EVENTO`).
+- `fer17_precio_evento_no_delete` (`BEFORE DELETE` en `FER17_PRECIO_EVENTO`).
+
+También crea la vista `FER17_AUDITORIA_TRIGGERS`, que permite al CLI verificar
+el inventario FER-17 sin conceder privilegios DDL al operador.
+
+El trigger de edición invalida la evidencia cuando cambia realmente el precio y
+registra `CAMBIO_PRECIO` e `INVALIDACION` en la misma transacción. El actor se
+toma de `@fer17_actor_id`, fijado por el backend, y se revalida como ADMIN activo.
+No convierte precios, no crea evidencia y no borra datos históricos.
+
+Requiere el esquema de evidencia FER-17. En una base nueva, `schema.sql` ya
+lo crea; en una base existente que aún no lo tiene, aplicar antes
+`migrate-fer-17-pricing-evidence.sql`. Reejecutar la migración de verificación
+no duplica triggers. Para revertir el código, conservar tabla, vista y triggers.
+
+### `migrate-s7-09-1-credit-workflow.sql`
+
+Migración aditiva e idempotente de T-S7-09.1. Crea `SOLICITUD_CREDITO` y `EVENTO_CREDITO` sin instalar triggers, sin tocar movimientos, pagos, imputaciones ni vencimientos y sin convertir datos históricos. En una base nueva, aplicarla al final de la secuencia de instalación. En una base existente, comprobar que FER-20 y FER-17 estén instalados y aplicar solo la migración aditiva de crédito. Es segura de repetir. En una instalación nueva `schema.sql` ya contiene las tablas, por lo que `CREATE TABLE IF NOT EXISTS` no modifica las tablas existentes.
 
 ### `seed.sql`
 
@@ -91,11 +121,13 @@ Sobre una base de datos nueva y vacía:
 ```text
 1. schema.sql
 2. migrate-fer-20-account-movements.sql
-3. seed.sql (solo entorno de desarrollo/pruebas)
-4. verify-seed.sql (solo después de seed.sql)
+3. migrate-fer-17-price-verification.sql
+4. migrate-s7-09-1-credit-workflow.sql
+5. seed.sql (solo entorno de desarrollo/pruebas)
+6. verify-seed.sql (solo después de seed.sql)
 ```
 
-`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1 y 2 más la verificación SQL de tablas y triggers.
+`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. `migrate-fer-17-price-verification.sql` instala la auditoría y los cuatro triggers de precio. La migración de crédito también se incluye en la secuencia de instalación. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1–4 más la verificación SQL de tablas y triggers.
 
 `verify-seed.sql` debe ejecutarse antes de modificar manualmente los datos cargados por el seed.
 
@@ -164,7 +196,7 @@ Si queda en `unhealthy`, revisar los logs. Si aparece un error de conexión con 
 
 Sobre la base recién creada y vacía, ejecutar cada comando por separado. Si alguno falla, detenerse y revisar el error antes de seguir.
 
-Crear las 21 tablas base:
+Crear las 24 tablas base:
 
 ```bash
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
@@ -174,6 +206,18 @@ Instalar los 3 triggers y guardias FER-20 de cuenta corriente (obligatorio tambi
 
 ```bash
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-20-account-movements.sql'
+```
+
+Instalar la auditoría y los 4 triggers FER-17 de precio (obligatorio también tras `schema.sql`):
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-17-price-verification.sql'
+```
+
+Aplicar la migración aditiva de T-S7-09.1 (idempotente, no instala triggers):
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-09-1-credit-workflow.sql'
 ```
 
 Cargar los datos ficticios de desarrollo:
@@ -194,13 +238,13 @@ La redirección `<` se realiza dentro del contenedor, por eso los mismos comando
 PASS: conteos, relaciones, importes y destinos de pago
 ```
 
-`verify-seed.sql` valida únicamente conteos, relaciones e importes del seed; **no detecta si faltan los triggers FER-20**. Comprobar explícitamente por SQL las 21 tablas y la presencia exacta de los tres triggers:
+`verify-seed.sql` valida únicamente conteos, relaciones e importes del seed; **no detecta si faltan triggers**. Comprobar explícitamente las 24 tablas, los siete triggers y la vista de auditoría:
 
 ```bash
-docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE(); SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME;"
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'; SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME; SELECT TABLE_NAME FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'FER17_AUDITORIA_TRIGGERS';"
 ```
 
-La consulta debe informar `21` tablas y los tres triggers `fer260_cuenta_revision` (`BEFORE UPDATE` en `CUENTA_CORRIENTE`), `fer260_imputacion_insert` (`BEFORE INSERT` en `IMPUTACION_MOVIMIENTO_CUENTA`) y `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`).
+La consulta debe informar `24` tablas base y los siete triggers: `fer17_precio_evento_no_delete`, `fer17_precio_evento_no_update`, `fer17_producto_alta_evento` (`AFTER INSERT` en `PRODUCTO`), `fer17_producto_precio_evento` (`AFTER UPDATE` en `PRODUCTO`), `fer260_cuenta_revision` (`BEFORE UPDATE` en `CUENTA_CORRIENTE`), `fer260_imputacion_insert` (`BEFORE INSERT` en `IMPUTACION_MOVIMIENTO_CUENTA`) y `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`).
 
 `schema.sql` requiere una base vacía y `seed.sql` requiere tablas vacías: no deben repetirse sobre una base ya cargada. Detener o reiniciar el contenedor no vacía la base. Para reconstruirla desde cero, usar el procedimiento de eliminación de datos indicado más abajo.
 
@@ -269,7 +313,7 @@ Para reconstruir:
 docker compose up -d --wait --wait-timeout 180
 ```
 
-Después ejecutar nuevamente los cuatro comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
+Después ejecutar nuevamente los comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `migrate-fer-17-price-verification.sql`, `migrate-s7-09-1-credit-workflow.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
 
 ---
 

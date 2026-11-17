@@ -85,6 +85,31 @@ async function assertControlFits(control: Locator) {
   expect.soft(right).toBeLessThanOrEqual(width + 1)
 }
 
+test('A.3 empresa pendiente sin cuenta puede consultar pero no operar a crédito', async ({ page }) => {
+  const email = `a3-${randomUUID()}@e2e.test`
+  const password = 'EmpresaPassword123!'
+  const cuit = `30-${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}-9`
+  await page.goto('/')
+  const registration = await page.request.post('/api/auth/register', {
+    headers: { Origin: new URL(page.url()).origin },
+    data: { tipoCliente: 'EMPRESA', nombreRazonSocial: 'Empresa A3', cuit, email, password },
+  })
+  expect(registration.status()).toBe(201)
+  await login(page, email, password, '/mi-cuenta/datos')
+  const session = await (await page.request.get('/api/auth/me')).json()
+  expect(session.user).toMatchObject({ estadoAprobacionEmpresa: 'PENDIENTE', cuentaCorrienteHabilitada: null })
+  await page.goto('/mi-cuenta')
+  const commercial = page.getByRole('region', { name: 'Estado comercial' })
+  await expect(commercial).toContainText('aprobación de tu empresa está pendiente')
+  await expect(commercial).toContainText('No tenés una cuenta corriente asociada')
+  await page.getByRole('navigation', { name: 'Menú de mi cuenta' }).getByRole('link', { name: 'Cuenta corriente', exact: true }).click()
+  await expect(page.getByRole('main')).toContainText('No tenés una cuenta corriente asociada')
+  const eligibility = await (await page.request.get(eligibilityPath)).json()
+  expect(eligibility.data).toMatchObject({ elegible: false, codigo: 'CUENTA_NO_HABILITADA', cotizacion: null })
+  await page.goto('/carrito')
+  await expect(page.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+})
+
 test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', async ({ page, browser, company }) => {
   await company.db.query("UPDATE CLIENTE SET estado_aprobacion_empresa = 'PENDIENTE' WHERE id_cliente = ?", [company.clientId])
   await page.setViewportSize({ width: 360, height: 844 })
@@ -100,6 +125,10 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
   try {
     const client = await clientContext.newPage()
     await login(client, company.email, company.password, '/mi-cuenta/datos')
+    await client.goto('/mi-cuenta')
+    const commercial = client.getByRole('region', { name: 'Estado comercial' })
+    await expect(commercial).toContainText('aprobación de tu empresa está pendiente')
+    await expect(commercial).toContainText('crédito está bloqueado')
     const checkout = client.getByRole('region', { name: 'Confirmación de pedido' })
     async function readEligibility(navigate: () => Promise<unknown>) {
       const eligibility = client.waitForResponse(response =>
@@ -120,11 +149,21 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
 
     await row.getByRole('button', { name: 'Rechazar cuenta empresa de ' + company.name }).click()
     await expect(row.getByText('Rechazada', { exact: true })).toBeVisible()
+    await client.goto('/mi-cuenta')
+    await commercial.getByRole('button', { name: 'Actualizar estado comercial' }).click()
+    await expect(commercial).toContainText('empresa fue rechazada')
+    await expect(commercial).toContainText('crédito está bloqueado')
+    await client.goto('/carrito')
     expect(await readEligibility(() => client.reload())).toMatchObject(blocked)
     await expectBlocked()
 
     await row.getByRole('button', { name: 'Aprobar cuenta empresa de ' + company.name }).click()
     await expect(row.getByText('Aprobada', { exact: true })).toBeVisible()
+    await client.goto('/mi-cuenta')
+    await commercial.getByRole('button', { name: 'Actualizar estado comercial' }).click()
+    await expect(commercial).toContainText('empresa está aprobada')
+    await expect(commercial).toContainText('crédito está disponible')
+    await client.goto('/carrito')
     expect(await readEligibility(() => client.reload())).toMatchObject({
       elegible: true, totalUSD: '20.00', creditoDisponibleUSD: '25.00', cotizacion: expect.any(String),
     })

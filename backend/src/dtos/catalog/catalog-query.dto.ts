@@ -1,8 +1,12 @@
-import { IsInt, Min, Max, ValidateIf } from 'class-validator';
+import { IsIn, IsInt, Min, Max, ValidateIf } from 'class-validator';
 import { Rule, parseInteger } from '../rules';
 import type { CatalogPagination } from '../../validators/catalog.validator';
 
-export const catalogError = 'Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. No se admiten parámetros desconocidos ni repetidos.';
+// Lista blanca única: el repositorio solo traduce estos valores a cláusulas internas.
+export const catalogOrderValues = ['predeterminado', 'nombre_asc', 'nombre_desc', 'precio_asc', 'precio_desc'] as const;
+export type CatalogOrder = (typeof catalogOrderValues)[number];
+
+export const catalogError = `Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. orden debe ser uno de ${catalogOrderValues.join(', ')}. No se admiten parámetros desconocidos ni repetidos.`;
 
 export class CatalogQuery {
   @IsInt() @Min(1) @Max(1000000) page!: number;
@@ -13,6 +17,9 @@ export class CatalogQuery {
   @Rule(v => typeof v === 'string' && [...v].length <= 200 && !!v.trim()
     && !/[\u0000-\u001f\u007f]/u.test(v) ? null : catalogError)
   busqueda?: string;
+  @ValidateIf((_o, v) => v !== undefined)
+  @IsIn(catalogOrderValues)
+  orden?: CatalogOrder;
 }
 
 export function prepareCatalog(input: Record<string, unknown>) {
@@ -25,5 +32,6 @@ export function prepareCatalog(input: Record<string, unknown>) {
 export function catalogInput(dto: CatalogQuery): CatalogPagination {
   return { page: dto.page, limit: dto.limit, offset: (dto.page - 1) * dto.limit,
     ...(dto.categoria === undefined ? {} : { categoria: dto.categoria }),
-    ...(dto.busqueda === undefined ? {} : { busqueda: dto.busqueda.trim() }) };
+    ...(dto.busqueda === undefined ? {} : { busqueda: dto.busqueda.trim() }),
+    ...(dto.orden === undefined ? {} : { orden: dto.orden }) };
 }

@@ -23,7 +23,10 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data } = await api.get<{ user: UsuarioSesion }>('/auth/me')
         if (version !== this.sessionVersion) return false
-        if (this.user?.id !== data.user.id || this.user?.rol !== data.user.rol) {
+        if (this.user?.id !== data.user.id || this.user?.rol !== data.user.rol ||
+            this.user?.tipo_cliente !== data.user.tipo_cliente ||
+            this.user?.estadoAprobacionEmpresa !== data.user.estadoAprobacionEmpresa ||
+            this.user?.cuentaCorrienteHabilitada !== data.user.cuentaCorrienteHabilitada) {
           this.sessionVersion = advanceSessionGeneration()
         }
         this.user = data.user

@@ -1,10 +1,11 @@
 import { Request, Response } from 'express';
-import { loginUsuario } from '../services/auth.services';
+import { loginUsuario, restoreUsuario } from '../services/auth.services';
 import { authCookieName, issueAuthCookieOptions, clearAuthCookieOptions } from '../config/auth-cookie.config';
 
 export const me = async (req: Request, res: Response) => {
     try {
-        const user = req.authUser;
+        const user = req.authUser?.tipo_cliente === 'EMPRESA' && req.auth
+            ? await restoreUsuario(req.auth, undefined, true) : req.authUser;
         if (!user) {
             return res.status(401).json({ message: 'No autenticado.' });
         }

@@ -47,7 +47,7 @@ export async function lockAccountOrderCart(
 ): Promise<LockedOrderCart> {
   requireTransaction(manager);
 
-  if (await lockCartClient(manager, userId) !== clientId) {
+  if (!await lockCartClient(manager, userId, clientId)) {
     throw new AccountOrderError(
       'CLIENTE_NO_HABILITADO',
       403,
@@ -77,7 +77,8 @@ export async function lockAccountOrderCart(
 
   const categories = new Set<number>();
 
-  // Orden estable para carritos que comparten productos.
+  // Orden estable para carritos que comparten productos. Bloquear PRODUCTO antes
+  // de que lockAccountOrderPriceInputs tome evidencia y sus operadores.
   for (const item of items) {
     if (!validQuantity(item.quantity)) {
       throw new AccountOrderError(
