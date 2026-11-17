@@ -1,3 +1,4 @@
+const { assertSchemaInventory } = require('./schema-inventory.cjs');
 const { execFileSync } = require('node:child_process');
 const { randomUUID } = require('node:crypto');
 const fs = require('node:fs');
@@ -210,7 +211,7 @@ async function main(signal) {
 
     const apply = file => execFileSync(
       'docker',
-      ['exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, database],
+      ['exec', '-i', container, 'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, database],
       { input: fs.readFileSync(path.join(backend, '../database', file)), stdio: 'pipe', timeout: 60000 },
     );
 
@@ -220,30 +221,12 @@ async function main(signal) {
     apply('migrate-fer-17-price-verification.sql');
     apply('migrate-fer-17-price-verification.sql');
 
-    const [tables] = await connection.query(
-      "SELECT COUNT(*) AS n FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_TYPE='BASE TABLE'",
-    );
-    assert.equal(Number(tables.n), 22, 'La instalación limpia debe tener 22 tablas base');
-    const triggerRows = await connection.query(
-      'SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=DATABASE() ORDER BY TRIGGER_NAME',
-    );
-    assert.deepEqual(triggerRows.map(row => row.TRIGGER_NAME), [
-      'fer17_precio_evento_no_delete',
-      'fer17_precio_evento_no_update',
-      'fer17_producto_alta_evento',
-      'fer17_producto_precio_evento',
-      'fer260_cuenta_revision',
-      'fer260_imputacion_insert',
-      'fer260_imputacion_update',
-    ], 'La instalación limpia debe tener 3 triggers FER-20 y 4 triggers FER-17');
-    const metadata = await connection.query('SELECT nombre, vigente FROM FER17_AUDITORIA_TRIGGERS ORDER BY nombre');
-    assert.deepEqual(metadata.map(row => row.nombre), triggerRows.slice(0, 4).map(row => row.TRIGGER_NAME));
-    assert.ok(metadata.every(row => Number(row.vigente) === 1));
+    const inventory = await assertSchemaInventory(sql => connection.query(sql), 'complete');
 
     console.log(JSON.stringify({
       database, container, port,
       version: (await connection.query('SELECT VERSION() AS version'))[0].version,
-      tables: Number(tables.n), triggers: triggerRows.length, view: 'FER17_AUDITORIA_TRIGGERS',
+      ...inventory,
     }));
 
     const env = {

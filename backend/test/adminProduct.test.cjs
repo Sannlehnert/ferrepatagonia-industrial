@@ -104,10 +104,12 @@ describe('Admin Products Endpoints (#197)', () => {
             assert.equal(await state(), 'VERIFICADO');
             await pool.query('UPDATE PRODUCTO SET activo=1, precio=160 WHERE id_producto=?', [id]);
             assert.equal(await state(), 'NO_VERIFICADO');
-            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=160, verificado_utc=UTC_TIMESTAMP() + INTERVAL 1 DAY WHERE id_producto=?', [id]);
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=160, valida=1, verificado_utc=UTC_TIMESTAMP() + INTERVAL 1 DAY WHERE id_producto=?', [id]);
             assert.equal(await state(), 'NO_VERIFICADO');
             await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET verificado_utc=UTC_TIMESTAMP(), evidencia=CHAR(9) WHERE id_producto=?', [id]);
             assert.equal(await state(), 'NO_VERIFICADO');
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET evidencia=? WHERE id_producto=?', [' \tFactura 123\n ', id]);
+            assert.equal(await state(), 'VERIFICADO');
             await pool.query("UPDATE PRECIO_USD_EVIDENCIA SET evidencia='test evidence', valida=0 WHERE id_producto=?", [id]);
             assert.equal(await state(), 'NO_VERIFICADO');
             await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET valida=1, sintetica=1 WHERE id_producto=?', [id]);

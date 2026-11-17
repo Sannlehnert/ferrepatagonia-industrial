@@ -1,7 +1,7 @@
 import { dataSource, inTransaction } from '../config/database.config';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
-import { hasPriceEvidence, priceEvidenceAdminJoin, priceEvidenceJoin, pricingTimestamp } from './priceEvidence';
+import { nonBlankPriceEvidence, priceEvidenceAdmin, productPriceEvidence, sqlUTC } from './product-price-evidence.sql';
 
 export interface ProductRecord {
     id_producto: number;
@@ -52,18 +52,19 @@ export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' |
 export const findAllAdmin = async (): Promise<(ProductRecord & { estado_precio_base: AdminBasePriceState })[]> => {
     const rows = await productQuery()
         .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
-        .leftJoin('PRECIO_USD_EVIDENCIA', 'e', priceEvidenceJoin, { at: pricingTimestamp(new Date()) })
-        .leftJoin('USUARIO', 'ea', priceEvidenceAdminJoin)
+        .leftJoin('PRECIO_USD_EVIDENCIA', 'e', productPriceEvidence(':at', ':nonBlank'), {
+            at: sqlUTC(new Date()), nonBlank: nonBlankPriceEvidence,
+        })
+        .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
         .addSelect('ea.id_usuario', 'price_verifier')
-        .addSelect('e.evidencia', 'price_evidence')
         .addSelect('e.sintetica', 'price_synthetic')
         .orderBy('p.id_producto', 'DESC')
-        .getRawMany<ProductRecord & { price_verifier: number | null; price_evidence: string | null; price_synthetic: number | null }>();
-    return rows.map(({ price_verifier, price_evidence, price_synthetic, ...product }) => ({
+        .getRawMany<ProductRecord & { price_verifier: number | null; price_synthetic: number | null }>();
+    return rows.map(({ price_verifier, price_synthetic, ...product }) => ({
         ...product,
         estado_precio_base: product.precio === null ? 'SIN_PRECIO'
             : Number(product.precio) === 0 ? 'BASE_CERO'
-            : !hasPriceEvidence(price_verifier, price_evidence) ? 'NO_VERIFICADO'
+            : price_verifier === null ? 'NO_VERIFICADO'
             : price_synthetic === 1 ? 'SINTETICO' : 'VERIFICADO',
     }));
 };
