@@ -24,13 +24,22 @@
   MariaDB 11.4 con Compose, esquema y triggers FER-20 en una base vacía,
   configuración mínima de `backend/.env`, arranque de backend y frontend, salud
   y advertencias de persistencia.
+
 - [Verificación de precios posterior al alta o edición (T-S7-05.2)](s7-05/T-S7-05.2-verificacion-precios.md):
   procedimiento local autorizado, evidencia comercial, invalidación por cambio
   de precio, historial append-only y migración FER-17 de auditoría.
+
 - [Solicitud y habilitación de crédito (T-S7-09.1)](s7-09/T-S7-09.1-solicitud-habilitacion-credito.md):
   flujo de solicitud, aprobación/rechazo, habilitación/deshabilitación y
   modificación de límite, con auditoría append-only y separación entre
   aprobación empresarial, crédito, habilitación y elegibilidad de compra.
+
+- [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
+  matriz P0/P1/P2, cobertura existente frente a brechas, catálogo maestro de
+  100 SKU separado de la demo sintética de 904, checkout de cuenta corriente
+  para empresas aprobadas y habilitadas, escenarios TOCTOU, seguridad y
+  persistencia, separación API/MariaDB/navegador y orden de ejecución con los
+  comandos y perfiles vigentes.
 
 ## Contratos de autenticación en Taiga
 
