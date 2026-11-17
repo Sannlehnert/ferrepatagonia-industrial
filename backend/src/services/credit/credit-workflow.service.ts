@@ -19,6 +19,7 @@ import {
   applyApprovedTerms,
   approveRequest,
   createAccount,
+  findAccountByClient,
   findAccountForUpdate,
   findClientById,
   findClientForUpdate,
@@ -28,7 +29,6 @@ import {
   findRequestByClientKey,
   findRequestById,
   findRequestClientId,
-  findRequestForUpdate,
   hasActiveClientUser,
   findRequestForClient,
   findUserById,
@@ -43,6 +43,7 @@ import {
   updateAccountLimit,
   utcSql,
   type CreditAccountRow,
+  type CreditClientRow,
   type CreditEventRow,
   type CreditRequestRow,
 } from '../../repositories/creditWorkflow.repository';
@@ -71,10 +72,6 @@ export interface CreditWorkflowResult<T = Record<string, unknown>> {
   data: T;
   eventoId: string;
   replay: boolean;
-}
-
-interface ClientContext {
-  client: NonNullable<Awaited<ReturnType<typeof findClientForUpdate>>>;
 }
 
 function parseDbAmount(value: string | null, allowZero = true): bigint | null {
@@ -174,7 +171,12 @@ async function readAdmin(manager: EntityManager, auth: AuthContext) {
   return user;
 }
 
-async function lockClientContext(manager: EntityManager, auth: AuthContext): Promise<ClientContext> {
+function assertApprovedCompany(client: CreditClientRow): void {
+  if (client.tipo_cliente !== 'EMPRESA') throw soloEmpresas();
+  if (client.estado_aprobacion_empresa !== 'APROBADA') throw empresaNoAprobada(403);
+}
+
+async function lockClientContext(manager: EntityManager, auth: AuthContext): Promise<CreditClientRow> {
   if (auth.rol !== 'CLIENTE') throw sinPermiso();
   const clientId = await findClientIdForUser(manager, auth.id);
   if (clientId === null) {
@@ -183,15 +185,15 @@ async function lockClientContext(manager: EntityManager, auth: AuthContext): Pro
     throw sinPermiso();
   }
 
-  // Orden único de bloqueo: CLIENTE antes que USUARIO. Las operaciones
-  // administrativas bloquean primero la cuenta y luego esta misma secuencia.
+  // Mismo orden que carrito y checkout. El primer SELECT solo localiza
+  // la empresa; la identidad se revalida con ambas filas bloqueadas.
   const client = await findClientForUpdate(manager, clientId);
   if (!client || client.activo !== 1) throw clienteInactivo();
   const user = await findUserForUpdate(manager, auth.id);
   if (!user || user.activo !== 1) throw noAutenticado();
   if (user.rol !== 'CLIENTE' || user.id_cliente !== client.id_cliente) throw sinPermiso();
-  if (client.tipo_cliente !== 'EMPRESA') throw soloEmpresas();
-  return { client };
+  assertApprovedCompany(client);
+  return client;
 }
 
 async function resolveClientForRead(manager: EntityManager, auth: AuthContext) {
@@ -204,6 +206,7 @@ async function resolveClientForRead(manager: EntityManager, auth: AuthContext) {
   }
   const client = await findClientById(manager, clientId);
   if (!client || client.activo !== 1) throw clienteInactivo();
+  assertApprovedCompany(client);
   return clientId;
 }
 
@@ -281,19 +284,19 @@ export async function createCreditRequest(
 
   try {
     return await inTransaction(async (manager) => {
-      const context = await lockClientContext(manager, auth);
+      const client = await lockClientContext(manager, auth);
       const previous = await replayClientCreation(
-        manager, context.client.id_cliente, auth.id, key, monto, input.plazoDias, observaciones,
+        manager, client.id_cliente, auth.id, key, monto, input.plazoDias, observaciones,
       );
       if (previous) return previous;
 
-      const pending = await findPendingRequestForClient(manager, context.client.id_cliente, true);
+      const pending = await findPendingRequestForClient(manager, client.id_cliente);
       if (pending) throw solicitudPendienteDuplicada(pending.id_solicitud_credito);
 
       const now = new Date();
       const fechaUtc = utcSql(now);
       const requestId = await insertRequest(manager, {
-        clienteId: context.client.id_cliente,
+        clienteId: client.id_cliente,
         solicitanteId: auth.id,
         monto,
         plazoDias: input.plazoDias,
@@ -301,11 +304,11 @@ export async function createCreditRequest(
         claveIdempotencia: key,
         fechaUtc,
       });
-      const row = await findRequestForUpdate(manager, requestId);
+      const row = await findRequestById(manager, requestId);
       if (!row) throw conflictoConcurrencia();
       const data = { solicitud: clientView(row) };
       const eventoId = await insertEvent(manager, {
-        clienteId: context.client.id_cliente,
+        clienteId: client.id_cliente,
         solicitudId: requestId,
         cuentaId: null,
         tipo: 'SOLICITUD_CREADA',
@@ -346,12 +349,12 @@ async function recoverClientRequest(
   observaciones: string | null,
 ): Promise<CreditWorkflowResult> {
   return inTransaction(async (manager) => {
-    const context = await lockClientContext(manager, auth);
+    const client = await lockClientContext(manager, auth);
     const previous = await replayClientCreation(
-      manager, context.client.id_cliente, auth.id, key, monto, plazoDias, observaciones,
+      manager, client.id_cliente, auth.id, key, monto, plazoDias, observaciones,
     );
     if (previous) return previous;
-    const pending = await findPendingRequestForClient(manager, context.client.id_cliente);
+    const pending = await findPendingRequestForClient(manager, client.id_cliente);
     if (pending) throw solicitudPendienteDuplicada(pending.id_solicitud_credito);
     throw conflictoConcurrencia();
   }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
@@ -430,9 +433,9 @@ export async function approveCreditRequest(
     const client = await findClientForUpdate(manager, clientId);
     if (!client) throw solicitudNoEncontrada();
     await lockAdmin(manager, auth);
-    if (!account) account = await findAccountForUpdate(manager, clientId);
-
-    const request = await findRequestForUpdate(manager, requestId);
+    // CLIENTE serializa las escrituras de sus solicitudes. Leer bajo READ
+    // COMMITTED evita bloquear al solicitante histórico a través del JOIN.
+    const request = await findRequestById(manager, requestId);
     if (!request || request.id_cliente !== clientId) throw solicitudNoEncontrada();
 
     const replayEvent = await findEventByKey(manager, auth.id, key, true);
@@ -471,6 +474,9 @@ export async function approveCreditRequest(
         evidencia: input.evidencia,
       });
     } else {
+      // Si la cuenta apareció antes de tomar CLIENTE, no invertir el orden
+      // intentando bloquear una cuenta que checkout ya puede tener tomada.
+      if (await findAccountByClient(manager, clientId)) throw conflictoConcurrencia();
       // MOVIMIENTO.fecha_efectiva tiene precisión de segundos. La cobertura de
       // alta se ancla al segundo para que el primer cargo no quede "antes".
       const coberturaDesdeUtc = now.toISOString().slice(0, 19).replace('T', ' ');
@@ -498,7 +504,7 @@ export async function approveCreditRequest(
     });
     if (affected !== 1) throw solicitudNoPendiente();
 
-    const updated = await findRequestForUpdate(manager, requestId);
+    const updated = await findRequestById(manager, requestId);
     const accountAfter = await findAccountForUpdate(manager, clientId);
     if (!updated || !accountAfter) throw conflictoConcurrencia();
     const revision = await readAccountRevision(manager, accountAfter.id_cuenta_corriente);
@@ -541,7 +547,7 @@ export async function rejectCreditRequest(
     const client = await findClientForUpdate(manager, clientId);
     if (!client) throw solicitudNoEncontrada();
     await lockAdmin(manager, auth);
-    const request = await findRequestForUpdate(manager, requestId);
+    const request = await findRequestById(manager, requestId);
     if (!request || request.id_cliente !== clientId) throw solicitudNoEncontrada();
 
     const replayEvent = await findEventByKey(manager, auth.id, key, true);
@@ -562,7 +568,7 @@ export async function rejectCreditRequest(
     });
     if (affected !== 1) throw solicitudNoPendiente();
 
-    const updated = await findRequestForUpdate(manager, requestId);
+    const updated = await findRequestById(manager, requestId);
     if (!updated) throw conflictoConcurrencia();
     const data = { solicitud: adminRequestView(updated) };
     const eventoId = await insertEvent(manager, {
@@ -752,34 +758,24 @@ export async function changeCreditLimit(
     const current = parseDbAmount(account.limite_credito, true);
     const unchanged = current !== null && current === limitCents
       && account.moneda_limite === 'USD' && Boolean(account.evidencia_limite?.trim());
-    if (unchanged) {
-      return {
-        data: {
-          cuenta: accountView(account),
-          limiteAnterior: account.limite_credito,
-          limiteNuevo: account.limite_credito,
-          sinCambios: true,
-        },
-        eventoId: '',
-        replay: true,
-      };
-    }
-
     const now = new Date();
     const fechaUtc = utcSql(now);
     const previousLimit = account.limite_credito;
-    await updateAccountLimit(manager, account.id_cuenta_corriente, {
-      limite: limit,
-      evidencia: input.evidencia,
-    });
-    const updated = await findAccountForUpdate(manager, clientId);
-    if (!updated) throw conflictoConcurrencia();
-    const revision = await readAccountRevision(manager, updated.id_cuenta_corriente);
+    let updated = account;
+    if (!unchanged) {
+      await updateAccountLimit(manager, account.id_cuenta_corriente, {
+        limite: limit,
+        evidencia: input.evidencia,
+      });
+      const row = await findAccountForUpdate(manager, clientId);
+      if (!row) throw conflictoConcurrencia();
+      updated = row;
+    }
     const data = {
       cuenta: accountView(updated),
       limiteAnterior: previousLimit,
       limiteNuevo: limit,
-      sinCambios: false,
+      sinCambios: unchanged,
     };
     const eventoId = await insertEvent(manager, {
       clienteId: clientId,
@@ -795,7 +791,7 @@ export async function changeCreditLimit(
       limiteNuevo: limit,
       motivo: input.motivo,
       evidencia: input.evidencia,
-      revisionCuenta: revision,
+      revisionCuenta: updated.revision,
       fechaUtc,
       resultadoJson: JSON.stringify(data),
     });

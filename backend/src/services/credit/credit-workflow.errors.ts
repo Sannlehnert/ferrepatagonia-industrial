@@ -31,8 +31,8 @@ export const soloEmpresas = () =>
 export const clienteInactivo = () =>
   new CreditWorkflowError('CLIENTE_INACTIVO', 403, 'La cuenta de cliente no está habilitada.');
 
-export const empresaNoAprobada = () =>
-  new CreditWorkflowError('EMPRESA_NO_APROBADA', 409, 'La empresa debe estar activa y aprobada comercialmente.');
+export const empresaNoAprobada = (status: 403 | 409 = 409) =>
+  new CreditWorkflowError('EMPRESA_NO_APROBADA', status, 'La empresa debe estar activa y aprobada comercialmente.');
 
 export const solicitudNoEncontrada = () =>
   new CreditWorkflowError('SOLICITUD_NO_ENCONTRADA', 404, 'No se encontró la solicitud de crédito.');

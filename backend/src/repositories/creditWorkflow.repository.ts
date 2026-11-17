@@ -240,21 +240,6 @@ export async function findRequestClientId(
   return row?.id_cliente ?? null;
 }
 
-export async function findRequestForUpdate(
-  manager: EntityManager,
-  requestId: number,
-): Promise<CreditRequestRow | null> {
-  const [row] = await manager.query<CreditRequestRow[]>(
-    `SELECT ${REQUEST_SELECT}
-     FROM SOLICITUD_CREDITO s
-     INNER JOIN CLIENTE c ON c.id_cliente = s.id_cliente
-     INNER JOIN USUARIO u ON u.id_usuario = s.id_usuario_solicitante
-     WHERE s.id_solicitud_credito = ? FOR UPDATE`,
-    [requestId],
-  );
-  return row ?? null;
-}
-
 export async function findRequestById(
   manager: EntityManager,
   requestId: number,
@@ -302,7 +287,6 @@ export async function findRequestForClient(
 export async function findPendingRequestForClient(
   manager: EntityManager,
   clientId: number,
-  lock = false,
 ): Promise<CreditRequestRow | null> {
   const [row] = await manager.query<CreditRequestRow[]>(
     `SELECT ${REQUEST_SELECT}
@@ -310,7 +294,7 @@ export async function findPendingRequestForClient(
      INNER JOIN CLIENTE c ON c.id_cliente = s.id_cliente
      INNER JOIN USUARIO u ON u.id_usuario = s.id_usuario_solicitante
      WHERE s.id_cliente = ? AND s.estado = 'PENDIENTE'
-     ORDER BY s.id_solicitud_credito DESC LIMIT 1${lock ? ' FOR UPDATE' : ''}`,
+     ORDER BY s.id_solicitud_credito DESC LIMIT 1`,
     [clientId],
   );
   return row ?? null;

@@ -10,6 +10,16 @@ const AMOUNT_PATTERN = /^(0|[1-9]\d{0,9})(?:\.(\d{1,2}))?$/;
 const IDEMPOTENCY_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const REQUEST_STATES = new Set<CreditRequestState>(['PENDIENTE', 'APROBADA', 'RECHAZADA']);
+const EVENT_TYPES = [
+  'SOLICITUD_CREADA', 'SOLICITUD_APROBADA', 'SOLICITUD_RECHAZADA',
+  'CUENTA_HABILITADA', 'CUENTA_DESHABILITADA', 'LIMITE_MODIFICADO',
+] as const;
+export type CreditEventType = typeof EVENT_TYPES[number];
+const EVENT_TYPE_SET: ReadonlySet<string> = new Set(EVENT_TYPES);
+
+function isCreditEventType(value: string): value is CreditEventType {
+  return EVENT_TYPE_SET.has(value);
+}
 
 export function parseCreditAmount(value: unknown, allowZero = false): bigint | null {
   if (typeof value !== 'string') return null;
@@ -33,13 +43,9 @@ export function normalizeIdempotencyKey(value: unknown): string | null {
   return IDEMPOTENCY_PATTERN.test(normalized) ? normalized : null;
 }
 
-const optionalText = (value: unknown, _max: number): string | null | undefined => {
-  if (value === undefined) return undefined;
-  if (value === null) return null;
-  if (typeof value !== 'string') return undefined;
-  const trimmed = value.trim();
-  return trimmed.length === 0 ? undefined : trimmed;
-};
+// Preserve supplied values so the rules can reject non-text and blank text.
+const optionalText = (value: unknown): unknown =>
+  typeof value === 'string' ? value.trim() : value;
 
 const requiredText = (value: unknown, _max: number): string | undefined =>
   typeof value === 'string' ? value.trim() : undefined;
@@ -163,7 +169,7 @@ export const createCreditRequestPolicy: DtoPolicy<CreateCreditRequest> = bodyPol
     montoSolicitado: typeof input.montoSolicitado === 'string'
       ? input.montoSolicitado.trim() : input.montoSolicitado,
     plazoDias: input.plazoDias,
-    observaciones: optionalText(input.observaciones, 1000),
+    observaciones: optionalText(input.observaciones),
   }),
 );
 
@@ -183,7 +189,7 @@ export const rejectCreditRequestPolicy: DtoPolicy<RejectCreditRequest> = bodyPol
   ['motivo', 'evidencia'],
   input => ({
     motivo: requiredText(input.motivo, 1000),
-    evidencia: optionalText(input.evidencia, 1000),
+    evidencia: optionalText(input.evidencia),
   }),
 );
 
@@ -192,7 +198,7 @@ export const enableCreditAccountPolicy: DtoPolicy<EnableCreditAccount> = bodyPol
   ['evidencia', 'motivo'],
   input => ({
     evidencia: requiredText(input.evidencia, 1000),
-    motivo: optionalText(input.motivo, 1000),
+    motivo: optionalText(input.motivo),
   }),
 );
 
@@ -201,7 +207,7 @@ export const disableCreditAccountPolicy: DtoPolicy<DisableCreditAccount> = bodyP
   ['motivo', 'evidencia'],
   input => ({
     motivo: requiredText(input.motivo, 1000),
-    evidencia: optionalText(input.evidencia, 1000),
+    evidencia: optionalText(input.evidencia),
   }),
 );
 
@@ -243,7 +249,7 @@ export interface CreditEventListQuery {
   antesDeId?: number;
   clienteId?: number;
   solicitudId?: number;
-  tipo?: string;
+  tipo?: CreditEventType;
 }
 
 const positiveQueryInt = (value: string, message: string): number => {
@@ -315,7 +321,7 @@ export function parseCreditEventListQuery(url: string): CreditEventListQuery {
   }
   if (params.has('tipo')) {
     const value = params.get('tipo')!;
-    if (!/^[A-Z_]{3,40}$/.test(value)) throw invalidCreditRequest('El tipo de evento es inválido.');
+    if (!isCreditEventType(value)) throw invalidCreditRequest('El tipo de evento es inválido.');
     query.tipo = value;
   }
   return query;

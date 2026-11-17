@@ -77,7 +77,7 @@ export const postClientCreditRequest: RequestHandler = async (req, res) => {
   try {
     const dto = res.locals.dto.body as CreateCreditRequest;
     const result = await createCreditRequest(req.auth!, dto, requireIdempotencyKey(req));
-    respond(res, result.replay ? 200 : 201, result.data, result.eventoId || undefined, result.replay);
+    respond(res, result.replay ? 200 : 201, result.data, result.eventoId, result.replay);
   } catch (error) {
     fail(res, error, 'No se pudo registrar la solicitud de crédito.');
   }

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { before, after, test } = require('node:test');
 const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
+const { setTimeout: delay } = require('node:timers/promises');
 const bcrypt = require('bcryptjs');
 
 // En Linux/WSL el binario nativo de sharp instalado para Windows no carga.
@@ -146,6 +147,63 @@ async function snapshotLedger(accountId) {
   };
 }
 
+// Pause one real HTTP transaction after it acquires a lock. Release it only
+// after MariaDB shows the competing locking read executing against that row.
+async function overlapOnLock({ matches, waitingFor, hold, contend }) {
+  const original = db.dataSource.createQueryRunner;
+  const paused = Promise.withResolvers();
+  const resume = Promise.withResolvers();
+  let matched = false;
+  db.dataSource.createQueryRunner = function (...args) {
+    const runner = original.apply(this, args);
+    const query = runner.query.bind(runner);
+    runner.query = async (sql, params, ...rest) => {
+      const result = await query(sql, params, ...rest);
+      if (!matched && runner.isTransactionActive && matches(sql, params)) {
+        matched = true;
+        const [{ id }] = await query('SELECT CONNECTION_ID() AS id');
+        paused.resolve(id);
+        await resume.promise;
+      }
+      return result;
+    };
+    return runner;
+  };
+  const requests = [];
+  const track = promise => {
+    requests.push(promise);
+    promise.catch(() => {});
+    return promise;
+  };
+  try {
+    const holder = track(hold());
+    const blocker = await Promise.race([
+      paused.promise,
+      holder.then(result => assert.fail(`La operación terminó antes del bloqueo: ${JSON.stringify(result)}`)),
+    ]);
+    let earlyResult;
+    track(contend()).then(result => { earlyResult = result; }, () => {});
+    const deadline = performance.now() + 1500;
+    let waiting = false;
+    do {
+      // MariaDB 11.4 can wait for a const row during query optimization
+      // (Statistics), before the wait is exposed in INNODB_LOCK_WAITS.
+      const running = await pool.query(`
+        SELECT INFO FROM information_schema.PROCESSLIST
+        WHERE DB = DATABASE() AND ID NOT IN (?, CONNECTION_ID())
+          AND COMMAND = 'Query' AND TIME_MS >= 100`, [blocker]);
+      waiting = running.some(row => typeof row.INFO === 'string' && waitingFor.test(row.INFO));
+      if (!waiting) await delay(50);
+    } while (!waiting && !earlyResult && performance.now() < deadline);
+    assert.ok(waiting, `MariaDB no mostró la lectura ${waitingFor} esperando por la sesión ${blocker}`);
+  } finally {
+    resume.resolve();
+    db.dataSource.createQueryRunner = original;
+    await Promise.allSettled(requests);
+  }
+  return Promise.all(requests);
+}
+
 before(async () => {
   await db.initializeDatabase();
   state.admin = await createUser('ADMIN');
@@ -282,11 +340,43 @@ test('S7-09.1 permisos: CLIENTE no resuelve, ADMIN inactivo/degradado no opera',
   assert.equal(staleRes.status, 401);
 });
 
-test('S7-09.1 empresa pendiente o rechazada no obtiene cuenta ni crédito', async () => {
+test('S7-09.1 F-01/F-05 empresas pendientes o rechazadas no crean ni consultan solicitudes', async () => {
   for (const company of [state.pending, state.rejected]) {
+    const request = await requestFor(company, '1000.00', 30);
+    assert.equal(request.status, 403, JSON.stringify(request.body));
+    assert.equal(request.body.code, 'EMPRESA_NO_APROBADA');
+    assert.equal(request.body.meta, undefined);
+    assert.deepEqual(await db.dataSource.query(
+      'SELECT id_solicitud_credito FROM SOLICITUD_CREDITO WHERE id_cliente = ?', [company.clientId],
+    ), []);
+    assert.deepEqual(await eventsFor(company.clientId), []);
+    assert.equal(await accountRow(company.clientId), null);
+  }
+  for (const [company, code] of [[state.pending, 'EMPRESA_NO_APROBADA'],
+    [state.rejected, 'EMPRESA_NO_APROBADA'], [state.particular, 'SOLO_EMPRESAS']]) {
+    for (const suffix of ['', `/${state.requestId}`]) {
+      const result = await api(`/cuenta-corriente/solicitudes${suffix}`, { token: company.token });
+      assert.equal(result.status, 403);
+      assert.equal(result.body.code, code);
+      assert.equal(result.body.data, undefined);
+    }
+  }
+});
+
+test('S7-09.1 F-01 revalida la empresa antes del replay y de la decisión administrativa', async () => {
+  for (const estado of ['PENDIENTE', 'RECHAZADA']) {
+    const company = await createUser('CLIENTE');
     const request = await requestFor(company, '1000.00', 30);
     assert.equal(request.status, 201, JSON.stringify(request.body));
     const requestId = request.body.data.solicitud.id;
+    await db.dataSource.query('UPDATE CLIENTE SET estado_aprobacion_empresa = ? WHERE id_cliente = ?',
+      [estado, company.clientId]);
+    const retry = await requestFor(company, '1000.00', 30, request.key);
+    assert.equal(retry.status, 403);
+    assert.equal(retry.body.code, 'EMPRESA_NO_APROBADA');
+    assert.equal(retry.body.data, undefined);
+    const detail = await api(`/cuenta-corriente/solicitudes/${requestId}`, { token: company.token });
+    assert.equal(detail.status, 403);
     const approval = await api(`/admin/solicitudes-credito/${requestId}/aprobar`, {
       method: 'POST', token: state.admin.token, key: idem(),
       body: { limiteAutorizado: '1000.00', plazoDias: 30, evidencia: 'ACTA-EMPRESA', motivo: 'Alta' },
@@ -301,6 +391,7 @@ test('S7-09.1 empresa pendiente o rechazada no obtiene cuenta ni crédito', asyn
     const failedEvents = (await eventsFor(company.clientId))
       .filter(item => item.id_solicitud_credito === requestId);
     assert.equal(failedEvents.length, 1, 'Solo debe existir el evento de creación');
+    assert.equal((await eventsFor(company.clientId)).length, 1);
     assert.equal(failedEvents[0].tipo_evento, 'SOLICITUD_CREADA');
     const enable = await api(`/admin/clientes/${company.clientId}/cuenta-corriente/habilitar`, {
       method: 'POST', token: state.admin.token, key: idem(), body: { evidencia: 'ACTA' },
@@ -310,16 +401,16 @@ test('S7-09.1 empresa pendiente o rechazada no obtiene cuenta ni crédito', asyn
 });
 
 test('S7-09.1 pasar a empresa APROBADA no habilita la cuenta por sí solo', async () => {
-  const [request] = await db.dataSource.query(
-    `SELECT id_solicitud_credito FROM SOLICITUD_CREDITO
-     WHERE id_cliente = ? AND estado = 'PENDIENTE'`, [state.pending.clientId],
-  );
-  assert.ok(request);
-  await db.dataSource.query(
-    "UPDATE CLIENTE SET estado_aprobacion_empresa = 'APROBADA' WHERE id_cliente = ?",
-    [state.pending.clientId],
-  );
-  const approval = await api(`/admin/solicitudes-credito/${request.id_solicitud_credito}/aprobar`, {
+  const forbidden = await requestFor(state.pending, '1000.00');
+  assert.equal(forbidden.status, 403);
+  const companyApproval = await api(`/admin/clientes/${state.pending.clientId}/estado-empresa`, {
+    method: 'PATCH', token: state.admin.token, body: { estado: 'APROBADA' },
+  });
+  assert.equal(companyApproval.status, 200, JSON.stringify(companyApproval.body));
+  assert.equal(await accountRow(state.pending.clientId), null);
+  const request = await requestFor(state.pending, '1000.00', 30, forbidden.key);
+  assert.equal(request.status, 201, JSON.stringify(request.body));
+  const approval = await api(`/admin/solicitudes-credito/${request.body.data.solicitud.id}/aprobar`, {
     method: 'POST', token: state.admin.token, key: idem(),
     body: { limiteAutorizado: '1000.00', plazoDias: 30, evidencia: 'ACTA-EMPRESA', motivo: 'Alta' },
   });
@@ -330,6 +421,58 @@ test('S7-09.1 pasar a empresa APROBADA no habilita la cuenta por sí solo', asyn
   const current = await ledger.calcularEstadoCuenta(account.id_cuenta_corriente);
   assert.equal(current.habilitada, false);
   assert.equal(current.estado_credito, 'BLOQUEADO');
+});
+
+test('S7-09.1 F-02 DTO HTTP no convierte texto inválido en ausencia ni consume la clave', async () => {
+  const company = await createUser('CLIENTE');
+  const key = idem();
+  const send = extra => api('/cuenta-corriente/solicitudes', {
+    method: 'POST', token: company.token, key,
+    body: { montoSolicitado: '750.00', plazoDias: 30, ...extra },
+  });
+  for (const observaciones of [12, false, '', '  \t']) {
+    const invalid = await send({ observaciones });
+    assert.equal(invalid.status, 400);
+    assert.deepEqual(invalid.body, { message: 'Las observaciones deben contener hasta 1000 caracteres.' });
+  }
+  assert.deepEqual(await db.dataSource.query(
+    'SELECT id_solicitud_credito FROM SOLICITUD_CREDITO WHERE id_cliente = ?', [company.clientId],
+  ), []);
+  assert.deepEqual(await eventsFor(company.clientId), []);
+  const accepted = await send({});
+  assert.equal(accepted.status, 201, JSON.stringify(accepted.body));
+  assert.equal(accepted.body.data.solicitud.observaciones, null);
+});
+
+test('S7-09.1 F-04 ADMIN no bloquea al solicitante histórico de otra empresa', async () => {
+  const author = await createUser('CLIENTE');
+  const current = await createUser('CLIENTE');
+  const request = await requestFor(author);
+  assert.equal(request.status, 201);
+  await db.dataSource.query("UPDATE USUARIO SET rol = 'ADMIN', id_cliente = NULL WHERE id_usuario = ?",
+    [current.id]);
+  await db.dataSource.query('UPDATE USUARIO SET id_cliente = ? WHERE id_usuario = ?',
+    [current.clientId, author.id]);
+
+  const blocker = db.dataSource.createQueryRunner();
+  try {
+    await blocker.startTransaction('READ COMMITTED');
+    await blocker.query('SELECT id_usuario FROM USUARIO WHERE id_usuario = ? FOR UPDATE', [author.id]);
+    const resolved = await api(`/admin/solicitudes-credito/${request.body.data.solicitud.id}/rechazar`, {
+      method: 'POST', token: state.admin.token, key: idem(), body: { motivo: 'Solicitud de relación anterior' },
+    });
+    assert.equal(resolved.status, 200, JSON.stringify(resolved.body));
+    assert.equal(resolved.body.data.solicitud.estado, 'RECHAZADA');
+    assert.deepEqual((await eventsFor(author.clientId)).map(event => event.tipo_evento),
+      ['SOLICITUD_CREADA', 'SOLICITUD_RECHAZADA']);
+    assert.deepEqual(await eventsFor(current.clientId), []);
+  } finally {
+    try {
+      if (blocker.isTransactionActive) await blocker.rollbackTransaction();
+    } finally {
+      await blocker.release();
+    }
+  }
 });
 
 test('S7-09.1 aprobación crea cuenta inhabilitada con límite, plazo y evidencia', async () => {
@@ -633,6 +776,47 @@ test('S7-09.1 límites inválidos y reducción por debajo de la deuda se rechaza
   assert.equal(after.length, before.length);
 });
 
+test('S7-09.1 F-03 el límite sin cambios registra la operación sin alterar cuenta ni libro', async () => {
+  const clientId = state.approved.clientId;
+  const account = await accountRow(clientId);
+  const financial = await snapshotLedger(account.id_cuenta_corriente);
+  assert.ok(financial.count > 0, 'La prueba debe preservar movimientos reales del fixture');
+  const beforeEvents = await eventsFor(clientId);
+  const key = idem();
+  const body = { limite: account.limite_credito, evidencia: 'ACTA-SIN-CAMBIOS', motivo: 'Ratificación' };
+  const send = patch => api(`/admin/clientes/${clientId}/cuenta-corriente/limite`, {
+    method: 'PUT', token: state.admin.token, key, body: { ...body, ...patch },
+  });
+  const first = await send();
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(first.body.data.sinCambios, true);
+  assert.equal(first.body.data.limiteAnterior, account.limite_credito);
+  assert.equal(first.body.data.limiteNuevo, account.limite_credito);
+  assert.equal(first.body.meta.replay, false);
+
+  const replay = await send();
+  assert.equal(replay.status, 200);
+  assert.deepEqual(replay.body, {
+    data: first.body.data, meta: { eventoId: first.body.meta.eventoId, replay: true },
+  });
+  for (const changed of [{ limite: '9000.00' }, { motivo: 'Otro motivo' }, { evidencia: 'Otra evidencia' }]) {
+    const conflict = await send(changed);
+    assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+    assert.equal(conflict.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  }
+  const afterEvents = await eventsFor(clientId);
+  assert.deepEqual(afterEvents.slice(0, -1), beforeEvents);
+  const event = afterEvents.at(-1);
+  assert.equal(String(event.id_evento_credito), first.body.meta.eventoId);
+  assert.equal(event.clave_idempotencia, key);
+  assert.equal(event.tipo_evento, 'LIMITE_MODIFICADO');
+  assert.equal(event.limite_anterior, account.limite_credito);
+  assert.equal(event.limite_nuevo, account.limite_credito);
+  assert.equal(String(event.revision_cuenta), first.body.data.cuenta.revision);
+  assert.deepEqual(await accountRow(clientId), account);
+  assert.deepEqual(await snapshotLedger(account.id_cuenta_corriente), financial);
+});
+
 test('S7-09.1 decisiones concurrentes y modificación concurrente de límite', async () => {
   const request = await requestFor(state.approved, '3000.00', 30);
   assert.equal(request.status, 201);
@@ -728,6 +912,15 @@ test('S7-09.1 auditoría reconstruible y sin datos internos para el cliente', as
   }
   assert.ok(events.body.data.items.some(item => item.tipo === 'LIMITE_MODIFICADO'
     && item.limiteAnterior === '2000.00' && item.limiteNuevo === '2500.00'));
+  const filtered = await api(`/admin/credito/eventos?clienteId=${state.approved.clientId}&tipo=LIMITE_MODIFICADO`, {
+    token: state.admin.token,
+  });
+  assert.equal(filtered.status, 200);
+  assert.ok(filtered.body.data.items.length > 0);
+  assert.ok(filtered.body.data.items.every(item => item.tipo === 'LIMITE_MODIFICADO'));
+  const invalidType = await api('/admin/credito/eventos?tipo=EVENTO_AJENO', { token: state.admin.token });
+  assert.equal(invalidType.status, 400);
+  assert.equal(invalidType.body.code, 'SOLICITUD_INVALIDA');
 
   const forbidden = await api(`/admin/credito/eventos?clienteId=${state.approved.clientId}`, {
     token: state.approved.token,
@@ -742,15 +935,15 @@ test('S7-09.1 auditoría reconstruible y sin datos internos para el cliente', as
 
 test('S7-09.1 checkout exige cuenta habilitada, empresa aprobada y precio FER-17 verificado', async () => {
   const company = await createUser('CLIENTE', { estadoEmpresa: 'PENDIENTE' });
-  const request = await requestFor(company);
-  assert.equal(request.status, 201, JSON.stringify(request.body));
-  const resolutionPath = `/admin/solicitudes-credito/${request.body.data.solicitud.id}/aprobar`;
   const companyPath = `/admin/clientes/${company.clientId}`;
   const admin = (path, body, method = 'POST') => api(path, {
     method, token: state.admin.token, key: idem(), body,
   });
   const setCompany = estado => admin(`${companyPath}/estado-empresa`, { estado }, 'PATCH');
   assert.equal((await setCompany('APROBADA')).status, 200);
+  const request = await requestFor(company);
+  assert.equal(request.status, 201, JSON.stringify(request.body));
+  const resolutionPath = `/admin/solicitudes-credito/${request.body.data.solicitud.id}/aprobar`;
   const approved = await admin(resolutionPath, { limiteAutorizado: '500.00', plazoDias: 30,
     evidencia: 'ACTA-CREDITO-7841', motivo: 'Crédito operativo' });
   assert.equal(approved.status, 200, JSON.stringify(approved.body));
@@ -800,10 +993,35 @@ test('S7-09.1 checkout exige cuenta habilitada, empresa aprobada y precio FER-17
   assert.equal((await verify('120.00')).ok, true);
   const newPrice = await quote();
   assert.equal(newPrice.body.data.totalUSD, '120.00');
-  const confirmed = await checkout(newPrice.body.data.cotizacion);
+  const [newRequest, concurrentQuote] = await overlapOnLock({
+    matches: (sql, params) => /estado_aprobacion_empresa, activo\s+FROM CLIENTE WHERE id_cliente = \? FOR UPDATE/.test(sql)
+      && params[0] === company.clientId,
+    waitingFor: /(?:FROM|JOIN) CLIENTE\b[\s\S]*FOR UPDATE/,
+    hold: () => requestFor(company, '1250.00'),
+    contend: quote,
+  });
+  assert.equal(newRequest.status, 201, JSON.stringify(newRequest.body));
+  assert.equal(concurrentQuote.status, 200);
+  assert.equal(concurrentQuote.body.data.elegible, true, JSON.stringify(concurrentQuote.body));
+  const confirmed = await checkout(concurrentQuote.body.data.cotizacion);
   assert.equal(confirmed.status, 201, JSON.stringify(confirmed.body));
   assert.equal((await snapshotLedger(accountId)).count, 1);
   assert.equal((await ledger.calcularEstadoCuenta(accountId)).credito_disponible, '380.00');
+
+  const [adminLimit, checkoutQuote] = await overlapOnLock({
+    matches: (sql, params) => /FROM CUENTA_CORRIENTE c\s+WHERE c.id_cliente = \? FOR UPDATE/.test(sql)
+      && params[0] === company.clientId,
+    waitingFor: /FROM CUENTA_CORRIENTE\s+WHERE id_cliente = \d+\s+FOR UPDATE/,
+    hold: () => admin(`${companyPath}/cuenta-corriente/limite`, {
+      limite: '550.00', evidencia: 'ACTA-550', motivo: 'Ampliación',
+    }, 'PUT'),
+    contend: quote,
+  });
+  assert.equal(adminLimit.status, 200, JSON.stringify(adminLimit.body));
+  assert.equal(checkoutQuote.status, 200);
+  // La compra anterior vació el carrito; la cotización no debe fallar por un lock.
+  assert.equal(checkoutQuote.body.data.codigo, 'CARRITO_VACIO');
+  assert.equal((await ledger.calcularEstadoCuenta(accountId)).credito_disponible, '430.00');
 });
 
 test('S7-09.1 persistencia tras reinicio del pool de datos', async () => {

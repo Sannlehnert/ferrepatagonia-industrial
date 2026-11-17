@@ -99,6 +99,29 @@ test('T-S7-09.1 DTO administrativos exigen evidencia y motivo', async () => {
   }
 });
 
+test('T-S7-09.1 F-02 texto opcional permite omisión y null; valida todo dato presente', async () => {
+  const cases = [
+    [createCreditRequestPolicy, { montoSolicitado: '100.00', plazoDias: 30 }, 'observaciones'],
+    [rejectCreditRequestPolicy, { motivo: 'Revisión' }, 'evidencia'],
+    [enableCreditAccountPolicy, { evidencia: 'Acta' }, 'motivo'],
+    [disableCreditAccountPolicy, { motivo: 'Revisión' }, 'evidencia'],
+  ];
+  for (const [policy, body, field] of cases) {
+    const omitted = await validateDtoInput(policy, body);
+    assert.equal(omitted.valid, true);
+    assert.equal(omitted.data[field], undefined);
+    for (const [input, expected] of [[null, null], [' texto ', 'texto'], ['x'.repeat(1000), 'x'.repeat(1000)]]) {
+      const accepted = await validateDtoInput(policy, { ...body, [field]: input });
+      assert.equal(accepted.valid, true);
+      assert.equal(accepted.data[field], expected);
+    }
+    for (const invalid of [0, 42, false, true, '', '   \t', 'x'.repeat(1001), [], {}]) {
+      const rejected = await validateDtoInput(policy, { ...body, [field]: invalid });
+      assert.equal(rejected.valid, false, `${field}=${JSON.stringify(invalid)}`);
+    }
+  }
+});
+
 test('T-S7-09.1 IDs de ruta no confían en strings arbitrarios', async () => {
   const valid = await validateDtoInput(creditRequestIdPolicy, { id: '12' });
   assert.equal(valid.valid, true);
@@ -123,5 +146,7 @@ test('T-S7-09.1 consultas rechazan filtros desconocidos y repetidos', () => {
     error => error.status === 400);
   assert.deepEqual(parseCreditEventListQuery('/eventos?tipo=LIMITE_MODIFICADO&solicitudId=4'),
     { limite: 50, tipo: 'LIMITE_MODIFICADO', solicitudId: 4 });
-  assert.throws(() => parseCreditEventListQuery('/eventos?tipo=lower'), error => error.status === 400);
+  for (const tipo of ['lower', 'EVENTO_AJENO', '', 'LIMITE_MODIFICADO%20']) {
+    assert.throws(() => parseCreditEventListQuery(`/eventos?tipo=${tipo}`), error => error.status === 400);
+  }
 });
