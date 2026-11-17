@@ -181,3 +181,57 @@ test('session verification error suppresses requests; explicit retry restores ve
  const s=r.start();await settle();assert.equal(r.calls.length,0);assert.ok(s.error.value);await s.retry();await settle();
  assert.equal(verified,1);assert.equal(r.calls.at(-1)[0],'/precios/mios');assert.equal(s.prices.value[1].precioUnitarioUSD,'90.00');r.stop();
 });
+
+test('visibilitychange and focus within 20 ms trigger one auto-refresh, manual retry still runs, and unmount cleans listeners',async(t)=>{
+  const listeners={window:new Map(),document:new Map()};
+  const prevWindow=global.window,prevDocument=global.document,prevNow=Date.now;
+  let now=1000;
+  Date.now=()=>now;
+  global.window={
+    addEventListener:(ev,fn)=>listeners.window.set(ev,fn),
+    removeEventListener:(ev,fn)=>{if(listeners.window.get(ev)===fn)listeners.window.delete(ev);},
+  };
+  global.document={
+    visibilityState:'visible',
+    addEventListener:(ev,fn)=>listeners.document.set(ev,fn),
+    removeEventListener:(ev,fn)=>{if(listeners.document.get(ev)===fn)listeners.document.delete(ev);},
+  };
+  t.after(()=>{global.window=prevWindow;global.document=prevDocument;Date.now=prevNow;});
+  const r=runtime(async()=>response());
+  const renderer=vue.createRenderer({
+    createElement:()=>({}),createText:()=>({}),createComment:()=>({}),
+    insert(){},remove(){},setText(){},setElementText(){},patchProp(){},
+    parentNode:()=>null,nextSibling:()=>null,
+  });
+  let state;
+  const app=renderer.createApp({setup(){state=r.load('composables/useProductPrices.ts').useProductPrices(r.products,r.catalogLoading);return state;},render:()=>null});
+  app.mount({});
+  await settle();
+  assert.equal(r.calls.length,1);
+  assert.ok(listeners.window.has('focus'));
+  assert.ok(listeners.document.has('visibilitychange'));
+
+  // visibilitychange (visible) followed by focus 20ms later -> only 1 additional request
+  listeners.document.get('visibilitychange')();
+  now+=20;
+  listeners.window.get('focus')();
+  await settle();
+  assert.equal(r.calls.length,2);
+  assert.equal(r.calls[1][2].signal.aborted,false);
+
+  // Manual retry within cooldown still executes immediately
+  now+=10;
+  await state.retry();
+  await settle();
+  assert.equal(r.calls.length,3);
+
+  // After cooldown (>250ms), focus triggers again
+  now+=300;
+  listeners.window.get('focus')();
+  await settle();
+  assert.equal(r.calls.length,4);
+
+  app.unmount();
+  assert.equal(listeners.window.size,0);
+  assert.equal(listeners.document.size,0);
+});

@@ -391,7 +391,7 @@ const requestClose = () => {
                             >
                                 Evidencia actual: {{ product?.estado_precio_base ? basePriceLabels[product.estado_precio_base] : 'No se pudo determinar el estado del precio base' }}
                             </p>
-                            <p class="mt-1 text-xs text-[#64748B]">Guardar o cambiar el importe no verifica el precio y invalida la evidencia previa. Requiere nueva evidencia antes de ofrecerlo en el catálogo.</p>
+                            <p class="mt-1 text-xs text-[#64748B]">Guardar o cambiar el importe no verifica el precio e invalida la evidencia previa. Requiere nueva evidencia antes de ofrecerlo en el catálogo.</p>
                             <p v-if="fieldErrors.precio" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.precio }}</p>
                         </div>
 

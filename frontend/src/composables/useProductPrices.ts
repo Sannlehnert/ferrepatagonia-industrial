@@ -47,8 +47,16 @@ export function useProductPrices(products: Ref<CatalogProduct[]>, catalogLoading
   watch(() => [products.value, catalogLoading.value, auth.sessionVersion, auth.user?.id,
     auth.user?.rol, auth.sessionChecked, auth.loggingIn, auth.loggingOut, auth.sessionError],
   () => { void retry() }, { immediate: true, flush: 'sync' })
-  const refreshOnFocus = () => { void retry() }
-  const refreshOnVisible = () => { if (document.visibilityState === 'visible') void retry() }
+  const AUTO_REFRESH_COOLDOWN_MS = 250
+  let lastAutoRefreshAt = -Infinity
+  function refreshOnAutoReturn() {
+    const now = Date.now()
+    if (now - lastAutoRefreshAt < AUTO_REFRESH_COOLDOWN_MS) return
+    lastAutoRefreshAt = now
+    void retry()
+  }
+  const refreshOnFocus = () => { refreshOnAutoReturn() }
+  const refreshOnVisible = () => { if (document.visibilityState === 'visible') refreshOnAutoReturn() }
   onMounted(() => {
     if (typeof window !== 'undefined') window.addEventListener('focus', refreshOnFocus)
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshOnVisible)

@@ -101,7 +101,7 @@ async function add() {
         text-base sm:text-sm font-semibold text-white
         disabled:cursor-not-allowed disabled:bg-slate-400
         focus-visible:outline-2 focus-visible:outline-offset-2
-        focus-visible:outline-[#145a8d] transition-colors"
+        focus-visible:outline-[#145a8d] transition-colors [.contents>&]:self-start"
       :disabled="disabled"
       :aria-describedby="`cart-message-${product.id}`"
       @click="add"
