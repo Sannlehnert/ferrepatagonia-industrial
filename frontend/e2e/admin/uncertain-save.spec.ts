@@ -53,6 +53,8 @@ test('una lectura anterior al 502 no reconcilia una desactivación persistida', 
   try {
     page.once('dialog', dialog => dialog.accept());
     await deactivate.click();
+    await expect(deactivate).toBeDisabled();
+    await expect(deactivate).toHaveAccessibleDescription(/acciones están temporalmente deshabilitadas/);
     await search.fill('E2E-25');
     await staleReadCaptured.promise;
     runningWrite.resolve();

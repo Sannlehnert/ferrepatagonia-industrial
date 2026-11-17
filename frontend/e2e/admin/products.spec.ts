@@ -88,7 +88,7 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
     createdId = Number(created.id_producto);
     expect(Number.isInteger(createdId) && createdId > 0).toBe(true);
 
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(page.getByRole('status').filter({ hasText: /se creó correctamente/ })).toHaveText(
       `"${initialName}" se creó correctamente.`,
     );
     await expect(form).toHaveCount(0);
@@ -99,10 +99,9 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
     // Comprobar persistencia en administración.
     await page.reload();
 
-    await page.getByRole('button', {
-      name: `Editar ${initialName}`,
-      exact: true,
-    }).click();
+    const edit = page.getByRole('button', { name: `Editar ${initialName}`, exact: true });
+    await edit.focus();
+    await page.keyboard.press('Enter');
 
     await expect(field('Nombre del Producto')).toHaveValue(initialName);
     await expect(field('Código SKU')).toHaveValue(code);
@@ -125,7 +124,7 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
     }).click();
 
     expect((await update).status()).toBe(200);
-    await expect(page.getByRole('status')).toHaveText(
+    await expect(page.getByRole('status').filter({ hasText: /se actualizó correctamente/ })).toHaveText(
       `"${editedName}" se actualizó correctamente.`,
     );
     await expect(form).toHaveCount(0);
