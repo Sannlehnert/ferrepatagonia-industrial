@@ -132,9 +132,30 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-ELE-TALADRO-500-W",
+      "archivo": "ilustrativa-ele.webp",
+      "sha256Publicado": "9bfd7306685ce42024155e314cc9cff6fcc8a4e86bc6660815ae9e4216709517",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ELE-AMOLADORA-1000-W",
+      "archivo": "ilustrativa-ele.webp",
+      "sha256Publicado": "9bfd7306685ce42024155e314cc9cff6fcc8a4e86bc6660815ae9e4216709517",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-ELE-CALADORA-500-W",
       "archivo": "caladora-500w.webp",
       "sha256Publicado": "4a386a6ff966d4e7251165478360565174f463649ee8e3b3345c16592260aa37",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ELE-LIJADORA-150-W",
+      "archivo": "ilustrativa-ele.webp",
+      "sha256Publicado": "9bfd7306685ce42024155e314cc9cff6fcc8a4e86bc6660815ae9e4216709517",
       "http": 200,
       "mime": "image/webp"
     },
@@ -149,6 +170,55 @@
       "sku": "FP-DEMO-CAS-CASCO-CORTO-AMARILLO",
       "archivo": "casco-visera-corta-amarillo.webp",
       "sha256Publicado": "77ef34091a205ac69cf42282c2125c6018c2c6b077728bbba11e7a045bda2128",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-RANURAS-AMARILLO",
+      "archivo": "ilustrativa-cas.webp",
+      "sha256Publicado": "c31972b534f2003b5e6f59bb13ae1e35c982c392538c45a789eb34c84d188769",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL",
+      "archivo": "ilustrativa-cha.webp",
+      "sha256Publicado": "045dab78b5a61a5c225161f65950084b636097dfe6ece9e7831ef8d2b7852e69",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL",
+      "archivo": "ilustrativa-cha.webp",
+      "sha256Publicado": "045dab78b5a61a5c225161f65950084b636097dfe6ece9e7831ef8d2b7852e69",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL",
+      "archivo": "ilustrativa-cha.webp",
+      "sha256Publicado": "045dab78b5a61a5c225161f65950084b636097dfe6ece9e7831ef8d2b7852e69",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL",
+      "archivo": "ilustrativa-cha.webp",
+      "sha256Publicado": "045dab78b5a61a5c225161f65950084b636097dfe6ece9e7831ef8d2b7852e69",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL",
+      "archivo": "ilustrativa-gua.webp",
+      "sha256Publicado": "42b7f4ff90ea61753f82633da4679f9b7dedbe18c86fb8f7806c4ea74f5bc5b9",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL",
+      "archivo": "ilustrativa-gua.webp",
+      "sha256Publicado": "42b7f4ff90ea61753f82633da4679f9b7dedbe18c86fb8f7806c4ea74f5bc5b9",
       "http": 200,
       "mime": "image/webp"
     },
@@ -405,6 +475,13 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES",
+      "archivo": "ilustrativa-aud.webp",
+      "sha256Publicado": "9d96986fc0b4997bfb2546a3cb7ff4851d8328429344fce6b191be35a7d41381",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-5-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
@@ -464,6 +541,13 @@
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-100-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-AUD-OREJERA-AMARILLO",
+      "archivo": "ilustrativa-aud.webp",
+      "sha256Publicado": "9d96986fc0b4997bfb2546a3cb7ff4851d8328429344fce6b191be35a7d41381",
       "http": 200,
       "mime": "image/webp"
     },
@@ -657,6 +741,41 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-CAL-BOTA-PVC-38-AR",
+      "archivo": "ilustrativa-cal.webp",
+      "sha256Publicado": "a4efe94e0872471d552f2d93b48ab25e8b1f4184a03e01936611739dd1488c3b",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-BOLSO-ARNES-10-L",
+      "archivo": "ilustrativa-alt.webp",
+      "sha256Publicado": "eb94fa0741d217864e664e0fc5a38d6ab27cbeabf0769f0e6687458de95d9faf",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-PROTECTOR-CINTA-150-MM",
+      "archivo": "ilustrativa-alt.webp",
+      "sha256Publicado": "eb94fa0741d217864e664e0fc5a38d6ab27cbeabf0769f0e6687458de95d9faf",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES",
+      "archivo": "ilustrativa-alt.webp",
+      "sha256Publicado": "eb94fa0741d217864e664e0fc5a38d6ab27cbeabf0769f0e6687458de95d9faf",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-AZUL",
+      "archivo": "ilustrativa-alt.webp",
+      "sha256Publicado": "eb94fa0741d217864e664e0fc5a38d6ab27cbeabf0769f0e6687458de95d9faf",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-CON-CONO-NARANJA-18-CM",
       "archivo": "cono-naranja-30-cm.webp",
       "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
@@ -716,6 +835,48 @@
       "sku": "FP-DEMO-CON-CONO-NARANJA-90-CM",
       "archivo": "cono-naranja-30-cm.webp",
       "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-CADENA-100-M",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-BARRA-CONOS-0-6-M",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA",
+      "archivo": "ilustrativa-cin.webp",
+      "sha256Publicado": "ffd74d86f6e42ca2551865f57e7aa8e929ddee5632a17ae87ba9beb473efc72e",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-PISO-AMARILLA",
+      "archivo": "ilustrativa-cin.webp",
+      "sha256Publicado": "ffd74d86f6e42ca2551865f57e7aa8e929ddee5632a17ae87ba9beb473efc72e",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-VISUAL-12-MM",
+      "archivo": "ilustrativa-cin.webp",
+      "sha256Publicado": "ffd74d86f6e42ca2551865f57e7aa8e929ddee5632a17ae87ba9beb473efc72e",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-TEXTO-100-M",
+      "archivo": "ilustrativa-cin.webp",
+      "sha256Publicado": "ffd74d86f6e42ca2551865f57e7aa8e929ddee5632a17ae87ba9beb473efc72e",
       "http": 200,
       "mime": "image/webp"
     },
@@ -909,9 +1070,114 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-FIJ-VARILLA-M10",
+      "archivo": "ilustrativa-fij.webp",
+      "sha256Publicado": "24914fc9e0ddf371c392c2d5e4a0b35b320200b450ab70dec698c8d4d4c7b096",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-ANCLAJE-M10",
+      "archivo": "ilustrativa-fij.webp",
+      "sha256Publicado": "24914fc9e0ddf371c392c2d5e4a0b35b320200b450ab70dec698c8d4d4c7b096",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-ABRAZADERA-12-MM",
+      "archivo": "ilustrativa-fij.webp",
+      "sha256Publicado": "24914fc9e0ddf371c392c2d5e4a0b35b320200b450ab70dec698c8d4d4c7b096",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
+      "archivo": "ilustrativa-cab.webp",
+      "sha256Publicado": "4ed780f91f9360e40b6b273518eebea093bdd090b512dd0f880fee765cce431a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-AZUL-0-5-MM2",
+      "archivo": "ilustrativa-cab.webp",
+      "sha256Publicado": "4ed780f91f9360e40b6b273518eebea093bdd090b512dd0f880fee765cce431a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-MARRON-0-5-MM2",
+      "archivo": "ilustrativa-cab.webp",
+      "sha256Publicado": "4ed780f91f9360e40b6b273518eebea093bdd090b512dd0f880fee765cce431a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2",
+      "archivo": "ilustrativa-cab.webp",
+      "sha256Publicado": "4ed780f91f9360e40b6b273518eebea093bdd090b512dd0f880fee765cce431a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-COLA-100-ML",
+      "archivo": "ilustrativa-adh.webp",
+      "sha256Publicado": "14922ce30b4c60211b584093cdf2b7b5fac88b29f08787de82145b69badd0d24",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS",
+      "archivo": "ilustrativa-adh.webp",
+      "sha256Publicado": "14922ce30b4c60211b584093cdf2b7b5fac88b29f08787de82145b69badd0d24",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-CONTACTO-100-ML",
+      "archivo": "ilustrativa-adh.webp",
+      "sha256Publicado": "14922ce30b4c60211b584093cdf2b7b5fac88b29f08787de82145b69badd0d24",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-CINTA-DOBLE-12-MM",
+      "archivo": "ilustrativa-adh.webp",
+      "sha256Publicado": "14922ce30b4c60211b584093cdf2b7b5fac88b29f08787de82145b69badd0d24",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-DISCO-METAL-100-MM",
+      "archivo": "ilustrativa-abr.webp",
+      "sha256Publicado": "14c447dd62cad7b45643ecbe12c3aa86e6d930ef092e73f63ef436e0b922bd7a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-ABR-DISCO-METAL-125-MM",
       "archivo": "disco-corte-metal.webp",
       "sha256Publicado": "f0e81702c3701497761e5e859f47757bddb8b7042ce1dd2752ac4cfd85a86d7a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-LIJA-MADERA-GRANO-100",
+      "archivo": "ilustrativa-abr.webp",
+      "sha256Publicado": "14c447dd62cad7b45643ecbe12c3aa86e6d930ef092e73f63ef436e0b922bd7a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-LIJA-AGUA-GRANO-1000",
+      "archivo": "ilustrativa-abr.webp",
+      "sha256Publicado": "14c447dd62cad7b45643ecbe12c3aa86e6d930ef092e73f63ef436e0b922bd7a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-DISCO-LIJA-100-MM",
+      "archivo": "ilustrativa-abr.webp",
+      "sha256Publicado": "14c447dd62cad7b45643ecbe12c3aa86e6d930ef092e73f63ef436e0b922bd7a",
       "http": 200,
       "mime": "image/webp"
     },
@@ -1049,11 +1315,11 @@
       "mime": "image/webp"
     }
   ],
-  "conImagenVerificada": 144,
-  "pendientesDeImagen": 760,
+  "conImagenVerificada": 182,
+  "pendientesDeImagen": 722,
   "archivosFotograficos": 23,
-  "gruposPendientes": 299,
-  "asociacionesConservadasAlRepetir": 144,
+  "gruposPendientes": 286,
+  "asociacionesConservadasAlRepetir": 182,
   "vistasConFotoVerificada": [
     "Home",
     "catálogo",

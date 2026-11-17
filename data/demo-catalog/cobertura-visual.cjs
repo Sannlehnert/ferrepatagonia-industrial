@@ -7,6 +7,9 @@ const familias = require('./variantes.cjs');
 const archivoFotos = join(__dirname, 'image-sources.csv');
 const directorioFotos = join(__dirname, '../../frontend/public/demo-catalog');
 const rutaWebp = /^\/demo-catalog\/([a-z0-9-]+\.webp)$/;
+// Las ilustraciones genéricas no son fotos: se reutilizan en toda su familia y
+// deben declararse como obra propia para que no se confundan con evidencia visual.
+const ilustrativaPrefijo = 'ilustrativa-';
 
 function leerCsv(path) {
   const { data, errors } = parse(readFileSync(path, 'utf8'), { header: true, skipEmptyLines: true });
@@ -23,6 +26,10 @@ function leerFuentes() {
     assert.ok(producto && !fuentes.has(fila.sku), `SKU desconocido o duplicado: ${fila.sku}`);
     const archivo = rutaWebp.exec(fila.ruta_final)?.[1];
     assert.ok(archivo && fila.autor && fila.licencia && fila.modificaciones, `Falta evidencia visual para ${fila.sku}`);
+    if (archivo.startsWith(ilustrativaPrefijo)) {
+      assert.ok(fila.licencia.startsWith('Obra propia') && /no corresponde a la variante exacta/.test(fila.modificaciones),
+        `La ilustración de ${fila.sku} debe declararse como obra propia y no exacta`);
+    }
     for (const url of [fila.fuente, fila.url_original, fila.referencia_licencia]) {
       assert.equal(new URL(url).protocol, 'https:', `Enlace de procedencia inválido para ${fila.sku}`);
     }
@@ -70,16 +77,20 @@ function auditarCobertura(fuentes = leerFuentes()) {
     });
     const grupo = grupos.get(clave);
     const fuente = fuentes.get(producto.codigo);
-    if (fuente && !grupo.archivos.includes(fuente.archivo)) {
+    const ilustrativa = fuente?.archivo.startsWith('ilustrativa-');
+    if (fuente && !ilustrativa && !grupo.archivos.includes(fuente.archivo)) {
       assert.ok(!grupoPorArchivo.has(fuente.archivo), `Foto ${fuente.archivo} reutilizada entre grupos no equivalentes`);
       grupoPorArchivo.set(fuente.archivo, clave);
       grupo.archivos.push(fuente.archivo);
     }
     if (!fuente) grupo.pendientes.push(producto.codigo);
   }
+  const archivosDe = ilustrativas => new Set([...fuentes.values()]
+    .filter(f => f.archivo.startsWith(ilustrativaPrefijo) === ilustrativas).map(f => f.archivo));
+  const skuIlustrativos = [...fuentes.values()].filter(f => f.archivo.startsWith(ilustrativaPrefijo)).length;
   return {
-    sku: productos.length, skuConFuente: fuentes.size, skuPendientes: productos.length - fuentes.size,
-    archivos: new Set([...fuentes.values()].map(f => f.archivo)).size,
+    sku: productos.length, skuConFuente: fuentes.size, skuIlustrativos, skuPendientes: productos.length - fuentes.size,
+    archivos: archivosDe(false).size, archivosIlustrativos: archivosDe(true).size,
     grupos: [...grupos.values()].filter(g => g.pendientes.length),
   };
 }

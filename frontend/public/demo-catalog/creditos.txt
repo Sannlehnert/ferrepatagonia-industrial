@@ -132,3 +132,42 @@ Fotografía «Hard hat 20111111» de Batholith.
 Original: https://commons.wikimedia.org/wiki/File:Hard_hat_20111111.jpg
 Licencia: dominio público según la ficha de Commons, https://commons.wikimedia.org/wiki/File:Hard_hat_20111111.jpg#Licensing
 Cambios: redimensionada a 960 × 720 y convertida a WebP.
+
+ilustrativa-abr.webp
+Ilustración genérica «Abrasivos», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-adh.webp
+Ilustración genérica «Adhesivos y selladores», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-alt.webp
+Ilustración genérica «Trabajo en altura», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-aud.webp
+Ilustración genérica «Protección auditiva», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-cab.webp
+Ilustración genérica «Cables», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-cal.webp
+Ilustración genérica «Calzado de trabajo», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-cas.webp
+Ilustración genérica «Cascos», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-cha.webp
+Ilustración genérica «Chalecos reflectivos», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-cin.webp
+Ilustración genérica «Cintas», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-con.webp
+Ilustración genérica «Conos y balizamiento», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-ele.webp
+Ilustración genérica «Herramientas eléctricas», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-fij.webp
+Ilustración genérica «Fijaciones», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-gua.webp
+Ilustración genérica «Guantes», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
