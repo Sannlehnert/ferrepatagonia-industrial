@@ -15,7 +15,7 @@ export const registerPolicy: DtoPolicy<Registro> = { type: Registro,
   fields: ['tipoCliente', 'nombreRazonSocial', 'email', 'password', 'docCliente', 'cuit', 'telefono', 'direccion'],
   unknownError, objectError: 'El body debe ser un objeto JSON.' };
 export const catalogPolicy: DtoPolicy<CatalogQuery> = { type: CatalogQuery,
-  fields: ['page', 'limit', 'categoria', 'busqueda'], prepare: prepareCatalog,
+  fields: ['page', 'limit', 'categoria', 'busqueda', 'orden'], prepare: prepareCatalog,
   unknownError: catalogError, objectError: catalogError, error: catalogError };
 export const productIdPolicy: DtoPolicy<ProductIdParams> = { type: ProductIdParams,
   fields: ['id'], prepare: prepareProductId,
