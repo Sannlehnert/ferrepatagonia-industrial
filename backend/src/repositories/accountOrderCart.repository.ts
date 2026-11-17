@@ -47,7 +47,7 @@ export async function lockAccountOrderCart(
 ): Promise<LockedOrderCart> {
   requireTransaction(manager);
 
-  if (await lockCartClient(manager, userId) !== clientId) {
+  if (!await lockCartClient(manager, userId, clientId)) {
     throw new AccountOrderError(
       'CLIENTE_NO_HABILITADO',
       403,

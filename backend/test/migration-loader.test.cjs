@@ -20,7 +20,7 @@ test('applySql envía el SQL original al cliente MariaDB por stdin', () => {
   assert.equal(calls.length, 1);
   assert.equal(calls[0].command, 'docker');
   assert.deepEqual(calls[0].args, [
-    'exec', '-i', 'pricing-test', 'mariadb', '-uroot', '-psecret', 'pricing_test',
+    'exec', '-i', 'pricing-test', 'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', '-psecret', 'pricing_test',
   ]);
   assert.ok(Buffer.isBuffer(calls[0].options.input));
   assert.ok(calls[0].options.input.equals(sql), 'El SQL debe llegar intacto, sin reinterpretar DELIMITER ni END//');
