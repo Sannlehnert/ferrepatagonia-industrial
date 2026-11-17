@@ -4,7 +4,99 @@ import Papa from 'papaparse';
 
 export const masterCsv = resolve(__dirname, '../../../docs/309/catalogo-maestro.csv');
 const fer17Migration = resolve(__dirname, '../../../database/migrate-fer-17-price-verification.sql');
-const normalizeTriggerBody = (body: string) => body.trim().replace(/\s+/g, ' ');
+
+// Reserved words are case-insensitive, but identifiers, quoted names and literals
+// are not always. Only recognized keywords are canonicalized; everything else is
+// compared verbatim so a different definition cannot look equivalent.
+const sqlKeywords = new Set(`
+  AFTER ALGORITHM ALL ALTER AND AS ASC BEFORE BEGIN BETWEEN BIGINT BINARY BLOB BOOL
+  BOOLEAN BOTH BY CALL CASCADE CASE CHANGE CHAR CHARACTER CHECK COLLATE COLUMN
+  COMMENT COMMIT CONSTRAINT CONTINUE CONVERT CREATE CROSS CURRENT_DATE CURRENT_TIME
+  CURRENT_TIMESTAMP CURRENT_USER DATABASE DATABASES DATE DATETIME DECIMAL DECLARE
+  DEFAULT DELETE DESC DESCRIBE DISTINCT DIV DO DOUBLE DROP DUAL EACH ELSE ELSEIF END
+  ENUM ESCAPED EXISTS EXPLAIN FALSE FETCH FLOAT FOR FORCE FOREIGN FROM FULL FUNCTION
+  GRANT GROUP HAVING IF IGNORE IN INDEX INNER INSERT INT INTEGER INTERVAL INTO INVOKER
+  IS ITERATE JOIN KEY KEYS LEADING LEAVE LEFT LIKE LIMIT LINES LOAD LOCK LONG LONGBLOB
+  LONGTEXT LOOP MATCH MEDIUMINT MEDIUMTEXT MOD MODIFIES NATURAL NEW NOT NULL NUMERIC
+  OFFSET OLD ON OPEN OPTION OR ORDER OUT OUTER OVER PARTITION PRECISION PRIMARY
+  PROCEDURE PURGE READ READS REAL REFERENCES REGEXP RELEASE RENAME REPEAT REPLACE
+  REQUIRES RESIGNAL RESTRICT RETURN RETURNS REVOKE RIGHT RLIKE ROLLBACK ROW ROWS
+  SAVEPOINT SCHEMA SELECT SEPARATOR SET SHARE SHOW SIGNAL SMALLINT SPATIAL SQL
+  SQLSTATE STARTING STRAIGHT_JOIN TABLE TERMINATED TEXT THEN TINYINT TINYTEXT TO
+  TRAILING TRIGGER TRUE UNDO UNION UNIQUE UNLOCK UNSIGNED UPDATE USAGE USE USING
+  UTC_DATE UTC_TIME UTC_TIMESTAMP VALUES VARBINARY VARCHAR VARYING VIEW WHEN WHERE
+  WHILE WITH WRITE XOR YEAR ZEROFILL NOW COALESCE CONCAT COUNT IFNULL LENGTH LOWER
+  MAX MIN NULLIF ROUND SUBSTRING SUM TRIM UPPER ABS CHAR_LENGTH
+`.trim().split(/\s+/));
+
+const operatorTokens = ['<=>', '->>', '->', ':=', '<=', '>=', '<>', '!=', '||', '&&', '<<', '>>', '!<', '!>'];
+
+function tokenizeSql(sql: string): string[] {
+  const tokens: string[] = [];
+  for (let index = 0; index < sql.length;) {
+    const char = sql[index];
+    if (/\s/.test(char)) { index++; continue; }
+    if (char === '#' || (char === '-' && sql[index + 1] === '-' && /[\s]|$/.test(sql[index + 2] ?? ' '))) {
+      const end = sql.indexOf('\n', index + 1);
+      index = end === -1 ? sql.length : end + 1;
+      continue;
+    }
+    if (char === '/' && sql[index + 1] === '*' && sql[index + 2] !== '!') {
+      const end = sql.indexOf('*/', index + 2);
+      index = end === -1 ? sql.length : end + 2;
+      continue;
+    }
+    if (char === "'" || char === '"' || char === '`') {
+      let cursor = index + 1;
+      while (cursor < sql.length) {
+        if (sql[cursor] === '\\' && char !== '`') { cursor += 2; continue; }
+        if (sql[cursor] === char) {
+          if (sql[cursor + 1] === char) { cursor += 2; continue; }
+          cursor++; break;
+        }
+        cursor++;
+      }
+      tokens.push(sql.slice(index, cursor));
+      index = cursor;
+      continue;
+    }
+    if (/[0-9]/.test(char)) {
+      let cursor = index + 1;
+      while (cursor < sql.length && /[0-9A-Za-z_.]/.test(sql[cursor])) cursor++;
+      tokens.push(sql.slice(index, cursor));
+      index = cursor;
+      continue;
+    }
+    if (char === '@') {
+      let cursor = index + 1;
+      while (cursor < sql.length && /[A-Za-z0-9_$@.]/.test(sql[cursor])) cursor++;
+      tokens.push(sql.slice(index, cursor));
+      index = cursor;
+      continue;
+    }
+    if (/[A-Za-z_$\u0080-\uffff]/.test(char)) {
+      let cursor = index + 1;
+      while (cursor < sql.length && /[A-Za-z0-9_$\u0080-\uffff]/.test(sql[cursor])) cursor++;
+      const word = sql.slice(index, cursor);
+      const keyword = word.toUpperCase();
+      tokens.push(sqlKeywords.has(keyword) ? keyword : word);
+      index = cursor;
+      continue;
+    }
+    const operator = operatorTokens.find(candidate => sql.startsWith(candidate, index));
+    if (operator) { tokens.push(operator); index += operator.length; continue; }
+    tokens.push(char);
+    index++;
+  }
+  return tokens;
+}
+
+export function triggerBodiesEquivalent(left: string, right: string): boolean {
+  const expected = tokenizeSql(left);
+  const actual = tokenizeSql(right);
+  return expected.length === actual.length &&
+    expected.every((token, index) => token === actual[index]);
+}
 
 const fields = [
   'numero', 'sku', 'categoria', 'nombre_propuesto', 'descripcion_propuesta',
@@ -66,15 +158,17 @@ async function main() {
   try {
     await initializeDatabase();
     const result = await inTransaction(async manager => {
-      // Retain the table metadata lock until commit, including during the trigger check.
-      await manager.query('SELECT codigo FROM PRODUCTO LIMIT 0');
+      // Shared-write metadata lock: it prevents a concurrent DDL from taking
+      // effect between the trigger check and the inserts, while remaining
+      // compatible with normal reads and writes. Kept until commit or rollback.
+      await manager.query('SELECT codigo FROM PRODUCTO LIMIT 0 FOR UPDATE');
       const [trigger] = await manager.query(`
         SELECT ACTION_STATEMENT AS body FROM information_schema.TRIGGERS
         WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = 'fer17_producto_alta_evento'
           AND BINARY EVENT_OBJECT_TABLE = 'PRODUCTO'
           AND ACTION_TIMING = 'AFTER' AND EVENT_MANIPULATION = 'INSERT'
           AND ACTION_ORIENTATION = 'ROW'`);
-      if (!trigger?.body || normalizeTriggerBody(trigger.body) !== normalizeTriggerBody(expectedBody)) {
+      if (!trigger?.body || !triggerBodiesEquivalent(trigger.body, expectedBody)) {
         throw new CatalogError(
           'Auditoría de alta ausente, incompatible o no visible. Aplicá las migraciones FER-17 y verificá el permiso TRIGGER sobre PRODUCTO.'
         );

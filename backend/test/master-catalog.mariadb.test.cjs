@@ -18,6 +18,22 @@ const backend = resolve(__dirname, '..');
 const rows = parseMasterCatalog(readFileSync(masterCsv, 'utf8'));
 const names = [...new Set(rows.map(row => row.category))];
 
+// The MariaDB 11.4 client enables TLS by default, even for a unix socket. A
+// clock-skewed ephemeral certificate would fail the bootstrap with error 2026.
+// Resolve the socket the image configures and use it explicitly, without TLS,
+// only for this internal bootstrap connection.
+const sqlSocket = container => {
+  const socket = docker(['exec', container, 'sh', '-c',
+    "mariadb --print-defaults | tr ' ' '\\n' | sed -n 's/^--socket=//p' | head -n1"]);
+  assert.match(socket, /^\//, 'El cliente de bootstrap debe resolver un socket local');
+  docker(['exec', container, 'test', '-S', socket]);
+  return socket;
+};
+const applySql = (container, socket, file) => docker(['exec', '-i', '-e', `MARIADB_LOCAL_SOCKET=${socket}`,
+  container, 'sh', '-c',
+  'exec mariadb --protocol=socket --socket="$MARIADB_LOCAL_SOCKET" --skip-ssl -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'],
+readFileSync(resolve(backend, '../database', file)));
+
 async function backendPort() {
   const probe = createServer().listen(0, '127.0.0.1');
   await once(probe, 'listening');
@@ -60,10 +76,11 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
       api = spawn(process.execPath, ['--require', './test/helpers/test-env.cjs', 'dist/server.js'], {
         cwd: backend, env, stdio: ['ignore', 'pipe', 'pipe']
       });
-      apiClosed = once(api, 'close');
-      // Attach a rejection handler immediately so a spawn failure can be reported by the race.
-      apiClosed.catch(() => {});
       let startup = '';
+      let startupError = '';
+      api.stderr.on('data', chunk => { startupError += chunk; });
+      api.on('error', error => { startupError += `spawn: ${error.code ?? ''} ${error.message}`; });
+      apiClosed = once(api, 'close');
       await Promise.race([
         new Promise(done => {
           api.stdout.on('data', chunk => {
@@ -71,8 +88,14 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
             if (startup.includes(`API disponible en puerto ${env.PORT}`)) done();
           });
         }),
-        apiClosed.then(([code]) => { throw Error(`La API terminó antes de escuchar: ${code}`); }),
-        delay(10000, undefined, { signal, ref: false }).then(() => { throw Error('La API no inició'); })
+        apiClosed.then(([code]) => {
+          throw Error(`La API terminó antes de escuchar: ${code}. ${startupError.trim()}`);
+        }, error => {
+          throw Error(`La API no pudo iniciarse: ${error.message}`);
+        }),
+        delay(60000, undefined, { signal, ref: false }).then(() => {
+          throw Error(`La API no inició. ${startup.trim()} ${startupError.trim()}`);
+        })
       ]);
     };
     const stopApi = async () => {
@@ -107,9 +130,8 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
         '-v', `${volume}:/var/lib/mysql`, '-e', `MARIADB_ROOT_PASSWORD=${password}`,
         '-e', `MARIADB_DATABASE=${database}`, 'mariadb:11.4']);
       const port = await connect();
-      const apply = file => docker(['exec', '-i', run, 'sh', '-c',
-        'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'],
-      readFileSync(resolve(backend, '../database', file)));
+      const socket = sqlSocket(run);
+      const apply = file => applySql(run, socket, file);
       for (const file of ['schema.sql', 'migrate-fer-20-account-movements.sql',
         'migrate-fer-17-pricing-evidence.sql']) apply(file);
       env = {
@@ -280,6 +302,199 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
         assert.equal(inventory('volume'), '');
         t.diagnostic(`Aislamiento ${run}: cero contenedores y volúmenes residuales.`);
       }
+    }
+  });
+});
+
+test('valida el trigger FER-17 y bloquea DDL concurrente antes de las altas', async t => {
+  await withTestSignals(async signal => {
+    const run = `master-catalog-lock-${randomUUID()}`;
+    const volume = `${run}-data`;
+    const label = `ferrepatagonia.master-catalog=${run}`;
+    const database = 'master_catalog_lock_test';
+    const password = randomUUID();
+    const limitedPassword = randomUUID();
+    const limitedUser = 'catalogo_limitado_312';
+    let admin;
+    let gate;
+    let ddl;
+    let port;
+    let volumeCreated = false;
+    const inventory = (type, ...args) => docker([type, 'ls', ...args, '-q', '--filter', `label=${label}`]);
+    const checkAbort = () => signal.throwIfAborted();
+    const waitFor = async (predicate, message, timeoutMs = 60000) => {
+      const deadline = performance.now() + timeoutMs;
+      while (true) {
+        checkAbort();
+        if (await predicate()) return;
+        assert.ok(performance.now() < deadline, message);
+        await delay(25, undefined, { signal });
+      }
+    };
+    const open = async () => {
+      for (let attempt = 0; attempt < 45; attempt++) {
+        checkAbort();
+        try {
+          return await mariadb.createConnection({
+            host: '127.0.0.1', port, user: 'root', password, database, connectTimeout: 1000
+          });
+        } catch (error) {
+          if (attempt === 44) throw error;
+          await delay(1000, undefined, { signal });
+        }
+      }
+    };
+    const migration = readFileSync(
+      resolve(backend, '../database/migrate-fer-17-price-verification.sql'), 'utf8');
+    const canonicalBody = migration.match(
+      /CREATE OR REPLACE TRIGGER fer17_producto_alta_evento\s+AFTER INSERT ON PRODUCTO\s+FOR EACH ROW\s+([\s\S]+?)\/\//
+    )?.[1];
+    const lowercaseKeywords = sql => sql.replace(
+      /\b(BEGIN|DECLARE|DEFAULT|SET|SELECT|FROM|WHERE|AND|LIMIT|INSERT|INTO|VALUES|END|NULL|NEW|OLD)\b/g,
+      keyword => keyword.toLowerCase());
+    const spaced = sql => sql.replace(/,\s*/g, ' ,   ').replace(/=/g, '  =  ');
+    let env;
+    const importerArgs = () => ['--require', './test/helpers/test-env.cjs',
+      'dist/scripts/import-master-catalog.js', '--confirmar-destino', `127.0.0.1:${port}/${database}`];
+    const invoke = ({ user = 'root', pass = password } = {}) => {
+      checkAbort();
+      const result = spawnSync(process.execPath, importerArgs(),
+        { cwd: backend, env: { ...env, DB_USER: user, DB_PASSWORD: pass }, encoding: 'utf8', timeout: 60000 });
+      if (result.error) throw result.error;
+      return result;
+    };
+    const load = async options => {
+      const result = invoke(options);
+      assert.equal(result.status, 0, result.stderr);
+      return JSON.parse(result.stdout);
+    };
+    const importAsync = () => promisify(execFile)(process.execPath, importerArgs(), {
+      cwd: backend, env, encoding: 'utf8', timeout: 60000, signal
+    }).then(result => JSON.parse(result.stdout));
+    const setTrigger = async (body, definer = false) => {
+      await admin.query('DROP TRIGGER IF EXISTS fer17_producto_alta_evento');
+      await admin.query(`CREATE ${definer ? 'DEFINER=CURRENT_USER ' : ''}TRIGGER fer17_producto_alta_evento
+        AFTER INSERT ON PRODUCTO FOR EACH ROW ${body}`);
+    };
+    try {
+      assert.ok(canonicalBody, 'La migración FER-17 debe definir el trigger de alta');
+      docker(['volume', 'create', '--label', label, volume]);
+      volumeCreated = true;
+      docker(['run', '-d', '--name', run, '--label', label, '-p', '127.0.0.1::3306',
+        '-v', `${volume}:/var/lib/mysql`, '-e', `MARIADB_ROOT_PASSWORD=${password}`,
+        '-e', `MARIADB_DATABASE=${database}`, 'mariadb:11.4']);
+      const binding = docker(['port', run, '3306/tcp']);
+      assert.match(binding, /^127\.0\.0\.1:\d+$/);
+      port = Number(binding.split(':').at(-1));
+      admin = await open();
+      const socket = sqlSocket(run);
+      for (const file of ['schema.sql', 'migrate-fer-20-account-movements.sql',
+        'migrate-fer-17-pricing-evidence.sql', 'migrate-fer-17-price-verification.sql']) {
+        applySql(run, socket, file);
+      }
+      for (const name of names) {
+        await admin.query('INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 1)', [name]);
+      }
+      env = {
+        ...process.env, DOTENV_CONFIG_PATH: resolve(__dirname, 'helpers/nonexistent.env'),
+        DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: database,
+        DB_USER: 'root', DB_PASSWORD: password, JWT_SECRET: randomUUID(), PORT: '3999',
+        PRODUCT_IMAGE_STORAGE_DIR: '', RECEIPT_STORAGE_DIR: '', IMPORT_STORAGE_DIR: ''
+      };
+
+      // F-03: el importador queda frenado en la lectura de CATEGORIA, después de
+      // validar el trigger y ya con el lock de PRODUCTO. Un DROP TRIGGER encolado
+      // desde otra sesión no puede completarse hasta que la transacción termine.
+      gate = await mariadb.createConnection({
+        host: '127.0.0.1', port, user: 'root', password, database, connectTimeout: 1000
+      });
+      await gate.query('LOCK TABLES CATEGORIA WRITE');
+      const pendingImport = importAsync();
+      await waitFor(async () => (await admin.query('SHOW FULL PROCESSLIST')).some(session =>
+        session.db === database && /FROM CATEGORIA/.test(session.Info ?? '')),
+      'El importador no alcanzó la barrera controlada de CATEGORIA');
+      const [visible] = await admin.query('SELECT COUNT(*) AS total FROM PRODUCTO');
+      assert.equal(Number(visible.total), 0,
+        'Una lectura normal no debe quedar bloqueada por el lock del importador');
+      ddl = await mariadb.createConnection({
+        host: '127.0.0.1', port, user: 'root', password, database, connectTimeout: 1000
+      });
+      let ddlSettled = false;
+      const ddlQuery = ddl.query('DROP TRIGGER fer17_producto_alta_evento')
+        .finally(() => { ddlSettled = true; });
+      ddlQuery.catch(() => {});
+      await waitFor(async () => (await admin.query('SHOW FULL PROCESSLIST')).some(session =>
+        /^DROP TRIGGER fer17_producto_alta_evento/.test(session.Info ?? '') &&
+        /metadata lock/i.test(session.State ?? '')),
+      'El DROP TRIGGER no quedó esperando el metadata lock de la transacción');
+      assert.equal(ddlSettled, false, 'El DDL no debe completarse mientras el importador retiene el lock');
+      t.diagnostic('DDL concurrente bloqueado: el importador conserva el metadata lock.');
+
+      await gate.query('UNLOCK TABLES');
+      const imported = await pendingImport;
+      await Promise.race([
+        ddlQuery,
+        delay(60000, undefined, { signal }).then(() => {
+          throw Error('El DDL concurrente no se completó al liberar la transacción');
+        })
+      ]);
+      assert.equal(ddlSettled, true);
+      assert.equal(imported.insertados.length, 100);
+      assert.deepEqual(imported.conservados, []);
+      const products = await admin.query('SELECT * FROM PRODUCTO ORDER BY id_producto');
+      const events = await admin.query('SELECT * FROM FER17_PRECIO_EVENTO ORDER BY id_evento');
+      assert.equal(products.length, 100);
+      assert.equal(events.length, 100);
+      assert.deepEqual(events.map(event => event.tipo), Array(100).fill('ALTA'));
+      assert.equal((await admin.query(`SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
+        WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = 'fer17_producto_alta_evento'`)).length, 0);
+      t.diagnostic('El DDL se completó recién al liberarse la transacción: 100 altas y 100 eventos ALTA.');
+
+      // F-05: solo se aceptan definiciones equivalentes. Cambiar mayúsculas de
+      // palabras clave o el espaciado no altera el resultado; literales o filas
+      // distintas sí deben rechazarse.
+      const accepted = async label => {
+        const result = await load();
+        assert.deepEqual(result.insertados, [], `${label}: no debe insertar`);
+        assert.equal(result.conservados.length, 100, `${label}: debe conservar los 100 SKU`);
+        t.diagnostic(`Trigger aceptado: ${label}.`);
+      };
+      const rejected = async (label, options) => {
+        const result = invoke(options);
+        assert.equal(result.status, 1, `${label}: debe rechazarse`);
+        assert.match(result.stderr, /Aplicá las migraciones FER-17/, `${label}: mensaje de auditoría`);
+        t.diagnostic(`Trigger rechazado: ${label}.`);
+      };
+      await setTrigger(canonicalBody);
+      await accepted('definición canónica');
+      await setTrigger(lowercaseKeywords(canonicalBody));
+      await accepted('palabras clave con otra capitalización');
+      await setTrigger(spaced(canonicalBody));
+      await accepted('espaciado equivalente');
+      await setTrigger(canonicalBody, true);
+      await accepted('DEFINER válido');
+      await setTrigger(canonicalBody.replace("'ALTA'", "'BAJA'"));
+      await rejected('alteración semántica');
+      await admin.query('DROP TRIGGER fer17_producto_alta_evento');
+      await rejected('trigger ausente');
+      await setTrigger(canonicalBody);
+      await admin.query(`CREATE USER '${limitedUser}'@'%' IDENTIFIED BY '${limitedPassword}'`);
+      await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON \`${database}\`.* TO '${limitedUser}'@'%'`);
+      await rejected('permisos insuficientes', { user: limitedUser, pass: limitedPassword });
+      assert.equal((await admin.query('SELECT id_producto FROM PRODUCTO')).length, 100);
+      assert.equal((await admin.query('SELECT id_evento FROM FER17_PRECIO_EVENTO')).length, 100);
+    } finally {
+      try { gate?.destroy(); } catch { /* el cierre libera el LOCK TABLES */ }
+      try { ddl?.destroy(); } catch { /* DDL pendiente descartado */ }
+      try { if (admin) await admin.end(); } catch { /* conexión ya cerrada */ }
+      try {
+        if (inventory('container', '-a')) docker(['rm', '-f', '-v', run]);
+      } finally {
+        if (volumeCreated) docker(['volume', 'rm', volume]);
+      }
+      assert.equal(inventory('container', '-a'), '');
+      assert.equal(inventory('volume'), '');
+      t.diagnostic(`Aislamiento ${run}: cero contenedores y volúmenes residuales.`);
     }
   });
 });
