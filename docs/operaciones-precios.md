@@ -12,9 +12,10 @@ Aplicar con un operador autorizado, antes de habilitar esta versión del backend
 4. Verificar tablas, FK, CHECK y triggers, y arrancar el backend construido con
    `npm run build`.
 
-Una base nueva usa `database/schema.sql`, que incluye las 22 tablas (la nueva es
-`FER17_PRECIO_EVENTO`) y luego requiere las migraciones FER-20 y FER-17 de
-verificación para instalar los 7 triggers (3 FER-20 + 4 FER-17). TypeORM
+Una base nueva usa `database/schema.sql`, que incluye 24 tablas (entre ellas
+`FER17_PRECIO_EVENTO`, `SOLICITUD_CREDITO` y `EVENTO_CREDITO`). Seguir el
+[orden de instalación](../database/README.md) para aplicar las migraciones de
+cuenta corriente, verificación de precios y crédito. FER-20 y FER-17 instalan los 7 triggers (3 FER-20 + 4 FER-17). TypeORM
 mantiene synchronize/dropSchema/migrationsRun desactivados; la aplicación no hace
 DDL ni verifica datos por su cuenta. La migración nueva es aditiva e idempotente:
 un `CREATE TABLE IF NOT EXISTS`, cuatro declaraciones `CREATE OR REPLACE TRIGGER`

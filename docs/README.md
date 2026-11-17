@@ -27,6 +27,10 @@
 - [Verificación de precios posterior al alta o edición (T-S7-05.2)](s7-05/T-S7-05.2-verificacion-precios.md):
   procedimiento local autorizado, evidencia comercial, invalidación por cambio
   de precio, historial append-only y migración FER-17 de auditoría.
+- [Solicitud y habilitación de crédito (T-S7-09.1)](s7-09/T-S7-09.1-solicitud-habilitacion-credito.md):
+  flujo de solicitud, aprobación/rechazo, habilitación/deshabilitación y
+  modificación de límite, con auditoría append-only y separación entre
+  aprobación empresarial, crédito, habilitación y elegibilidad de compra.
 
 ## Contratos de autenticación en Taiga
 
