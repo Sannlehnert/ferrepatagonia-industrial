@@ -79,7 +79,7 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
     await form.getByRole('combobox').selectOption({
       label: 'Herramientas E2E',
     });
-    await field('Precio Base').fill('150');
+    await field('Importe base cargado').fill('150');
     await field('Stock').fill('8');
 
     const creation = page.waitForResponse((response) =>
@@ -142,13 +142,13 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
 
     await expect(field('Nombre del Producto')).toHaveValue(initialName);
     await expect(field('Código SKU')).toHaveValue(code);
-    await expect(field('Precio Base')).toHaveValue('150');
+    await expect(field('Importe base cargado')).toHaveValue('150');
     await expect(field('Stock')).toHaveValue('8');
     await expect(form.getByRole('combobox')).toHaveValue('1');
 
     // Cambiar el importe invalida la evidencia vinculada al valor anterior.
     await field('Nombre del Producto').fill(editedName);
-    await field('Precio Base').fill('170');
+    await field('Importe base cargado').fill('170');
 
     const update = page.waitForResponse((response) =>
       new URL(response.url()).pathname
@@ -188,7 +188,7 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
 
     await expect(field('Nombre del Producto')).toHaveValue(editedName);
     await expect(field('Código SKU')).toHaveValue(code);
-    await expect(field('Precio Base')).toHaveValue('170');
+    await expect(field('Importe base cargado')).toHaveValue('170');
     await expect(field('Stock')).toHaveValue('8');
     await expect(form.getByRole('combobox')).toHaveValue('1');
   } finally {
