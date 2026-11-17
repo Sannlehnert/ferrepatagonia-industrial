@@ -4,9 +4,14 @@ Tarea T-S7-02.2 de la historia #288. El orden y los SKU provienen del catálogo 
 
 ## Resultado
 
-**13 de 50 SKU tienen imagen aprobada** y **37 quedan pendientes**. No se asoció ninguna foto cuando faltaba una coincidencia visual con el modelo y la variante. El criterio de «imagen en los 50 SKU» no está cumplido y requiere una decisión del equipo (ver «Opciones»).
+**12 de 50 SKU tienen imagen aprobada** y **38 quedan pendientes**. No se asoció ninguna foto cuando faltaba una coincidencia visual con el modelo y la variante. El criterio de «imagen en los 50 SKU» no está cumplido y requiere una decisión del equipo (ver «Opciones»).
 
-Las fotos agregadas se registran en [`image-sources.csv`](../../data/demo-catalog/image-sources.csv) y en [`creditos.txt`](../../frontend/public/demo-catalog/creditos.txt). Cada foto se asocia a todos los SKU del mismo grupo visual del catálogo de 904 productos (las mismas reglas de [`cobertura-visual.cjs`](../../data/demo-catalog/cobertura-visual.cjs)): el disco de corte a 9 medidas, el borceguí a 9 talles y los dos cascos amarillos a 1 SKU cada uno. Con esto el registro pasa de 132 SKU y 19 archivos a **152 SKU y 23 archivos**; faltan **752 SKU**.
+Las fotos agregadas se registran en [`image-sources.csv`](../../data/demo-catalog/image-sources.csv) y en [`creditos.txt`](../../frontend/public/demo-catalog/creditos.txt). Cada foto se asocia solo a los SKU cuya variante coincide con lo que muestra: el disco de corte a 1 SKU (125 mm, porque la propia etiqueta del disco fotografiado indica «125 × 1 mm»; el modelo pasó a exigir una foto por medida), el borceguí a 9 talles (sin escala visible) y los dos cascos amarillos a 1 SKU cada uno. Con esto el registro pasa de 132 SKU y 19 archivos a **144 SKU y 23 archivos**; faltan **760 SKU**.
+
+## Correcciones de la auditoría (PR #125, SHA 628e412)
+- **Disco de corte:** la foto muestra un disco de 125 mm y se había reutilizado para nueve medidas. Ahora solo se asocia al SKU de 125 mm y `ABR-disco-metal` pasó al conjunto `separar` de [`cobertura-visual.cjs`](../../data/demo-catalog/cobertura-visual.cjs). El n.º 2 (100 mm) vuelve a pendiente.
+- **Borceguí:** la imagen medía 960 × 1707 y se redimensionó a 540 × 960 (máximo de 960 px por lado). El crédito incluye la atribución que pide Commons: «© Victor Adrian / https://bestformyfeet.com».
+- **Informe `catalog-validation.json`:** se regenera con la prueba real de catálogo para que `imagenes` y `conImagenVerificada` coincidan (144).
 
 ## Criterios aplicados
 - Fuente: Wikimedia Commons, con licencia CC0, CC BY, CC BY-SA o dominio público registrada por archivo.
@@ -18,7 +23,7 @@ Las fotos agregadas se registran en [`image-sources.csv`](../../data/demo-catalo
 | N.º | SKU | Producto | Estado de la imagen |
 | ---: | --- | --- | --- |
 | 1 | `FP-DEMO-ABR-DISCO-LIJA-100-MM` | Disco de lija con respaldo adhesivo · 100 mm | **Pendiente.** Sin foto con licencia libre que muestre un disco de lija con respaldo adhesivo. |
-| 2 | `FP-DEMO-ABR-DISCO-METAL-100-MM` | Disco de corte para metal · 100 mm | Agregada en #310 · `disco-corte-metal.webp` · Ralf Pfeifer · CC BY-SA 4.0 |
+| 2 | `FP-DEMO-ABR-DISCO-METAL-100-MM` | Disco de corte para metal · 100 mm | **Pendiente.** La única candidata muestra un disco de 125 mm (lo indica su etiqueta); no representa 100 mm. |
 | 3 | `FP-DEMO-ABR-LIJA-AGUA-GRANO-1000` | Hoja de lija al agua 230 × 280 mm · grano 1000 | **Pendiente.** El grano visible exige una foto por variante; la candidata no muestra el grano 1000. |
 | 4 | `FP-DEMO-ABR-LIJA-MADERA-GRANO-100` | Hoja de lija para madera 230 × 280 mm · grano 100 | **Pendiente.** El grano visible exige una foto por variante; la candidata no muestra el grano 100. |
 | 5 | `FP-DEMO-ADH-CINTA-DOBLE-12-MM` | Cinta de montaje doble faz · 12 mm | **Pendiente.** La candidata mezcla dos cintas distintas y no representa la de 12 mm. |
@@ -64,17 +69,16 @@ Las fotos agregadas se registran en [`image-sources.csv`](../../data/demo-catalo
 | 45 | `FP-DEMO-FIJ-TARUGO-NYLON-10-MM` | Tarugo de nailon · 10 mm | Preexistente · `tarugo-nailon.webp` · Hungryjabberwock · Dominio público |
 | 46 | `FP-DEMO-FIJ-ABRAZADERA-12-MM` | Abrazadera de montaje para caño · 12 mm | **Pendiente.** Las candidatas son abrazaderas de carpintería, no de montaje para caño. |
 | 47 | `FP-DEMO-FIJ-ANCLAJE-M10` | Anclaje metálico de expansión · M10 | **Pendiente.** La candidata es un diagrama, no una fotografía del anclaje. |
-| 48 | `FP-DEMO-FIJ-VARILLA-M10` | Varilla roscada zincada de 1 m · M10 | **Pendiente.** Hay una candidata válida (Threaded rods of different sizes, CC BY-SA 4.0), pero Commons respondió HTTP 429 al descargarla. Queda para reintentar. |
+| 48 | `FP-DEMO-FIJ-VARILLA-M10` | Varilla roscada zincada de 1 m · M10 | **Pendiente.** La candidata (Threaded rods of different sizes, CC BY-SA 4.0) se pudo descargar al reintentar, pero muestra varillas de distintas medidas mezcladas en un exhibidor; no permite afirmar que sea M10 de 1 m. Se descartó para no crear una asociación engañosa. |
 | 49 | `FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL` | Guante de algodón tejido · talle 2XL | **Pendiente.** Sin candidata de guante tejido de algodón. |
 | 50 | `FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL` | Guante de cuero descarne de puño largo · talle 2XL | **Pendiente.** Las candidatas tienen puño corto; el SKU es de puño largo. |
 
-## Opciones para los 37 pendientes
-1. Reintentar la varilla roscada (n.º 48) cuando Commons deje de responder HTTP 429.
-2. Pedir a Santiago o Lucci que tomen o aporten fotografías propias (con licencia del equipo) para los SKU sin candidata.
-3. Aceptar fotos genéricas del tipo de producto con una leyenda de «imagen ilustrativa». Hoy el catálogo no tiene esa leyenda y el criterio de #285 pide coincidencia visual, por lo que no se aplicó.
-4. Dejarlos con el texto «Sin imagen» que ya muestra la tienda, como el resto de los 752.
+## Opciones para los 38 pendientes (alcance parcial pendiente de aprobación formal)
+1. Pedir a Santiago o Lucci que tomen o aporten fotografías propias (con licencia del equipo) para los SKU sin candidata. Es la única vía que cubre variantes con color, potencia o leyenda específicos.
+2. Aceptar fotos genéricas del tipo de producto con una leyenda de «imagen ilustrativa». Hoy el catálogo no tiene esa leyenda y el criterio de #285 pide coincidencia visual, por lo que no se aplicó.
+3. Dejarlos con el texto «Sin imagen» que ya muestra la tienda, como el resto de los 760, y registrar un seguimiento con responsable y fecha.
 
 ## Verificación
 - `node data/demo-catalog/cobertura-visual.cjs`: valida SKU conocidos y sin duplicados, evidencia completa, WebP y que ninguna foto se reutilice entre grupos distintos.
 - `node --test data/demo-catalog/generar.test.cjs`.
-- Los contadores fijos de los E2E pasaron de 132 a 152 fotos y de 772 a 752 SKU sin foto.
+- Los contadores fijos de los E2E pasaron de 132 a 144 fotos y de 772 a 760 SKU sin foto.

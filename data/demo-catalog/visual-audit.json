@@ -1,7 +1,7 @@
 {
   "sku": 904,
-  "skuConFuente": 152,
-  "skuPendientes": 752,
+  "skuConFuente": 144,
+  "skuPendientes": 760,
   "archivos": 23,
   "grupos": [
     {
@@ -3017,6 +3017,86 @@
         "FP-DEMO-ADH-CINTA-DOBLE-36-MM",
         "FP-DEMO-ADH-CINTA-DOBLE-48-MM",
         "FP-DEMO-ADH-CINTA-DOBLE-50-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/75 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "75 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-75-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/100 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "100 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-100-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/115 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "115 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-115-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/150 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "150 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-150-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/180 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "180 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-180-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/230 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "230 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-230-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/300 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "300 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-300-MM"
+      ],
+      "archivos": []
+    },
+    {
+      "clave": "ABR-disco-metal/355 mm",
+      "modelo": "Disco de corte para metal",
+      "criterioVisible": "355 mm",
+      "familia": "Discos de corte y abrasivos",
+      "pendientes": [
+        "FP-DEMO-ABR-DISCO-METAL-355-MM"
       ],
       "archivos": []
     },

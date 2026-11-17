@@ -45,7 +45,7 @@ const separar = new Set([
   'AUD-orejera', 'ALT-bolso-arnes', 'CON-poste', 'CIN-cinta-delimitar', 'CIN-cinta-piso',
   'SEN-cartel-pvc', 'SEN-cartel-aluminio', 'SEN-cartel-vinilo', 'SEN-cartel-acrilico',
   'MAT-bornera', 'ILU-reflector', 'ILU-lampara-e27', 'ADH-cola', 'ADH-contacto',
-  'ABR-lija-madera', 'ABR-lija-agua',
+  'ABR-lija-madera', 'ABR-lija-agua', 'ABR-disco-metal',
 ]);
 
 function auditarCobertura(fuentes = leerFuentes()) {

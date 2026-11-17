@@ -34,6 +34,18 @@ test('el inventario visual reconcilia los 904 SKU con el registro de fotos y los
   assert.deepEqual(reporte, require('./visual-audit.json'));
 });
 
+test('el informe de catálogo concilia imágenes, fuentes y pendientes', () => {
+  const informe = require('./catalog-validation.json');
+  const fuentes = leerFuentes();
+  const auditoria = auditarCobertura(fuentes);
+  assert.equal(informe.imagenes.length, informe.conImagenVerificada);
+  assert.equal(informe.conImagenVerificada, fuentes.size);
+  assert.deepEqual(informe.imagenes.map(i => i.sku).sort(), [...fuentes.keys()].sort());
+  assert.equal(informe.pendientesDeImagen, auditoria.skuPendientes);
+  assert.equal(informe.archivosFotograficos, auditoria.archivos);
+  assert.equal(informe.gruposPendientes, auditoria.grupos.length);
+});
+
 test('el generador exige nombres de categoría inequívocos', () => {
   const [primera] = categoriasRequeridas;
   assert.throws(() => generar(categorias.filter(c => c.nombre !== primera)), /categoría activa/);

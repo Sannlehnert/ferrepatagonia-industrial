@@ -123,7 +123,7 @@ async function main() {
     });
     setup = undefined;
     assert.equal(code, 0, 'Preparación incompleta; los datos y el volumen se conservaron.');
-    fs.writeFileSync(local.ready, '904 SKU; 152 imágenes verificadas al inicializar.\n', { flag: 'wx' });
+    fs.writeFileSync(local.ready, '904 SKU; 144 imágenes verificadas al inicializar.\n', { flag: 'wx' });
   }
   if (stopped) return;
   console.log('Demo: ' + publicOrigin + ' | API: http://localhost:' + apiPort + '/api/health');

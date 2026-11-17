@@ -139,6 +139,20 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-CAS-CASCO-ALA-AMARILLO",
+      "archivo": "casco-ala-completa-amarillo.webp",
+      "sha256Publicado": "086b19afa6d081caf660b3ade9812e49ae92aa06fd752f37e1a316821265bede",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-CORTO-AMARILLO",
+      "archivo": "casco-visera-corta-amarillo.webp",
+      "sha256Publicado": "77ef34091a205ac69cf42282c2125c6018c2c6b077728bbba11e7a045bda2128",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-5-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
@@ -517,6 +531,69 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-CAL-BORCEGUI-38-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-39-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-40-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-41-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-42-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-43-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-44-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-45-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-46-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-CAL-ZAPATO-38-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
@@ -832,6 +909,13 @@
       "mime": "image/webp"
     },
     {
+      "sku": "FP-DEMO-ABR-DISCO-METAL-125-MM",
+      "archivo": "disco-corte-metal.webp",
+      "sha256Publicado": "f0e81702c3701497761e5e859f47757bddb8b7042ce1dd2752ac4cfd85a86d7a",
+      "http": 200,
+      "mime": "image/webp"
+    },
+    {
       "sku": "FP-DEMO-MEC-MECHA-HSS-3-MM",
       "archivo": "mecha-hss-3mm.webp",
       "sha256Publicado": "d40e4635cd7a4ed8ff206b7cb0bb3cf805aa44a691d5590e1302392d708b4ad4",
@@ -965,11 +1049,11 @@
       "mime": "image/webp"
     }
   ],
-  "conImagenVerificada": 152,
-  "pendientesDeImagen": 752,
+  "conImagenVerificada": 144,
+  "pendientesDeImagen": 760,
   "archivosFotograficos": 23,
-  "gruposPendientes": 291,
-  "asociacionesConservadasAlRepetir": 152,
+  "gruposPendientes": 299,
+  "asociacionesConservadasAlRepetir": 144,
   "vistasConFotoVerificada": [
     "Home",
     "catálogo",
