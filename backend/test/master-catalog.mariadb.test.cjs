@@ -1,6 +1,7 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { execFileSync, spawn, spawnSync } = require('node:child_process');
+const { execFile, execFileSync, spawn, spawnSync } = require('node:child_process');
+const { promisify } = require('node:util');
 const { randomUUID } = require('node:crypto');
 const { once } = require('node:events');
 const { readFileSync } = require('node:fs');
@@ -80,12 +81,15 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci√
       try { await apiClosed; } finally { api = undefined; }
     };
     let env;
-    const invoke = (target = `127.0.0.1:${env.DB_PORT}/${database}`) => {
+    const target = () => `127.0.0.1:${env.DB_PORT}/${database}`;
+    const args = destination => [
+      '--require', './test/helpers/test-env.cjs', 'dist/scripts/import-master-catalog.js',
+      '--confirmar-destino', destination
+    ];
+    const invoke = (destination = target()) => {
       checkAbort();
-      const result = spawnSync(process.execPath, [
-        '--require', './test/helpers/test-env.cjs', 'dist/scripts/import-master-catalog.js',
-        '--confirmar-destino', target
-      ], { cwd: backend, env, encoding: 'utf8', timeout: 60000 });
+      const result = spawnSync(process.execPath, args(destination),
+        { cwd: backend, env, encoding: 'utf8', timeout: 60000 });
       if (result.error) throw result.error;
       return result;
     };
@@ -107,7 +111,7 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci√
         'exec mariadb -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'],
       readFileSync(resolve(backend, '../database', file)));
       for (const file of ['schema.sql', 'migrate-fer-20-account-movements.sql',
-        'migrate-fer-17-pricing-evidence.sql', 'migrate-fer-17-price-verification.sql']) apply(file);
+        'migrate-fer-17-pricing-evidence.sql']) apply(file);
       env = {
         ...process.env, DOTENV_CONFIG_PATH: resolve(__dirname, 'helpers/nonexistent.env'),
         DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: database,
@@ -116,10 +120,21 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci√
       };
       await startApi();
       assert.match(invoke('destino-incorrecto').stderr, /destino confirmado/);
-      assert.match(invoke().stderr, /categor√≠a activa/);
       for (const name of names) {
         await connection.query('INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 1)', [name]);
       }
+      const assertRejectedAudit = async () => {
+        const result = invoke();
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /Aplic√° las migraciones FER-17/);
+        assert.deepEqual(await products(), []);
+      };
+      await assertRejectedAudit();
+      await connection.query(`
+        CREATE TRIGGER fer17_producto_alta_evento AFTER INSERT ON PRODUCTO
+        FOR EACH ROW SET @catalog_test_no_audit = 1`);
+      await assertRejectedAudit();
+      apply('migrate-fer-17-price-verification.sql');
       await connection.query('INSERT INTO CATEGORIA (nombre, activo) VALUES (?, 0)', [names[0]]);
       const duplicate = await invoke();
       assert.equal(duplicate.status, 1);
@@ -145,7 +160,54 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci√
       assert.deepEqual(await events(), [unrelatedEvent]);
       await connection.query('DROP TRIGGER catalog_test_fail');
 
-      assert.deepEqual(load(), { insertados: rows.map(row => row.sku), conservados: [] });
+      // Keep both processes at the same first INSERT until we observe both reaching it.
+      const gate = 'catalog_master_test_start';
+      await connection.query(`
+        CREATE TRIGGER catalog_test_gate BEFORE INSERT ON PRODUCTO FOR EACH ROW
+        BEGIN
+          IF NEW.codigo = '${rows[0].sku}' THEN
+            IF GET_LOCK('${gate}', 10) <> 1 THEN
+              SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'No se abri√≥ la barrera de prueba';
+            END IF;
+            DO RELEASE_LOCK('${gate}');
+          END IF;
+        END`);
+      const [locked] = await connection.query('SELECT GET_LOCK(?, 0) AS acquired', [gate]);
+      assert.equal(Number(locked.acquired), 1);
+      const importAsync = () => promisify(execFile)(process.execPath, args(target()), {
+        cwd: backend, env, encoding: 'utf8', timeout: 30000, signal
+      }).then(result => JSON.parse(result.stdout));
+      const imports = Promise.allSettled([importAsync(), importAsync()]);
+      let barrierError;
+      try {
+        const deadline = performance.now() + 4000;
+        while (true) {
+          checkAbort();
+          const processes = await connection.query('SHOW FULL PROCESSLIST');
+          const inserting = processes.filter(p => p.db === database &&
+            /INSERT INTO PRODUCTO|GET_LOCK\('catalog_master_test_start'/.test(p.Info ?? '') &&
+            Number(p.Id) !== connection.threadId);
+          if (inserting.length === 2) break;
+          assert.ok(performance.now() < deadline, 'Ambos procesos deben alcanzar el primer INSERT');
+          await delay(25, undefined, { signal });
+        }
+      } catch (error) {
+        barrierError = error;
+      } finally {
+        await connection.query('SELECT RELEASE_LOCK(?)', [gate]);
+      }
+      const outcomes = await imports;
+      if (barrierError) throw barrierError;
+      const concurrent = outcomes.map(outcome => {
+        if (outcome.status === 'rejected') throw outcome.reason;
+        return outcome.value;
+      }).sort((a, b) => b.insertados.length - a.insertados.length);
+      await connection.query('DROP TRIGGER catalog_test_gate');
+      assert.deepEqual(concurrent[0], { insertados: rows.map(row => row.sku), conservados: [] });
+      assert.deepEqual(concurrent[1], {
+        insertados: [], conservados: rows.map(row => ({ sku: row.sku, codigoExistente: row.sku }))
+      });
+      t.diagnostic('Concurrencia con barrera: un proceso insert√≥ 100 SKU y el otro conserv√≥ los 100.');
       const first = await products();
       const firstEvents = await events();
       assert.equal(first.length, 101);
@@ -167,6 +229,8 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci√
         assert.equal(event.id_producto, product.id_producto);
         assert.equal(event.tipo, 'ALTA');
         assert.equal(event.precio_nuevo, null);
+        assert.equal(event.evidencia, null);
+        assert.equal(event.id_admin, null);
       }
       assert.equal((await connection.query('SELECT * FROM PRECIO_USD_EVIDENCIA')).length, 0);
       const repeated = {

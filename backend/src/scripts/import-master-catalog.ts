@@ -3,6 +3,8 @@ import { resolve } from 'node:path';
 import Papa from 'papaparse';
 
 export const masterCsv = resolve(__dirname, '../../../docs/309/catalogo-maestro.csv');
+const fer17Migration = resolve(__dirname, '../../../database/migrate-fer-17-price-verification.sql');
+const normalizeTriggerBody = (body: string) => body.trim().replace(/\s+/g, ' ');
 
 const fields = [
   'numero', 'sku', 'categoria', 'nombre_propuesto', 'descripcion_propuesta',
@@ -56,9 +58,28 @@ async function main() {
     throw new CatalogError('El destino confirmado no coincide con la configuración del backend.');
   }
   const { initializeDatabase, destroyDatabase, inTransaction } = await import('../config/database.config.js');
+  const migration = await readFile(fer17Migration, 'utf8');
+  const expectedBody = migration.match(
+    /CREATE OR REPLACE TRIGGER fer17_producto_alta_evento\s+AFTER INSERT ON PRODUCTO\s+FOR EACH ROW\s+([\s\S]+?)\/\//
+  )?.[1];
+  if (!expectedBody) throw new CatalogError('No se pudo leer la definición de alta de la migración FER-17.');
   try {
     await initializeDatabase();
     const result = await inTransaction(async manager => {
+      // Retain the table metadata lock until commit, including during the trigger check.
+      await manager.query('SELECT codigo FROM PRODUCTO LIMIT 0');
+      const [trigger] = await manager.query(`
+        SELECT ACTION_STATEMENT AS body FROM information_schema.TRIGGERS
+        WHERE TRIGGER_SCHEMA = DATABASE() AND TRIGGER_NAME = 'fer17_producto_alta_evento'
+          AND BINARY EVENT_OBJECT_TABLE = 'PRODUCTO'
+          AND ACTION_TIMING = 'AFTER' AND EVENT_MANIPULATION = 'INSERT'
+          AND ACTION_ORIENTATION = 'ROW'`);
+      if (!trigger?.body || normalizeTriggerBody(trigger.body) !== normalizeTriggerBody(expectedBody)) {
+        throw new CatalogError(
+          'Auditoría de alta ausente, incompatible o no visible. Aplicá las migraciones FER-17 y verificá el permiso TRIGGER sobre PRODUCTO.'
+        );
+      }
+
       const uniqueSku = await manager.query(`
         SELECT INDEX_NAME FROM information_schema.STATISTICS
         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'PRODUCTO' AND NON_UNIQUE = 0

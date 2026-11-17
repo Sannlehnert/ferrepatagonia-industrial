@@ -2,6 +2,8 @@
 
 El comando importa los 100 SKU de [`catalogo-maestro.csv`](../309/catalogo-maestro.csv) mediante la conexión del backend. Ejecutalo sobre una instalación normal preparada según el [README de base de datos](../../database/README.md), con las migraciones vigentes, incluida la auditoría FER-17. El comando no instala el esquema ni requiere datos de ejemplo.
 
+Usá una credencial operativa con permiso `TRIGGER` sobre `PRODUCTO` para que MariaDB exponga la definición real del trigger. El importador comprueba la definición contra la migración versionada antes de insertar y aborta si falta, difiere o no está visible.
+
 Antes de cargar, creá o verificá en ADMIN estas categorías: **Construcción y consumibles**, **Electricidad e iluminación**, **Fijaciones**, **Herramientas**, **Neumática**, **Protección personal**, **Ropa y calzado de trabajo** y **Señalización y balizamiento**. Cada nombre debe corresponder a una sola categoría activa según la comparación de MariaDB. Si hay un nombre ausente, inactivo o ambiguo, resolvelo en ADMIN antes de reintentar. El comando no modifica categorías.
 
 Desde `backend/`, con la configuración habitual del backend y después de instalar sus dependencias:
