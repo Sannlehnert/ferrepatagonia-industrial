@@ -106,7 +106,7 @@ const topics = [
               class="rounded-lg border border-slate-200 bg-white"
             >
               <summary
-                class="min-h-11 cursor-pointer rounded-lg px-4 py-3 font-semibold marker:text-[#145a8d] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+                class="box-border min-h-11 cursor-pointer rounded-lg px-4 py-3 font-semibold marker:text-[#145a8d] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
               >
                 {{ question.title }}
               </summary>

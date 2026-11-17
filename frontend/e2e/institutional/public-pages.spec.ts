@@ -76,7 +76,7 @@ test('el menú y el pie enlazan ambas páginas y sus accesos llevan a destinos r
   await expect(page).toHaveURL(/\/ayuda$/)
   await menu.getByRole('link', { name: 'Quiénes somos' }).click()
   await expect(page).toHaveURL(/\/sobre-nosotros$/)
-  await expect(main.getByRole('link', { name: 'Registrar una empresa' })).toHaveAttribute('href', '/registro')
+  await expect(main.getByRole('link', { name: 'Registrar una empresa' })).toHaveAttribute('href', '/registro?tipo=empresa')
   await main.getByRole('link', { name: 'Ver catálogo' }).click()
   await expect(page).toHaveURL(/\/catalogo$/)
   await expect(page.getByRole('heading', { name: 'Catálogo', exact: true })).toBeVisible()

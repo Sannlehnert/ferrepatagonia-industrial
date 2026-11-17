@@ -48,7 +48,7 @@ const steps = [
       </section>
     </div>
 
-    <div class="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:pb-14 md:grid-cols-2 lg:px-10">
+    <div class="mx-auto grid max-w-6xl gap-6 px-4 pt-6 pb-10 sm:px-6 sm:pb-14 md:grid-cols-2 lg:px-10">
       <section class="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
         <h2 class="m-0 text-xl font-bold">Catálogo y carrito</h2>
         <p class="mt-3 mb-5 leading-relaxed text-slate-700">
@@ -58,7 +58,7 @@ const steps = [
         </p>
         <RouterLink
           :to="{ name: 'catalogo' }"
-          class="inline-flex min-h-11 items-center rounded-md bg-[#145a8d] px-4 py-2 text-sm font-bold text-white no-underline hover:bg-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+          class="box-border inline-flex min-h-11 items-center rounded-md bg-[#145a8d] px-4 py-2 text-sm font-bold text-white no-underline hover:bg-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
         >
           Ver catálogo
         </RouterLink>
@@ -73,7 +73,7 @@ const steps = [
         </p>
         <div v-if="!auth.isAuthenticated" class="flex flex-wrap gap-x-5 gap-y-1">
           <RouterLink
-            :to="{ name: 'registro' }"
+            :to="{ name: 'registro', query: { tipo: 'empresa' } }"
             class="inline-flex min-h-11 items-center rounded text-sm font-bold text-[#145a8d] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
           >
             Registrar una empresa
