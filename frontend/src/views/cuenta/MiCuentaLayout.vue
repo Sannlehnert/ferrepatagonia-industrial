@@ -86,7 +86,7 @@ async function logout() {
     </div>
 
     <div class="flex flex-1 min-w-0">
-      <aside class="hidden md:flex md:w-64 shrink-0 flex-col bg-[#0B2438] p-6 text-white">
+      <aside class="hidden md:flex md:w-64 shrink-0 flex-col self-start sticky top-0 h-screen overflow-y-auto bg-[#0B2438] p-6 text-white">
         <h2 class="text-xl font-bold mb-6">
           <RouterLink :to="{ name: 'cuenta-dashboard' }" class="text-white no-underline">Mi Cuenta</RouterLink>
         </h2>

@@ -6,6 +6,7 @@ import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
 import { onRealtime } from '@/services/realtime'
 import { orderReceiptsPath, uploadPaymentReceipt } from '@/services/paymentReceiptService'
+import { normalizeOrderFilter } from '@/utils/accountFilters'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderSummary } from '@/types/clientOrder'
 
@@ -79,7 +80,7 @@ const filtroEstado = ref('')
 const filtroModalidad = ref('')
 
 watch(
-  () => route.query.filtro,
+  () => normalizeOrderFilter(route.query.filtro),
   filtro => {
     if (filtro === 'sin-comprobante') {
       filtroComprobante.value = 'NO_ADJUNTO'
@@ -100,7 +101,7 @@ function limpiarFiltros() {
   filtroComprobante.value = ''
   filtroEstado.value = ''
   filtroModalidad.value = ''
-  if (route.query.filtro) {
+  if (route.query.filtro !== undefined) {
     void router.replace({ query: {} })
   }
 }

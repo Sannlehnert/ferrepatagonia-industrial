@@ -83,6 +83,35 @@ for (const width of [320, 360, 1280]) {
   }
 }
 
+test('filtro desconocido, vacío o repetido deja activo el historial general', async ({ page }) => {
+  await mockApi(page, 'EMPRESA')
+  const menu = page.getByRole('navigation', { name: 'Menú de mi cuenta' })
+  await page.setViewportSize({ width: 1280, height: 700 })
+  for (const query of ['?filtro=desconocido', '?filtro=', '?filtro=desconocido&filtro=x']) {
+    await page.goto(`/mi-cuenta/pedidos${query}`)
+    await expect(menu.getByRole('link', { name: 'Historial de pedidos' })).toHaveAttribute('aria-current', 'page')
+    await expect(menu.locator('[aria-current="page"]')).toHaveCount(1)
+  }
+  await page.goto('/mi-cuenta/pedidos?filtro=cuenta-corriente')
+  await expect(menu.getByRole('link', { name: 'Pedidos con cuenta corriente' })).toHaveAttribute('aria-current', 'page')
+  await expect(menu.locator('[aria-current="page"]')).toHaveCount(1)
+})
+
+for (const width of [768, 1024, 1280]) {
+  test(`sidebar con contenido largo a ${width}px mantiene accesibles Volver a tienda y Cerrar sesión`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 600 })
+    await mockApi(page, 'EMPRESA')
+    await page.goto('/mi-cuenta')
+    await page.locator('main').evaluate(el => { el.style.minHeight = '4000px' })
+    await page.evaluate('window.scrollTo(0, 3000)')
+    await expect.poll(() => page.evaluate<number>('window.scrollY')).toBeGreaterThan(0)
+    for (const name of ['Volver a tienda', 'Cerrar sesión']) {
+      const button = page.locator('aside').getByRole('button', { name })
+      await expect(button).toBeInViewport()
+    }
+  })
+}
+
 test('volver a tienda conserva el origen y usa catálogo ante acceso directo', async ({ page }) => {
   await mockApi(page, 'PARTICULAR')
   await page.goto('/catalogo?busqueda=hierro')

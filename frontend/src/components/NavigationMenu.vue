@@ -6,6 +6,7 @@ import {
     type MenuItem,
 } from '@/config/menu'
 import type { Permission } from '@/config/permissions'
+import { normalizeOrderFilter } from '@/utils/accountFilters'
 
 const props = withDefaults(
     defineProps<{
@@ -34,7 +35,7 @@ function isItemActive(item: MenuItem & { routeName: string }): boolean {
     const targetPath = router.resolve(getItemRoute(item)).path.replace(/\/$/, '') || '/'
     const currentPath = route.path.replace(/\/$/, '') || '/'
     if (props.variant === 'account') {
-        return currentPath === targetPath && (route.query.filtro ?? null) === (item.query?.filtro ?? null)
+        return currentPath === targetPath && normalizeOrderFilter(route.query.filtro) === normalizeOrderFilter(item.query?.filtro)
     }
     if (targetPath === '/admin' || targetPath === '/admin/dashboard') {
         return currentPath === targetPath

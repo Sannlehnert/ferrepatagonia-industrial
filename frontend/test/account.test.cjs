@@ -30,6 +30,16 @@ test('account menu only exposes permitted controlled routes',()=>{
  }
  for(const user of [null,{rol:'ADMIN',tipoCliente:null}]) assert.deepEqual(menu.getNavigableMenu(menu.accountMenu,permissions.getPermissionsForUser(user)),[]);
 });
+test('normalizeOrderFilter reduce vacíos, repetidos y desconocidos al historial general', () => {
+ const m={exports:{}};
+ const source=readFileSync(resolve(__dirname,'../src/utils/accountFilters.ts'),'utf8');
+ new Function('module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(m,m.exports);
+ const { normalizeOrderFilter } = m.exports;
+ assert.equal(normalizeOrderFilter('sin-comprobante'),'sin-comprobante');
+ assert.equal(normalizeOrderFilter('cuenta-corriente'),'cuenta-corriente');
+ assert.equal(normalizeOrderFilter(['cuenta-corriente','x']),'cuenta-corriente');
+ for (const value of [undefined,null,'','desconocido',['desconocido'],[],'SIN-COMPROBANTE']) assert.equal(normalizeOrderFilter(value),null);
+});
 test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedidos at pedidos', () => {
  const routerSource = readFileSync(resolve(__dirname, '../src/router/index.ts'), 'utf8');
  assert.match(routerSource, /path:\s*''[\s\S]*?MiCuentaDashboardView\.vue/);
