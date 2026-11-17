@@ -29,9 +29,11 @@
   procedimiento local autorizado, evidencia comercial, invalidación por cambio
   de precio, historial append-only y migración FER-17 de auditoría.
 - [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
-  matriz P0/P1/P2, cobertura existente frente a brechas, escenarios de
-  seguridad y persistencia, separación API/MariaDB/navegador y orden de
-  ejecución con los comandos y perfiles vigentes.
+  matriz P0/P1/P2, cobertura existente frente a brechas, catálogo maestro de
+  100 SKU separado de la demo sintética de 904, checkout de cuenta corriente
+  para empresas aprobadas y habilitadas, escenarios TOCTOU, seguridad y
+  persistencia, separación API/MariaDB/navegador y orden de ejecución con los
+  comandos y perfiles vigentes.
 
 ## Contratos de autenticación en Taiga
 
