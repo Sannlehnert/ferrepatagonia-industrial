@@ -15,16 +15,7 @@ const labelKey = 'ferrepatagonia.s7-03-1-audit';
 const labelValue = token;
 const image = 'mariadb:11.4';
 
-// Inventario exacto de database/schema.sql. FER17_PRECIO_EVENTO es la extensión
-// legítima de #320; cualquier tabla faltante o adicional invalida la auditoría.
-const expectedTables = [
-    'CARRITO', 'CATEGORIA', 'CLIENTE', 'COMPROBANTE_PAGO', 'CONFIRMACION_PEDIDO_CC',
-    'COTIZACION', 'CUENTA_CORRIENTE', 'DETALLE_PEDIDO', 'DETALLE_PEDIDO_CC_PRECIO',
-    'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION', 'FER17_LISTA_INACTIVA_EVENTO',
-    'FER17_PRECIO_EVENTO', 'IMPUTACION_MOVIMIENTO_CUENTA', 'ITEM_CARRITO', 'LISTA_PRECIO',
-    'MOVIMIENTO_CUENTA_CORRIENTE', 'PAGO', 'PEDIDO', 'PRECIO_USD_EVIDENCIA', 'PRODUCTO',
-    'USUARIO',
-];
+const { assertSchemaInventory } = require('./schema-inventory.cjs');
 
 // Permite ejecutar el runner tanto desde Linux/WSL (docker) como desde
 // Windows (docker.exe). Solo se acepta un motor con daemon disponible.
@@ -56,7 +47,7 @@ const docker = (...args) => execFileSync(dockerBin, args, {
 function applySql(sqlFile) {
     const result = spawnSync(dockerBin, [
         'exec', '-i', container,
-        'mariadb', '-uroot', `-p${password}`, database,
+        'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, database,
     ], {
         input: fs.readFileSync(sqlFile),
         encoding: 'utf8',
@@ -124,33 +115,14 @@ async function main() {
 
         applySql(path.join(backend, '../database/schema.sql'));
         applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+        applySql(path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
+        applySql(path.join(backend, '../database/migrate-s7-09-1-credit-workflow.sql'));
 
         const [identity] = await connection.query('SELECT DATABASE() AS base');
         assert.equal(identity.base, database, 'La auditoría debe ejecutarse sobre la base aislada creada');
 
-        const tables = await connection.query(`
-            SELECT TABLE_NAME FROM information_schema.TABLES
-            WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE'
-            ORDER BY TABLE_NAME
-        `, [database]);
-        assert.deepEqual(
-            tables.map(row => row.TABLE_NAME),
-            expectedTables,
-            'El esquema aislado debe tener exactamente las 22 tablas vigentes, incluida FER17_PRECIO_EVENTO',
-        );
-
-        const triggers = await connection.query(`
-            SELECT TRIGGER_NAME FROM information_schema.TRIGGERS
-            WHERE TRIGGER_SCHEMA = ?
-            ORDER BY TRIGGER_NAME
-        `, [database]);
-        assert.deepEqual(
-            triggers.map(row => row.TRIGGER_NAME),
-            ['fer260_cuenta_revision', 'fer260_imputacion_insert', 'fer260_imputacion_update'],
-            'El esquema aislado debe tener los 3 triggers FER-20',
-        );
-
-        console.log('[T-S7-03.1] Esquema verificado: 22 tablas y 3 triggers FER-20.');
+        const inventory = await assertSchemaInventory(sql => connection.query(sql), 'complete');
+        console.log('[T-S7-03.1] Instalación completa verificada:', inventory);
         console.log('[T-S7-03.1] Ejecutando company-approval-audit.test.cjs...');
 
         const result = spawnSync(process.execPath, [
