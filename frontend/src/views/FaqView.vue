@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import DemoNotice from '@/components/DemoNotice.vue'
 
 const topics = [
   {
@@ -41,6 +42,32 @@ const topics = [
       },
     ],
   },
+  {
+    title: 'Pedidos y pagos',
+    questions: [
+      {
+        title: '¿Cómo pago un pedido?',
+        answer: 'Cuando el pedido se paga por transferencia, cargá el comprobante desde Mi cuenta, en Pedidos. El pedido sigue pendiente hasta que el comprobante se revisa.',
+      },
+      {
+        title: '¿Dónde veo el estado de mis pedidos?',
+        answer: 'Ingresá a Mi cuenta y abrí Pedidos para consultar el estado y el detalle de cada uno.',
+      },
+    ],
+  },
+  {
+    title: 'Sobre esta demostración',
+    questions: [
+      {
+        title: '¿Los productos, precios y datos son reales?',
+        answer: 'No. Es un proyecto académico: el catálogo, los precios de referencia en USD y los datos de empresas y clientes son de ejemplo y no representan una oferta ni una empresa real.',
+      },
+      {
+        title: '¿Por qué algunos productos no tienen foto?',
+        answer: 'Las imágenes se incorporan solo cuando existe una fuente con licencia que coincide con el producto. Si falta, se muestra sin imagen en lugar de usar una foto engañosa.',
+      },
+    ],
+  },
 ]
 </script>
 
@@ -51,7 +78,7 @@ const topics = [
         <p class="m-0 border-l-2 border-[#f59e0b] pl-3 text-xs font-bold tracking-widest uppercase">
           Centro de ayuda
         </p>
-        <h1 id="faq-title" tabindex="-1"class="mt-4 mb-0 text-3xl leading-tight font-extrabold outline-none sm:text-5xl">
+        <h1 id="faq-title" tabindex="-1" class="mt-4 mb-0 text-3xl leading-tight font-extrabold outline-none sm:text-5xl">
           Preguntas frecuentes
         </h1>
         <p class="mt-4 mb-0 max-w-2xl text-base leading-relaxed text-slate-200 sm:text-lg">
@@ -63,6 +90,7 @@ const topics = [
 
     <div class="mx-auto grid max-w-6xl items-start gap-8 px-4 py-10 sm:px-6 sm:py-14 lg:grid-cols-[minmax(0,1fr)_18rem] lg:px-10">
       <div class="grid gap-8">
+        <DemoNotice />
         <section
           v-for="(topic, index) in topics"
           :key="topic.title"

@@ -86,6 +86,16 @@ test('el menú y el pie enlazan ambas páginas y sus accesos llevan a destinos r
   await expect(page).toHaveURL(/\/login$/)
 })
 
+test('ambas páginas señalan que el contenido es ficticio y no afirman datos comerciales', async ({ page }) => {
+  for (const destination of [faq, about]) {
+    await page.goto(destination.path)
+    const notice = page.getByRole('complementary', { name: 'Aviso de contenido demostrativo' })
+    await expect(notice).toContainText('Contenido ficticio de demostración')
+    const text = await page.getByRole('main').innerText()
+    expect(text).not.toMatch(/\b(19|20)\d{2}\b|años de experiencia|sucursal|horario|garant[ií]a|env[ií]o|entrega en/i)
+  }
+})
+
 test('los acordeones se pueden abrir y cerrar con el teclado', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   await page.goto(faq.path)

@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { RouterLink } from 'vue-router'
+import DemoNotice from '@/components/DemoNotice.vue'
 import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
+
+const steps = [
+  { title: 'Explorá', text: 'Recorré el catálogo por categoría o buscá por nombre o código.' },
+  { title: 'Registrate', text: 'Creá una cuenta como particular o como empresa.' },
+  { title: 'Armá el carrito', text: 'Con sesión de cliente, agregá los productos habilitados para compra.' },
+  { title: 'Seguí tu pedido', text: 'Consultá el estado y cargá el comprobante de transferencia desde Mi cuenta.' },
+]
 </script>
 
 <template>
@@ -16,20 +24,37 @@ const auth = useAuthStore()
           Ferrepatagonia Industrial
         </h1>
         <p class="mt-4 mb-0 max-w-2xl text-base leading-relaxed text-slate-200 sm:text-lg">
-          Nuestra plataforma reúne el catálogo y las herramientas de compra en línea para
-          clientes particulares y empresas. Podés explorar los productos y consultar su
-          disponibilidad antes de ingresar a tu cuenta.
+          Ferrepatagonia Industrial es una tienda en línea de ferretería industrial creada
+          como proyecto académico. Reúne un catálogo de ejemplo y las herramientas de compra
+          para clientes particulares y empresas.
         </p>
       </div>
     </div>
 
-    <div class="mx-auto grid max-w-6xl gap-6 px-4 py-10 sm:px-6 sm:py-14 md:grid-cols-2 lg:px-10">
+    <div class="mx-auto max-w-6xl px-4 pt-10 sm:px-6 sm:pt-14 lg:px-10">
+      <DemoNotice />
+    </div>
+
+    <div class="mx-auto max-w-6xl px-4 pt-6 sm:px-6 lg:px-10">
+      <section aria-labelledby="about-how" class="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
+        <h2 id="about-how" class="m-0 text-xl font-bold">Cómo funciona la demostración</h2>
+        <ol class="mt-4 mb-0 grid list-none gap-4 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          <li v-for="(step, index) in steps" :key="step.title">
+            <p class="m-0 text-xs font-bold tracking-widest text-[#145a8d] uppercase">Paso {{ index + 1 }}</p>
+            <p class="mt-1 mb-0 font-bold">{{ step.title }}</p>
+            <p class="mt-1 mb-0 text-sm leading-relaxed text-slate-700">{{ step.text }}</p>
+          </li>
+        </ol>
+      </section>
+    </div>
+
+    <div class="mx-auto grid max-w-6xl gap-6 px-4 py-6 sm:px-6 sm:pb-14 md:grid-cols-2 lg:px-10">
       <section class="rounded-lg border border-slate-200 bg-white p-5 sm:p-7">
         <h2 class="m-0 text-xl font-bold">Catálogo y carrito</h2>
         <p class="mt-3 mb-5 leading-relaxed text-slate-700">
           Explorá por categoría o buscá por nombre o código. Cada ficha muestra información
-          del producto y su disponibilidad. Con una sesión de cliente, podés armar tu carrito
-          con los productos habilitados para compra.
+          del producto y su disponibilidad. Los precios son de referencia y simulados.
+          Con una sesión de cliente, podés armar tu carrito con los productos habilitados para compra.
         </p>
         <RouterLink
           :to="{ name: 'catalogo' }"
