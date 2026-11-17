@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import ProductThumbnail from '@/components/ProductThumbnail.vue';
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import ProductFormModal from './ProductFormModal.vue';
@@ -23,11 +23,9 @@ const categorias = ref<CategoryOption[]>([]);
 const isLoadingCategories = ref(false);
 const categoriesError = ref('');
 
-const appliedSearch = computed(() => {
-    const search = route.query.busqueda;
-    return typeof search === 'string' && [...search].length <= 200
-        && !/[\u0000-\u001f\u007f]/u.test(search) ? search.trim() : '';
-});
+const normalizeSearch = (search: unknown) => typeof search === 'string' && [...search].length <= 200
+    && !/[\u0000-\u001f\u007f]/u.test(search) ? search.trim() : '';
+const appliedSearch = computed(() => normalizeSearch(route.query.busqueda));
 const requestedPage = computed(() => {
     const page = route.query.page;
     return typeof page === 'string' && /^[1-9][0-9]{0,6}$/.test(page)
@@ -35,6 +33,9 @@ const requestedPage = computed(() => {
 });
 const searchQuery = ref(appliedSearch.value);
 const searchPending = computed(() => searchQuery.value.trim() !== appliedSearch.value);
+const searchInput = ref<HTMLInputElement | null>(null);
+const previousPageButton = ref<HTMLButtonElement | null>(null);
+const nextPageButton = ref<HTMLButtonElement | null>(null);
 const isLoading = ref(true);
 const loadError = ref('');
 const isSessionExpired = ref(false);
@@ -43,46 +44,86 @@ const actionError = ref('');
 const processingId = ref<number | null>(null);
 const needsReload = ref(false);
 const actionsDisabled = computed(() => isLoading.value || processingId.value !== null || needsReload.value || Boolean(loadError.value));
+const pagingUnavailable = computed(() => isLoading.value || searchPending.value
+    || processingId.value !== null || Boolean(loadError.value));
 
 const isModalOpen = ref(false);
 const selectedProduct = ref<AdminProduct | null>(null);
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let currentRequest: AbortController | undefined;
+let listQuery: { page: number; search: string } | undefined;
+let unmounted = false;
 
-const navigate = (page: number, search: string, replace = false) => {
-    const location = { query: { ...route.query, page: page === 1 ? undefined : String(page), busqueda: search || undefined } };
-    return replace ? router.replace(location) : router.push(location);
+const listLocation = (page: number, search: string) => {
+    const query = { ...route.query };
+    delete query.page;
+    delete query.busqueda;
+    if (page !== 1) query.page = String(page);
+    if (search) query.busqueda = search;
+    return { query, hash: route.hash };
+};
+
+const changePage = (offset: number) => {
+    if (pagingUnavailable.value || !result.value) return;
+    void router.push(listLocation(result.value.page + offset, appliedSearch.value));
 };
 
 const scheduleSearch = () => {
     clearTimeout(searchTimer);
     if (searchPending.value) {
-        searchTimer = setTimeout(() => void navigate(1, searchQuery.value.trim(), true), 300);
+        searchTimer = setTimeout(() => {
+            const search = normalizeSearch(searchQuery.value);
+            searchQuery.value = search;
+            if (search !== appliedSearch.value) void router.replace(listLocation(1, search));
+        }, 300);
     }
 };
 
 const clearSearch = () => {
     clearTimeout(searchTimer);
     searchQuery.value = '';
-    void navigate(1, '', true);
+    void router.replace(listLocation(1, ''));
+};
+
+const restorePagerFocus = async (page: AdminProductPage) => {
+    const previous = previousPageButton.value;
+    const next = nextPageButton.value;
+    const focused = [previous, next].find(button => button?.matches(':focus'));
+    if (!focused || (page.totalPages > 0
+        && (focused === previous ? page.page > 1 : page.page < page.totalPages))) return;
+
+    await nextTick();
+    const { activeElement, body } = focused.ownerDocument;
+    if (activeElement !== focused && activeElement !== body) return;
+    const target = page.totalPages <= 1 ? searchInput.value : focused === previous ? next : previous;
+    target?.focus();
 };
 
 const fetchProductos = async () => {
+    if (unmounted) return;
     currentRequest?.abort();
     const request = new AbortController();
     currentRequest = request;
+    const page = requestedPage.value;
+    const search = appliedSearch.value;
+    listQuery = { page, search };
     isLoading.value = true;
     loadError.value = '';
     isSessionExpired.value = false;
 
     try {
-        const response = await getAdminProductPage(requestedPage.value, appliedSearch.value, request.signal);
-        if (request.signal.aborted) return;
+        const response = await getAdminProductPage(page, search, request.signal);
+        if (request.signal.aborted || requestedPage.value !== page || appliedSearch.value !== search) return;
         result.value = response;
+        void restorePagerFocus(response);
         if (needsReload.value) isModalOpen.value = false;
         needsReload.value = false;
         actionError.value = '';
+        if (response.page !== page) {
+            listQuery = { page: response.page, search };
+            void router.replace(listLocation(response.page, search));
+        }
     } catch (error: unknown) {
         if (request.signal.aborted) return;
         if (axios.isAxiosError(error)) {
@@ -153,6 +194,10 @@ const handleSaved = async (msg: string) => {
 };
 
 const handleUncertain = () => {
+    // A read started before this failure cannot confirm the write's outcome.
+    currentRequest?.abort();
+    isLoading.value = false;
+    result.value = null;
     needsReload.value = true;
     actionError.value = uncertainMutationMessage;
 };
@@ -179,14 +224,23 @@ const toggleStatus = async (prod: AdminProduct) => {
     }
 };
 
-watch([requestedPage, appliedSearch], () => {
-    clearTimeout(searchTimer);
-    searchQuery.value = appliedSearch.value;
-    fetchProductos();
+watch([() => route.query.page, () => route.query.busqueda], ([rawPage, rawSearch]) => {
+    const page = requestedPage.value;
+    const search = appliedSearch.value;
+    const location = listLocation(page, search);
+    if (rawPage !== location.query.page || rawSearch !== location.query.busqueda) {
+        void router.replace(location);
+    }
+    if (listQuery?.page !== page || listQuery.search !== search) {
+        clearTimeout(searchTimer);
+        searchQuery.value = search;
+        void fetchProductos();
+    }
 }, { immediate: true });
 watch(searchQuery, scheduleSearch);
 onMounted(fetchCategorias);
 onBeforeUnmount(() => {
+    unmounted = true;
     clearTimeout(searchTimer);
     currentRequest?.abort();
 });
@@ -207,6 +261,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="flex items-center gap-2">
                 <input
+                    ref="searchInput"
                     v-model="searchQuery"
                     type="text"
                     maxlength="200"
@@ -267,12 +322,12 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Estado Vacío (Solo cuando la API respondió OK) -->
-        <div v-else-if="!result?.data.length" class="flex-1 flex flex-col justify-center items-center py-12 text-[#64748B]">
+        <div v-else-if="result && !result.data.length" class="flex-1 flex flex-col justify-center items-center py-12 text-[#64748B]">
             <p class="text-lg font-semibold">No se encontraron productos.</p>
         </div>
 
         <!-- Grilla de Productos -->
-        <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-6 content-start items-stretch pb-6">
+        <div v-else-if="result" class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-6 content-start items-stretch pb-6">
             <div
                 v-for="prod in result.data"
                 :key="prod.id_producto"
@@ -342,16 +397,16 @@ onBeforeUnmount(() => {
 
         <!-- Barra Inferior -->
         <div class="bg-[#F1F5F9] border-t border-[#E2E8F0] py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-            <div v-if="result && !isLoading && !loadError" class="text-sm text-[#64748B] font-medium">
-                Mostrando {{ result.data.length }} de {{ result.total }} productos
-                <nav v-if="result.totalPages > 0" aria-label="Paginación de productos" class="flex flex-wrap items-center gap-3">
-                    <button type="button" class="min-h-11 underline disabled:opacity-50"
-                        :disabled="result.page <= 1 || searchPending || processingId !== null"
-                        @click="navigate(result.page - 1, appliedSearch)">Anterior</button>
+            <div v-if="result" class="text-sm text-[#64748B] font-medium">
+                <span v-if="!isLoading && !loadError">Mostrando {{ result.data.length }} de {{ result.total }} productos</span>
+                <nav v-if="result.totalPages > 0" aria-label="Paginación de productos" :aria-busy="isLoading" class="flex flex-wrap items-center gap-3">
+                    <button ref="previousPageButton" type="button" class="min-h-11 underline disabled:opacity-50 aria-disabled:opacity-50"
+                        :disabled="result.page <= 1" :aria-disabled="pagingUnavailable || undefined"
+                        @click="changePage(-1)">Anterior</button>
                     <span>Página {{ result.page }} de {{ result.totalPages }}</span>
-                    <button type="button" class="min-h-11 underline disabled:opacity-50"
-                        :disabled="result.page >= result.totalPages || searchPending || processingId !== null"
-                        @click="navigate(result.page + 1, appliedSearch)">Siguiente</button>
+                    <button ref="nextPageButton" type="button" class="min-h-11 underline disabled:opacity-50 aria-disabled:opacity-50"
+                        :disabled="result.page >= result.totalPages" :aria-disabled="pagingUnavailable || undefined"
+                        @click="changePage(1)">Siguiente</button>
                 </nav>
             </div>
             <button

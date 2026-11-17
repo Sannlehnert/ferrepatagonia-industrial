@@ -7,6 +7,7 @@ const { parse, compileScript } = require('@vue/compiler-sfc');
 const ts = require('typescript');
 const errors = require('../src/services/adminMutationError.ts');
 const product = {id_producto: 7, id_categoria: 2, codigo: 'SKU-7', nombre: 'Taladro', precio: 10, stock: 5, activo: 1, descripcion: 'Original', imagen: 'https://example.test/image'};
+const firstPage = () => ({data:[{...product}],page:1,limit:20,total:1,totalPages:1});
 const httpError = status => Object.assign(new Error('rechazo'), {isAxiosError:true, response: status ? {status, data:{message:'rechazo'}} : undefined});
 const renderer = vue.createRenderer({createElement:()=>({}),createText:()=>({}),createComment:()=>({}),insert(){},remove(){},setText(){},setElementText(){},patchProp(){},parentNode:()=>null,nextSibling:()=>null});
 const settle = async () => { for(let i=0;i<5;i++){await new Promise(r=>setImmediate(r)); await vue.nextTick();} };
@@ -23,7 +24,7 @@ async function mount(t, modal=false, overrides={}, props={}) {
  const calls=[];
  const route=vue.reactive({query:{}});
  const navigate=({query})=>{route.query=query;};
- const service={getAdminProductPage:async()=>({data:[{...product}],page:1,limit:20,total:1,totalPages:1}),getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
+ const service={getAdminProductPage:async()=>firstPage(),getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
  const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
  component.render=()=>null;
  const events=[];
@@ -47,13 +48,13 @@ test('status: pending mutation prevents duplicate and opening any modal',async t
 });
 for(const status of [undefined,500,502]) test(`uncertain status ${status}: failed reload retains lock; successful reload unlocks`,async t=>{
  let fail=false;let attempts=0;
- const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('offline');return {data:[product]};},setAdminProductActive:async()=>{attempts++;throw httpError(status);}});
+ const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('offline');return firstPage();},setAdminProductActive:async()=>{attempts++;throw httpError(status);}});
  global.window={confirm:()=>true};await state.toggleStatus(product);assert.equal(state.needsReload,true);
  fail=true;await state.fetchProductos();await state.toggleStatus(product);state.openCreateModal();assert.equal(attempts,1);assert.equal(state.isModalOpen,false);assert.equal(state.actionsDisabled,true);
  fail=false;await state.fetchProductos();assert.equal(state.needsReload,false);assert.equal(state.actionsDisabled,false);
 });
 test('successful mutation or modal save followed by failed read stays locked',async t=>{
- let fail=false;const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('read failed');return {data:[product]};}});
+ let fail=false;const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('read failed');return firstPage();}});
  fail=true;global.window={confirm:()=>true};await state.toggleStatus(product);assert.equal(state.needsReload,true);
  fail=false;await state.fetchProductos();fail=true;await state.handleSaved('guardado');assert.equal(state.needsReload,true);assert.equal(state.actionsDisabled,true);
 });
