@@ -34,7 +34,7 @@ test('valida stock y refleja los cambios en el catálogo público', async ({
   });
 
   try {
-    await page.goto('/admin/productos');
+    await page.goto('/admin/productos?busqueda=E2E-02');
     await page.getByRole('button', {
       name: 'Editar Producto E2E 02',
       exact: true,

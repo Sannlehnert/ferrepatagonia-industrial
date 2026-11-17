@@ -57,6 +57,33 @@ export async function getAdminProducts(
     throw new Error('La respuesta del listado de productos no es válida.');
 }
 
+export interface AdminProductPage {
+    data: AdminProduct[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+
+export async function getAdminProductPage(
+    page: number,
+    search: string,
+    signal?: AbortSignal,
+): Promise<AdminProductPage> {
+    const { data } = await api.get<AdminProductPage>('/admin/productos', {
+        params: { page, busqueda: search || undefined },
+        signal,
+    });
+    if (!Array.isArray(data?.data) || !Number.isSafeInteger(data.total) || data.total < 0
+        || !Number.isSafeInteger(data.limit) || data.limit < 1 || data.limit > 100
+        || data.totalPages !== Math.ceil(data.total / data.limit)
+        || data.page !== Math.min(page, Math.max(1, data.totalPages))
+        || data.data.length !== Math.min(data.limit, data.total - (data.page - 1) * data.limit)) {
+        throw new Error('La respuesta del listado de productos no es válida.');
+    }
+    return data;
+}
+
 export async function setAdminProductActive(productId: number, active: boolean): Promise<void> {
     if (active) await api.put(`/admin/productos/${productId}`, { activo: true });
     else await api.patch(`/admin/productos/${productId}/desactivar`);

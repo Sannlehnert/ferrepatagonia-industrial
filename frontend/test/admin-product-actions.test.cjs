@@ -21,13 +21,15 @@ function load(file, mocks={}) {
 }
 async function mount(t, modal=false, overrides={}, props={}) {
  const calls=[];
- const service={getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
- const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRouter:()=>({push(){}})}}).default;
+ const route=vue.reactive({query:{}});
+ const navigate=({query})=>{route.query=query;};
+ const service={getAdminProductPage:async()=>({data:[{...product}],page:1,limit:20,total:1,totalPages:1}),getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
+ const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
  component.render=()=>null;
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
  app.mount({}); t.after(()=>app.unmount()); await settle();
- return {state:app._instance.setupState,calls,events};
+ return {state:app._instance.setupState,calls,events,route};
 }
 test('status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation',async t=>{
  const {state,calls}=await mount(t); let confirmations=0;
@@ -45,15 +47,33 @@ test('status: pending mutation prevents duplicate and opening any modal',async t
 });
 for(const status of [undefined,500,502]) test(`uncertain status ${status}: failed reload retains lock; successful reload unlocks`,async t=>{
  let fail=false;let attempts=0;
- const {state}=await mount(t,false,{getAdminProducts:async()=>{if(fail)throw Error('offline');return [{...product}];},setAdminProductActive:async()=>{attempts++;throw httpError(status);}});
+ const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('offline');return {data:[product]};},setAdminProductActive:async()=>{attempts++;throw httpError(status);}});
  global.window={confirm:()=>true};await state.toggleStatus(product);assert.equal(state.needsReload,true);
  fail=true;await state.fetchProductos();await state.toggleStatus(product);state.openCreateModal();assert.equal(attempts,1);assert.equal(state.isModalOpen,false);assert.equal(state.actionsDisabled,true);
  fail=false;await state.fetchProductos();assert.equal(state.needsReload,false);assert.equal(state.actionsDisabled,false);
 });
 test('successful mutation or modal save followed by failed read stays locked',async t=>{
- let fail=false;const {state}=await mount(t,false,{getAdminProducts:async()=>{if(fail)throw Error('read failed');return [{...product}];}});
+ let fail=false;const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('read failed');return {data:[product]};}});
  fail=true;global.window={confirm:()=>true};await state.toggleStatus(product);assert.equal(state.needsReload,true);
  fail=false;await state.fetchProductos();fail=true;await state.handleSaved('guardado');assert.equal(state.needsReload,true);assert.equal(state.actionsDisabled,true);
+});
+
+test('paginated list discards an earlier request after the route changes', async t => {
+ const requests=[];
+ const {state,route}=await mount(t,false,{
+  getAdminProductPage:(page,search,signal)=>new Promise(resolve=>requests.push({page,search,signal,resolve})),
+ });
+ route.query={page:'3',busqueda:'SKU'};
+ await settle();
+ assert.equal(requests.length,2);
+ assert.equal(requests[0].signal.aborted,true);
+ assert.deepEqual([requests[1].page,requests[1].search],[3,'SKU']);
+ requests[1].resolve({data:[product],page:3,limit:20,total:41,totalPages:3});
+ requests[0].resolve({data:[],page:1,limit:20,total:0,totalPages:0});
+ await settle();
+ assert.equal(state.result.page,3);
+ assert.equal(state.result.data[0].id_producto,product.id_producto);
+ assert.equal(state.isLoading,false);
 });
 for(const status of [400,401,403,404,409,422]) test(`known rejection ${status} does not count as uncertain`,async t=>{
  const {state}=await mount(t,false,{setAdminProductActive:async()=>{throw httpError(status);}});

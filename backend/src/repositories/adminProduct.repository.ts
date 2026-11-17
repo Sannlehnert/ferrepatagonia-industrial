@@ -1,4 +1,5 @@
 import { dataSource, inTransaction } from '../config/database.config';
+import type { EntityManager } from 'typeorm';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
 
@@ -40,15 +41,32 @@ export interface UpdateProductDTO {
 // Explicit raw projections preserve DECIMAL strings, numeric flags and JSON keys.
 const fields = ['id_producto', 'id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo', 'fecha_actualizacion'];
 
-function productQuery() {
-    const query = dataSource.getRepository(ProductoSchema).createQueryBuilder('p');
+function productQuery(manager?: EntityManager) {
+    const query = (manager ?? dataSource).getRepository(ProductoSchema).createQueryBuilder('p');
     fields.forEach((field, index) => index === 0 ? query.select('p.' + field, field) : query.addSelect('p.' + field, field));
     return query;
 }
 
-export const findAllAdmin = async (): Promise<ProductRecord[]> => productQuery()
+const adminListQuery = (manager?: EntityManager) => productQuery(manager)
     .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
-    .orderBy('p.id_producto', 'DESC').getRawMany<ProductRecord>();
+    .orderBy('p.id_producto', 'DESC');
+
+export const findAllAdmin = (): Promise<ProductRecord[]> => adminListQuery().getRawMany<ProductRecord>();
+
+export const findAdminPage = (requestedPage: number, limit: number, search?: string) =>
+    inTransaction(async manager => {
+        const query = adminListQuery(manager);
+        if (search !== undefined) {
+            const pattern = '%' + search.replace(/[!%_]/g, '!$&') + '%';
+            query.andWhere("(p.nombre LIKE :pattern ESCAPE '!' OR p.codigo LIKE :pattern ESCAPE '!')", { pattern });
+        }
+        const total = await query.getCount();
+        const totalPages = Math.ceil(total / limit);
+        const page = Math.min(requestedPage, Math.max(1, totalPages));
+        const data = total === 0 ? [] : await query
+            .offset((page - 1) * limit).limit(limit).getRawMany<ProductRecord>();
+        return { data, page, limit, total, totalPages };
+    }, { isolation: 'REPEATABLE READ' });
 
 export const findById = async (id: number): Promise<ProductRecord | null> =>
     await productQuery().where('p.id_producto = :id', { id }).getRawOne<ProductRecord>() ?? null;

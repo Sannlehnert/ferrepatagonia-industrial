@@ -37,7 +37,7 @@ test('bloquea cambios tras una respuesta perdida hasta recargar correctamente', 
   let saveRequests = 0;
 
   try {
-    await page.goto('/admin/productos');
+    await page.goto('/admin/productos?busqueda=E2E-02');
     await page.getByRole('button', {
       name: 'Editar Producto E2E 02',
       exact: true,
