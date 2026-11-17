@@ -24,14 +24,26 @@ async function lockingRead<T>(manager: EntityManager, sql: string, parameters: n
     }
 }
 
-// Lock the authoritative identity and the shared client row before touching the cart.
-export async function lockCartClient(manager: EntityManager, userId: number): Promise<number | null> {
-    const row = await lockingRead<{ id_cliente: number }>(manager, `
-        SELECT c.id_cliente FROM USUARIO u
-        INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente
-        WHERE u.id_usuario = ? AND u.rol = 'CLIENTE' AND u.activo = 1 AND c.activo = 1
-        FOR UPDATE`, [userId]);
-    return row?.id_cliente ?? null;
+export async function findCartClientId(manager: EntityManager, userId: number): Promise<number | null> {
+    const [identity] = await manager.query<{ id_cliente: number | null }[]>(`
+        SELECT id_cliente FROM USUARIO
+        WHERE id_usuario = ? AND rol = 'CLIENTE' AND activo = 1`, [userId]);
+    return identity?.id_cliente ?? null;
+}
+
+// Credit and FER-20 take CLIENTE before USUARIO. A locking join would let
+// MariaDB choose the opposite order. Revalidate the identity after locating it.
+export async function lockCartClient(manager: EntityManager, userId: number, clientId: number): Promise<boolean> {
+    const client = await lockingRead<{ id_cliente: number }>(manager, `
+        SELECT id_cliente FROM CLIENTE WHERE id_cliente = ? AND activo = 1
+        FOR UPDATE`, [clientId]);
+    if (!client) return false;
+
+    const user = await lockingRead<{ id_cliente: number }>(manager, `
+        SELECT id_cliente FROM USUARIO
+        WHERE id_usuario = ? AND id_cliente = ? AND rol = 'CLIENTE' AND activo = 1
+        FOR UPDATE`, [userId, clientId]);
+    return Boolean(user);
 }
 
 export async function findCartId(manager: EntityManager, clientId: number): Promise<number | null> {

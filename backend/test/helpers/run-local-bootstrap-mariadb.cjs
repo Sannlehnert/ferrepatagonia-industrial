@@ -32,6 +32,7 @@ async function run() {
         assert.ok(session && !interrupted, 'MariaDB descartable no disponible');
         applyFile(profile, path.join(backend, '../database/schema.sql'));
         applyFile(profile, path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+        applyFile(profile, path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
         console.log(JSON.stringify({ mode: 'local-bootstrap', database: profile.database, host: profile.host,
             port: profile.port, container: profile.container }));
 

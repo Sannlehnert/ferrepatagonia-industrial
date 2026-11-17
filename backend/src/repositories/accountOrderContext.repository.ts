@@ -34,7 +34,7 @@ export async function lockAccountOrderContext(
     );
   }
 
-  if (await lockCartClient(manager, auth.id) !== clientId) {
+  if (!await lockCartClient(manager, auth.id, clientId)) {
     throw new AccountOrderError(
       'CLIENTE_NO_HABILITADO', 403,
       'La cuenta de cliente no está habilitada.',
