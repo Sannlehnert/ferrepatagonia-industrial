@@ -19,6 +19,8 @@
     "test:price-verification:isolated": "node test/helpers/run-price-verification-mariadb.cjs",
     "precio:verificar": "node scripts/verify-product-price.cjs",
     "precio:historial": "node scripts/verify-product-price.cjs --historial",
+    "catalogo:importar-maestro": "node dist/scripts/import-master-catalog.js",
+    "test:catalogo-maestro": "node --test test/master-catalog.test.cjs test/master-catalog.mariadb.test.cjs",
     "test:cart:isolated": "node test/helpers/run-cart-mariadb.cjs",
     "test:cuenta-corriente": "node test/helpers/run-cuenta-corriente-mariadb.cjs",
     "test:cuenta-corriente:client": "node --test test/cc251.h05.test.cjs && node test/helpers/run-cuenta-corriente-client-mariadb.cjs",
