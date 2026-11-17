@@ -37,8 +37,7 @@ test('normalizeOrderFilter reduce vacíos, repetidos y desconocidos al historial
  const { normalizeOrderFilter } = m.exports;
  assert.equal(normalizeOrderFilter('sin-comprobante'),'sin-comprobante');
  assert.equal(normalizeOrderFilter('cuenta-corriente'),'cuenta-corriente');
- assert.equal(normalizeOrderFilter(['cuenta-corriente','x']),'cuenta-corriente');
- for (const value of [undefined,null,'','desconocido',['desconocido'],[],'SIN-COMPROBANTE']) assert.equal(normalizeOrderFilter(value),null);
+ for (const value of [undefined,null,'','desconocido',['desconocido'],[],'SIN-COMPROBANTE',['cuenta-corriente','x'],['sin-comprobante','cuenta-corriente'],['cuenta-corriente','cuenta-corriente']]) assert.equal(normalizeOrderFilter(value),null);
 });
 test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedidos at pedidos', () => {
  const routerSource = readFileSync(resolve(__dirname, '../src/router/index.ts'), 'utf8');

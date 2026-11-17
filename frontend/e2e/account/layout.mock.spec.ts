@@ -87,7 +87,10 @@ test('filtro desconocido, vacío o repetido deja activo el historial general', a
   await mockApi(page, 'EMPRESA')
   const menu = page.getByRole('navigation', { name: 'Menú de mi cuenta' })
   await page.setViewportSize({ width: 1280, height: 700 })
-  for (const query of ['?filtro=desconocido', '?filtro=', '?filtro=desconocido&filtro=x']) {
+  for (const query of [
+    '?filtro=desconocido', '?filtro=', '?filtro=desconocido&filtro=x',
+    '?filtro=sin-comprobante&filtro=cuenta-corriente', '?filtro=cuenta-corriente&filtro=cuenta-corriente',
+  ]) {
     await page.goto(`/mi-cuenta/pedidos${query}`)
     await expect(menu.getByRole('link', { name: 'Historial de pedidos' })).toHaveAttribute('aria-current', 'page')
     await expect(menu.locator('[aria-current="page"]')).toHaveCount(1)
