@@ -7,7 +7,8 @@ const advisory = (name, url = 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf
   ({ name, dependency: name, url, severity, range: '<=4.0.7' });
 const other = (name, severity) => advisory(name, 'https://github.com/advisories/GHSA-1111-2222-3333', severity);
 const finding = (name, via, severity = 'high') =>
-  ({ name, via, severity, range: '*', isDirect: false, effects: [], nodes: [`node_modules/${name}`] });
+  ({ name, via, severity, range: '*', isDirect: false, effects: [],
+    nodes: [`node_modules/${name === 'otro' ? 'axios' : name}`] });
 
 function report(rows = []) {
   const vulnerabilities = Object.fromEntries(rows.map(row => [row.name, { ...row, effects: [] }]));
@@ -54,7 +55,7 @@ test('permite únicamente los diez hallazgos de desarrollo revisados antes del v
   data.vulnerabilities.tinyglobby.effects = [];
   npm10.stdout = JSON.stringify(data);
   assert.equal(evaluate(input({ full: npm10 })).length, 10);
-  assert.deepEqual(evaluate(input({ full: report(), now: Date.parse('2026-11-25') })), []);
+  assert.throws(() => evaluate(input({ full: report() })), /no acredita la cobertura/);
 });
 
 test('bloquea cualquier advisory alto o crítico ajeno, directo o en la cadena exceptuada', () => {
@@ -65,7 +66,7 @@ test('bloquea cualquier advisory alto o crítico ajeno, directo o en la cadena e
   }
   const moderate = finding('otro', [other('otro', 'moderate')], 'moderate');
   assert.throws(() => evaluate(input({ full: report([...baseline(), moderate]) })), /hallazgos nuevos/);
-  assert.deepEqual(evaluate(input({ full: report([moderate]) })), []);
+  assert.throws(() => evaluate(input({ full: report([moderate]) })), /no acredita la cobertura/);
   for (const name of ['picomatch', 'vite']) {
     const rows = baseline();
     rows.find(row => row.name === name).via.push(other(name, 'moderate'));
@@ -79,10 +80,10 @@ test('invalida la excepción al cambiar versión, introducir una copia o alcanza
   assert.throws(() => evaluate(version), /una sola instalación/);
   const nested = input();
   nested.lock.packages['node_modules/otro/node_modules/picomatch'] = { version: '4.0.7', dev: true };
-  assert.throws(() => evaluate(nested), /una sola instalación/);
+  assert.throws(() => evaluate(nested), /inventario|una sola instalación/);
   const prod = input();
   delete prod.lock.packages['node_modules/picomatch'].dev;
-  assert.throws(() => evaluate(prod), /de desarrollo/);
+  assert.throws(() => evaluate(prod), /inventario|de desarrollo/);
   const prodEdge = input();
   prodEdge.lock.packages[''].dependencies.picomatch = '^4.0.7';
   assert.throws(() => evaluate(prodEdge), /alcanza dependencias de producción/);
@@ -112,5 +113,21 @@ test('bloquea fallos de npm, JSON inválido, resultados incompletos y estados in
     report([finding('vite', ['otro']), finding('otro', ['vite'])]),
   ]) {
     for (const field of ['production', 'full']) assert.throws(() => evaluate(input({ [field]: result })));
+  }
+});
+
+test('rechaza inventarios contradictorios y nodos ajenos al lockfile', () => {
+  for (const mutate of [
+    data => Object.keys(data.metadata.dependencies).forEach(key => { data.metadata.dependencies[key] = 0; }),
+    data => { data.metadata.dependencies.total++; },
+    data => { data.metadata.dependencies.dev--; },
+    data => { delete data.metadata.dependencies.peer; },
+    data => { data.vulnerabilities.picomatch.nodes = ['node_modules/ausente']; },
+  ]) {
+    const full = report(baseline());
+    const data = JSON.parse(full.stdout);
+    mutate(data);
+    full.stdout = JSON.stringify(data);
+    assert.throws(() => evaluate(input({ full })), /inventario|incompleto/);
   }
 });
