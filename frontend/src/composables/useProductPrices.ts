@@ -48,11 +48,14 @@ export function useProductPrices(products: Ref<CatalogProduct[]>, catalogLoading
     auth.user?.rol, auth.sessionChecked, auth.loggingIn, auth.loggingOut, auth.sessionError],
   () => { void retry() }, { immediate: true, flush: 'sync' })
   const refreshOnFocus = () => { void retry() }
+  const refreshOnVisible = () => { if (document.visibilityState === 'visible') void retry() }
   onMounted(() => {
     if (typeof window !== 'undefined') window.addEventListener('focus', refreshOnFocus)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshOnVisible)
   })
   onScopeDispose(() => {
     if (typeof window !== 'undefined') window.removeEventListener('focus', refreshOnFocus)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshOnVisible)
     controller?.abort()
     prices.value = {}
   })

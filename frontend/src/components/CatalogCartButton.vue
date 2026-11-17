@@ -111,7 +111,7 @@ async function add() {
 
     <p
       :id="`cart-message-${product.id}`"
-      class="mb-0 mt-2 text-xs text-slate-500 empty:hidden"
+      class="mb-0 mt-2 text-xs text-slate-500 empty:hidden [.contents>&]:order-last [.contents>&]:w-full"
     >
       {{ message }}
     </p>

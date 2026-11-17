@@ -291,11 +291,12 @@ onBeforeUnmount(() => {
             </h3>
             <ProductPrice :line="pricing.prices[p.id]" :loading="pricing.loading" :error="pricing.error" :personalized="pricing.personalized" />
 
-            <div class="mt-auto flex items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
+            <div class="mt-auto flex flex-wrap items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
               <span aria-label="Disponibilidad de stock" class="text-sm" :class="p.disponible ? 'text-green-700' : 'text-red-700'">
                 {{ p.disponible ? 'Disponible' : 'No disponible' }}
               </span>
               <CatalogCartButton
+                class="contents"
                 :product="p"
                 :line="pricing.prices[p.id]"
                 :loading="pricing.loading"

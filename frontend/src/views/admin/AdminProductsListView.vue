@@ -13,7 +13,7 @@ import {
 } from '../../services/adminProductService';
 
 import { isMutationResultUncertain, adminMutationErrorMessage, uncertainMutationMessage } from '../../services/adminMutationError';
-import type { AdminBasePriceState } from '@/types/pricing';
+import { basePriceLabels } from '@/types/pricing';
 
 const router = useRouter();
 
@@ -96,13 +96,6 @@ const formatPrice = (value: number | string | null | undefined): string => {
     const num = Number(value);
     if (isNaN(num)) return '—';
     return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(num);
-};
-const basePriceLabels: Record<AdminBasePriceState, string> = {
-    SIN_PRECIO: 'Sin precio base',
-    BASE_CERO: 'Precio base cero · No comprable',
-    NO_VERIFICADO: 'Precio pendiente de verificación',
-    VERIFICADO: 'Precio base verificado',
-    SINTETICO: 'Precio base simulado · No es evidencia real',
 };
 
 const openCreateModal = () => {
