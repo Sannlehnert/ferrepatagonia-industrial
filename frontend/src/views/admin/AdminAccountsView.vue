@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
+import AdminCreditRequests from '@/components/AdminCreditRequests.vue'
+import AdminCreditAccountControls from '@/components/AdminCreditAccountControls.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { accountMoney } from '@/services/adminAccountDto'
@@ -57,7 +59,17 @@ function lookupClient() {
   validation.value = ''
   void loadDetail(Number(raw))
 }
+const creditFeedback = ref('')
+
+function onCreditUpdated(clientId: number, message: string) {
+  if (!allowed() || selected.value !== clientId) return
+
+  void loadDetail(clientId)
+  creditFeedback.value = message
+  void list.load(signal => getAdminAccounts(filters, signal))
+}
 function loadDetail(clientId: number, kind?: 'movimientos' | 'vencimientos', cursor?: string) {
+  creditFeedback.value = ''
   selected.value = clientId
   const previous = selectedData.value
   return detail.load(async signal => {
@@ -74,6 +86,7 @@ function loadDetail(clientId: number, kind?: 'movimientos' | 'vencimientos', cur
   })
 }
 watch(() => [identity(), auth.loggingOut, auth.loggingIn], () => {
+  creditFeedback.value = ''
   list.reset(); detail.reset(); selected.value = null
   clientInput.value = ''; enabledInput.value = ''; filters = {}; validation.value = ''
   if (allowed()) void loadList()
@@ -84,6 +97,7 @@ onMounted(() => { void loadList() })
 <template>
   <section v-if="allowed()" class="accounts" aria-labelledby="accounts-title">
     <header><h1 id="accounts-title">Cuentas corrientes</h1><p>Consulta administrativa de saldos, movimientos y vencimientos en USD.</p></header>
+    <AdminCreditRequests />
     <form class="filters" @submit.prevent="applyFilters">
       <label>ID de cliente<input v-model="clientInput" inputmode="numeric" autocomplete="off" /></label>
       <label>Habilitación<select v-model="enabledInput"><option value="">Todas</option><option value="true">Habilitadas</option><option value="false">Inhabilitadas</option></select></label>
@@ -107,6 +121,9 @@ onMounted(() => { void loadList() })
     </template>
     <section v-if="selected" aria-labelledby="account-detail-title" class="detail">
       <h2 id="account-detail-title">Cliente {{ selected }}</h2>
+      <p v-if="creditFeedback" role="status" class="text-emerald-800">
+        {{ creditFeedback }}
+      </p>
       <p v-if="detail.loading.value" role="status">Cargando detalle…</p>
       <div v-else-if="detail.error.value" class="notice"><p role="alert">{{ message(detail.error.value) }}</p><button @click="loadDetail(selected)">Reiniciar detalle</button></div>
       <template v-else-if="summary">
@@ -123,6 +140,12 @@ onMounted(() => { void loadList() })
             <div><dt>Vencida a 60 días</dt><dd>{{ accountMoney(summary.deudaVencida60Dias) }}</dd></div>
             <div><dt>Por vencer</dt><dd>{{ accountMoney(summary.deudaPorVencerTotal) }}</dd></div>
           </dl>
+          <AdminCreditAccountControls
+            :key="`${identity()}:${selected}`"
+            :client-id="selected"
+            :account="summary"
+            @updated="onCreditUpdated"
+          />
           <h3>Movimientos</h3>
           <template v-if="movements && movements.estado !== 'SIN_CUENTA'">
             <p v-if="movements.cobertura !== 'COMPLETA'">Historial incompleto: no acredita el saldo total.</p>
