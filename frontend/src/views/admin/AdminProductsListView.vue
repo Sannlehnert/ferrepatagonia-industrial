@@ -51,6 +51,29 @@ const pagingUnavailable = computed(() => isLoading.value || searchPending.value
 
 const isModalOpen = ref(false);
 const selectedProduct = ref<AdminProduct | null>(null);
+let modalTrigger: HTMLElement | null = null;
+let restoreModalFocus = false;
+
+const restoreListFocus = () => {
+    if (unmounted || isModalOpen.value || isLoading.value) return;
+    const edit = selectedProduct.value && tableRegion.value?.querySelector<HTMLButtonElement>(
+        `[data-product-edit="${selectedProduct.value.id_producto}"]`
+    );
+    const target = edit || (modalTrigger?.isConnected ? modalTrigger : searchInput.value);
+    target?.focus({ preventScroll: true });
+    restoreModalFocus = false;
+};
+
+const revealTableControl = (event: FocusEvent) => {
+    const region = tableRegion.value;
+    const control = event.target;
+    if (!region || !(control instanceof HTMLButtonElement)) return;
+    const bounds = region.getBoundingClientRect();
+    const button = control.getBoundingClientRect();
+    const padding = 6;
+    if (button.left < bounds.left + padding) region.scrollLeft += button.left - bounds.left - padding;
+    else if (button.right > bounds.right - padding) region.scrollLeft += button.right - bounds.right + padding;
+};
 
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 let currentRequest: AbortController | undefined;
@@ -104,6 +127,7 @@ const restorePagerFocus = async (page: AdminProductPage) => {
 
 const fetchProductos = async () => {
     if (unmounted) return;
+    const restoreReloadFocus = reloadButton.value?.matches(':focus');
     currentRequest?.abort();
     const request = new AbortController();
     currentRequest = request;
@@ -139,7 +163,14 @@ const fetchProductos = async () => {
             loadError.value = 'No se pudo cargar el listado de productos.';
         }
     } finally {
-        if (!request.signal.aborted) isLoading.value = false;
+        if (!request.signal.aborted) {
+            isLoading.value = false;
+            await nextTick();
+            if (restoreModalFocus) restoreListFocus();
+            else if (restoreReloadFocus && !isModalOpen.value) {
+                (reloadButton.value ?? searchInput.value)?.focus({ preventScroll: true });
+            }
+        }
     }
 };
 
@@ -170,7 +201,8 @@ const formatPrice = (value: number | string | null | undefined): string => {
 };
 
 const openCreateModal = () => {
-    if (actionsDisabled.value) return;
+    if (actionsDisabled.value || isModalOpen.value) return;
+    modalTrigger = searchInput.value?.ownerDocument.activeElement as HTMLElement | null;
     saveMessage.value = '';
     selectedProduct.value = null;
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
@@ -180,7 +212,8 @@ const openCreateModal = () => {
 };
 
 const openEditModal = (prod: AdminProduct) => {
-    if (actionsDisabled.value) return;
+    if (actionsDisabled.value || isModalOpen.value) return;
+    modalTrigger = searchInput.value?.ownerDocument.activeElement as HTMLElement | null;
     saveMessage.value = '';
     selectedProduct.value = { ...prod };
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
@@ -252,6 +285,12 @@ watch([() => route.query.page, () => route.query.busqueda], ([rawPage, rawSearch
     }
 }, { immediate: true });
 watch(searchQuery, scheduleSearch);
+watch(isModalOpen, async open => {
+    if (open) return;
+    restoreModalFocus = true;
+    await nextTick();
+    restoreListFocus();
+});
 onMounted(fetchCategorias);
 onBeforeUnmount(() => {
     unmounted = true;
@@ -261,7 +300,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
+    <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full wrap-anywhere bg-[#F1F5F9]">
         <!-- Barra Superior -->
         <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 bg-[#F1F5F9] py-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -353,6 +392,7 @@ onBeforeUnmount(() => {
                 aria-label="Tabla desplazable de productos"
                 aria-describedby="admin-products-scroll"
                 tabindex="0"
+                @focusin="revealTableControl"
                 class="mb-6 w-full min-w-0 overflow-x-auto rounded-md border border-slate-300 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             >
                 <table class="w-full min-w-[48rem] border-collapse text-left text-sm text-[#0B2438]" aria-describedby="admin-products-price">
@@ -394,6 +434,7 @@ onBeforeUnmount(() => {
                                         type="button"
                                         :disabled="actionsDisabled"
                                         :aria-label="`Editar ${prod.nombre}`"
+                                        :data-product-edit="prod.id_producto"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
                                         class="min-h-11 rounded-md border border-[#103A5C] bg-white px-3 font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
                                         @click="openEditModal(prod)"

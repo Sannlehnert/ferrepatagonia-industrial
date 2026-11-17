@@ -30,7 +30,7 @@ async function mount(t, modal=false, overrides={}, props={}) {
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
  app.mount({}); t.after(()=>app.unmount()); await settle();
- return {state:app._instance.setupState,calls,events,route};
+ return {state:app._instance.setupState,calls,events,route,props:app._instance.props};
 }
 test('status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation',async t=>{
  const {state,calls}=await mount(t); let confirmations=0;
@@ -161,4 +161,20 @@ describe('Product Form & Actions - Regression Tests (#240)', () => {
         assert.equal(payload.precio, undefined, 'El payload no debe incluir precio: 0');
         assert.notEqual(payload.precio, 0, 'El precio no debe coaccionarse a cero');
     });
+});
+test('modal refuses a submit when selection changes after draft initialization', async t => {
+ const {state,calls,props}=await mount(t,true);
+ props.product={...product,id_producto:8,nombre:'Otro'};
+ await settle();
+ await state.handleSubmit();
+ assert.equal(calls.length,0);
+ assert.match(state.backendError,/seleccionado cambió/);
+ assert.equal(state.draftProduct.id_producto,7);
+});
+test('an active edit cannot be replaced or switched to creation', async t => {
+ const {state}=await mount(t);
+ state.openEditModal(product);
+ state.openEditModal({...product,id_producto:8});
+ state.openCreateModal();
+ assert.equal(state.selectedProduct.id_producto,7);
 });

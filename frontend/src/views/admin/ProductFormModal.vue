@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import axios from 'axios';
 import ProductThumbnail from '@/components/ProductThumbnail.vue';
 import {
@@ -30,7 +30,27 @@ const emit = defineEmits<{
     (e: 'reload'): void;
 }>();
 
-const isEditMode = computed(() => Boolean(props.product?.id_producto));
+const draftProduct = ref<AdminProduct | null>(null);
+const dialog = ref<HTMLDialogElement | null>(null);
+const isEditMode = computed(() => Boolean(draftProduct.value?.id_producto));
+
+const containDialogFocus = (event: KeyboardEvent) => {
+    if (event.key !== 'Tab' || !dialog.value) return;
+    const controls = [...dialog.value.querySelectorAll<HTMLElement>(
+        'button, input, select, textarea, a[href], [tabindex]'
+    )].filter(control => !control.matches(':disabled') && control.tabIndex >= 0
+        && control.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls.at(-1);
+    const current = dialog.value.ownerDocument.activeElement;
+    if (event.shiftKey && current === first) {
+        event.preventDefault();
+        last?.focus();
+    } else if (!event.shiftKey && current === last) {
+        event.preventDefault();
+        first?.focus();
+    }
+};
 const isSubmitting = ref(false);
 const backendError = ref('');
 const uncertain = ref(false);
@@ -104,8 +124,17 @@ const availableCategories = computed<CategoryOption[]>(() => {
 watch(
     () => props.isOpen,
     (isOpen, wasOpen) => {
-        if (!isOpen) clearImage();
+        if (!isOpen) {
+            clearImage();
+            dialog.value?.close();
+        }
         if (!isOpen || wasOpen) return;
+        draftProduct.value = props.product ? { ...props.product } : null;
+        void nextTick(() => {
+            if (!props.isOpen || !dialog.value) return;
+            dialog.value.showModal();
+            dialog.value.querySelector<HTMLInputElement>('form input')?.focus({ preventScroll: true });
+        });
         backendError.value = '';
         uncertain.value = false;
         fieldErrors.value = {};
@@ -196,7 +225,11 @@ const validateForm = (): boolean => {
 };
 
 const handleSubmit = async () => {
-    if (formDisabled.value || imageError.value) return;
+    if (!props.isOpen || formDisabled.value || imageError.value) return;
+    if (props.product?.id_producto !== draftProduct.value?.id_producto) {
+        backendError.value = 'El producto seleccionado cambió. Cerrá el formulario y volvé a abrirlo.';
+        return;
+    }
     backendError.value = '';
     if (!validateForm()) return;
 
@@ -218,7 +251,7 @@ const handleSubmit = async () => {
             activo: Boolean(form.value.activo)
         };
 
-        const original = props.product;
+        const original = draftProduct.value;
         const priceUnchanged = original !== null && (
             isPriceEmpty
                 ? (original.precio === null || original.precio === undefined)
@@ -278,16 +311,20 @@ const requestClose = () => {
 </script>
 
 <template>
-    <div
+    <dialog
+        ref="dialog"
         v-if="isOpen"
-        class="fixed inset-0 bg-[#0B2438]/75 flex items-center justify-center z-50 p-2 sm:p-4"
+        aria-labelledby="product-form-title"
+        class="fixed inset-0 m-auto h-full max-h-none w-full max-w-none box-border border-0 bg-[#0B2438]/75 p-2 sm:p-4 open:flex items-center justify-center"
+        @cancel.prevent="requestClose"
+        @keydown="containDialogFocus"
         @click.self="requestClose"
     >
         <div class="bg-[#F8FAFC] w-full max-w-3xl rounded-lg shadow-xl border border-[#E2E8F0] flex flex-col max-h-[90dvh]">
             <!-- Encabezado fijo -->
             <div class="shrink-0 flex justify-between items-center p-4 sm:p-6 border-b border-[#E2E8F0] bg-white rounded-t-lg">
-                <h3 class="text-lg sm:text-xl font-bold text-[#0B2438]">
-                    {{ isEditMode ? `Editar Producto #${product?.id_producto}` : 'Crear Nuevo Producto' }}
+                <h3 id="product-form-title" class="text-lg sm:text-xl font-bold text-[#0B2438]">
+                    {{ isEditMode ? `Editar Producto #${draftProduct?.id_producto}` : 'Crear Nuevo Producto' }}
                 </h3>
                 <button
                     type="button"
@@ -475,5 +512,5 @@ const requestClose = () => {
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </template>
