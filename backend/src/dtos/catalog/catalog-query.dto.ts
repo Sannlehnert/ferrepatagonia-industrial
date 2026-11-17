@@ -3,10 +3,10 @@ import { Rule, parseInteger } from '../rules';
 import type { CatalogPagination } from '../../validators/catalog.validator';
 
 // Lista blanca única: el repositorio solo traduce estos valores a cláusulas internas.
-export const catalogOrderValues = ['predeterminado', 'nombre_asc', 'nombre_desc'] as const;
+export const catalogOrderValues = ['predeterminado', 'nombre_asc', 'nombre_desc', 'precio_asc', 'precio_desc'] as const;
 export type CatalogOrder = (typeof catalogOrderValues)[number];
 
-export const catalogError = 'Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. orden debe ser predeterminado, nombre_asc o nombre_desc. No se admiten parámetros desconocidos ni repetidos.';
+export const catalogError = `Query inválida. page (1 a 1000000), limit (1 a 100) y categoria (1 a 2147483647) deben ser enteros positivos sin ceros iniciales. busqueda debe ser texto no vacío de hasta 200 caracteres, sin controles. orden debe ser uno de ${catalogOrderValues.join(', ')}. No se admiten parámetros desconocidos ni repetidos.`;
 
 export class CatalogQuery {
   @IsInt() @Min(1) @Max(1000000) page!: number;

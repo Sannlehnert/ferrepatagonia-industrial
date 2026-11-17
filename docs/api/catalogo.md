@@ -23,13 +23,10 @@ ni garantiza disponibilidad al confirmar una compra. No se expone el stock exact
 El listado incluye `imagen` cuando el producto tiene una URL asociada. Home
 y catálogo usan esa URL directamente para mostrar la foto.
 
-**Precio provisional, autorizado el 16/10/2026:** `precio` siempre es `null` y
-`estadoPrecio` siempre es `PENDIENTE_DEFINICION`. No representa un precio comercial,
-un precio cero ni un producto gratuito. No se consulta ni publica `PRODUCTO.precio`.
-No se devuelve moneda ni se hacen cálculos, descuentos o conversiones.
-FER-15 debe definir con el equipo y el cliente la política pública, moneda y
-contrato definitivo. El criterio de precio de #189 queda **parcialmente pendiente**.
-El frontend debe mostrar un estado pendiente, nunca convertir null a cero.
+El listado conserva `precio: null` y `estadoPrecio: PENDIENTE_DEFINICION`.
+La UI obtiene los importes desde FER-17. Para `orden=precio_asc` o `orden=precio_desc`,
+el listado usa internamente el unitario público acreditado en USD como clave de
+ordenamiento. La respuesta mantiene la misma proyección en todos los órdenes.
 
 ## Request
 
@@ -41,6 +38,8 @@ GET /api/catalogo?busqueda=T-7
 GET /api/catalogo?busqueda=taladro&categoria=2&page=1&limit=20
 GET /api/catalogo?orden=nombre_asc&page=1&limit=20
 GET /api/catalogo?orden=nombre_desc&categoria=2&page=1&limit=20
+GET /api/catalogo?orden=precio_asc&busqueda=taladro&categoria=2&page=1&limit=20
+GET /api/catalogo?orden=precio_desc&page=1&limit=20
 ```
 
 | Parámetro | Predeterminado | Valores aceptados |
@@ -49,7 +48,7 @@ GET /api/catalogo?orden=nombre_desc&categoria=2&page=1&limit=20
 | limit | 20 | Entero de 1 a 100 |
 | categoria | Sin filtro | ID entero de 1 a 2147483647 (INT con signo de MariaDB) |
 | busqueda | Sin búsqueda | Una cadena no vacía de hasta 200 puntos de código Unicode antes de trim |
-| orden | predeterminado | `predeterminado`, `nombre_asc` o `nombre_desc` |
+| orden | predeterminado | `predeterminado`, `nombre_asc`, `nombre_desc`, `precio_asc`, `precio_desc` |
 
 page, limit y categoria se aceptan únicamente como cadenas de dígitos decimales positivos, sin
 ceros iniciales. Se rechazan vacíos, negativos, fracciones, exponentes, espacios,
@@ -106,6 +105,8 @@ se conservan page y limit. Un producto que coincide en ambos campos aparece una 
 | `predeterminado` | `p.id_producto ASC` | Equivalente a omitir el parámetro |
 | `nombre_asc` | `p.nombre ASC, p.id_producto ASC` | Alfabético ascendente |
 | `nombre_desc` | `p.nombre DESC, p.id_producto ASC` | Alfabético descendente |
+| `precio_asc` | `precio_publico_usd IS NULL, precio_publico_usd ASC, p.id_producto ASC` | Menor a mayor, precios no disponibles al final |
+| `precio_desc` | `precio_publico_usd IS NULL, precio_publico_usd DESC, p.id_producto ASC` | Mayor a menor, precios no disponibles al final |
 
 La comparación alfabética usa la collation de `PRODUCTO.nombre`
 (`utf8mb4_unicode_ci`), la misma que la búsqueda: no distingue mayúsculas ni
@@ -115,7 +116,7 @@ la paginación determinista y evita duplicados u omisiones entre páginas cuando
 hay nombres repetidos.
 
 Los valores son exactos y sensibles a mayúsculas: `NOMBRE_ASC`, `nombre-asc`,
-`precio_asc`, `id_asc`, vacíos, espacios o valores repetidos
+`PRECIO_ASC`, `id_asc`, vacíos, espacios o valores repetidos
 (`orden=nombre_asc&orden=nombre_desc`) devuelven **400**. No hay alias `sort`,
 `order` ni `orderBy`; son parámetros desconocidos. El valor se valida contra una
 lista blanca y el repositorio solo interpola una cláusula interna constante en
@@ -127,10 +128,20 @@ del orden; dentro de cada página cambia únicamente la secuencia de productos.
 Productos o categorías inactivos siguen excluidos. Un catálogo vacío devuelve
 200 con `productos: []` y los mismos metadatos, cualquiera sea `orden`.
 
-No se implementa orden por precio: los precios públicos y personalizados
-provienen de FER-17 y su contrato debe resolverse antes de exponer un criterio
-comercial. La interfaz «Ordenar por» corresponde a #350 y no forma parte de este
-contrato.
+Para #349 se adopta el canal público de [FER-17](precios.md) para visitantes y
+compradores. La HU #303 y la tarea #349 requieren seguir la política de precios
+y no especifican qué canal usar. La ruta de catálogo es pública y el resultado
+es independiente de la sesión. El cálculo usa descuento de lista 0%, especial
+público si corresponde y redondeo HALF_UP a dos decimales sobre el unitario USD.
+La cotización personalizada se obtiene en `POST /api/precios/mios`.
+
+Las bases ausentes, cero o sin evidencia válida, los unitarios que redondean a
+cero y las evidencias sintéticas quedan juntos al final en ambos sentidos, por ID
+ascendente. La evidencia debe corresponder al importe vigente, estar validada,
+provenir de un ADMIN, contener una referencia y tener fecha de verificación no
+posterior a la consulta. El orden se calcula en SQL sobre el conjunto filtrado
+antes de `LIMIT/OFFSET`, en el mismo snapshot de solo lectura que el `COUNT`.
+La interfaz «Ordenar por» corresponde a #350.
 
 ## Response 200
 
@@ -286,7 +297,10 @@ empates de nombre con desempate por ID, paginación estable, combinación con
 búsqueda y categoría, catálogo vacío, inactivos, consistencia de total/páginas y
 rechazo de valores vacíos, desconocidos, con mayúsculas o repetidos. Las pruebas
 de repositorio verifican que cada valor produce únicamente la cláusula interna
-esperada y que un valor no reconocido no se interpola.
+esperada y que un valor no reconocido no se interpola. MariaDB compara
+`precio_asc` y `precio_desc` con la cotización pública de FER-17, verifica
+promociones, redondeo y desempates, precios no disponibles, aislamiento de la
+lista privada, y cambios concurrentes de evidencia, nombre y estado activo.
 
 ## Prueba manual
 
@@ -309,6 +323,8 @@ curl.exe -i 'http://localhost:3000/api/catalogo?orden=nombre_asc&page=1&limit=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?orden=nombre_desc&page=1&limit=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?orden=predeterminado&page=1&limit=2'
 curl.exe -i 'http://localhost:3000/api/catalogo?orden=precio_asc'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=precio_desc&page=2&limit=2'
+curl.exe -i 'http://localhost:3000/api/catalogo?orden=PRECIO_ASC'
 curl.exe -i 'http://localhost:3000/api/catalogo?orden=nombre_asc&orden=nombre_desc'
 curl.exe -i -H 'Cookie: jwt_token=invalido' 'http://localhost:3000/api/catalogo'
 curl.exe -i 'http://localhost:3000/api/health'
@@ -318,7 +334,10 @@ Esperar 200 en consultas válidas, incluso con página vacía o cookie inválida
 400 en inputs inválidos o parámetros no admitidos. Sin `orden` verificar orden
 ascendente de IDs; con `nombre_asc`/`nombre_desc`, orden alfabético y desempate
 por ID ascendente ante nombres iguales. Comprobar metadatos, ausencia de duplicados
-con datos estables, precio nulo y ausencia de moneda/stock.
+con datos estables, precio nulo y ausencia de moneda/stock. Para los órdenes
+por precio, comparar los unitarios acreditados no sintéticos con
+`POST /api/precios` y comprobar que los productos sin una clave válida quedan
+al final en ambos sentidos.
 Para estados activo/inactivo y concurrencia usar la integración automatizada,
 que prepara y limpia sus propios datos. Si el catálogo superase 99999900 productos,
 la request de página 1000000 y limit 100 podría tener resultados válidos.

@@ -49,7 +49,8 @@ for (const query of ['page=0', 'page=-1', 'page=1.5', 'page=1e2', 'page=01', 'pa
   'categoria[]=1', 'categoria[id]=1', 'categoria=1%20OR%201=1',
   'page=1%20OR%201=1',
   'orden=', 'orden=nombre', 'orden=NOMBRE_ASC', 'orden=nombre-asc',
-  'orden=precio_asc', 'orden=id_asc', 'orden=nombre%20asc',
+  'orden=PRECIO_ASC', 'orden=precio', 'orden=precio_desc%20', 'orden=id_asc', 'orden=nombre%20asc',
+  'orden=precio_asc&orden=precio_desc', 'orden=precio_asc&lista=1', 'orden=precio_desc&cliente=1',
   'orden=nombre_asc&orden=nombre_desc', 'orden=nombre_asc&orden=nombre_asc',
   'orden[]=nombre_asc', 'orden[x]=nombre_asc']) {
   test(`400 sin consultar BD: ${query}`, async t => {
@@ -91,7 +92,7 @@ test('validador rechaza objetos y arrays, y admite límites mínimos', () => {
     { page: 1, limit: 20, offset: 0, categoria: 2147483647 });
 });
 
-for (const orden of ['predeterminado', 'nombre_asc', 'nombre_desc']) {
+for (const orden of ['predeterminado', 'nombre_asc', 'nombre_desc', 'precio_asc', 'precio_desc']) {
   test(`validador admite orden ${orden}`, () => {
     assert.deepEqual(parseCatalogPagination({ orden }), { page: 1, limit: 20, offset: 0, orden });
     assert.deepEqual(
@@ -101,7 +102,8 @@ for (const orden of ['predeterminado', 'nombre_asc', 'nombre_desc']) {
 }
 test('validador rechaza orden fuera de lista blanca o estructurado', () => {
   for (const orden of [null, [], {}, 1, true, ['nombre_asc'], '', 'nombre',
-    'NOMBRE_ASC', 'nombre-asc', 'precio_asc', 'id_asc', 'nombre asc',
+    'NOMBRE_ASC', 'nombre-asc', 'PRECIO_ASC', 'precio', 'precio_desc ', 'id_asc', 'nombre asc',
+    ['precio_asc', 'precio_desc'], { x: 'precio_asc' },
     'nombre_asc,id_producto', 'p.nombre; DROP TABLE PRODUCTO']) {
     assert.equal(parseCatalogPagination({ orden }), null);
   }
@@ -129,7 +131,7 @@ for (const total of [0, 3]) {
   });
 }
 
-for (const orden of ['predeterminado', 'nombre_asc', 'nombre_desc']) {
+for (const orden of ['predeterminado', 'nombre_asc', 'nombre_desc', 'precio_asc', 'precio_desc']) {
   test(`HTTP propaga orden ${orden} junto con búsqueda, categoría y paginación`, async t => {
     const stub = t.mock.method(repository, 'findCatalogPage', async () => ({ rows: [row], total: 1 }));
     const response = await fetch(
@@ -166,10 +168,12 @@ for (const categoria of [undefined, 2, 2147483647]) {
     assert.deepEqual(select.values, [...count.values, 2, 4]);
   });
 }
-for (const [orden, clause] of [
+for (const [orden, clause, priceOrder = false] of [
   ['predeterminado', 'p.id_producto ASC'],
   ['nombre_asc', 'p.nombre ASC, p.id_producto ASC'],
   ['nombre_desc', 'p.nombre DESC, p.id_producto ASC'],
+  ['precio_asc', 'precio_publico_usd IS NULL, precio_publico_usd ASC, p.id_producto ASC', true],
+  ['precio_desc', 'precio_publico_usd IS NULL, precio_publico_usd DESC, p.id_producto ASC', true],
 ]) {
   test(`repositorio aplica cláusula interna y desempate para orden ${orden}`, async t => {
     const queries = [];
@@ -187,7 +191,14 @@ for (const [orden, clause] of [
     assert.ok(select.sql.includes('p.id_producto ASC'), 'desempate determinista por id');
     assert.ok(select.sql.includes('p.activo = 1 AND c.activo = 1'));
     assert.ok(!count.sql.includes('ORDER BY'));
-    assert.deepEqual(select.values, [2, 2, 2]);
+    assert.equal(select.sql.includes('PRECIO_USD_EVIDENCIA'), priceOrder);
+    assert.ok(!count.sql.includes('PRECIO_USD_EVIDENCIA'));
+    if (priceOrder) {
+      assert.match(select.sql, /e\.verificado_utc<=\? AND e\.evidencia REGEXP \?/);
+      assert.match(select.values[0], /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$/);
+      assert.equal(typeof select.values[1], 'string');
+    }
+    assert.deepEqual(select.values.slice(priceOrder ? 2 : 0), [2, 2, 2]);
   });
 }
 test('repositorio no interpola un orden desconocido y conserva el predeterminado', async t => {
