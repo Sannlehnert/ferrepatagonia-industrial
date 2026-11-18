@@ -18,8 +18,20 @@ new Function('require', 'module', 'exports', code)(name => {
   if (name === '../../services/adminProductService') return { saveAdminProduct() {} }
   if (name === '@/components/ProductThumbnail.vue') return { default: {} }
   if (name === '../../services/adminMutationError') return require('../src/services/adminMutationError.ts')
+  if (name === '@/types/pricing') return require('../src/types/pricing.ts')
   return require(name)
 }, compiled, compiled.exports)
+
+test('editar muestra la evidencia actual del precio base y crear no', async () => {
+  const render = product => renderToString(createSSRApp(compiled.exports.default, { isOpen: true, product, categories: [] }))
+  const sintetico = await render({ id_producto: 1, id_categoria: 7, activo: 1, precio: 10, estado_precio_base: 'SINTETICO' })
+  assert.match(sintetico, /Importe base cargado \(USD\)/)
+  assert.match(sintetico, /Precio base simulado · No es evidencia real/)
+  assert.match(sintetico, /invalida la evidencia previa/)
+  const pendiente = await render({ id_producto: 1, id_categoria: 7, activo: 1, precio: 10, estado_precio_base: 'NO_VERIFICADO' })
+  assert.match(pendiente, /Precio pendiente de verificación/)
+  assert.doesNotMatch(await render(null), /estado-precio-base/)
+})
 
 test('error y reintento de categorías siguen visibles junto a la categoría actual', async () => {
   const html = await renderToString(createSSRApp(compiled.exports.default, {
