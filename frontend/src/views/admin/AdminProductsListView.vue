@@ -300,7 +300,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full wrap-anywhere bg-[#F1F5F9]">
+    <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
         <!-- Barra Superior -->
         <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 bg-[#F1F5F9] py-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -331,14 +331,14 @@ onBeforeUnmount(() => {
         <p
             v-if="saveMessage"
             role="status"
-            class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800"
+            class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 wrap-anywhere"
         >
             {{ saveMessage }}
         </p>
 
         <p v-if="processingId !== null" id="admin-products-lock" role="status" class="mb-4">Actualizando estado del producto. Las acciones están temporalmente deshabilitadas.</p>
         <div v-if="actionError || needsReload" role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
-            <p>{{ actionError || 'Recargá el listado para confirmar los datos antes de modificar productos.' }}</p>
+            <p class="wrap-anywhere">{{ actionError || 'Recargá el listado para confirmar los datos antes de modificar productos.' }}</p>
             <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="min-h-11 underline disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
         </div>
 
@@ -353,7 +353,7 @@ onBeforeUnmount(() => {
             role="alert"
             class="rounded-md border border-red-200 bg-red-50 p-5 text-red-700 my-4"
         >
-            <p class="font-semibold">{{ loadError }}</p>
+            <p class="font-semibold wrap-anywhere">{{ loadError }}</p>
             <div class="mt-3 flex gap-3">
                 <button
                     v-if="isSessionExpired"
@@ -393,7 +393,7 @@ onBeforeUnmount(() => {
                 aria-describedby="admin-products-scroll"
                 tabindex="0"
                 @focusin="revealTableControl"
-                class="mb-6 w-full min-w-0 overflow-x-auto rounded-md border border-slate-300 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                class="relative mb-6 w-full min-w-0 overflow-x-auto rounded-md border border-slate-300 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             >
                 <table class="w-full min-w-[48rem] border-collapse text-left text-sm text-[#0B2438]" aria-describedby="admin-products-price">
                     <caption class="sr-only">Productos del catálogo</caption>
@@ -436,7 +436,7 @@ onBeforeUnmount(() => {
                                         :aria-label="`Editar ${prod.nombre}`"
                                         :data-product-edit="prod.id_producto"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 rounded-md border border-[#103A5C] bg-white px-3 font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="min-h-11 whitespace-nowrap rounded-md border border-[#103A5C] bg-white px-3 font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
                                         @click="openEditModal(prod)"
                                     >Editar</button>
                                     <button
@@ -445,7 +445,7 @@ onBeforeUnmount(() => {
                                         :data-product-status="prod.id_producto"
                                         :aria-label="`${prod.activo ? 'Desactivar' : 'Activar'} ${prod.nombre}`"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 rounded-md border bg-white px-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="min-h-11 whitespace-nowrap rounded-md border bg-white px-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
                                         :class="prod.activo ? 'border-red-700 text-red-800 enabled:hover:bg-red-50' : 'border-emerald-700 text-emerald-800 enabled:hover:bg-emerald-50'"
                                         @click="toggleStatus(prod, $event)"
                                     >{{ prod.activo ? 'Desactivar' : 'Activar' }}</button>

@@ -81,41 +81,173 @@ test('P2: guardar fuera del filtro y reconciliar devuelven foco estable', async 
     await expect(action).toBeEnabled();
     await expect(search(page)).toBeFocused();
 });
-test('P2/P3: acciones completas con Tab y Shift+Tab y errores sin overflow', async ({ page }) => {
+test('P2-01/P2-02: datos extremos sin overflow global ni etiquetas fragmentadas', async ({ page }) => {
     await login(page);
+    const longName = 'Producto ' + 'N'.repeat(190);
+    const longSku = 'S'.repeat(100);
     await page.route(list, async (route) => {
         const response = await route.fetch();
         const data = await response.json();
-        data.data[0] = { ...data.data[0], nombre: 'Producto ' + 'N'.repeat(190), codigo: 'S'.repeat(100), categoria_nombre: null, imagen: null, precio: null };
+        data.data[0] = {
+            ...data.data[0],
+            nombre: longName,
+            codigo: longSku,
+            categoria_nombre: 'Categoría E2E de prueba',
+            precio: 12345.67,
+            activo: true,
+            imagen: null,
+        };
         await route.fulfill({ response, json: data });
     });
     await page.goto('/admin/productos?busqueda=E2E-02');
     const region = page.getByRole('region', { name: 'Tabla desplazable de productos' });
-    const controls = region.getByRole('button');
+    const edit = region.getByRole('button', { name: `Editar ${longName}`, exact: true });
+    const status = region.getByRole('button', { name: `Desactivar ${longName}`, exact: true });
+    await expect(edit).toBeEnabled();
+    await expect(status).toBeEnabled();
+    await expect(region.getByText('Activo', { exact: true })).toBeVisible();
+
+    // Semántica de tabla y etiqueta accesible del SKU preservadas.
+    await expect(page.getByRole('table')).toHaveCount(1);
+    await expect(page.locator('table caption')).toHaveText('Productos del catálogo');
+    await expect(page.getByRole('columnheader')).toHaveCount(7);
+    await expect(page.getByRole('rowheader', { name: longName })).toHaveCount(1);
+    await expect(page.locator('tbody .sr-only').first()).toHaveText('SKU: ');
+    await expect(region).toHaveAttribute('aria-describedby', 'admin-products-scroll');
+
     for (const width of [320, 360, 390, 768, 1024, 1280]) {
         await page.setViewportSize({ width, height: 800 });
         await region.evaluate(el => { el.scrollLeft = 0; });
-        await region.focus();
-        for (const key of ['Tab', 'Tab', 'Shift+Tab', 'Tab']) {
-            await page.keyboard.press(key);
-            const metrics = await region.evaluate(el => {
-                const button = el.ownerDocument.activeElement!.getBoundingClientRect();
-                const bounds = el.getBoundingClientRect();
-                return { left: button.left - bounds.left, right: bounds.right - button.right, page: el.ownerDocument.documentElement.scrollWidth };
-            });
-            expect(metrics.left).toBeGreaterThanOrEqual(4);
-            expect(metrics.right).toBeGreaterThanOrEqual(4);
+
+        // 1. La página no desarrolla overflow horizontal global.
+        expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);
+        expect(await page.evaluate<number>('document.body.scrollWidth')).toBeLessThanOrEqual(width);
+
+        // El texto oculto del SKU queda contenido por la región posicionada.
+        const skuLabel = await region.evaluate(el => {
+            const label = el.querySelector('.sr-only')!.getBoundingClientRect();
+            const bounds = el.getBoundingClientRect();
+            return { left: label.left, right: label.right, regionLeft: bounds.left, regionRight: bounds.right };
+        });
+        expect(skuLabel.left).toBeGreaterThanOrEqual(skuLabel.regionLeft);
+        expect(skuLabel.right).toBeLessThanOrEqual(skuLabel.regionRight);
+
+        // 2. El desplazamiento horizontal es interno y llega a todas las columnas.
+        const overflow = await region.evaluate(el => ({
+            overflowX: el.ownerDocument.defaultView!.getComputedStyle(el).overflowX,
+            client: el.clientWidth,
+            scroll: el.scrollWidth,
+            page: el.ownerDocument.documentElement.scrollWidth,
+        }));
+        expect(overflow.overflowX).toBe('auto');
+        expect(overflow.page).toBeLessThanOrEqual(width);
+        if (width < 1280) expect(overflow.scroll).toBeGreaterThan(overflow.client);
+        const reached = await region.evaluate(el => {
+            el.scrollLeft = el.scrollWidth;
+            const bounds = el.getBoundingClientRect();
+            const last = el.querySelector('tbody tr:last-child td:last-child button:last-child')!.getBoundingClientRect();
+            return {
+                scrollLeft: el.scrollLeft,
+                max: el.scrollWidth - el.clientWidth,
+                lastRight: last.right,
+                regionRight: bounds.right,
+                page: el.ownerDocument.documentElement.scrollWidth,
+            };
+        });
+        expect(reached.scrollLeft).toBeGreaterThanOrEqual(reached.max - 1);
+        expect(reached.lastRight).toBeLessThanOrEqual(reached.regionRight + 1);
+        expect(reached.page).toBeLessThanOrEqual(width);
+
+        // 3, 4 y 5. Tab y Shift+Tab dejan cada control visible, enfocado, con foco completo y sin fragmentar.
+        const geometry = () => region.evaluate(el => {
+            const button = el.ownerDocument.activeElement as typeof el;
+            const box = button.getBoundingClientRect();
+            const bounds = el.getBoundingClientRect();
+            const style = el.ownerDocument.defaultView!.getComputedStyle(button);
+            const range = el.ownerDocument.createRange();
+            range.selectNodeContents(button);
+            const outlineWidth = parseFloat(style.outlineWidth);
+            const outlineOffset = parseFloat(style.outlineOffset);
+            return {
+                text: button.textContent?.trim(),
+                lines: range.getClientRects().length,
+                width: box.width,
+                height: box.height,
+                leftGap: box.left - bounds.left,
+                rightGap: bounds.right - box.right,
+                outlineStyle: style.outlineStyle,
+                outlineWidth,
+                outlineOffset,
+                outlineFits: box.left - outlineWidth - outlineOffset >= bounds.left
+                    && box.right + outlineWidth + outlineOffset <= bounds.right,
+                page: el.ownerDocument.documentElement.scrollWidth,
+            };
+        });
+        const check = async (expected: string) => {
+            const metrics = await geometry();
+            expect(metrics.text).toBe(expected);
+            expect(metrics.lines).toBe(1);
+            expect(metrics.width).toBeGreaterThanOrEqual(56);
+            expect(metrics.height).toBeLessThanOrEqual(48);
+            expect(metrics.leftGap).toBeGreaterThanOrEqual(4);
+            expect(metrics.rightGap).toBeGreaterThanOrEqual(4);
+            expect(metrics.outlineStyle).not.toBe('none');
+            expect(metrics.outlineWidth).toBeGreaterThanOrEqual(2);
+            expect(metrics.outlineFits).toBe(true);
             expect(metrics.page).toBeLessThanOrEqual(width);
-        }
-        await expect(controls.last()).toBeFocused();
+        };
+        await region.evaluate(el => { el.scrollLeft = 0; });
+        await region.focus();
+        await page.keyboard.press('Tab');
+        await expect(edit).toBeFocused();
+        await check('Editar');
+        await page.keyboard.press('Tab');
+        await expect(status).toBeFocused();
+        await check('Desactivar');
+        await page.keyboard.press('Tab');
+        await page.keyboard.press('Shift+Tab');
+        await expect(status).toBeFocused();
+        await check('Desactivar');
+        await page.keyboard.press('Shift+Tab');
+        await expect(edit).toBeFocused();
+        await check('Editar');
+
+        // 6. Los textos largos se ajustan dentro de su celda.
+        const wrapping = await region.evaluate((el, name) => {
+            const header = el.querySelector('tbody th') as typeof el;
+            const skuCell = header.nextElementSibling as typeof el;
+            const nameRange = el.ownerDocument.createRange();
+            nameRange.selectNodeContents(header.querySelector('span')!);
+            const skuRange = el.ownerDocument.createRange();
+            skuRange.selectNodeContents(skuCell);
+            return {
+                nameFits: header.scrollWidth <= header.clientWidth + 1,
+                skuFits: skuCell.scrollWidth <= skuCell.clientWidth + 1,
+                nameLines: nameRange.getClientRects().length,
+                skuLines: skuRange.getClientRects().length,
+                name: header.textContent?.trim(),
+            };
+        }, longName);
+        expect(wrapping.name).toBe(longName);
+        expect(wrapping.nameFits).toBe(true);
+        expect(wrapping.skuFits).toBe(true);
+        expect(wrapping.nameLines).toBeGreaterThan(1);
+        expect(wrapping.skuLines).toBeGreaterThan(1);
     }
+
     await page.unroute(list);
     await page.route(list, r => r.fulfill({ status: 500, json: { message: 'X'.repeat(160) } }), { times: 1 });
     await search(page).fill('E2E-03');
-    await expect(page.getByRole('alert')).toContainText('X'.repeat(160));
+    const alert = page.getByRole('alert');
+    await expect(alert).toContainText('X'.repeat(160));
     for (const width of [320, 360, 390, 768, 1024, 1280]) {
         await page.setViewportSize({ width, height: 800 });
+        // 7. El mensaje de 160 caracteres consecutivos se ajusta sin desbordar.
         expect(await page.evaluate<number>('document.documentElement.scrollWidth')).toBeLessThanOrEqual(width);
+        const message = await alert.locator('p').evaluate(el => ({
+            fits: el.scrollWidth <= el.clientWidth + 1,
+        }));
+        expect(message.fits).toBe(true);
     }
     await page.getByRole('button', { name: 'Reintentar' }).click();
     await expect(region).toBeVisible();
