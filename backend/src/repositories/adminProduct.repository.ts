@@ -1,4 +1,5 @@
 import { dataSource, inTransaction } from '../config/database.config';
+import type { EntityManager } from 'typeorm';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
 import { nonBlankPriceEvidence, priceEvidenceAdmin, productPriceEvidence, sqlUTC } from './product-price-evidence.sql';
@@ -41,33 +42,51 @@ export interface UpdateProductDTO {
 // Explicit raw projections preserve DECIMAL strings, numeric flags and JSON keys.
 const fields = ['id_producto', 'id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo', 'fecha_actualizacion'];
 
-function productQuery() {
-    const query = dataSource.getRepository(ProductoSchema).createQueryBuilder('p');
+function productQuery(manager?: EntityManager) {
+    const query = (manager ?? dataSource).getRepository(ProductoSchema).createQueryBuilder('p');
     fields.forEach((field, index) => index === 0 ? query.select('p.' + field, field) : query.addSelect('p.' + field, field));
     return query;
 }
 
 export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' | 'VERIFICADO' | 'SINTETICO';
+export type AdminProductRow = ProductRecord & { estado_precio_base: AdminBasePriceState };
+type RawAdminProductRow = ProductRecord & { price_verifier: number | null; price_synthetic: number | null };
 
-export const findAllAdmin = async (): Promise<(ProductRecord & { estado_precio_base: AdminBasePriceState })[]> => {
-    const rows = await productQuery()
-        .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
-        .leftJoin('PRECIO_USD_EVIDENCIA', 'e', productPriceEvidence(':at', ':nonBlank'), {
-            at: sqlUTC(new Date()), nonBlank: nonBlankPriceEvidence,
-        })
-        .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
-        .addSelect('ea.id_usuario', 'price_verifier')
-        .addSelect('e.sintetica', 'price_synthetic')
-        .orderBy('p.id_producto', 'DESC')
-        .getRawMany<ProductRecord & { price_verifier: number | null; price_synthetic: number | null }>();
-    return rows.map(({ price_verifier, price_synthetic, ...product }) => ({
-        ...product,
-        estado_precio_base: product.precio === null ? 'SIN_PRECIO'
-            : Number(product.precio) === 0 ? 'BASE_CERO'
-            : price_verifier === null ? 'NO_VERIFICADO'
-            : price_synthetic === 1 ? 'SINTETICO' : 'VERIFICADO',
-    }));
-};
+const adminListQuery = (manager?: EntityManager) => productQuery(manager)
+    .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
+    .leftJoin('PRECIO_USD_EVIDENCIA', 'e', productPriceEvidence(':at', ':nonBlank'), {
+        at: sqlUTC(new Date()), nonBlank: nonBlankPriceEvidence,
+    })
+    .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
+    .addSelect('ea.id_usuario', 'price_verifier')
+    .addSelect('e.sintetica', 'price_synthetic')
+    .orderBy('p.id_producto', 'DESC');
+
+const withBasePriceState = ({ price_verifier, price_synthetic, ...product }: RawAdminProductRow): AdminProductRow => ({
+    ...product,
+    estado_precio_base: product.precio === null ? 'SIN_PRECIO'
+        : Number(product.precio) === 0 ? 'BASE_CERO'
+        : price_verifier === null ? 'NO_VERIFICADO'
+        : price_synthetic === 1 ? 'SINTETICO' : 'VERIFICADO',
+});
+
+export const findAllAdmin = async (): Promise<AdminProductRow[]> =>
+    (await adminListQuery().getRawMany<RawAdminProductRow>()).map(withBasePriceState);
+
+export const findAdminPage = (requestedPage: number, limit: number, search?: string) =>
+    inTransaction(async manager => {
+        const query = adminListQuery(manager);
+        if (search !== undefined) {
+            const pattern = '%' + search.replace(/[!%_]/g, '!$&') + '%';
+            query.andWhere("(p.nombre LIKE :pattern ESCAPE '!' OR p.codigo LIKE :pattern ESCAPE '!')", { pattern });
+        }
+        const total = await query.getCount();
+        const totalPages = Math.ceil(total / limit);
+        const page = Math.min(requestedPage, Math.max(1, totalPages));
+        const rows = total === 0 ? [] : await query
+            .offset((page - 1) * limit).limit(limit).getRawMany<RawAdminProductRow>();
+        return { data: rows.map(withBasePriceState), page, limit, total, totalPages };
+    }, { isolation: 'REPEATABLE READ' });
 
 export const findById = async (id: number): Promise<ProductRecord | null> =>
     await productQuery().where('p.id_producto = :id', { id }).getRawOne<ProductRecord>() ?? null;

@@ -32,7 +32,7 @@ test('cancela, desactiva y reactiva un producto con reflejo público', async ({
   });
 
   try {
-    await page.goto('/admin/productos');
+    await page.goto('/admin/productos?busqueda=E2E-02');
     await expect(deactivate).toBeEnabled();
 
     await visitor.goto(`${origin}/catalogo?busqueda=E2E-02`);
