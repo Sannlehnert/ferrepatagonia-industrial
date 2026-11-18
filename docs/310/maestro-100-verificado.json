@@ -1,0 +1,413 @@
+{
+  "total": 100,
+  "conFuente": 61,
+  "pendientes": [
+    "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-2XL",
+    "FP-DEMO-GUA-GUANTE-PVC-TALLE-2XL",
+    "FP-DEMO-ILU-LAMPARA-E27-10-W",
+    "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-100-UNIDADES",
+    "FP-DEMO-ILU-REFLECTOR-100-W",
+    "FP-DEMO-ILU-REGLETA-LED-120-CM",
+    "FP-DEMO-MAN-LIMAS-10-PIEZAS",
+    "FP-DEMO-MAN-LLAVE-COMBINADA-10-MM",
+    "FP-DEMO-MAT-BORNERA-CON-10-POSICIONES",
+    "FP-DEMO-MAT-CAJA-EMBUTIR-10-10-CM",
+    "FP-DEMO-MAT-CAJA-SUPERFICIE-10-10-CM",
+    "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-100-UNIDADES",
+    "FP-DEMO-MEC-COPA-19-MM",
+    "FP-DEMO-MEC-MECHA-MADERA-10-MM",
+    "FP-DEMO-MEC-MECHA-MAMPOSTERIA-10-MM",
+    "FP-DEMO-NEU-MANGUERA-PE-10-12-MM-INTERIOR-EXTERIOR",
+    "FP-DEMO-NEU-MANGUERA-PU-10-12-MM-INTERIOR-EXTERIOR",
+    "FP-DEMO-NEU-MANIFOLD-SALIDAS-10",
+    "FP-DEMO-NEU-SOPLADORA-100-MM",
+    "FP-DEMO-OBR-ESPACIADOR-1-5-MM",
+    "FP-DEMO-OBR-MALLA-100-MM",
+    "FP-DEMO-OBR-MALLA-OBRA-0-3-M-DE-ANCHO",
+    "FP-DEMO-OBR-PERFIL-10-10-MM",
+    "FP-DEMO-OCU-SOBRELENTE-PACK-DE-100-UNIDADES",
+    "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-100-UNIDADES",
+    "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-100-UNIDADES",
+    "FP-DEMO-RES-PREFILTRO-PACK-DE-100-UNIDADES",
+    "FP-DEMO-RES-RETENEDOR-PACK-DE-100-UNIDADES",
+    "FP-DEMO-ROP-CAMISA-TALLE-2XL",
+    "FP-DEMO-ROP-CAMPERA-TALLE-2XL",
+    "FP-DEMO-ROP-MAMELUCO-TALLE-2XL",
+    "FP-DEMO-ROP-PANTALON-TALLE-2XL",
+    "FP-DEMO-SEN-CARTEL-ACRILICO-ACCESO-RESTRINGIDO",
+    "FP-DEMO-SEN-CARTEL-ALUMINIO-ACCESO-RESTRINGIDO",
+    "FP-DEMO-SEN-CARTEL-PVC-ACCESO-RESTRINGIDO",
+    "FP-DEMO-SEN-CARTEL-VINILO-ACCESO-RESTRINGIDO",
+    "FP-DEMO-SUM-FILM-100-MM",
+    "FP-DEMO-SUM-TRAPO-PACK-DE-100-UNIDADES",
+    "FP-DEMO-TOR-ARANDELA-GROWER-M10"
+  ],
+  "asociaciones": [
+    {
+      "sku": "FP-DEMO-ABR-DISCO-LIJA-100-MM",
+      "archivo": "ilustrativa-abr.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/ef257207-427f-433e-b175-516d9f95a3b3.webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-DISCO-METAL-100-MM",
+      "archivo": "ilustrativa-abr-corte.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/5bb1194d-0df7-4e2d-ad26-6a0d83149954.webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-LIJA-AGUA-GRANO-1000",
+      "archivo": "ilustrativa-abr-hoja.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/e26f7d05-7ca1-4f70-a213-904d14f58638.webp"
+    },
+    {
+      "sku": "FP-DEMO-ABR-LIJA-MADERA-GRANO-100",
+      "archivo": "ilustrativa-abr-hoja.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/e6c3db62-788c-4afe-8a59-edff1279f1cf.webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-CINTA-DOBLE-12-MM",
+      "archivo": "ilustrativa-adh-cinta.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/d58b69c6-0f7c-4e10-82d0-d6ed3d954dd0.webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-COLA-100-ML",
+      "archivo": "ilustrativa-adh-cola.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/eac3b047-3b6c-4cd0-affd-a7aead85a6fe.webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-CONTACTO-100-ML",
+      "archivo": "ilustrativa-adh.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/6fc2c1fa-e22b-4201-93f2-34d68a71752e.webp"
+    },
+    {
+      "sku": "FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS",
+      "archivo": "ilustrativa-adh-sellador.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/8385960b-73bc-4fec-b832-32a2ccc6a438.webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-AZUL",
+      "archivo": "ilustrativa-alt.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/26232e80-17a8-4432-83ec-a714d35eead9.webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-BOLSO-ARNES-10-L",
+      "archivo": "ilustrativa-alt-bolso.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/c24f1f97-5c1b-42be-9db1-aeb8ecc8f078.webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES",
+      "archivo": "ilustrativa-alt-etiqueta.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/0ae9aba1-e9f0-4909-99a8-e0589b1d39be.webp"
+    },
+    {
+      "sku": "FP-DEMO-ALT-PROTECTOR-CINTA-150-MM",
+      "archivo": "ilustrativa-alt-protector.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/46e51210-26d8-4fa8-97fd-fcdfe8ea2ef9.webp"
+    },
+    {
+      "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-100-UNIDADES",
+      "archivo": "tapones-aletas-cordon.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/fd876a8b-2fe9-435e-b21e-4f3c92eebd50.webp"
+    },
+    {
+      "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-100-UNIDADES",
+      "archivo": "tapones-espuma.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/ef058793-6165-45db-98b2-cb0fc7599f6b.webp"
+    },
+    {
+      "sku": "FP-DEMO-AUD-OREJERA-AMARILLO",
+      "archivo": "ilustrativa-aud.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/f20f38c5-1a4d-468b-a21e-403785f11da4.webp"
+    },
+    {
+      "sku": "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES",
+      "archivo": "ilustrativa-aud-tapon.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/62d63aaf-fd28-49df-8553-be5e3a2ee467.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-AZUL-0-5-MM2",
+      "archivo": "ilustrativa-cab.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/11817870-cd00-4e7d-beae-5ce0654a12e6.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2",
+      "archivo": "ilustrativa-cab-bipolar.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/01732b5c-f7c8-4d65-a817-fb2fce72af94.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-MARRON-0-5-MM2",
+      "archivo": "ilustrativa-cab-marron.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/b8e7bcfd-fb99-403f-ab90-34b7b3fa4af9.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
+      "archivo": "ilustrativa-cab-negro.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/3a457e3b-52fd-4e05-817c-2fff8f76b03e.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BOTIN-38-AR",
+      "archivo": "botin-trabajo-negro.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/fcbbee30-6c65-4394-96e7-1faf991cac85.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-ZAPATO-38-AR",
+      "archivo": "zapato-trabajo-bajo.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/e00662c1-6d3f-48f8-a3df-23bc061ff8d9.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-38-AR",
+      "archivo": "borcegui-marron.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/eaefd7c8-73f0-4982-8f54-47cfa06c8a9c.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BOTA-PVC-38-AR",
+      "archivo": "ilustrativa-cal-bota-pvc.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/99f7f1d5-eeca-422a-966b-5dd87d424ec1.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-BLANCO-BARBOQUEJO",
+      "archivo": "casco-blanco-barboquejo.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/fb5d6344-c677-490c-8979-a5416cef4806.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-ALA-AMARILLO",
+      "archivo": "ilustrativa-cas-ala.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/62cc6ab3-c34b-49aa-b46f-a291b20daee8.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-CORTO-AMARILLO",
+      "archivo": "casco-visera-corta-amarillo.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/9389b337-bfe2-4574-ae7f-141cf100fae4.webp"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-RANURAS-AMARILLO",
+      "archivo": "ilustrativa-cas.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/196ee7bd-fd36-4bdf-b696-78be25af981a.webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL",
+      "archivo": "ilustrativa-cha-cierre.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/e0c7c720-bbb0-4def-835d-fcd53f6cd223.webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL",
+      "archivo": "ilustrativa-cha-bolsillos.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/4284ff1c-622a-4a9b-916f-2aad9666e18e.webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL",
+      "archivo": "ilustrativa-cha-malla.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/25160435-761f-40a4-b142-2686faec5713.webp"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL",
+      "archivo": "ilustrativa-cha-naranja.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/718c46df-9ab8-476e-9fc2-441855b54793.webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA",
+      "archivo": "ilustrativa-cin-lisa.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/f3f9ca6a-77e9-48e2-9244-1172d37cc3a3.webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-PISO-AMARILLA",
+      "archivo": "ilustrativa-cin-lisa.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/64074d71-2dea-4720-af27-e43ec469b7f0.webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-TEXTO-100-M",
+      "archivo": "ilustrativa-cin.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/c58c255f-a55a-4b15-b0b4-4d27ec8153d5.webp"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-VISUAL-12-MM",
+      "archivo": "ilustrativa-cin-lisa.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/19e0eeb6-b4c5-49b9-bd35-03ffa0790f19.webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-CONO-NARANJA-18-CM",
+      "archivo": "ilustrativa-con.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/f0881aa8-3ad3-4f92-9c4b-84719dcbae64.webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-CONO-NARANJA-30-CM",
+      "archivo": "cono-naranja-30-cm.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/990483da-a6fa-40e2-9531-9882bd2b5e1d.webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-BARRA-CONOS-0-6-M",
+      "archivo": "ilustrativa-con-barra.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/db1b8472-895e-456a-916a-a39575c9b1c1.webp"
+    },
+    {
+      "sku": "FP-DEMO-CON-CADENA-100-M",
+      "archivo": "ilustrativa-con-cadena.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/781bc16d-f318-4150-963d-dbd3429a17fb.webp"
+    },
+    {
+      "sku": "FP-DEMO-ELE-CALADORA-500-W",
+      "archivo": "caladora-500w.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/078de555-c0ab-4058-9e85-5301da000f43.webp"
+    },
+    {
+      "sku": "FP-DEMO-ELE-AMOLADORA-1000-W",
+      "archivo": "ilustrativa-ele-amoladora.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/42f86aa4-24a3-4b33-b75e-07d769a32156.webp"
+    },
+    {
+      "sku": "FP-DEMO-ELE-LIJADORA-150-W",
+      "archivo": "ilustrativa-ele-lijadora.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/f0f071ae-6370-45b1-846c-9b64fe0e2b3a.webp"
+    },
+    {
+      "sku": "FP-DEMO-ELE-TALADRO-500-W",
+      "archivo": "ilustrativa-ele.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/5453a5a9-311d-48b2-a1be-307cbed9ca8a.webp"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-TARUGO-NYLON-10-MM",
+      "archivo": "ilustrativa-fij-tarugo.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/928cf875-93bd-446a-b63d-3f356d4f5cbd.webp"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-ABRAZADERA-12-MM",
+      "archivo": "ilustrativa-fij-abrazadera.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/705eb124-7dc1-4b80-93af-c4374f8a8689.webp"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-ANCLAJE-M10",
+      "archivo": "ilustrativa-fij-anclaje.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/238ccb2f-96ef-4b37-af44-bb9e984735a2.webp"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-VARILLA-M10",
+      "archivo": "ilustrativa-fij-varilla.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/fbad664b-4163-4660-b300-e77677d7d95f.webp"
+    },
+    {
+      "sku": "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL",
+      "archivo": "ilustrativa-gua-algodon.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/62947fa8-17d9-4683-8805-44be103625da.webp"
+    },
+    {
+      "sku": "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL",
+      "archivo": "ilustrativa-gua-descarne.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/4367b2ed-359f-489c-acc6-778093aab216.webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-2-5-MM",
+      "archivo": "destornillador-plano.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/7d88d9f7-c5dd-4eee-aaa8-7c5745512e52.webp"
+    },
+    {
+      "sku": "FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM",
+      "archivo": "llave-ajustable.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/e0e3aeab-6081-4eb7-9eeb-d297eb484706.webp"
+    },
+    {
+      "sku": "FP-DEMO-MEC-MECHA-HSS-3-MM",
+      "archivo": "mecha-hss-3mm.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/3ab7c306-9d01-4cd2-9b58-020f3e9b62e1.webp"
+    },
+    {
+      "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-100-UNIDADES",
+      "archivo": "antiparra-transparente.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/e8938259-0624-493b-aee3-32ca65b08a75.webp"
+    },
+    {
+      "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-100-UNIDADES",
+      "archivo": "anteojo-lente-gris.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/43bb70bb-1e02-45c1-a9fd-806ab694c8a1.webp"
+    },
+    {
+      "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-100-UNIDADES",
+      "archivo": "anteojo-transparente.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/cb88c352-1f94-4023-a24f-68744631db94.webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-100-UNIDADES",
+      "archivo": "cepillo-alambre.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/5f64cf69-e754-4c72-bfd6-520af3cf55f5.webp"
+    },
+    {
+      "sku": "FP-DEMO-SUM-PRECINTO-100-MM",
+      "archivo": "precinto-negro.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/5f8f4984-e3dc-47a2-a339-0dc5bb5ff0a3.webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M10",
+      "archivo": "arandela-plana.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/9b8eaf00-bf69-4428-a512-8b6c3df07283.webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-HEX-ACABADO-DORADO",
+      "archivo": "tornillo-hexagonal.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/8aae3584-ffe5-4f2b-9846-0d40f1ca9e23.webp"
+    },
+    {
+      "sku": "FP-DEMO-TOR-TUERCA-M10",
+      "archivo": "tuercas-hexagonales.webp",
+      "estado": "asociada",
+      "imagen": "/api/product-images/a94f1d1f-5eb4-4e88-a577-ebb5a76a6848.webp"
+    }
+  ]
+}
