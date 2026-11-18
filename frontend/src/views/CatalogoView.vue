@@ -230,7 +230,11 @@ onBeforeUnmount(() => {
   <main class="fp-shell py-6 sm:py-9">
     <p class="m-0 mb-2 text-xs text-slate-500">
       Inicio /
-      <RouterLink v-if="categoriaId" class="fp-focus text-[var(--fp-blue)]" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
+      <RouterLink
+        v-if="categoriaId"
+        class="fp-focus text-[var(--fp-blue)]"
+        :to="{ name: 'catalogo', query: { ...route.query, categoria: undefined, page: undefined } }"
+      >Catálogo</RouterLink>
       <template v-else>Catálogo</template>
       <template v-if="categoriaId"> / {{ nombreCategoria }}</template>
     </p>
@@ -240,16 +244,26 @@ onBeforeUnmount(() => {
         <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
         <p class="fp-section-copy">{{ total }} productos</p>
       </div>
-      <select
-        :value="orden"
-        class="fp-focus box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-        aria-label="Ordenar productos"
-        @change="cambiarOrden"
-      >
-        <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
-          Ordenar: {{ option.label }}
-        </option>
-      </select>
+      <div>
+        <select
+          :value="orden"
+          class="fp-focus box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+          aria-label="Ordenar productos"
+          :aria-describedby="orden.startsWith('precio_') ? 'catalog-order-help' : undefined"
+          @change="cambiarOrden"
+        >
+          <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
+            Ordenar: {{ option.label }}
+          </option>
+        </select>
+        <p
+          v-if="orden.startsWith('precio_')"
+          id="catalog-order-help"
+          class="m-0 mt-1 max-w-xs text-xs text-slate-500"
+        >
+          El orden usa el precio público del catálogo; tu precio personalizado no modifica la posición.
+        </p>
+      </div>
     </header>
 
     <div class="grid grid-cols-1 items-start gap-5 min-[801px]:grid-cols-[190px_minmax(0,1fr)]">

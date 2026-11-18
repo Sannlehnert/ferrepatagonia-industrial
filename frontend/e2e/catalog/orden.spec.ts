@@ -69,3 +69,39 @@ test('un orden inválido en la URL se normaliza y usa el predeterminado', async 
   await expect(page.getByRole('combobox', { name: 'Ordenar productos' })).toHaveValue('predeterminado')
   await expect(page.getByRole('heading', { level: 3 }).first()).toBeVisible()
 })
+
+test('ordena por precio público y conserva el criterio al cambiar y quitar la categoría', async ({
+  page,
+}) => {
+  await page.goto('/catalogo')
+
+  const sort = page.getByRole('combobox', { name: 'Ordenar productos' })
+  const names = page.getByRole('heading', { level: 3 })
+  await sort.selectOption('precio_asc')
+
+  await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(page.getByText(
+    'El orden usa el precio público del catálogo; tu precio personalizado no modifica la posición.',
+    { exact: true },
+  )).toBeVisible()
+  await expect(names.first()).toHaveText('Producto E2E 24')
+
+  const filters = page.getByRole('form', { name: 'Buscar y filtrar productos' })
+  const category = filters.getByRole('combobox', { name: 'Categoría', exact: true })
+  await category.selectOption({ label: 'Fijaciones E2E' })
+  await filters.getByRole('button', { name: 'Buscar', exact: true }).click()
+
+  await expect(page).toHaveURL(/categoria=2/)
+  await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(sort).toHaveValue('precio_asc')
+  await expect(names.first()).toHaveText('Producto E2E 24')
+
+  await page.locator('#contenido-principal').getByRole('link', {
+    name: 'Catálogo',
+    exact: true,
+  }).click()
+  await expect(page).not.toHaveURL(/categoria=/)
+  await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(sort).toHaveValue('precio_asc')
+  await expect(names.first()).toHaveText('Producto E2E 24')
+})
