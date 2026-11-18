@@ -81,6 +81,66 @@ describe('Admin Products Endpoints (#197)', () => {
         assert.equal(Array.isArray(body), true);
     });
 
+    it('paginates in MariaDB with stable ordering and literal name/SKU matches', async () => {
+        const { pool } = require('../dist/config/catalog-snapshot.config.js');
+        const list = async (query, cookie = adminCookie) => fetch(
+            `${BASE_URL}/admin/productos?${query}`, { headers: { Cookie: cookie } });
+        const readPage = async (query) => {
+            const res = await list(query);
+            assert.equal(res.status, 200);
+            return res.json();
+        };
+        const readIds = body => body.data.map(product => product.id_producto);
+        const search = 'busqueda=' + encodeURIComponent(TEST_PREFIX + 'PAGE%_');
+
+        for (const query of ['page=0', 'page=-1', 'page=1.5', 'page=1000001', 'page=1&page=2',
+            'limit=0', 'limit=101', 'limit=01', 'busqueda=%20', 'busqueda=%00',
+            'busqueda=' + 'x'.repeat(201), 'busqueda[]=x', 'sort=name']) {
+            assert.equal((await list(query)).status, 400, query);
+        }
+        assert.equal((await list('page=1', '')).status, 401);
+        assert.equal((await list('page=1', clientCookie)).status, 403);
+
+        const empty = { data: [], page: 1, limit: 20, total: 0, totalPages: 0 };
+        assert.deepEqual(await readPage(search), empty);
+
+        const fixtures = [];
+        try {
+            await pool.query('DELETE FROM PRODUCTO WHERE id_producto = ?', [fixtureProductId]);
+            assert.deepEqual(await readPage('page=2'), empty);
+        } finally {
+            await pool.query(
+                "INSERT INTO PRODUCTO (id_producto, id_categoria, codigo, nombre, precio, stock, activo) VALUES (?, 1, ?, 'Validation fixture', 1, 1, 1)",
+                [fixtureProductId, `${TEST_PREFIX}VALIDATION`]);
+        }
+
+        try {
+            for (let index = 1; index <= 8; index++) {
+                const marker = index === 8 ? 'PAGEax' : 'PAGE%_';
+                const sku = index === 1 ? `${TEST_PREFIX}BY-NAME` : `${TEST_PREFIX}${marker}${index}`;
+                const name = index === 1 ? `Nombre ${TEST_PREFIX}${marker}` : 'Prueba de paginación';
+                const row = await pool.query(
+                    'INSERT INTO PRODUCTO (id_categoria, codigo, nombre, precio, stock, activo) VALUES (1, ?, ?, 1, 1, ?)',
+                    [sku, name, index % 2]);
+                fixtures.push(Number(row.insertId));
+            }
+            const expected = fixtures.slice(0, 7).reverse();
+            const first = await readPage(`limit=3&${search}`);
+            const middle = await readPage(`page=2&limit=3&${search}`);
+            const last = await readPage(`page=3&limit=3&${search}`);
+            assert.deepEqual([first.page, middle.page, last.page], [1, 2, 3]);
+            for (const body of [first, middle, last]) {
+                assert.deepEqual([body.limit, body.total, body.totalPages], [3, 7, 3]);
+            }
+            assert.deepEqual([readIds(first), readIds(middle), readIds(last)],
+                [expected.slice(0, 3), expected.slice(3, 6), expected.slice(6)]);
+            assert.ok(first.data.some(product => !product.activo));
+            assert.deepEqual(await readPage(`page=1000000&limit=3&${search}`), last);
+        } finally {
+            for (const id of fixtures) await pool.query('DELETE FROM PRODUCTO WHERE id_producto = ?', [id]);
+        }
+    });
+
     it('reports the base price evidence state without verifying saved prices', async () => {
         const { pool } = require('../dist/config/catalog-snapshot.config.js');
         const inserted = await pool.query(

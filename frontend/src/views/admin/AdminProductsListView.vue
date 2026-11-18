@@ -1,14 +1,15 @@
 <script setup lang="ts">
 import ProductThumbnail from '@/components/ProductThumbnail.vue';
-import { ref, computed, onMounted } from 'vue';
-import { RouterLink, useRouter } from 'vue-router';
+import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
+import { RouterLink, useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import ProductFormModal from './ProductFormModal.vue';
 import {
-    getAdminProducts,
+    getAdminProductPage,
     setAdminProductActive,
     getActiveCategories,
     type AdminProduct,
+    type AdminProductPage,
     type CategoryOption
 } from '../../services/adminProductService';
 
@@ -16,13 +17,26 @@ import { isMutationResultUncertain, adminMutationErrorMessage, uncertainMutation
 import { basePriceLabels } from '@/types/pricing';
 
 const router = useRouter();
+const route = useRoute();
 
-const productos = ref<AdminProduct[]>([]);
+const result = ref<AdminProductPage | null>(null);
 const categorias = ref<CategoryOption[]>([]);
 const isLoadingCategories = ref(false);
 const categoriesError = ref('');
 
-const searchQuery = ref('');
+const normalizeSearch = (search: unknown) => typeof search === 'string' && [...search].length <= 200
+    && !/[\u0000-\u001f\u007f]/u.test(search) ? search.trim() : '';
+const appliedSearch = computed(() => normalizeSearch(route.query.busqueda));
+const requestedPage = computed(() => {
+    const page = route.query.page;
+    return typeof page === 'string' && /^[1-9][0-9]{0,6}$/.test(page)
+        && Number(page) <= 1000000 ? Number(page) : 1;
+});
+const searchQuery = ref(appliedSearch.value);
+const searchPending = computed(() => searchQuery.value.trim() !== appliedSearch.value);
+const searchInput = ref<HTMLInputElement | null>(null);
+const previousPageButton = ref<HTMLButtonElement | null>(null);
+const nextPageButton = ref<HTMLButtonElement | null>(null);
 const isLoading = ref(true);
 const loadError = ref('');
 const isSessionExpired = ref(false);
@@ -31,24 +45,88 @@ const actionError = ref('');
 const processingId = ref<number | null>(null);
 const needsReload = ref(false);
 const actionsDisabled = computed(() => isLoading.value || processingId.value !== null || needsReload.value || Boolean(loadError.value));
+const pagingUnavailable = computed(() => isLoading.value || searchPending.value
+    || processingId.value !== null || Boolean(loadError.value));
 
 const isModalOpen = ref(false);
 const selectedProduct = ref<AdminProduct | null>(null);
 
-let initialLoad = true;
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let currentRequest: AbortController | undefined;
+let listQuery: { page: number; search: string } | undefined;
+let unmounted = false;
+
+const listLocation = (page: number, search: string) => {
+    const query = { ...route.query };
+    delete query.page;
+    delete query.busqueda;
+    if (page !== 1) query.page = String(page);
+    if (search) query.busqueda = search;
+    return { query, hash: route.hash };
+};
+
+const changePage = (offset: number) => {
+    if (pagingUnavailable.value || !result.value) return;
+    void router.push(listLocation(result.value.page + offset, appliedSearch.value));
+};
+
+const scheduleSearch = () => {
+    clearTimeout(searchTimer);
+    if (searchPending.value) {
+        searchTimer = setTimeout(() => {
+            const search = normalizeSearch(searchQuery.value);
+            searchQuery.value = search;
+            if (search !== appliedSearch.value) void router.replace(listLocation(1, search));
+        }, 300);
+    }
+};
+
+const clearSearch = () => {
+    clearTimeout(searchTimer);
+    searchQuery.value = '';
+    void router.replace(listLocation(1, ''));
+};
+
+const restorePagerFocus = async (page: AdminProductPage) => {
+    const previous = previousPageButton.value;
+    const next = nextPageButton.value;
+    const focused = [previous, next].find(button => button?.matches(':focus'));
+    if (!focused || (page.totalPages > 0
+        && (focused === previous ? page.page > 1 : page.page < page.totalPages))) return;
+
+    await nextTick();
+    const { activeElement, body } = focused.ownerDocument;
+    if (activeElement !== focused && activeElement !== body) return;
+    const target = page.totalPages <= 1 ? searchInput.value : focused === previous ? next : previous;
+    target?.focus();
+};
+
 const fetchProductos = async () => {
-    if (isLoading.value && !initialLoad) return;
-    initialLoad = false;
+    if (unmounted) return;
+    currentRequest?.abort();
+    const request = new AbortController();
+    currentRequest = request;
+    const page = requestedPage.value;
+    const search = appliedSearch.value;
+    listQuery = { page, search };
     isLoading.value = true;
     loadError.value = '';
     isSessionExpired.value = false;
 
     try {
-        productos.value = await getAdminProducts();
+        const response = await getAdminProductPage(page, search, request.signal);
+        if (request.signal.aborted || requestedPage.value !== page || appliedSearch.value !== search) return;
+        result.value = response;
+        void restorePagerFocus(response);
         if (needsReload.value) isModalOpen.value = false;
         needsReload.value = false;
         actionError.value = '';
+        if (response.page !== page) {
+            listQuery = { page: response.page, search };
+            void router.replace(listLocation(response.page, search));
+        }
     } catch (error: unknown) {
+        if (request.signal.aborted) return;
         if (axios.isAxiosError(error)) {
             if (error.response?.status === 401) {
                 isSessionExpired.value = true;
@@ -60,7 +138,7 @@ const fetchProductos = async () => {
             loadError.value = 'No se pudo cargar el listado de productos.';
         }
     } finally {
-        isLoading.value = false;
+        if (!request.signal.aborted) isLoading.value = false;
     }
 };
 
@@ -82,14 +160,6 @@ const fetchCategorias = async () => {
         isLoadingCategories.value = false;
     }
 };
-
-const productosFiltrados = computed(() => {
-    const query = searchQuery.value.trim().toLowerCase();
-    if (!query) return productos.value;
-    return productos.value.filter(
-        (p) => p.nombre.toLowerCase().includes(query) || p.codigo.toLowerCase().includes(query)
-    );
-});
 
 const formatPrice = (value: number | string | null | undefined): string => {
     if (value === null || value === undefined || value === '') return '—';
@@ -125,6 +195,10 @@ const handleSaved = async (msg: string) => {
 };
 
 const handleUncertain = () => {
+    // A read started before this failure cannot confirm the write's outcome.
+    currentRequest?.abort();
+    isLoading.value = false;
+    result.value = null;
     needsReload.value = true;
     actionError.value = uncertainMutationMessage;
 };
@@ -151,9 +225,25 @@ const toggleStatus = async (prod: AdminProduct) => {
     }
 };
 
-onMounted(() => {
-    fetchProductos();
-    fetchCategorias();
+watch([() => route.query.page, () => route.query.busqueda], ([rawPage, rawSearch]) => {
+    const page = requestedPage.value;
+    const search = appliedSearch.value;
+    const location = listLocation(page, search);
+    if (rawPage !== location.query.page || rawSearch !== location.query.busqueda) {
+        void router.replace(location);
+    }
+    if (listQuery?.page !== page || listQuery.search !== search) {
+        clearTimeout(searchTimer);
+        searchQuery.value = search;
+        void fetchProductos();
+    }
+}, { immediate: true });
+watch(searchQuery, scheduleSearch);
+onMounted(fetchCategorias);
+onBeforeUnmount(() => {
+    unmounted = true;
+    clearTimeout(searchTimer);
+    currentRequest?.abort();
 });
 </script>
 
@@ -170,13 +260,20 @@ onMounted(() => {
                     Importar desde planilla
                 </RouterLink>
             </div>
-            <input
-                v-model="searchQuery"
-                type="text"
-                placeholder="Buscar por Nombre o SKU..."
-                aria-label="Buscar productos por nombre o SKU"
-                class="box-border min-h-11 w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
-            >
+            <div class="flex items-center gap-2">
+                <input
+                    ref="searchInput"
+                    v-model="searchQuery"
+                    type="text"
+                    maxlength="200"
+                    placeholder="Buscar por Nombre o SKU..."
+                    aria-label="Buscar productos por nombre o SKU"
+                    class="box-border min-h-11 w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-[#94A3B8] focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
+                >
+                <button v-if="searchQuery || appliedSearch" type="button" class="min-h-11 underline" @click="clearSearch">
+                    Limpiar búsqueda
+                </button>
+            </div>
         </div>
 
         <p
@@ -227,14 +324,14 @@ onMounted(() => {
         </div>
 
         <!-- Estado Vacío (Solo cuando la API respondió OK) -->
-        <div v-else-if="productosFiltrados.length === 0" class="flex-1 flex flex-col justify-center items-center py-12 text-[#64748B]">
+        <div v-else-if="result && !result.data.length" class="flex-1 flex flex-col justify-center items-center py-12 text-[#64748B]">
             <p class="text-lg font-semibold">No se encontraron productos.</p>
         </div>
 
         <!-- Grilla de Productos -->
-        <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-6 content-start items-stretch pb-6">
+        <div v-else-if="result" class="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15rem),1fr))] gap-6 content-start items-stretch pb-6">
             <div
-                v-for="prod in productosFiltrados"
+                v-for="prod in result.data"
                 :key="prod.id_producto"
                 class="w-full max-w-[21rem] justify-self-center bg-white border border-[#E2E8F0] rounded-lg shadow-sm overflow-hidden flex flex-col relative transition-all hover:shadow-md"
                 :class="{ 'opacity-75 grayscale-[30%]': !prod.activo }"
@@ -309,8 +406,17 @@ onMounted(() => {
 
         <!-- Barra Inferior -->
         <div class="bg-[#F1F5F9] border-t border-[#E2E8F0] py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-            <div class="text-sm text-[#64748B] font-medium">
-                Mostrando {{ productosFiltrados.length }} productos
+            <div v-if="result" class="text-sm text-[#64748B] font-medium">
+                <span v-if="!isLoading && !loadError">Mostrando {{ result.data.length }} de {{ result.total }} productos</span>
+                <nav v-if="result.totalPages > 0" aria-label="Paginación de productos" :aria-busy="isLoading" class="flex flex-wrap items-center gap-3">
+                    <button ref="previousPageButton" type="button" class="min-h-11 underline disabled:opacity-50 aria-disabled:opacity-50"
+                        :disabled="result.page <= 1" :aria-disabled="pagingUnavailable || undefined"
+                        @click="changePage(-1)">Anterior</button>
+                    <span>Página {{ result.page }} de {{ result.totalPages }}</span>
+                    <button ref="nextPageButton" type="button" class="min-h-11 underline disabled:opacity-50 aria-disabled:opacity-50"
+                        :disabled="result.page >= result.totalPages" :aria-disabled="pagingUnavailable || undefined"
+                        @click="changePage(1)">Siguiente</button>
+                </nav>
             </div>
             <button
                 type="button"
