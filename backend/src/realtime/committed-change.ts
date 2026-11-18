@@ -7,7 +7,9 @@ export type CommittedChange =
   | {
     kind: 'order';
     clientId: number;
-    order: Pick<ConfirmedAccountOrder, 'pedidoId' | 'estado'>;
+    order: Pick<ConfirmedAccountOrder, 'pedidoId' | 'estado'> & {
+      modalidadPago?: 'CUENTA_CORRIENTE' | 'TRANSFERENCIA';
+    };
     productIds: readonly number[];
   };
 
