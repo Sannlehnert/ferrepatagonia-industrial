@@ -1,7 +1,6 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const { parse } = require('../../backend/node_modules/papaparse')
 const ts = require('typescript')
 const { test } = require('node:test')
 
@@ -14,13 +13,16 @@ new Function('module', 'exports', code)(mod, mod.exports)
 const { isIllustrativeDemoImage } = mod.exports
 
 test('recognizes every illustrative SKU after its uploaded filename is replaced', () => {
-  const { data: sources, errors } = parse(
-    fs.readFileSync(path.join(__dirname, '../../data/demo-catalog/image-sources.csv'), 'utf8'),
-    { header: true, skipEmptyLines: true },
-  )
-  assert.deepEqual(errors, [])
+  const rows = fs.readFileSync(path.join(__dirname, '../../data/demo-catalog/image-sources.csv'), 'utf8')
+    .split(/\r?\n/).slice(1).filter(Boolean)
+  const sources = rows.map(row => {
+    const sku = row.slice(0, row.indexOf(','))
+    const image = /\/demo-catalog\/([a-z0-9-]+\.webp)(?:,|$)/.exec(row)?.[1]
+    assert.ok(sku && image, `Invalid image source row for ${sku}`)
+    return { sku, image }
+  })
   for (const source of sources) {
-    const illustrative = source.ruta_final.includes('/ilustrativa-')
+    const illustrative = source.image.startsWith('ilustrativa-')
     assert.equal(
       isIllustrativeDemoImage(source.sku, '/api/product-images/00000000-0000-4000-8000-000000000000.webp'),
       illustrative,
