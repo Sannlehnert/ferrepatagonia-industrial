@@ -76,6 +76,51 @@ test('Área Empresas lleva a ingreso y registro de empresa con teclado y desde e
   await expect(page.getByLabel('Razón social')).toBeVisible()
 })
 
+test('Área Empresas desde el header de escritorio enfoca el destino y permite tabular al ingreso', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('/')
+  const headerLink = page.getByRole('navigation', { name: 'Menú principal' })
+    .getByRole('link', { name: 'Empresas', exact: true })
+  await headerLink.focus()
+  await page.keyboard.press('Enter')
+
+  await expect(page).toHaveURL(/\/#empresas$/)
+  await expect(business(page)).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
+})
+
+test('el acceso directo a #empresas enfoca el destino y mantiene el orden de tabulación', async ({ page }) => {
+  await page.goto('/#empresas')
+
+  await expect(business(page)).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
+})
+
+test('el acceso de empresas permanece visible al cargar contenido en móvil', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  let releaseRequests!: () => void
+  const requestsReady = new Promise<void>(resolve => { releaseRequests = resolve })
+  await page.route('**/api/catalogo?*', async route => {
+    await requestsReady
+    await route.continue()
+  })
+  await page.route('**/api/categorias', async route => {
+    await requestsReady
+    await route.continue()
+  })
+
+  await page.goto('/#empresas')
+  await expect(business(page)).toBeFocused()
+  releaseRequests()
+
+  const login = business(page).getByRole('link', { name: 'Ingresar como empresa' })
+  await expect(login).toBeInViewport()
+  await expect(categories(page).getByRole('link', { name: 'Herramientas E2E' })).toBeVisible()
+  expect(await page.locator('html').evaluate(element => element.scrollWidth)).toBe(320)
+})
+
 for (const width of [360, 1280]) {
   test('Área Empresas desde el footer conserva la navegación por teclado a ' + width + ' px', async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
