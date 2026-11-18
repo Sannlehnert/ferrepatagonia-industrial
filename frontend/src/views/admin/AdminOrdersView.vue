@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import axios from 'axios'
+import { useRoute } from 'vue-router'
+import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
+import AdminOrderReceiptSummary from '@/components/AdminOrderReceiptSummary.vue'
+import AdminOrdersPagination from '@/components/AdminOrdersPagination.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
@@ -20,6 +24,7 @@ import type {
 } from '@/types/adminOrder'
 
 const auth = useAuthStore()
+const route = useRoute()
 const allowed = () => auth.rol === 'ADMIN' && !auth.loggingOut && !auth.loggingIn
 const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}`
 
@@ -29,6 +34,7 @@ const detail = usePrivateAccountRead<AdminOrderDetail>(identity, allowed)
 // Filtros
 const searchInput = ref('')
 const statusInput = ref<AdminOrderFilterStatus | ''>('')
+const paymentModeInput = ref('')
 const dateInput = ref('')
 const validationError = ref('')
 
@@ -51,6 +57,12 @@ let queuedListRefresh: string | undefined
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
+const visibleRange = computed(() => {
+  const page = ordersPage.value
+  if (!page || !page.items.length) return '0 resultados'
+  const first = (page.pagination.page - 1) * page.pagination.limit + 1
+  return `${first}–${first + page.items.length - 1} de ${page.pagination.total} pedidos`
+})
 
 // isSaving es 100% reactivo: al cambiar currentModalOpeningId.value se invalida de inmediato
 const isSaving = computed(
@@ -131,6 +143,7 @@ function applyFilters() {
     page: 1,
     limit: 20,
     ...(statusInput.value ? { estado: statusInput.value } : {}),
+    ...(paymentModeInput.value ? { modalidadPago: paymentModeInput.value } : {}),
     ...(dateInput.value ? { fecha: dateInput.value } : {}),
     ...(rawQuery ? { q: rawQuery } : {}),
   }
@@ -141,6 +154,7 @@ function applyFilters() {
 function clearFilters() {
   searchInput.value = ''
   statusInput.value = ''
+  paymentModeInput.value = ''
   dateInput.value = ''
   validationError.value = ''
   activeFilters = { page: 1, limit: 20 }
@@ -219,6 +233,9 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
   statusFeedback.value = null
   nextStatusSelection.value = ''
 
+  await nextTick()
+  if (thisOpening !== currentModalOpeningId.value) return
+  modalCloseBtn.value?.focus()
   await detail.load(signal => getAdminOrderDetail(orderId, signal))
 
   if (thisOpening !== currentModalOpeningId.value || selectedOrderId.value !== orderId) {
@@ -317,21 +334,6 @@ async function submitStatusChange() {
   }
 }
 
-function statusBadgeClass(status: string): string {
-  switch (status) {
-    case 'CONFIRMADO':
-      return 'bg-[#FEF3C7] text-[#D97706] border border-[#FDE68A]'
-    case 'EN_PREPARACION':
-      return 'bg-amber-100 text-amber-800 border border-amber-200'
-    case 'ENVIADO':
-      return 'bg-[#E0F2FE] text-[#0369A1] border border-[#BAE6FD]'
-    case 'ENTREGADO':
-      return 'bg-[#DCFCE7] text-[#16A34A] border border-[#BBF7D0]'
-    default:
-      return 'bg-[#F1F5F9] text-[#64748B] border border-[#E2E8F0]'
-  }
-}
-
 watch(
   () => [identity(), auth.loggingOut, auth.loggingIn],
   () => {
@@ -343,6 +345,7 @@ watch(
     selectedOrderId.value = null
     searchInput.value = ''
     statusInput.value = ''
+    paymentModeInput.value = ''
     dateInput.value = ''
     validationError.value = ''
     activeFilters = { page: 1, limit: 20 }
@@ -353,7 +356,9 @@ watch(
 
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
-  if (allowed()) void loadList(1)
+  const query = route.query.q
+  if (typeof query === 'string' && query.trim().length <= 100) searchInput.value = query
+  if (allowed()) applyFilters()
 })
 
 onBeforeUnmount(() => {
@@ -365,55 +370,69 @@ onBeforeUnmount(() => {
 <template>
   <section
     v-if="allowed()"
-    class="min-w-0 text-[#0b2438]"
+    class="admin-orders min-w-0 max-w-7xl text-[#0b2438]"
     aria-labelledby="admin-orders-title"
   >
     <header class="mb-6">
       <h1 id="admin-orders-title" class="m-0 mb-1 text-[28px] font-semibold text-[#0B2438]">Pedidos</h1>
-      <p class="m-0 text-sm text-slate-500">
-        Consulta de operaciones confirmadas, detalle de pedido/cliente y seguimiento de estados autorizados.
-      </p>
     </header>
 
     <!-- Barra de Filtros Superior -->
     <div class="mb-6 rounded-2xl border border-[#E2E8F0] bg-[#F8FAFC] p-2.5 shadow-xs">
-      <form class="flex flex-wrap items-center gap-3" @submit.prevent="applyFilters">
-        <div class="relative min-w-[200px] flex-1">
+      <form class="grid grid-cols-1 items-end gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Filtros de pedidos" @submit.prevent="applyFilters">
+        <label class="min-w-0">
+          <span class="mb-1 block text-xs font-semibold text-slate-600">Buscar pedido o cliente</span>
           <input
             v-model="searchInput"
             type="search"
             maxlength="100"
             aria-label="Buscar pedidos por empresa, ID o CUIT"
-            placeholder="Ingrese Empresa o ID"
+            placeholder="Nombre, ID, email o CUIT"
             class="h-10 w-full rounded-xl border border-[#E2E8F0] bg-white pl-4 pr-4 text-sm text-[#0B2438] placeholder-slate-400 focus:border-[#145A8D] focus:outline-none focus:ring-1 focus:ring-[#145A8D]"
           />
-        </div>
+        </label>
 
-        <div class="relative">
+        <label class="min-w-0">
+          <span class="mb-1 block text-xs font-semibold text-slate-600">Estado del pedido</span>
           <select
             v-model="statusInput"
             aria-label="Filtrar por estado del pedido"
             class="h-10 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-medium text-slate-700 focus:border-[#145A8D] focus:outline-none"
           >
-            <option value="">Estado del Pedido</option>
-            <option value="CONFIRMADO">Pendiente / Confirmado</option>
+            <option value="">Todos los estados</option>
+            <option value="CONFIRMADO">Confirmado</option>
             <option value="EN_PREPARACION">En preparación</option>
             <option value="ENVIADO">Enviado</option>
             <option value="ENTREGADO">Entregado</option>
             <option value="DEMO_REGISTRADO">DEMO Registrado</option>
           </select>
-        </div>
+        </label>
 
-        <input
-          v-model="dateInput"
-          type="date"
-          aria-label="Filtrar por fecha"
-          class="h-10 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm text-slate-700 focus:border-[#145A8D] focus:outline-none"
-        />
+        <label class="min-w-0">
+          <span class="mb-1 block text-xs font-semibold text-slate-600">Modalidad de pago</span>
+          <select v-model="paymentModeInput" aria-label="Filtrar por modalidad de pago" class="w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700">
+            <option value="">Todas las modalidades</option>
+            <option value="TRANSFERENCIA">Transferencia bancaria</option>
+            <option value="CUENTA_CORRIENTE">Cuenta corriente</option>
+            <option value="DEMO_DIRECTO">Pago directo (DEMO)</option>
+            <option value="DEMO_CUENTA_CORRIENTE">Cuenta corriente (DEMO)</option>
+          </select>
+        </label>
 
+        <label class="min-w-0">
+          <span class="mb-1 block text-xs font-semibold text-slate-600">Fecha del pedido (Argentina)</span>
+          <input
+            v-model="dateInput"
+            type="date"
+            aria-label="Filtrar por fecha"
+            class="h-10 rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm text-slate-700 focus:border-[#145A8D] focus:outline-none"
+          />
+        </label>
+
+        <div class="flex flex-wrap gap-3 sm:col-span-2 xl:col-span-4">
         <button
           type="submit"
-          class="h-10 rounded-xl bg-[#145A8D] px-5 text-sm font-bold text-white transition-colors hover:bg-[#103A5C]"
+          class="h-10 rounded-xl border border-transparent bg-[#145A8D] px-5 text-sm font-bold text-white transition-colors hover:bg-[#103A5C]"
         >
           Filtrar
         </button>
@@ -424,6 +443,7 @@ onBeforeUnmount(() => {
         >
           Limpiar
         </button>
+        </div>
       </form>
     </div>
 
@@ -442,28 +462,32 @@ onBeforeUnmount(() => {
       </button>
     </div>
 
-    <template v-else-if="ordersPage">
+    <div v-else-if="ordersPage" class="orders-results">
+      <p v-if="ordersPage.items.length" class="text-xs text-slate-500 sm:hidden">Deslizá la tabla para ver todas las columnas.</p>
       <div v-if="ordersPage.items.length === 0" role="status" class="py-12 text-center text-slate-500">
         No se encontraron pedidos registrados para los filtros seleccionados.
       </div>
 
       <div
         v-else
-        class="overflow-x-auto rounded-xl border border-[#E2E8F0] bg-white shadow-xs"
+        class="orders-table overflow-auto rounded-xl border border-[#E2E8F0] bg-white shadow-xs"
         role="region"
         aria-label="Listado de pedidos"
+        :aria-busy="list.loading.value"
         tabindex="0"
       >
         <table class="w-full min-w-[750px] border-collapse text-left">
+          <caption class="sr-only">Pedidos registrados, con estado operativo e importes. La modalidad de pago no indica acreditación.</caption>
           <thead>
-            <tr class="border-b border-[#E2E8F0] bg-[#F8FAFC] text-xs font-semibold uppercase tracking-wider text-slate-500">
-              <th class="py-3.5 pl-6 pr-4">ID Pedido</th>
+            <tr class="border-b border-[#E2E8F0] bg-[#F8FAFC] text-xs font-semibold text-slate-600">
+              <th class="py-3.5 pl-6 pr-4">Pedido</th>
               <th class="px-4 py-3.5">Fecha</th>
               <th class="px-4 py-3.5">Cliente/Empresa</th>
-              <th class="px-4 py-3.5">Monto Total</th>
-              <th class="px-4 py-3.5">Método de Pago</th>
-              <th class="px-4 py-3.5 text-center">Estado Pedido</th>
-              <th class="py-3.5 pl-4 pr-6 text-right">Acciones</th>
+              <th class="px-4 py-3.5 text-right">Total</th>
+              <th class="px-4 py-3.5">Modalidad de pago</th>
+              <th class="px-4 py-3.5">Estado del pedido</th>
+              <th class="px-4 py-3.5">Comprobantes</th>
+              <th class="sticky right-0 z-10 bg-[#F8FAFC] py-3.5 pl-4 pr-6 text-left">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-[#E2E8F0] text-sm">
@@ -472,35 +496,34 @@ onBeforeUnmount(() => {
               :key="order.idPedido"
               class="transition-colors hover:bg-slate-50/70"
             >
-              <td class="whitespace-nowrap py-4 pl-6 pr-4 font-bold text-[#0B2438]">
+              <td class="whitespace-nowrap py-3 pl-6 pr-4 font-semibold text-[#0B2438]">
                 #{{ String(order.idPedido).padStart(2, '0') }}
                 <span v-if="order.origen === 'DEMO'" class="ml-1 text-[11px] font-normal text-slate-400">(DEMO)</span>
               </td>
-              <td class="whitespace-nowrap px-4 py-4 font-semibold text-[#0B2438]">{{ formatDate(order.fecha) }}</td>
-              <td class="px-4 py-4 font-bold text-[#0B2438]">
+              <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ formatDate(order.fecha) }}</td>
+              <td class="px-4 py-3 font-medium text-[#0B2438]">
                 <div>{{ order.cliente.nombreRazonSocial }}</div>
                 <div class="text-xs font-normal text-slate-500">
                   {{ order.cliente.tipoCliente }}
                   <template v-if="order.cliente.cuit"> · {{ order.cliente.cuit }}</template>
                 </div>
               </td>
-              <td class="whitespace-nowrap px-4 py-4 font-bold text-[#0B2438]">
+              <td class="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-[#0B2438]">
                 {{ formatAdminOrderMoney(order.total, order.moneda) }}
               </td>
-              <td class="px-4 py-4 text-slate-700">{{ formatAdminOrderPaymentMode(order.modalidadPago) }}</td>
-              <td class="whitespace-nowrap px-4 py-4 text-center">
-                <span class="inline-block rounded-full px-3 py-1 text-xs font-bold" :class="statusBadgeClass(order.estado)">
-                  {{ formatAdminOrderStatus(order.estado) }}
-                </span>
+              <td class="px-4 py-3 text-slate-700">{{ formatAdminOrderPaymentMode(order.modalidadPago) }}</td>
+              <td class="whitespace-nowrap px-4 py-3">
+                <AdminOrderStatusBadge :status="order.estado" />
               </td>
-              <td class="whitespace-nowrap py-4 pl-4 pr-6 text-right">
+              <td class="px-4 py-3"><AdminOrderReceiptSummary :summary="order.comprobantes" /></td>
+              <td class="sticky right-0 bg-white whitespace-nowrap py-3 pl-4 pr-6 text-left">
                 <button
                   type="button"
-                  class="text-sm font-semibold text-[#0EA5E9] hover:underline"
+                  class="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-[#103A5C] hover:bg-slate-50"
                   :aria-label="`Ver detalle del pedido ${order.idPedido}`"
                   @click="openOrderDetailModal(order.idPedido, $event)"
                 >
-                  ver
+                  Ver detalle
                 </button>
               </td>
             </tr>
@@ -508,32 +531,8 @@ onBeforeUnmount(() => {
         </table>
       </div>
 
-      <nav
-        v-if="ordersPage.pagination.totalPages > 1"
-        class="mt-4 flex items-center justify-between text-sm text-slate-600"
-        aria-label="Paginación"
-      >
-        <div>Página {{ ordersPage.pagination.page }} de {{ ordersPage.pagination.totalPages }}</div>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold disabled:opacity-40"
-            :disabled="ordersPage.pagination.page <= 1"
-            @click="loadList(ordersPage.pagination.page - 1)"
-          >
-            Anterior
-          </button>
-          <button
-            type="button"
-            class="rounded-lg border border-slate-300 bg-white px-3 py-1.5 font-semibold disabled:opacity-40"
-            :disabled="ordersPage.pagination.page >= ordersPage.pagination.totalPages"
-            @click="loadList(ordersPage.pagination.page + 1)"
-          >
-            Siguiente
-          </button>
-        </div>
-      </nav>
-    </template>
+      <AdminOrdersPagination :summary="visibleRange" :pagination="ordersPage.pagination" :loading="list.loading.value" @navigate="page => loadList(page, true)" />
+    </div>
 
     <!-- Modal con Trampa de Foco Accesible (H-02) -->
     <div
@@ -549,14 +548,14 @@ onBeforeUnmount(() => {
         tabindex="-1"
       >
         <!-- Header -->
-        <div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
+        <div class="flex shrink-0 items-center justify-between border-b border-slate-200 px-4 py-2 sm:px-5">
           <h2 class="text-lg sm:text-xl font-bold text-[#0B2438]">
             Pedido #{{ selectedOrderId }}
           </h2>
           <button
             ref="modalCloseBtn"
             type="button"
-            class="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-lg text-2xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
+            class="detail-close flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white p-0 text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
             aria-label="Cerrar modal"
             @click="closeModal"
           >
@@ -565,7 +564,7 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Cuerpo del Modal -->
-        <div class="flex-1 overflow-y-auto p-4 sm:p-6">
+        <div class="min-h-0 flex-1 overflow-y-auto break-words p-3 sm:p-4">
           <p v-if="detail.loading.value" role="status" class="py-6 text-center text-slate-500">Cargando información del pedido…</p>
 
           <div v-else-if="detail.error.value" class="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-red-700">
@@ -581,47 +580,47 @@ onBeforeUnmount(() => {
 
           <template v-else-if="selectedOrder && selectedOrder.idPedido === selectedOrderId">
             <!-- Datos del Cliente y Operación -->
-            <div class="mb-5 grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4 text-sm">
+            <div class="detail-summary mb-4 grid grid-cols-1 gap-x-6 gap-y-4 rounded-xl bg-[#F8FAFC] p-4 text-sm sm:grid-cols-2">
               <div>
                 <span class="block text-xs font-semibold uppercase text-slate-500">Cliente</span>
-                <span class="font-bold text-[#0B2438]">{{ selectedOrder.cliente.nombreRazonSocial }}</span>
+                <span class="detail-value">{{ selectedOrder.cliente.nombreRazonSocial }}</span>
                 <div class="text-xs text-slate-500">
                   {{ selectedOrder.cliente.cuit ? `CUIT: ${selectedOrder.cliente.cuit}` : (selectedOrder.cliente.documento ?? '') }}
                 </div>
               </div>
               <div>
                 <span class="block text-xs font-semibold uppercase text-slate-500">Contacto</span>
-                <div class="text-xs text-[#0B2438]">{{ selectedOrder.cliente.email ?? 'Sin email' }}</div>
-                <div class="text-xs text-slate-500">{{ selectedOrder.cliente.telefono ?? 'Sin teléfono' }}</div>
+                <div class="detail-value">{{ selectedOrder.cliente.email ?? 'Sin email' }}</div>
+                <div class="detail-value">{{ selectedOrder.cliente.telefono ?? 'Sin teléfono' }}</div>
               </div>
               <div>
                 <span class="block text-xs font-semibold uppercase text-slate-500">Fecha</span>
-                <span class="font-semibold text-slate-700">{{ formatDate(selectedOrder.fecha) }}</span>
+                <span class="detail-value">{{ formatDate(selectedOrder.fecha) }}</span>
               </div>
               <div>
                 <span class="block text-xs font-semibold uppercase text-slate-500">Modalidad</span>
-                <span class="font-semibold text-[#0EA5E9]">{{ formatAdminOrderPaymentMode(selectedOrder.modalidadPago) }}</span>
+                <span class="detail-value">{{ formatAdminOrderPaymentMode(selectedOrder.modalidadPago) }}</span>
               </div>
-              <div class="sm:col-span-2 border-t border-slate-200 pt-2">
+              <div class="flex items-center justify-between gap-3 border-t border-slate-200 pt-3 sm:col-span-2">
                 <span class="text-xs font-semibold uppercase text-slate-500">Total</span>
-                <div class="text-lg font-bold text-[#145A8D]">
+                <div class="text-lg font-semibold text-[#103A5C]">
                   {{ formatAdminOrderMoney(selectedOrder.total, selectedOrder.moneda) }}
                 </div>
               </div>
             </div>
 
             <!-- Seguimiento de Estado -->
-            <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-              <h3 class="mb-3 text-sm font-bold uppercase tracking-wider text-slate-700">Seguimiento de Estado</h3>
-              <div class="mb-2 text-xs text-slate-600">
-                Estado actual: <strong>{{ formatAdminOrderStatus(selectedOrder.estado) }}</strong>
+            <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4">
+              <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h3 class="m-0 text-sm font-semibold text-[#0B2438]">Estado del pedido</h3>
+                <AdminOrderStatusBadge :status="selectedOrder.estado" />
               </div>
               <template v-if="selectedOrder.estadosPermitidos.length > 0">
-                <div class="flex flex-wrap items-center gap-3">
+                <div class="detail-status-controls flex flex-wrap items-center gap-3">
                   <select
                     v-model="nextStatusSelection"
                     aria-label="Seleccionar nuevo estado de pedido"
-                    class="h-10 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-[#0B2438]"
+                    class="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-medium text-[#0B2438]"
                     :disabled="isSaving"
                   >
                     <option
@@ -635,7 +634,7 @@ onBeforeUnmount(() => {
                   <button
                     type="button"
                     :disabled="!canSubmitStatusChange"
-                    class="h-10 rounded-lg bg-[#145A8D] px-4 text-sm font-bold text-white hover:bg-[#103A5C] disabled:opacity-50"
+                    class="h-11 rounded-lg border border-transparent bg-[#145A8D] px-4 text-sm font-semibold text-white hover:bg-[#103A5C] disabled:opacity-50"
                     @click="submitStatusChange"
                   >
                     {{ isSaving ? 'Guardando…' : 'Guardar Estado' }}
@@ -653,6 +652,10 @@ onBeforeUnmount(() => {
               >
                 {{ statusFeedback.text }}
               </p>
+              <div class="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <span class="font-semibold text-[#0B2438]">Comprobantes</span>
+                <AdminOrderReceiptSummary :summary="selectedOrder.comprobantes" />
+              </div>
             </div>
 
             <!-- Líneas de Artículos -->
@@ -696,3 +699,31 @@ onBeforeUnmount(() => {
     </div>
   </section>
 </template>
+
+<style scoped>
+.admin-orders :is(button, input, select) { box-sizing: border-box; min-height: 44px; }
+.admin-orders button:not(:disabled), .admin-orders select:not(:disabled) { cursor: pointer; }
+.admin-orders button:disabled { cursor: not-allowed; }
+.admin-orders form :is(input, select) { width: 100%; min-width: 0; max-width: 100%; }
+.admin-orders :is(button, input, select, a, [tabindex]):focus-visible {
+  outline: 2px solid #145a8d;
+  outline-offset: 3px;
+}
+.admin-orders th { white-space: nowrap; }
+.detail-summary .uppercase { margin-bottom: 4px; text-transform: none; font-size: 12px; font-weight: 600; color: #64748b; }
+.detail-value { color: #0b2438; font-size: 14px; font-weight: 500; line-height: 1.5; }
+.detail-close { box-sizing: border-box; flex: 0 0 44px; }
+@media (max-width: 639px) { .detail-status-controls > :is(select, button) { flex: 1 1 100%; width: 100%; } }
+.admin-orders thead th { font-size: 12px; font-weight: 600; line-height: 1.5; vertical-align: middle; }
+.orders-results { min-width: 0; }
+@media (min-width: 800px) and (min-height: 640px) {
+  :global(.admin-frame:has(.admin-orders)) { height: 100dvh; min-height: 0; overflow: hidden; }
+  :global(.admin-main:has(.admin-orders)) { height: 100%; min-height: 0; box-sizing: border-box; overflow: hidden; }
+  .admin-orders { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .admin-orders > :not(.orders-results) { flex-shrink: 0; }
+  .orders-results { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+  .orders-table { flex: 1; min-height: 0; }
+  .orders-table thead th { position: sticky; top: 0; z-index: 10; background: #f8fafc; box-shadow: inset 0 -1px #e2e8f0; }
+  .orders-table thead th:last-child { z-index: 20; }
+}
+</style>

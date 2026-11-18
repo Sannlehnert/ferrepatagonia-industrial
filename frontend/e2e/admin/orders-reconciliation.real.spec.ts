@@ -94,7 +94,7 @@ ordersTest('un PATCH tardío actualiza por REST la página filtrada y deja intac
   const { company, a, b } = await fixture(db, 20)
   const bBefore = await persisted(db, b)
   await openPanel(page, company)
-  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Paginación de pedidos', exact: true }).getByRole('button', { name: 'Siguiente', exact: true }).click()
   await expect(rowFor(page, a)).toContainText('Confirmado')
   await expect(rowFor(page, a)).toContainText('10/11/2026')
   const pending = await holdCommittedPatch(page, a)

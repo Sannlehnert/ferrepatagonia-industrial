@@ -15,6 +15,7 @@ const STATUS_LABELS: Readonly<Record<string, string>> = {
 }
 
 const PAYMENT_MODE_LABELS: Readonly<Record<string, string>> = {
+  TRANSFERENCIA: 'Transferencia bancaria',
   CUENTA_CORRIENTE: 'Cuenta corriente',
   DEMO_DIRECTO: 'Pago directo (DEMO)',
   DEMO_CUENTA_CORRIENTE: 'Cuenta corriente (DEMO)',
@@ -22,6 +23,14 @@ const PAYMENT_MODE_LABELS: Readonly<Record<string, string>> = {
 
 export function formatAdminOrderStatus(status: string): string {
   return STATUS_LABELS[status] ?? status
+}
+
+const orderDateFormatter = new Intl.DateTimeFormat('es-AR', {
+  timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric',
+})
+export function formatAdminOrderDate(value: string): string {
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : orderDateFormatter.format(parsed)
 }
 
 export function formatAdminOrderPaymentMode(mode: string): string {
