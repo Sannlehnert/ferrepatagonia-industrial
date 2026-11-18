@@ -57,6 +57,24 @@ test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ pa
   await expect(page).toHaveURL(/\/$/)
 })
 
+test('Área Empresas lleva a ingreso y registro de empresa con teclado y desde el footer', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('contentinfo').getByRole('link', { name: 'Área empresas' }).click()
+  await expect(page).toHaveURL(/\/#empresas$/)
+  await expect(business(page)).toBeFocused()
+
+  await business(page).getByRole('link', { name: 'Ingresar como empresa' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/login$/)
+
+  await page.goto('/')
+  await business(page).getByRole('link', { name: 'Registrá tu empresa' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/registro\?tipo=empresa$/)
+  await expect(page.getByRole('radio', { name: 'Empresa' })).toBeChecked()
+  await expect(page.getByLabel('Razón social')).toBeVisible()
+})
+
 test('Home de particular muestra su acceso y abre el carrito real', async ({ page }) => {
   await signIn(page, 'cliente-nuevo@e2e.test')
   await page.goto('/')
