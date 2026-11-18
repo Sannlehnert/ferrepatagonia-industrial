@@ -1,8 +1,8 @@
 # S7-05.1 — Diagnóstico de precios públicos y particulares
 
-Fecha: 15/11/2026  
-Rama: `feature/s7-05-1-pricing-diagnosis`  
-Base: `develop` en `413ad8e` (merge #108)  
+- Fecha: 15/11/2026
+- Rama: `feature/s7-05-1-pricing-diagnosis`
+- Base: `develop` en `413ad8e` (merge #108)
 Alcance: diagnóstico y pruebas. La verificación posterior a crear/editar precios corresponde a T-S7-05.2.
 
 ## Dictamen ejecutivo

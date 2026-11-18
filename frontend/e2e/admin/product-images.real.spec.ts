@@ -14,7 +14,7 @@ async function signIn(page: Page, email = 'admin@e2e.test') {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta\/datos)$/)
+  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta)$/)
 }
 
 async function photo(width: number) {
@@ -41,7 +41,7 @@ test('alta y reemplazo con vista previa, estado de carga y catálogo a 360 px', 
   await field(page, 'Nombre del Producto').fill(name)
   await field(page, 'Código SKU').fill(code)
   await page.locator('form').getByRole('combobox').selectOption({ label: 'Herramientas E2E' })
-  await field(page, 'Precio Base').fill('150')
+  await field(page, 'Importe base cargado').fill('150')
   await field(page, 'Stock').fill('8')
   await photoInput(page).setInputFiles({ name: 'invalida.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') })
   await expect(page.getByRole('alert')).toContainText('Seleccioná una foto JPEG, PNG o WebP.')

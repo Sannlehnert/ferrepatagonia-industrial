@@ -7,6 +7,7 @@ declare module 'vue-router' {
   interface RouteMeta {
     requiresAuth?: boolean
     roles?: Rol[]
+    storefront?: boolean
   }
 }
 
@@ -81,6 +82,7 @@ const router = createRouter({
     {
       path: '/',
       component: () => import('@/layouts/PublicLayout.vue'),
+      meta: { storefront: true },
       children: [
         {
           path: '',
@@ -171,16 +173,12 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from) => {
-  if (typeof window !== 'undefined' && typeof sessionStorage !== 'undefined') {
-    if (!from.path.startsWith('/mi-cuenta') && to.path.startsWith('/mi-cuenta')) {
-      const isAuthRoute = from.path === '/login' || from.path === '/registro'
-      const fallback = from.fullPath && from.fullPath !== '/' && !isAuthRoute ? from.fullPath : '/catalogo'
-      try {
-        sessionStorage.setItem('last_external_route', fallback)
-      } catch {
-        // Ignorar restricciones de almacenamiento en navegadores privados
-      }
+router.afterEach((to, from, failure) => {
+  if (!failure && from.meta.storefront && (to.path.startsWith('/mi-cuenta') || to.name === 'login')) {
+    try {
+      sessionStorage.setItem('last_external_route', from.fullPath)
+    } catch (error) {
+      console.warn('No se pudo guardar la página de la tienda.', error)
     }
   }
 })
