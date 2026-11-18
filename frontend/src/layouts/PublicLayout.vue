@@ -35,7 +35,7 @@ watch(
       <RouterView />
     </div>
 
-    <PublicFooter />
+    <PublicFooter @navigate="focusContent" />
 
     <CartDrawer
       v-if="panel.visible && auth.rol === 'CLIENTE'"

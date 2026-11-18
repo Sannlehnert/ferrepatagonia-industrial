@@ -63,7 +63,8 @@ test('Área Empresas lleva a ingreso y registro de empresa con teclado y desde e
   await expect(page).toHaveURL(/\/#empresas$/)
   await expect(business(page)).toBeFocused()
 
-  await business(page).getByRole('link', { name: 'Ingresar como empresa' }).focus()
+  await page.keyboard.press('Tab')
+  await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(page).toHaveURL(/\/login$/)
 
@@ -74,6 +75,28 @@ test('Área Empresas lleva a ingreso y registro de empresa con teclado y desde e
   await expect(page.getByRole('radio', { name: 'Empresa' })).toBeChecked()
   await expect(page.getByLabel('Razón social')).toBeVisible()
 })
+
+for (const width of [360, 1280]) {
+  test('Área Empresas desde el footer conserva la navegación por teclado a ' + width + ' px', async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/catalogo')
+    const footerLink = page.getByRole('contentinfo').getByRole('link', { name: 'Área empresas' })
+    await footerLink.focus()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/#empresas$/)
+    await expect(business(page)).toBeFocused()
+
+    await footerLink.focus()
+    await page.keyboard.press('Enter')
+    await expect(business(page)).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(business(page).getByRole('link', { name: 'Registrá tu empresa' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/registro\?tipo=empresa$/)
+  })
+}
 
 test('Home de particular muestra su acceso y abre el carrito real', async ({ page }) => {
   await signIn(page, 'cliente-nuevo@e2e.test')
