@@ -62,9 +62,9 @@ const isParticular = computed(() => {
 <template>
   <div class="space-y-6">
     <!-- Saludo / Título: Nombre del usuario o empresa -->
-    <h2 class="text-2xl font-bold text-[#0B2438] text-center my-6">
+    <h1 class="text-2xl font-bold text-[#0B2438] text-center my-6">
       {{ auth.user?.nombre || 'Mi Cuenta' }}
-    </h2>
+    </h1>
 
     <CompanyStatus />
 
@@ -99,7 +99,7 @@ const isParticular = computed(() => {
           </svg>
         </div>
         <div class="text-4xl font-bold text-[#10B981] my-2">
-          {{ loading && !orders ? '-' : totalOrdersCount }}
+          {{ error || (loading && !orders) ? '-' : totalOrdersCount }}
         </div>
         <p class="text-xs text-slate-500 m-0">
           Todos los estados{{ ultimoPedidoFecha ? ' - último: ' + ultimoPedidoFecha : '' }}
@@ -121,7 +121,7 @@ const isParticular = computed(() => {
           </svg>
         </div>
         <div class="text-4xl font-bold text-[#0EA5E9] my-2">
-          {{ loading && !orders ? '-' : creditOrdersCount }}
+          {{ error || (loading && !orders) ? '-' : creditOrdersCount }}
         </div>
         <p class="text-xs text-slate-500 m-0">
           Modalidad cuenta corriente
@@ -142,7 +142,7 @@ const isParticular = computed(() => {
           </svg>
         </div>
         <div class="text-4xl font-bold text-[#10B981] my-2">
-          {{ loading && !orders ? '-' : pendingReceiptOrdersCount }}
+          {{ error || (loading && !orders) ? '-' : pendingReceiptOrdersCount }}
         </div>
         <p class="text-xs text-slate-500 m-0">
           Transferencias pendientes
