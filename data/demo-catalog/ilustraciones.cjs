@@ -3,6 +3,8 @@
 // Uso: node data/demo-catalog/ilustraciones.cjs   (regenera los WebP en frontend/public/demo-catalog)
 const { writeFileSync } = require('node:fs');
 const { join } = require('node:path');
+const { createHash } = require('node:crypto');
+const assert = require('node:assert/strict');
 
 const destino = join(__dirname, '../../frontend/public/demo-catalog');
 const tinta = '#0b2438';
@@ -27,8 +29,7 @@ const dibujos = {
   CAL: `<path d="M260 110h90v90c0 25 20 40 50 50l70 28c25 10 25 52 0 52H260z" fill="#8a5a2b" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
     <rect x="260" y="330" width="210" height="22" fill="${tinta}"/>`,
   CAS: `<path d="M240 270a120 120 0 0 1 240 0z" fill="${ambar}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
-    <rect x="200" y="270" width="320" height="28" rx="12" fill="${ambar}" stroke="${tinta}" stroke-width="10"/>
-    <path d="M360 150v120" ${trazoDe()}/>`,
+    <path d="M230 270h260" ${trazoDe(tinta, 18)}/><path d="M310 270v-38m100 38v-38" ${trazoDe(tinta, 12)}/>`,
   CHA: `<path d="M265 110l50 20 45 40 45-40 50-20 25 70-35 25v135H275V205l-35-25z" fill="#f2d10a" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
     <path d="M315 130v215M405 130v215M275 270h170" fill="none" stroke="#e6e9ec" stroke-width="22"/>`,
   CIN: `<circle cx="360" cy="230" r="120" fill="#f2d10a" stroke="${tinta}" stroke-width="10"/>
@@ -46,6 +47,53 @@ const dibujos = {
   GUA: `<path d="M270 350V230l-20-60 25-8 25 60V120h26v100V105h26v115V120h26v110V150h26v110l30 40-40 60z" fill="#d8b98a" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>`,
 };
 
+const dibujosDeVariante = {
+  'ABR-HOJA': `<path d="M260 110h150l70 70v250H260z" fill="#f3d9a8" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M410 110v70h70M295 225h150M295 270h150M295 315h150M295 360h150" ${trazoDe(azul, 12)}/>`,
+  'ADH-COLA': `<path d="M290 175h140l25 185H265z" fill="#ffffff" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M320 175v-45h80v45m-60-45v-30h40v30" ${trazoDe(azul, 14)}/>
+    <rect x="295" y="250" width="130" height="58" rx="8" fill="${ambar}" stroke="${tinta}" stroke-width="8"/>`,
+  'ADH-CINTA': `<circle cx="360" cy="250" r="128" fill="${ambar}" stroke="${tinta}" stroke-width="12"/>
+    <circle cx="360" cy="250" r="58" fill="#f4f7fa" stroke="${tinta}" stroke-width="10"/>
+    <path d="M360 122a128 128 0 0 1 104 54" ${trazoDe('#ffffff', 18)}/>`,
+  'ADH-SELLADOR': `<path d="M275 190h170l25 125-30 55H280l-30-55z" fill="#ffffff" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M310 190v-45h100v45m-48-45l48-55h54" ${trazoDe(azul, 18)}/>
+    <rect x="300" y="255" width="120" height="48" rx="6" fill="${ambar}"/>`,
+  'ALT-BOLSO': `<path d="M260 190h200l25 180H235z" fill="${azul}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M305 190v-35a55 55 0 0 1 110 0v35m-145 70h180" ${trazoDe(tinta, 12)}/>
+    <rect x="320" y="278" width="80" height="52" rx="8" fill="${ambar}" stroke="${tinta}" stroke-width="8"/>`,
+  'ALT-ETIQUETA': `<path d="M240 170l220-45 35 180-220 45z" fill="#ffffff" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <circle cx="300" cy="205" r="16" fill="${ambar}" stroke="${tinta}" stroke-width="8"/>
+    <path d="M335 205l110-22m-100 66l110-22" ${trazoDe(azul, 12)}/>`,
+  'ALT-PROTECTOR': `<path d="M245 190h230l35 60-35 60H245l-35-60z" fill="${azul}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M275 205v90m40-90v90m40-90v90m40-90v90m40-90v90" ${trazoDe('#ffffff', 8)}/>`,
+  'AUD-TAPON': `<path d="M280 160c-35 15-48 54-30 86l32 55c14 24 48 30 68 10 16-16 17-40 4-60l-28-43c-13-20-25-37-46-48zM440 160c35 15 48 54 30 86l-32 55c-14 24-48 30-68 10-16-16-17-40-4-60l28-43c13-20 25-37 46-48z" fill="${ambar}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M330 300c-20 48 5 78 35 78s55-30 35-78" ${trazoDe(azul, 10)}/>`,
+  'CAL-BOTA-PVC': `<path d="M275 110h95v120c0 26 18 42 46 54l52 24c30 14 27 52-7 52H250V190z" fill="#334155" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M255 360h215m-200-22l-5 22m45-22l-5 22m45-22l-5 22m45-22l-5 22" ${trazoDe(tinta, 8)}/>`,
+  'CON-BARRA': `<rect x="195" y="225" width="330" height="58" rx="24" fill="#f26a1b" stroke="${tinta}" stroke-width="10"/>
+    <rect x="175" y="210" width="45" height="88" rx="14" fill="${azul}" stroke="${tinta}" stroke-width="10"/>
+    <rect x="500" y="210" width="45" height="88" rx="14" fill="${azul}" stroke="${tinta}" stroke-width="10"/>
+    <path d="M270 230v48m80-48v48m80-48v48" ${trazoDe('#ffffff', 8)}/>`,
+  'CON-CADENA': `<g fill="none" stroke="${azul}" stroke-width="24">
+    <ellipse cx="245" cy="250" rx="58" ry="36" transform="rotate(-35 245 250)"/>
+    <ellipse cx="330" cy="250" rx="58" ry="36" transform="rotate(35 330 250)"/>
+    <ellipse cx="415" cy="250" rx="58" ry="36" transform="rotate(-35 415 250)"/>
+    <ellipse cx="500" cy="250" rx="58" ry="36" transform="rotate(35 500 250)"/>
+    </g>`,
+  'ELE-AMOLADORA': `<path d="M250 170h190l50 55-55 55H310l-30 45h-42l30-65-40-42z" fill="${azul}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <circle cx="465" cy="280" r="74" fill="#c9d1d9" stroke="${tinta}" stroke-width="10"/>
+    <circle cx="465" cy="280" r="24" fill="#f4f7fa" stroke="${tinta}" stroke-width="8"/>
+    <path d="M285 180v-42h82v42m-140 90h-70v70" ${trazoDe()}/>`,
+  'ELE-LIJADORA': `<path d="M255 205l60-65h120l60 65-25 110H280z" fill="${azul}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
+    <path d="M315 140v-38h120v38m-156 174h192" ${trazoDe()}/>
+    <rect x="285" y="315" width="180" height="38" rx="12" fill="${ambar}" stroke="${tinta}" stroke-width="8"/>`,
+  'FIJ-ABRAZADERA': `<path d="M250 300a110 110 0 1 1 220 0" ${trazoDe(azul, 28)}/>
+    <path d="M250 300v45h40v-45m140 0v45h40v-45" ${trazoDe(tinta, 12)}/>
+    <rect x="335" y="125" width="50" height="48" rx="8" fill="${ambar}" stroke="${tinta}" stroke-width="8"/>
+    <path d="M360 170v60m-35 0h70" ${trazoDe()}/>`,
+};
+
 const familias = {
   ABR: 'Abrasivos', ADH: 'Adhesivos y selladores', ALT: 'Trabajo en altura', AUD: 'Protección auditiva',
   CAB: 'Cables', CAL: 'Calzado de trabajo', CAS: 'Cascos', CHA: 'Chalecos reflectivos',
@@ -53,26 +101,74 @@ const familias = {
   GUA: 'Guantes',
 };
 
-const svg = familia => `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="540" viewBox="0 0 720 540">
+const claves = [...Object.keys(familias), ...Object.keys(dibujosDeVariante)];
+const familiaDe = clave => clave.split('-')[0];
+const archivoDe = clave => `ilustrativa-${clave.toLowerCase()}.webp`;
+const variantesPorSku = Object.freeze({
+  'FP-DEMO-ABR-LIJA-AGUA-GRANO-1000': 'ABR-HOJA',
+  'FP-DEMO-ABR-LIJA-MADERA-GRANO-100': 'ABR-HOJA',
+  'FP-DEMO-ADH-COLA-100-ML': 'ADH-COLA',
+  'FP-DEMO-ADH-CINTA-DOBLE-12-MM': 'ADH-CINTA',
+  'FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS': 'ADH-SELLADOR',
+  'FP-DEMO-ALT-BOLSO-ARNES-10-L': 'ALT-BOLSO',
+  'FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES': 'ALT-ETIQUETA',
+  'FP-DEMO-ALT-PROTECTOR-CINTA-150-MM': 'ALT-PROTECTOR',
+  'FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES': 'AUD-TAPON',
+  'FP-DEMO-CAL-BOTA-PVC-38-AR': 'CAL-BOTA-PVC',
+  'FP-DEMO-CON-BARRA-CONOS-0-6-M': 'CON-BARRA',
+  'FP-DEMO-CON-CADENA-100-M': 'CON-CADENA',
+  'FP-DEMO-ELE-AMOLADORA-1000-W': 'ELE-AMOLADORA',
+  'FP-DEMO-ELE-LIJADORA-150-W': 'ELE-LIJADORA',
+  'FP-DEMO-FIJ-ABRAZADERA-12-MM': 'FIJ-ABRAZADERA',
+});
+
+const archivoIlustrativoDeSku = sku => {
+  const codigoFamilia = /^FP-DEMO-([A-Z]{3})-/.exec(sku)?.[1];
+  assert.ok(codigoFamilia && familias[codigoFamilia], `SKU sin familia de ilustración: ${sku}`);
+  return archivoDe(variantesPorSku[sku] ?? codigoFamilia);
+};
+
+function validarLeyenda(contenido) {
+  assert.match(contenido, />IMAGEN ILUSTRATIVA</);
+  assert.match(contenido, />No es la variante exacta</);
+}
+
+const svg = clave => {
+  const codigoFamilia = familiaDe(clave);
+  const etiqueta = familias[codigoFamilia];
+  const dibujo = dibujosDeVariante[clave] ?? dibujos[codigoFamilia];
+  assert.ok(etiqueta && dibujo, `Familia de ilustración desconocida: ${clave}`);
+  const contenido = `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="540" viewBox="0 0 720 540">
   <rect width="720" height="540" fill="#f4f7fa"/>
-  <text x="360" y="62" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="${tinta}">${familias[familia]}</text>
-  ${dibujos[familia]}
+  <text x="360" y="62" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="${tinta}">${etiqueta}</text>
+  ${dibujo}
   <rect y="410" width="720" height="130" fill="${ambar}"/>
   <text x="360" y="462" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700" fill="${tinta}">IMAGEN ILUSTRATIVA</text>
   <text x="360" y="508" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="32" fill="${tinta}">No es la variante exacta</text>
 </svg>`;
+  validarLeyenda(contenido);
+  return contenido;
+};
 
-const archivoDe = familia => `ilustrativa-${familia.toLowerCase()}.webp`;
-
-async function generar() {
+async function bytesDe(clave) {
   const sharp = require('../../backend/node_modules/sharp');
-  sharp.cache(false);
-  for (const familia of Object.keys(familias)) {
-    const bytes = await sharp(Buffer.from(svg(familia))).webp({ quality: 85 }).toBuffer();
-    writeFileSync(join(destino, archivoDe(familia)), bytes);
-  }
+  return sharp(Buffer.from(svg(clave))).webp({ quality: 85 }).toBuffer();
 }
 
-if (require.main === module) generar().then(() => console.log(`${Object.keys(familias).length} ilustraciones`));
+async function generar() {
+  const hashes = {};
+  for (const clave of claves) {
+    const archivo = archivoDe(clave);
+    const bytes = await bytesDe(clave);
+    writeFileSync(join(destino, archivo), bytes);
+    hashes[archivo] = createHash('sha256').update(bytes).digest('hex');
+  }
+  writeFileSync(join(destino, 'ilustraciones-manifest.json'), `${JSON.stringify(hashes, null, 2)}\n`);
+}
 
-module.exports = { archivoDe, familias, svg };
+if (require.main === module) generar().then(() => console.log(`${claves.length} ilustraciones`));
+
+module.exports = {
+  archivoDe, archivoIlustrativoDeSku, bytesDe, claves, familias, generar, svg,
+  validarLeyenda, variantesPorSku,
+};

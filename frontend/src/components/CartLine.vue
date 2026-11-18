@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import CartQuantityControl from '@/components/CartQuantityControl.vue'
+import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
 import type { CartItem } from '@/types/cart'
 import { precioCarritoComprable } from '@/services/cartService'
+import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
 
 const props = defineProps<{
   item: CartItem
@@ -16,6 +18,9 @@ const emit = defineEmits<{
 }>()
 
 const failedImage = ref(false)
+const isIllustrativeImage = computed(() =>
+  isIllustrativeDemoImage(props.item.codigo, props.item.imagen),
+)
 
 watch(() => props.item.imagen, () => {
   failedImage.value = false
@@ -80,6 +85,10 @@ const availabilityMessage = computed(() => {
       <p class="my-1 text-xs text-slate-500 [overflow-wrap:anywhere]">
         {{ item.codigo }}
       </p>
+      <IllustrativeImageNotice
+        v-if="isIllustrativeImage"
+        class="mb-2"
+      />
 
       <CartQuantityControl
         :quantity="item.cantidad"

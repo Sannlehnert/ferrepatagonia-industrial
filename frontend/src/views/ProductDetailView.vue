@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import CatalogCartButton from '@/components/CatalogCartButton.vue'
+import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
 import ProductPrices from '@/components/ProductPrices.vue'
 import { getCatalogProduct } from '@/services/catalogService'
 import { refreshOnStock } from '@/services/realtime'
 import type { CatalogProduct, CatalogProductDetail } from '@/types/catalog'
 import { getProductImageSource } from '@/utils/productImage'
+import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
 import axios from 'axios'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -43,6 +45,9 @@ const returnLabel = computed(() => {
 })
 
 const imageSource = computed(() => getProductImageSource(product.value?.imagen))
+const isIllustrativeImage = computed(() =>
+  product.value ? isIllustrativeDemoImage(product.value.codigo, product.value.imagen) : false,
+)
 
 async function loadProduct() {
   controller?.abort()
@@ -121,6 +126,10 @@ onBeforeUnmount(() => controller?.abort())
             @error="imageFailed = true"
           />
           <span v-else class="text-sm text-slate-500">Sin imagen disponible</span>
+          <IllustrativeImageNotice
+            v-if="isIllustrativeImage"
+            class="mx-3 mb-3"
+          />
         </div>
 
         <div class="flex min-w-0 flex-col">

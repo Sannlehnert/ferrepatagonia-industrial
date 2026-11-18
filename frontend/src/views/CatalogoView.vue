@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ProductPrices from '@/components/ProductPrices.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
+import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
 import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -19,6 +20,7 @@ import type {
   CatalogCategory,
 } from '@/types/catalog'
 import CatalogCartButton from '@/components/CatalogCartButton.vue'
+import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
 
 const LIMITE = 12
 const route = useRoute()
@@ -279,6 +281,10 @@ onBeforeUnmount(() => {
                 <span aria-hidden="true">Sin imagen</span>
               </ProductThumbnail>
             </div>
+            <IllustrativeImageNotice
+              v-if="isIllustrativeDemoImage(p.codigo, p.imagen)"
+              class="mb-2"
+            />
 
             <p class="m-0 min-w-0 max-w-full text-[.75rem] text-[var(--fp-muted)] [overflow-wrap:anywhere]">COD. {{ p.codigo }}</p>
             <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">

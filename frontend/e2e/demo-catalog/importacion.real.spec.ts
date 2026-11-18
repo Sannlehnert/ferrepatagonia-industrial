@@ -315,11 +315,12 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     const sinEvidencia = await auditarPrecios(publico, '/api/precios', dbFilas, 0, false)
     // Evidencia de prueba únicamente en la MariaDB descartable que acredita connectOwned.
     // El cotejo previo garantiza que el importe persistido coincide con el CSV revisado.
+    const verificadoUtc = new Date().toISOString().slice(0, 23).replace('T', ' ')
     const evidencia = await db.query(`
       INSERT INTO PRECIO_USD_EVIDENCIA
         (id_producto, precio_verificado, evidencia, id_admin, verificado_utc, valida, sintetica)
-      SELECT id_producto, precio, ?, 1, UTC_TIMESTAMP(3), 1, 1 FROM PRODUCTO WHERE codigo LIKE 'FP-DEMO-%'
-    `, [`SINTETICO ACADEMICO #286 SHA256:${hash}`])
+      SELECT id_producto, precio, ?, 1, ?, 1, 1 FROM PRODUCTO WHERE codigo LIKE 'FP-DEMO-%'
+    `, [`SINTETICO ACADEMICO #286 SHA256:${hash}`, verificadoUtc])
     expect(evidencia.affectedRows).toBe(filas.length)
     const publicoUSD = await auditarPrecios(publico, '/api/precios', dbFilas, 0, true)
     const empresaUSD = await auditarPrecios(empresa, '/api/precios/mios', dbFilas, 10, true)
@@ -346,10 +347,13 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await expect(enlace).toBeVisible()
       const url = new URL(producto.imagen, baseURL).href
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
+      const esIlustrativa = fuentes.get(producto.codigo)!.archivo.startsWith('ilustrativa-')
+      if (esIlustrativa) await expect(page.getByRole('note')).toContainText('Imagen ilustrativa')
       await enlace.focus()
       await page.keyboard.press('Enter')
       await expect(page.getByRole('heading', { name: producto.nombre, level: 1, exact: true })).toBeVisible()
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
+      if (esIlustrativa) await expect(page.getByRole('note')).toContainText('Imagen ilustrativa')
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
     }
@@ -371,6 +375,18 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     await expect(enlace).toBeVisible()
     await page.goForward()
     await expect(page.getByRole('heading', { name: muestra.nombre, level: 1, exact: true })).toBeVisible()
+    const productoIlustrativo = dbFilas.find(p => fuentes.get(p.codigo)?.archivo.startsWith('ilustrativa-'))!
+    await respuesta(await page.request.post('/api/auth/login', {
+      data: credentials.account, headers: { Origin: baseURL! },
+    }))
+    expect((await page.request.post('/api/carrito/items', {
+      data: { productoId: productoIlustrativo.id, cantidad: 1 }, headers: { Origin: baseURL! },
+    })).status()).toBe(204)
+    await page.goto('/carrito')
+    await expect(page.getByRole('note')).toContainText('Imagen ilustrativa')
+    expect((await page.request.delete(`/api/carrito/items/${productoIlustrativo.id}`, {
+      headers: { Origin: baseURL! },
+    })).status()).toBe(204)
     if (process.env.E2E_DEMO_INTERACTIVE === '1') {
       expect(empresaUSD.comprablesAcademico).toBe(904)
       expect((await respuesta(await empresa.get('/api/pedidos'))).data.items).toHaveLength(0)

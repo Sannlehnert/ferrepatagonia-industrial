@@ -136,14 +136,38 @@ Cambios: redimensionada a 960 × 720 y convertida a WebP.
 ilustrativa-abr.webp
 Ilustración genérica «Abrasivos», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
+ilustrativa-abr-hoja.webp
+Ilustración de hoja abrasiva, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde al grano exacto.
+
 ilustrativa-adh.webp
 Ilustración genérica «Adhesivos y selladores», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-adh-cinta.webp
+Ilustración de rollo de cinta doble faz, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-adh-cola.webp
+Ilustración de envase de cola vinílica, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-adh-sellador.webp
+Ilustración de cartucho sellador, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
 ilustrativa-alt.webp
 Ilustración genérica «Trabajo en altura», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
+ilustrativa-alt-bolso.webp
+Ilustración de bolso de arnés, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-alt-etiqueta.webp
+Ilustración de etiqueta de identificación, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-alt-protector.webp
+Ilustración de funda protectora para cinta de arnés, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
 ilustrativa-aud.webp
 Ilustración genérica «Protección auditiva», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-aud-tapon.webp
+Ilustración de tapones auditivos con cordón, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
 ilustrativa-cab.webp
 Ilustración genérica «Cables», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
@@ -151,8 +175,11 @@ Ilustración genérica «Cables», obra propia del proyecto Ferrepatagonia Indus
 ilustrativa-cal.webp
 Ilustración genérica «Calzado de trabajo», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
+ilustrativa-cal-bota-pvc.webp
+Ilustración de bota de PVC, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
 ilustrativa-cas.webp
-Ilustración genérica «Cascos», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+Silueta genérica de casco sin ranuras laterales no verificadas, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
 ilustrativa-cha.webp
 Ilustración genérica «Chalecos reflectivos», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
@@ -163,11 +190,26 @@ Ilustración genérica «Cintas», obra propia del proyecto Ferrepatagonia Indus
 ilustrativa-con.webp
 Ilustración genérica «Conos y balizamiento», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
+ilustrativa-con-barra.webp
+Ilustración de barra de enlace para conos, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-con-cadena.webp
+Ilustración de cadena de balizamiento, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
 ilustrativa-ele.webp
 Ilustración genérica «Herramientas eléctricas», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
+ilustrativa-ele-amoladora.webp
+Ilustración de amoladora angular, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la potencia exacta.
+
+ilustrativa-ele-lijadora.webp
+Ilustración de lijadora orbital, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la potencia exacta.
+
 ilustrativa-fij.webp
 Ilustración genérica «Fijaciones», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
+
+ilustrativa-fij-abrazadera.webp
+Ilustración de abrazadera para caño, obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.
 
 ilustrativa-gua.webp
 Ilustración genérica «Guantes», obra propia del proyecto Ferrepatagonia Industrial (data/demo-catalog/ilustraciones.cjs). No es una fotografía y no corresponde a la variante exacta.

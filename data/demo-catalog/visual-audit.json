@@ -1,10 +1,10 @@
 {
   "sku": 904,
   "skuConFuente": 182,
-  "skuIlustrativos": 38,
+  "skuIlustrativos": 47,
   "skuPendientes": 722,
   "archivos": 23,
-  "archivosIlustrativos": 13,
+  "archivosIlustrativos": 26,
   "grupos": [
     {
       "clave": "MAN-llave-combinada",
