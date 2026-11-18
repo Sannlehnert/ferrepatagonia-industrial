@@ -322,7 +322,12 @@ onBeforeUnmount(() => {
                     aria-label="Buscar productos por nombre o SKU"
                     class="box-border min-h-11 w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
                 >
-                <button v-if="searchQuery || appliedSearch" type="button" class="min-h-11 underline" @click="clearSearch">
+                <button
+                    v-if="searchQuery || appliedSearch"
+                    type="button"
+                    class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    @click="clearSearch"
+                >
                     Limpiar búsqueda
                 </button>
             </div>
@@ -339,7 +344,7 @@ onBeforeUnmount(() => {
         <p v-if="processingId !== null" id="admin-products-lock" role="status" class="mb-4">Actualizando estado del producto. Las acciones están temporalmente deshabilitadas.</p>
         <div v-if="actionError || needsReload" role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
             <p class="wrap-anywhere">{{ actionError || 'Recargá el listado para confirmar los datos antes de modificar productos.' }}</p>
-            <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="min-h-11 underline disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
+            <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
         </div>
 
         <!-- Estado de Carga -->
@@ -358,7 +363,7 @@ onBeforeUnmount(() => {
                 <button
                     v-if="isSessionExpired"
                     type="button"
-                    class="box-border min-h-11 border-0 bg-[#103A5C] text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D]"
+                    class="box-border min-h-11 border-0 bg-[#103A5C] text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="router.push('/login')"
                 >
                     Iniciar sesión
@@ -366,7 +371,7 @@ onBeforeUnmount(() => {
                 <button
                     v-else
                     type="button"
-                    class="box-border min-h-11 bg-white border border-red-300 text-red-700 text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100"
+                    class="box-border min-h-11 bg-white border border-red-300 text-red-700 text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="fetchProductos"
                 >
                     Reintentar
@@ -464,11 +469,11 @@ onBeforeUnmount(() => {
             <div v-if="result" class="text-sm text-slate-700 font-medium">
                 <span v-if="!isLoading && !loadError">Mostrando {{ result.data.length }} de {{ result.total }} productos</span>
                 <nav v-if="result.totalPages > 0" aria-label="Paginación de productos" :aria-busy="isLoading" class="flex flex-wrap items-center gap-3">
-                    <button ref="previousPageButton" type="button" class="min-h-11 underline disabled:opacity-50 aria-disabled:opacity-50"
+                    <button ref="previousPageButton" type="button" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 aria-disabled:opacity-50"
                         :disabled="result.page <= 1" :aria-disabled="pagingUnavailable || undefined"
                         @click="changePage(-1)">Anterior</button>
                     <span>Página {{ result.page }} de {{ result.totalPages }}</span>
-                    <button ref="nextPageButton" type="button" class="min-h-11 underline disabled:opacity-50 aria-disabled:opacity-50"
+                    <button ref="nextPageButton" type="button" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 aria-disabled:opacity-50"
                         :disabled="result.page >= result.totalPages" :aria-disabled="pagingUnavailable || undefined"
                         @click="changePage(1)">Siguiente</button>
                 </nav>
@@ -477,7 +482,7 @@ onBeforeUnmount(() => {
                 type="button"
                 @click="openCreateModal"
                 :disabled="actionsDisabled"
-                class="box-border min-h-11 border-0 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md disabled:opacity-50 w-full sm:w-auto"
+                class="box-border min-h-11 border-0 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
             >
                 + Nuevo Producto
             </button>
