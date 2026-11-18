@@ -79,12 +79,24 @@ for (const scenario of [
     await expect(names).toHaveCount(12);
     await expect(category).toBeEnabled();
 
-    await expect(category.locator('option')).toHaveText([
+    // Otras suites crean categorías activas en la base E2E compartida:
+    // verificar presencia y ausencia sin exigir una lista cerrada.
+    for (const name of [
       'Todas las categorías',
       'Fijaciones E2E',
       'Herramientas E2E',
       'Vacía E2E',
-    ]);
+    ]) {
+      await expect(category.getByRole('option', {
+        name,
+        exact: true,
+      })).toHaveCount(1);
+    }
+
+    await expect(category.getByRole('option', {
+      name: 'Oculta E2E',
+      exact: true,
+    })).toHaveCount(0);
 
     await filters.getByRole('searchbox', {
       name: 'Nombre o código',
