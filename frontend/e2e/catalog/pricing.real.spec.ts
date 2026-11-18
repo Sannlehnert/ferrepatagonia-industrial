@@ -180,7 +180,7 @@ test('cambio de sesión invalida precios previos y la UI bloquea precios sintét
     evidenciaBaseUSD:{synthetic:true},
   })
   await expect(card()).toHaveCount(1)
-  await expect(card()).toContainText('Precio no disponible')
+  await expect(card()).toContainText('Precio sintético no disponible')
   await expect(card()).not.toContainText('USD 112.50')
   await expect(card()).not.toContainText('USD 125.00')
 
@@ -199,7 +199,7 @@ test('cambio de sesión invalida precios previos y la UI bloquea precios sintét
     estadoPrecio:'DEFINIDO',
     evidenciaBaseUSD:{synthetic:true},
   })
-  await expect(card()).toContainText('Precio no disponible')
+  await expect(card()).toContainText('Precio sintético no disponible')
   await expect(card()).not.toContainText('USD 112.50')
   await expect(card()).not.toContainText('USD 100.00')
 })

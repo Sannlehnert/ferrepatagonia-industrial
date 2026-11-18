@@ -77,6 +77,42 @@ for (const [title,p,result] of [
   ['zero',line({precioUnitarioUSD:'0.00'}),{}], ['numeric amount',line({precioUnitarioUSD:90}),{}],
   ['missing evidence',line({evidenciaBaseUSD:undefined}),{}], ['unexpected product',line({productoId:9}),{}],
 ]) test(`rejects ${title} instead of exposing an accredited price`,async()=>{const r=runtime(async()=>response([p],result));await assert.rejects(r.service.getPrices([1],false));});
+for (const personalized of [false,true]) test(`mixed ${personalized?'personalized':'public'} prices isolate synthetic lines`,async()=>{
+  const synthetic=line({productoId:2,evidenciaBaseUSD:{reference:'fixture',verifiedAt:'2026-01-01T00:00:00Z',synthetic:true}});
+  const r=runtime(async()=>response([line(),synthetic],{datosSinteticos:true}));
+  r.products.value=[{id:1,disponible:true},{id:2,disponible:true}];
+  if(personalized) r.auth.user=user(1);
+  const s=r.start();await settle();
+  assert.equal(s.error.value,'');assert.equal(s.prices.value[1].precioUnitarioUSD,'90.00');
+  assert.equal(r.service.precioComprable(s.prices.value[1]),true);
+  const blocked=s.prices.value[2];assert.equal(r.service.precioComprable(blocked),false);
+  for(const key of ['precioBaseUSD','precioUnitarioUSD','subtotalUSD','subtotalARS']) assert.equal(blocked[key],null);
+  const html=await renderToString(vue.createSSRApp(r.load('components/ProductPrice.vue').default,{line:blocked,loading:false,error:'',personalized}));
+  assert.match(html,/Precio sintético no disponible/);assert.doesNotMatch(html,/USD|90\.00|100\.00/);r.stop();
+});
+test('only personalized academic synthetic prices remain available and clearly labeled',async()=>{
+  const synthetic=line({evidenciaBaseUSD:{reference:'fixture',verifiedAt:'2026-01-01T00:00:00Z',synthetic:true},compraAcademica:true});
+  const r=runtime(async()=>response([synthetic],{datosSinteticos:true}));
+  const [academic]=await r.service.getPrices([1],true);
+  assert.equal(r.service.precioComprable(academic),true);
+  const html=await renderToString(vue.createSSRApp(r.load('components/ProductPrice.vue').default,{line:academic,loading:false,error:'',personalized:true}));
+  assert.match(html,/Precio simulado académico/);assert.match(html,/USD 90\.00/);
+  const [publicLine]=await r.service.getPrices([1],false);
+  assert.equal(r.service.precioComprable(publicLine),false);assert.equal(publicLine.precioUnitarioUSD,null);
+});
+test('synthetic lines without a defined price retain their original state message',async()=>{
+  const p=line({estadoPrecio:'FINAL_CERO',precioComprable:false,precioUnitarioUSD:'0.00',
+    evidenciaBaseUSD:{reference:'fixture',verifiedAt:'2026-01-01T00:00:00Z',synthetic:true}});
+  const r=runtime(async()=>response([p],{datosSinteticos:true}));
+  const [blocked]=await r.service.getPrices([1],false);
+  const html=await renderToString(vue.createSSRApp(r.load('components/ProductPrice.vue').default,{line:blocked,loading:false,error:'',personalized:false}));
+  assert.match(html,/Precio final cero/);assert.doesNotMatch(html,/USD/);
+});
+test('rejects inconsistent synthetic metadata even in mixed responses',async()=>{
+  const synthetic=line({productoId:2,evidenciaBaseUSD:{reference:'fixture',verifiedAt:'2026-01-01T00:00:00Z',synthetic:true}});
+  const r=runtime(async()=>response([line(),synthetic],{datosSinteticos:false}));
+  await assert.rejects(r.service.getPrices([1,2],false));
+});
 test('two clients, logout, failed logout and login transition synchronously invalidate private results',async()=>{
   let price='90.00';const r=runtime(async()=>response([line({precioUnitarioUSD:price})]));r.auth.user=user(1);const s=r.start();await settle();
   assert.equal(s.prices.value[1].precioUnitarioUSD,'90.00');
@@ -144,4 +180,58 @@ test('session verification error suppresses requests; explicit retry restores ve
  r.auth.fetchSession=async()=>{verified++;r.auth.user=user(2);r.auth.sessionError='';r.auth.sessionChecked=true;};
  const s=r.start();await settle();assert.equal(r.calls.length,0);assert.ok(s.error.value);await s.retry();await settle();
  assert.equal(verified,1);assert.equal(r.calls.at(-1)[0],'/precios/mios');assert.equal(s.prices.value[1].precioUnitarioUSD,'90.00');r.stop();
+});
+
+test('visibilitychange and focus within 20 ms trigger one auto-refresh, manual retry still runs, and unmount cleans listeners',async(t)=>{
+  const listeners={window:new Map(),document:new Map()};
+  const prevWindow=global.window,prevDocument=global.document,prevNow=Date.now;
+  let now=1000;
+  Date.now=()=>now;
+  global.window={
+    addEventListener:(ev,fn)=>listeners.window.set(ev,fn),
+    removeEventListener:(ev,fn)=>{if(listeners.window.get(ev)===fn)listeners.window.delete(ev);},
+  };
+  global.document={
+    visibilityState:'visible',
+    addEventListener:(ev,fn)=>listeners.document.set(ev,fn),
+    removeEventListener:(ev,fn)=>{if(listeners.document.get(ev)===fn)listeners.document.delete(ev);},
+  };
+  t.after(()=>{global.window=prevWindow;global.document=prevDocument;Date.now=prevNow;});
+  const r=runtime(async()=>response());
+  const renderer=vue.createRenderer({
+    createElement:()=>({}),createText:()=>({}),createComment:()=>({}),
+    insert(){},remove(){},setText(){},setElementText(){},patchProp(){},
+    parentNode:()=>null,nextSibling:()=>null,
+  });
+  let state;
+  const app=renderer.createApp({setup(){state=r.load('composables/useProductPrices.ts').useProductPrices(r.products,r.catalogLoading);return state;},render:()=>null});
+  app.mount({});
+  await settle();
+  assert.equal(r.calls.length,1);
+  assert.ok(listeners.window.has('focus'));
+  assert.ok(listeners.document.has('visibilitychange'));
+
+  // visibilitychange (visible) followed by focus 20ms later -> only 1 additional request
+  listeners.document.get('visibilitychange')();
+  now+=20;
+  listeners.window.get('focus')();
+  await settle();
+  assert.equal(r.calls.length,2);
+  assert.equal(r.calls[1][2].signal.aborted,false);
+
+  // Manual retry within cooldown still executes immediately
+  now+=10;
+  await state.retry();
+  await settle();
+  assert.equal(r.calls.length,3);
+
+  // After cooldown (>250ms), focus triggers again
+  now+=300;
+  listeners.window.get('focus')();
+  await settle();
+  assert.equal(r.calls.length,4);
+
+  app.unmount();
+  assert.equal(listeners.window.size,0);
+  assert.equal(listeners.document.size,0);
 });
