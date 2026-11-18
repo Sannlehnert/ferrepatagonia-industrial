@@ -4,7 +4,7 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 const { categoriasRequeridas, columnas, csv, familias, generar } = require('./generar.cjs');
 const {
-  auditarCobertura, leerFuentes, validarAsociacion, validarContenidoIlustrativo, validarFuente,
+  auditarCobertura, leerFuentes, validarAsociacion, validarContenidoIlustrativo, validarFuente, leerRegistroCredito,
 } = require('./cobertura-visual.cjs');
 const { asociarFotos, leerCatalogoMaestro, seleccionarFuentesCatalogo } = require('./asociar-fotos.cjs');
 const {
@@ -82,6 +82,54 @@ test('rechaza huellas, autoría, licencias, fuentes y familias inconsistentes', 
   assert.throws(() => validarFuente(fuente, Buffer.from('foto alterada')), /Hash del informe/);
   for (const sku of ['FP-DEMO-FIJ-TARUGO-NYLON-10-MM', 'FP-DEMO-CAS-CASCO-ALA-AMARILLO']) {
     assert.throws(() => validarAsociacion(sku, sku.includes('TARUGO') ? 'tarugo-nailon.webp' : 'casco-ala-completa-amarillo.webp'), /Ilustración incompatible/);
+  }
+});
+
+test('rechaza recortar CC BY-SA 4.0 a CC BY aunque sea un prefijo del crédito', () => {
+  const fuente = leerFuentes().get('FP-DEMO-ELE-CALADORA-500-W');
+  assert.equal(fuente.licencia, 'CC BY-SA 4.0');
+  assert.doesNotThrow(() => validarFuente(fuente, fuente.bytes));
+  assert.throws(() => validarFuente({ ...fuente, licencia: 'CC BY' }, fuente.bytes), /inconsistentes.*: licencia/);
+});
+
+test('rechaza sustituir la ficha de Wikimedia por el dominio de Commons', () => {
+  const fuente = leerFuentes().get('FP-DEMO-ELE-CALADORA-500-W');
+  assert.equal(fuente.fuente, 'https://commons.wikimedia.org/wiki/File:Ryobi_RJS_720_-_2017-01-19_(8).jpg');
+  assert.doesNotThrow(() => validarFuente(fuente, fuente.bytes));
+  assert.throws(() => validarFuente({ ...fuente, fuente: 'https://commons.wikimedia.org/' }, fuente.bytes),
+    /inconsistentes.*: fuente/);
+});
+
+test('rechaza sustituir la URL de licencia por el dominio de Creative Commons', () => {
+  const fuente = leerFuentes().get('FP-DEMO-ELE-CALADORA-500-W');
+  assert.equal(fuente.referencia_licencia, 'https://creativecommons.org/licenses/by-sa/4.0');
+  assert.doesNotThrow(() => validarFuente(fuente, fuente.bytes));
+  assert.throws(() => validarFuente({ ...fuente, referencia_licencia: 'https://creativecommons.org/' }, fuente.bytes),
+    /inconsistentes.*: referencia_licencia/);
+});
+
+test('exige un único registro completo por archivo usado, sin restringir créditos históricos ajenos', () => {
+  const archivo = 'caladora-500w.webp';
+  const bloques = readFileSync(join(__dirname, '../../frontend/public/demo-catalog/creditos.txt'), 'utf8')
+    .split(/\r?\n\s*\r?\n/);
+  const bloque = bloques.find(texto => texto.split(/\r?\n/)[0] === archivo);
+  const registro = bloque.split(/\r?\n/).find(linea => linea.startsWith('Registro: '));
+  const valores = registro.slice('Registro: '.length).split(' · ');
+  const fuente = leerFuentes().get('FP-DEMO-ELE-CALADORA-500-W');
+  const campos = ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia'];
+  assert.deepEqual(leerRegistroCredito(archivo, bloque), Object.fromEntries(campos.map(campo => [campo, fuente[campo]])));
+  assert.deepEqual(leerRegistroCredito(archivo, `${bloque}\n\nhistorico-sin-uso.webp\nFormato anterior sin Registro`),
+    leerRegistroCredito(archivo, bloque));
+  assert.throws(() => leerRegistroCredito(archivo, `${bloque}\n\n${bloque}`), /Créditos ausentes o duplicados/);
+  assert.throws(() => leerRegistroCredito(archivo, `${bloque}\n${registro}`), /Registro ausente o duplicado/);
+  assert.throws(() => leerRegistroCredito(archivo, bloque.replace(registro, '')), /Registro ausente o duplicado/);
+  assert.throws(() => leerRegistroCredito(archivo, bloque.replace(archivo, `otro-${archivo}`)), /Créditos ausentes/);
+  assert.throws(() => leerRegistroCredito(archivo, bloque.replace(registro, ` ${registro}`)), /Registro ambiguo/);
+  assert.throws(() => leerRegistroCredito(archivo, bloque.replace(registro, `${registro} · extra`)), /Registro incompleto o ambiguo/);
+  for (let indice = 0; indice < campos.length; indice++) {
+    const incompleto = valores.map((valor, i) => i === indice ? '' : valor);
+    assert.throws(() => leerRegistroCredito(archivo, bloque.replace(registro, `Registro: ${incompleto.join(' · ')}`)),
+      /Registro incompleto o ambiguo/);
   }
 });
 

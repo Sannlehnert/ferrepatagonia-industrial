@@ -14,7 +14,8 @@ const informeCatalogo = JSON.parse(readFileSync(join(__dirname, 'catalog-validat
 const imagenReportadaPorSku = new Map(informeCatalogo.imagenes.map(imagen => [imagen.sku, imagen.archivo]));
 const evidenciaPorSku = new Map(informeCatalogo.imagenes.map(imagen => [imagen.sku, imagen]));
 const familiaPorCodigo = new Map(familias.map(([codigo, , nombre]) => [codigo, nombre]));
-const creditos = readFileSync(join(directorioFotos, 'creditos.txt'), 'utf8').split(/\r?\n\s*\r?\n/);
+const creditos = readFileSync(join(directorioFotos, 'creditos.txt'), 'utf8');
+const camposCredito = ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia'];
 const fotoPorSku = new Map([
   ['FP-DEMO-ABR-DISCO-METAL-125-MM', 'disco-corte-metal.webp'],
   ['FP-DEMO-CAS-CASCO-ALA-AMARILLO', 'casco-ala-completa-amarillo.webp'],
@@ -49,6 +50,21 @@ function validarContenidoIlustrativo(archivo, bytes) {
   assert.equal(hash, manifiestoIlustraciones[archivo], `La ilustración ${archivo} no coincide con la versión con leyenda`);
 }
 
+function leerRegistroCredito(archivo, contenido = creditos) {
+  // Solo exigir el formato estructurado para el activo consultado: hay
+  // créditos históricos sin asociación que conservan su formato anterior.
+  const bloques = contenido.split(/\r?\n\s*\r?\n/)
+    .filter(bloque => bloque.split(/\r?\n/)[0] === archivo);
+  assert.equal(bloques.length, 1, `Créditos ausentes o duplicados para ${archivo}`);
+  const registros = bloques[0].split(/\r?\n/).filter(linea => /^\s*Registro\s*:/i.test(linea));
+  assert.equal(registros.length, 1, `Registro ausente o duplicado para ${archivo}`);
+  assert.match(registros[0], /^Registro: /, `Registro ambiguo para ${archivo}`);
+  const valores = registros[0].slice('Registro: '.length).split(' · ');
+  assert.ok(valores.length === camposCredito.length && valores.every(valor => valor && valor === valor.trim()),
+    `Registro incompleto o ambiguo para ${archivo}`);
+  return Object.fromEntries(camposCredito.map((campo, indice) => [campo, valores[indice]]));
+}
+
 function validarFuente(fila, bytes, informe = evidenciaPorSku.get(fila.sku)) {
   const archivo = rutaWebp.exec(fila.ruta_final)?.[1];
   assert.equal(fila.familia, familiaPorCodigo.get(fila.sku.split('-')[2]), `Familia incorrecta para ${fila.sku}`);
@@ -56,9 +72,10 @@ function validarFuente(fila, bytes, informe = evidenciaPorSku.get(fila.sku)) {
   assert.equal(createHash('sha256').update(bytes).digest('hex'), informe.sha256Origen, `Hash del informe incorrecto para ${fila.sku}`);
   assert.equal(informe.http, 200);
   assert.equal(informe.mime, 'image/webp');
-  const bloque = creditos.find(texto => texto.split(/\r?\n/)[0] === archivo);
-  assert.ok(bloque && ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia'].every(campo =>
-    fila[campo] && bloque.includes(fila[campo])), `Créditos o procedencia inconsistentes para ${fila.sku}`);
+  const registro = leerRegistroCredito(archivo);
+  for (const campo of camposCredito) {
+    assert.equal(fila[campo], registro[campo], `Créditos o procedencia inconsistentes para ${fila.sku}: ${campo}`);
+  }
   // La licencia de filas que comparten un activo debe conservar la misma evidencia.
   return archivo;
 }
@@ -155,5 +172,5 @@ function auditarCobertura(fuentes = leerFuentes()) {
 if (require.main === module) process.stdout.write(`${JSON.stringify(auditarCobertura(), null, 2)}\n`);
 
 module.exports = {
-  leerFuentes, auditarCobertura, validarAsociacion, validarContenidoIlustrativo, validarFuente,
+  leerFuentes, auditarCobertura, validarAsociacion, validarContenidoIlustrativo, validarFuente, leerRegistroCredito,
 };
