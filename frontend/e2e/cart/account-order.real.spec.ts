@@ -6,7 +6,7 @@ async function signIn(page: import('@playwright/test').Page) {
   await page.getByLabel('Email', { exact: true }).fill('cc258-empty@example.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(/\/mi-cuenta$/)
 }
 
 test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda compra', async ({ page, context }) => {
@@ -164,7 +164,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(/\/mi-cuenta$/)
   await page.goto('/mi-cuenta/pedidos')
   await expect(page.getByText('Todavía no tenés pedidos.', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: orderNumber, exact: true })).toHaveCount(0)

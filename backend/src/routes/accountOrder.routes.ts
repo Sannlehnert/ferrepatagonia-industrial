@@ -3,6 +3,9 @@ import {
   handleAccountOrder,
   handleClientOrderRead,
 } from '../controllers/accountOrder.controller';
+import { transferOrderRouter } from './transferOrder.routes';
+
+export { transferOrderRouter };
 
 export const accountOrderRouter = Router();
 
@@ -21,7 +24,12 @@ accountOrderRouter.get(
 export const clientOrderRouter = Router();
 
 clientOrderRouter.use((req, _res, next) => {
-  if (req.path === '/cuenta-corriente' || req.path.startsWith('/cuenta-corriente/')) {
+  if (
+    req.path === '/cuenta-corriente' ||
+    req.path.startsWith('/cuenta-corriente/') ||
+    req.path === '/transferencia' ||
+    req.path.startsWith('/transferencia/')
+  ) {
     next('router');
     return;
   }

@@ -42,6 +42,19 @@ Tailwind CSS v4. La Home definitiva corresponde a la tarea #220 de Bruno y se
 integra por separado; debe validarse visualmente junto con estas pantallas
 antes del release.
 
+### Mi Cuenta
+
+El panel `/mi-cuenta` tiene navegación propia, sin cabecera ni pie de tienda.
+El menú muestra las secciones de cuenta corriente solo para empresas y marca
+el filtro de pedidos activo. Al cambiar de sección se vuelve al inicio; al
+usar Atrás o Adelante se restaura la posición anterior.
+
+«Volver a tienda» recupera la última página pública visitada en la pestaña,
+incluyendo búsqueda y filtros; si no está disponible, abre el catálogo. El
+inicio de sesión conserva el destino solicitado desde la tienda o una ruta
+protegida; sin destino válido, los clientes ingresan al dashboard y los
+administradores a su panel.
+
 ### Importación administrativa de productos
 
 La pantalla `/admin/productos/importar` descarga una plantilla CSV y acepta
