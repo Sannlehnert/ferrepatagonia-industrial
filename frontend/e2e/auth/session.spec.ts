@@ -9,7 +9,7 @@ for (const account of [
   {
     role: 'cliente',
     email: 'cliente@e2e.test',
-    destination: '/mi-cuenta',
+    destination: '/mi-cuenta/datos',
   },
 ]) {
   test(`${account.role}: inicia, restaura y cierra sesión`, async ({

@@ -131,7 +131,7 @@ for (const width of viewports) {
 
       if (width < 768) {
         // Validar área táctil del botón Volver (>= 44x44px)
-        const backBtn = page.getByRole('button', { name: 'Volver a tienda' })
+        const backBtn = page.getByRole('button', { name: 'Volver', exact: true })
         await expect(backBtn).toBeVisible()
         const backBox = await backBtn.boundingBox()
         expect(backBox).not.toBeNull()
@@ -145,7 +145,7 @@ for (const width of viewports) {
         await expect(menuToggle).toBeVisible()
         await menuToggle.click()
 
-        const accountMenu = page.getByRole('navigation', { name: 'Menú de mi cuenta' })
+        const accountMenu = page.getByRole('navigation', { name: 'Menú de navegación de cuenta' })
         await expect(accountMenu.getByRole('link', { name: 'Pedidos sin comprobante', exact: true })).toBeVisible()
         await accountMenu.getByRole('link', { name: 'Historial de pedidos', exact: true }).click()
         await expect(page).toHaveURL('/mi-cuenta/pedidos')

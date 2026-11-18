@@ -15,7 +15,7 @@ test('API real: agrega desde catálogo y conserva el carrito al recargar', async
     exact: true,
   }).click()
 
-  await expect(page).toHaveURL(/\/mi-cuenta$/)
+  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
 
   await page.goto('/catalogo?busqueda=E2E-24')
 

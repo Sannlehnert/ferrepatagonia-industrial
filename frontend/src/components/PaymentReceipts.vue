@@ -136,7 +136,7 @@ function operation(receipt: PaymentReceipt) {
 
     <form v-if="mode !== 'admin'" class="space-y-4" @submit.prevent="upload">
       <label
-        class="box-border min-w-0 max-w-full border-2 border-dashed border-[#CBD5E1] rounded-[10px] p-6 sm:p-8 w-full flex flex-col items-center justify-center gap-3 bg-[#F8FAFC] hover:bg-slate-50 transition cursor-pointer text-center"
+        class="border-2 border-dashed border-[#CBD5E1] rounded-[10px] p-6 sm:p-8 w-full flex flex-col items-center justify-center gap-3 bg-[#F8FAFC] hover:bg-slate-50 transition cursor-pointer text-center"
         @dragover.prevent
         @drop.prevent="handleDrop"
       >

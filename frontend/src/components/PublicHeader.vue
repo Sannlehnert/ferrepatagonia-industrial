@@ -140,7 +140,7 @@ function toggleCartDrawer() {
           </RouterLink>
         </nav>
         <div class="header-account">
-          <RouterLink v-if="account" :to="{ name: account.route, query: account.route === 'login' ? { redirect: route.fullPath } : undefined }" class="header-link fp-focus">
+          <RouterLink v-if="account" :to="{ name: account.route }" class="header-link fp-focus">
             <CommerceIcon name="user" /> {{ account.label }}
           </RouterLink>
           <RouterLink v-if="!auth.isAuthenticated" :to="{ name: 'registro' }" class="header-link register-link fp-focus">

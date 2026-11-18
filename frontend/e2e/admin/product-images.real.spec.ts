@@ -14,7 +14,7 @@ async function signIn(page: Page, email = 'admin@e2e.test') {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta)$/)
+  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta\/datos)$/)
 }
 
 async function photo(width: number) {

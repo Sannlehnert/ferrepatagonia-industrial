@@ -15,7 +15,7 @@ for (const account of [
   {
     role: 'cliente',
     email: 'cliente@e2e.test',
-    destination: '/mi-cuenta',
+    destination: '/mi-cuenta/datos',
     expectedStatus: 403,
   },
   {

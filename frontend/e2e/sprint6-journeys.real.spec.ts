@@ -95,7 +95,7 @@ test('A.3 empresa pendiente sin cuenta puede consultar pero no operar a crédito
     data: { tipoCliente: 'EMPRESA', nombreRazonSocial: 'Empresa A3', cuit, email, password },
   })
   expect(registration.status()).toBe(201)
-  await login(page, email, password, '/mi-cuenta')
+  await login(page, email, password, '/mi-cuenta/datos')
   const session = await (await page.request.get('/api/auth/me')).json()
   expect(session.user).toMatchObject({ estadoAprobacionEmpresa: 'PENDIENTE', cuentaCorrienteHabilitada: null })
   await page.goto('/mi-cuenta')
@@ -124,7 +124,7 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
   const clientContext = await browser.newContext()
   try {
     const client = await clientContext.newPage()
-    await login(client, company.email, company.password, '/mi-cuenta')
+    await login(client, company.email, company.password, '/mi-cuenta/datos')
     await client.goto('/mi-cuenta')
     const commercial = client.getByRole('region', { name: 'Estado comercial' })
     await expect(commercial).toContainText('aprobación de tu empresa está pendiente')
@@ -193,7 +193,7 @@ for (const width of [320, 360, 390, 768, 1024, 1280]) {
 
     await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await login(page, company.email, company.password, '/mi-cuenta')
+    await login(page, company.email, company.password, '/mi-cuenta/datos')
 
     async function capture(name: string) {
       if (process.env.SPRINT6_284_CAPTURES !== '1') return

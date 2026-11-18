@@ -2,7 +2,7 @@ import type { Router, RouteLocationRaw } from 'vue-router'
 import type { Rol } from '@/types/auth'
 
 export const rutas = {
-  miCuenta: '/mi-cuenta',
+  miCuenta: '/mi-cuenta/datos',
 }
 
 // Destino por defecto según el rol del usuario autenticado.
@@ -11,7 +11,7 @@ export function rutaPorRol(rol: Rol | null): RouteLocationRaw {
     case 'ADMIN':
       return { name: 'admin-dashboard' }
     case 'CLIENTE':
-      return { name: 'cuenta-dashboard' }
+      return { name: 'cuenta-datos' }
     default:
       return { name: 'login' }
   }

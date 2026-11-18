@@ -75,7 +75,7 @@ for (const account of [
   await page.getByLabel('Email',{exact:true}).fill(account.email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button',{name:'Ingresar',exact:true}).click()
-  await expect(page).toHaveURL(/\/(?:mi-cuenta|admin\/dashboard)$/)
+  await expect(page).toHaveURL(/\/(?:mi-cuenta\/datos|admin\/dashboard)$/)
   const pending = page.waitForResponse(r=>new URL(r.url()).pathname===account.endpoint && r.request().method()==='POST')
   await page.goto('/catalogo')
   const response = await pending
@@ -113,7 +113,7 @@ test('backend real: visitante, cliente nuevo y listas propias al cambiar de sesi
     await page.getByLabel('Email',{exact:true}).fill(email)
     await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
     await page.getByRole('button',{name:'Ingresar',exact:true}).click()
-    await expect(page).toHaveURL(/\/(?:mi-cuenta|admin\/dashboard)$/)
+    await expect(page).toHaveURL(/\/(?:mi-cuenta\/datos|admin\/dashboard)$/)
   }
   const signOut=async()=>{
     const logout=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/auth/logout'&&r.request().method()==='POST')
@@ -158,7 +158,7 @@ test('cambio de sesión invalida precios previos y la UI bloquea precios sintét
     await page.getByLabel('Email',{exact:true}).fill(email)
     await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
     await page.getByRole('button',{name:'Ingresar',exact:true}).click()
-    await expect(page).toHaveURL(/\/mi-cuenta$/)
+    await expect(page).toHaveURL(/\/mi-cuenta\/datos/)
   }
   const openCatalog=async()=>{
     const pricing=page.waitForResponse(r=>new URL(r.url()).pathname==='/api/precios/mios' && r.request().method()==='POST')

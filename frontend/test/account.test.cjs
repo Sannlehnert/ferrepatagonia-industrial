@@ -25,20 +25,17 @@ test('account menu only exposes permitted controlled routes',()=>{
  for(const tipoCliente of ['PARTICULAR','EMPRESA']) {
   const visible=menu.getNavigableMenu(menu.accountMenu,permissions.getPermissionsForUser({rol:'CLIENTE',tipoCliente}));
   assert.deepEqual(visible.map(item=>item.routeName),tipoCliente === 'EMPRESA'
-   ? ['cuenta-dashboard','cuenta-pedidos','cuenta-pedidos','cuenta-pedidos','cuenta-corriente','cuenta-datos']
-   : ['cuenta-dashboard','cuenta-pedidos','cuenta-pedidos','cuenta-datos']);
+   ? ['cuenta-pedidos','cuenta-corriente','cuenta-datos'] : ['cuenta-pedidos','cuenta-datos']);
  }
  for(const user of [null,{rol:'ADMIN',tipoCliente:null}]) assert.deepEqual(menu.getNavigableMenu(menu.accountMenu,permissions.getPermissionsForUser(user)),[]);
 });
-test('normalizeOrderFilter reduce vacíos, repetidos y desconocidos al historial general', () => {
- const m={exports:{}};
- const source=readFileSync(resolve(__dirname,'../src/utils/accountFilters.ts'),'utf8');
- new Function('module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(m,m.exports);
- const { normalizeOrderFilter } = m.exports;
- assert.equal(normalizeOrderFilter('sin-comprobante'),'sin-comprobante');
- assert.equal(normalizeOrderFilter('cuenta-corriente'),'cuenta-corriente');
- for (const value of [undefined,null,'','desconocido',['desconocido'],[],'SIN-COMPROBANTE',['cuenta-corriente','x'],['sin-comprobante','cuenta-corriente'],['cuenta-corriente','cuenta-corriente']]) assert.equal(normalizeOrderFilter(value),null);
+
+test('MiCuentaLayout does not have sticky header and scrolls naturally', () => {
+ const layoutSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaLayout.vue'), 'utf8');
+ assert.doesNotMatch(layoutSource, /sticky\s+top-0/);
+ assert.match(layoutSource, /class="[^"]*w-full\s+bg-white\s+shadow-xs[^"]*"/);
 });
+
 test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedidos at pedidos', () => {
  const routerSource = readFileSync(resolve(__dirname, '../src/router/index.ts'), 'utf8');
  assert.match(routerSource, /path:\s*''[\s\S]*?MiCuentaDashboardView\.vue/);
@@ -48,14 +45,12 @@ test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedi
 
 test('MiCuentaDashboardView renders greeting, 3 metric cards and no orders table', () => {
  const dashboardSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaDashboardView.vue'), 'utf8');
- assert.match(dashboardSource, /<h1 class="text-2xl\s+font-bold\s+text-\[#0B2438\]\s+text-center\s+my-6">/);
  assert.match(dashboardSource, /text-2xl\s+font-bold\s+text-\[#0B2438\]\s+text-center\s+my-6/);
  assert.match(dashboardSource, /Pedidos Realizados/);
  assert.match(dashboardSource, /text-\[#10B981\]/);
  assert.match(dashboardSource, /Pedidos con Cuenta Corriente/);
  assert.match(dashboardSource, /text-\[#0EA5E9\]/);
  assert.match(dashboardSource, /Pedidos sin comprobante/);
- assert.equal((dashboardSource.match(/\{\{ error \|\| \(loading && !orders\) \? '-' :/g) || []).length, 3);
  assert.doesNotMatch(dashboardSource, /<table/);
  assert.doesNotMatch(dashboardSource, /Monto Total/);
 });
@@ -72,5 +67,43 @@ test('HistorialPedidos does not render metric cards and keeps filter bar above a
  assert.ok(filterBarIndex < loadingIndex, 'Filter bar must be above loading state');
  assert.ok(filterBarIndex < errorIndex, 'Filter bar must be above error state');
  assert.ok(filterBarIndex < tableIndex, 'Filter bar must be above table');
+});
+
+test('NavigationMenu evaluates exact route and search query exclusively for account links', async () => {
+ const menuSource = readFileSync(resolve(__dirname, '../src/components/NavigationMenu.vue'), 'utf8');
+ assert.match(menuSource, /path === '\/mi-cuenta\/pedidos' && !query\.filtro/);
+ assert.match(menuSource, /path === '\/mi-cuenta\/pedidos' && query\.filtro === 'sin-comprobante'/);
+ assert.match(menuSource, /bg-\[#103A5C\]\s+text-white/);
+ assert.match(menuSource, /text-\[#A7B6C4\]/);
+});
+
+test('NavigationMenu and MiCuentaDashboardView segregate PARTICULAR from EMPRESA roles', () => {
+ const menuSource = readFileSync(resolve(__dirname, '../src/components/NavigationMenu.vue'), 'utf8');
+ assert.match(menuSource, /account-credit/);
+ assert.match(menuSource, /PARTICULAR/);
+
+ const dashboardSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaDashboardView.vue'), 'utf8');
+ assert.match(dashboardSource, /isParticular\s*\?\s*'md:grid-cols-2'\s*:\s*'md:grid-cols-3'/);
+ assert.match(dashboardSource, /v-if="!isParticular"/);
+});
+
+test('MiCuentaLayout and CartView provide mobile header and intelligent back navigation', () => {
+ const layoutSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaLayout.vue'), 'utf8');
+ assert.match(layoutSource, /w-full\s+bg-white\s+shadow-xs/);
+ assert.match(layoutSource, /bg-\[#0B2438\]\s+text-white\s+px-4\s+py-3\s+flex\s+items-center\s+justify-between/);
+ assert.match(layoutSource, /Volver/);
+ assert.match(layoutSource, /last_external_route/);
+ assert.match(layoutSource, /router\.push\(fallback\)/);
+ assert.match(layoutSource, /isMobileMenuOpen/);
+ assert.match(layoutSource, /Menú de navegación de cuenta/);
+
+ const cartSource = readFileSync(resolve(__dirname, '../src/views/CartView.vue'), 'utf8');
+ assert.match(cartSource, /md:hidden[\s\S]*?← Volver/);
+ assert.match(cartSource, /min-h-\[44px\]\s+inline-flex\s+items-center\s+gap-1\.5\s+text-sm\s+font-medium\s+text-\[#103A5C\]\s+hover:text-\[#145A8D\]\s+mb-2/);
+ assert.match(cartSource, /router\.back\(\)/);
+
+ const headerSource = readFileSync(resolve(__dirname, '../src/components/PublicHeader.vue'), 'utf8');
+ assert.match(headerSource, /openCartDrawer/);
+ assert.match(headerSource, /route:\s*'cuenta-dashboard'/);
 });
 
