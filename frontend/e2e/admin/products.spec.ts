@@ -47,6 +47,25 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
   const visitor = await visitorContext.newPage();
   const origin = new URL(page.url()).origin;
   const publicNames = visitor.getByRole('heading', { level: 3 });
+  const adminNames = page.getByRole('heading', { level: 3 });
+  const adminProductCard = (expectedName: string) =>
+    page.locator('.admin-products .grid > div').filter({
+      has: page.getByRole('heading', { name: expectedName, exact: true }),
+    });
+  const filterAdminByCode = async (expectedName: string) => {
+    const searchInput = page.getByLabel('Buscar productos por nombre o SKU');
+    if ((await searchInput.inputValue()) !== code) {
+      const filtered = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/admin/productos'
+          && response.request().method() === 'GET'
+          && url.searchParams.get('busqueda') === code;
+      });
+      await searchInput.fill(code);
+      expect((await filtered).status()).toBe(200);
+    }
+    await expect(adminNames).toHaveText([expectedName]);
+  };
 
   const checkPublicProduct = async (expectedName: string) => {
     await visitor.goto(
@@ -108,8 +127,10 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
     await checkPublicProduct(initialName);
     await expect(visitor.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
     await expect(visitor.getByRole('button', { name: 'Agregar', exact: true })).toBeDisabled();
-    await page.getByLabel('Buscar productos por nombre o SKU').fill(code);
-    await expect(page.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
+    await filterAdminByCode(initialName);
+    await expect(
+      adminProductCard(initialName).getByText('Precio pendiente de verificación', { exact: true }),
+    ).toBeVisible();
 
     // Esta evidencia ficticia solo se inserta en la base descartable del runner.
     const profile = process.env.CCE2E_TEST_PROFILE;
@@ -125,8 +146,10 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
       await connection.end();
     }
     await page.reload();
-    await page.getByLabel('Buscar productos por nombre o SKU').fill(code);
-    await expect(page.getByText('Precio base verificado', { exact: true })).toBeVisible();
+    await filterAdminByCode(initialName);
+    await expect(
+      adminProductCard(initialName).getByText('Precio base verificado', { exact: true }),
+    ).toBeVisible();
     await visitor.evaluate('window.dispatchEvent(new Event("focus"))');
     await expect(visitor.getByText('USD 150.00', { exact: true })).toBeVisible();
     await visitor.goto(`${origin}/producto/${createdId}`);
@@ -166,8 +189,10 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
       `"${editedName}" se actualizó correctamente.`,
     );
     await expect(form).toHaveCount(0);
-    await page.getByLabel('Buscar productos por nombre o SKU').fill(code);
-    await expect(page.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
+    await filterAdminByCode(editedName);
+    await expect(
+      adminProductCard(editedName).getByText('Precio pendiente de verificación', { exact: true }),
+    ).toBeVisible();
 
     await visitor.evaluate('window.dispatchEvent(new Event("focus"))');
     await expect(visitor.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
