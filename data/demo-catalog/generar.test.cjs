@@ -4,9 +4,9 @@ const { join } = require('node:path');
 const { test } = require('node:test');
 const { categoriasRequeridas, columnas, csv, familias, generar } = require('./generar.cjs');
 const {
-  auditarCobertura, leerFuentes, validarAsociacion, validarContenidoIlustrativo,
+  auditarCobertura, leerFuentes, validarAsociacion, validarContenidoIlustrativo, validarFuente,
 } = require('./cobertura-visual.cjs');
-const { leerCatalogoMaestro, seleccionarFuentesCatalogo } = require('./asociar-fotos.cjs');
+const { asociarFotos, leerCatalogoMaestro, seleccionarFuentesCatalogo } = require('./asociar-fotos.cjs');
 const {
   archivoIlustrativoDeSku, claves, svg, validarLeyenda,
 } = require('./ilustraciones.cjs');
@@ -67,8 +67,36 @@ test('cada ilustración de origen es generada con leyenda textual verificable', 
   assert.throws(() => validarLeyenda(svg('ABR').replace('IMAGEN ILUSTRATIVA', '')), /IMAGEN ILUSTRATIVA/);
   assert.throws(() => validarContenidoIlustrativo('ilustrativa-abr.webp', Buffer.from('WebP sin leyenda')),
     /versión con leyenda/);
-  assert.equal(archivos.size, 26);
-  assert.equal(claves.length, 27);
+  assert.equal(archivos.size, 38);
+  assert.equal(claves.length, 42);
+});
+
+test('rechaza huellas, autoría, licencias, fuentes y familias inconsistentes', () => {
+  const fuente = leerFuentes().get('FP-DEMO-CON-CONO-NARANJA-30-CM');
+  const informe = require('./catalog-validation.json').imagenes.find(i => i.sku === fuente.sku);
+  for (const campo of ['autor', 'licencia', 'fuente', 'url_original', 'referencia_licencia']) {
+    assert.throws(() => validarFuente({ ...fuente, [campo]: 'https://example.invalid/evidencia-falsa' }, fuente.bytes), /Créditos/);
+  }
+  assert.throws(() => validarFuente({ ...fuente, familia: 'Guantes de trabajo' }, fuente.bytes), /Familia incorrecta/);
+  assert.throws(() => validarFuente(fuente, fuente.bytes, { ...informe, sha256Origen: '0'.repeat(64) }), /Hash del informe/);
+  assert.throws(() => validarFuente(fuente, Buffer.from('foto alterada')), /Hash del informe/);
+  for (const sku of ['FP-DEMO-FIJ-TARUGO-NYLON-10-MM', 'FP-DEMO-CAS-CASCO-ALA-AMARILLO']) {
+    assert.throws(() => validarAsociacion(sku, sku.includes('TARUGO') ? 'tarugo-nailon.webp' : 'casco-ala-completa-amarillo.webp'), /Ilustración incompatible/);
+  }
+});
+
+test('todos los activos asociados se decodifican y respetan el máximo de 960 px', async () => {
+  const sharp = require('../../backend/node_modules/sharp');
+  const archivos = new Map([...leerFuentes().values()].map(f => [f.archivo, f.bytes]));
+  for (const [archivo, bytes] of archivos) {
+    const { info } = await sharp(bytes, { failOn: 'warning' }).raw().toBuffer({ resolveWithObject: true });
+    assert.ok(info.width > 0 && info.height > 0 && Math.max(info.width, info.height) <= 960, archivo);
+    const normalizado = await sharp(bytes).rotate().webp({ quality: 85 }).toBuffer();
+    const huella = require('node:crypto').createHash('sha256').update(normalizado).digest('hex');
+    for (const imagen of require('./catalog-validation.json').imagenes.filter(i => i.archivo === archivo)) {
+      assert.equal(imagen.sha256Publicado, huella, `Hash publicado incorrecto: ${imagen.sku}`);
+    }
+  }
 });
 
 test('rechaza asociaciones renombradas, familias incorrectas y fotografías de otra medida', () => {
@@ -94,6 +122,16 @@ test('prepara la asociación al catálogo maestro de 100 SKU sin exigir los SKU 
   for (const [sku, fuente] of seleccion.fuentes) {
     assert.equal(fuente.nombre, catalogo.find(fila => fila.sku === sku).nombre_propuesto);
   }
+});
+
+test('conservar una imagen existente no la declara verificada ni identifica su archivo con el plan nuevo', async () => {
+  const fuente = leerFuentes().get('FP-DEMO-FIJ-TARUGO-NYLON-10-MM');
+  const producto = { id_producto: 1, codigo: fuente.sku, nombre: fuente.nombre, imagen: '/api/product-images/anterior.webp' };
+  const resultado = await asociarFotos({ get: async ruta => ruta.endsWith('/1') ? producto : [producto],
+    subir: () => assert.fail('No reemplazar una imagen preexistente automáticamente') },
+  { aplicar: true, fuentes: new Map([[fuente.sku, fuente]]) });
+  assert.deepEqual(resultado, [{ sku: fuente.sku, archivoPlanificado: fuente.archivo,
+    estado: 'conservada', imagen: producto.imagen, verificacionPendiente: true }]);
 });
 
 test('el generador exige nombres de categoría inequívocos', () => {

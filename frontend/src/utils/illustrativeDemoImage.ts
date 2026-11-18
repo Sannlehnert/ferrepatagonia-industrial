@@ -1,4 +1,6 @@
 const illustratedDemoSkus = new Set([
+  'FP-DEMO-FIJ-TARUGO-NYLON-10-MM',
+  'FP-DEMO-CAS-CASCO-ALA-AMARILLO',
   'FP-DEMO-ABR-DISCO-LIJA-100-MM',
   'FP-DEMO-ABR-DISCO-METAL-100-MM',
   'FP-DEMO-ABR-LIJA-AGUA-GRANO-1000',
@@ -51,5 +53,9 @@ const illustratedDemoSkus = new Set([
 const illustrativeAsset = /(?:^|\/)ilustrativa-[^/?#]+\.webp(?:[?#]|$)/i
 
 export function isIllustrativeDemoImage(codigo: string, image: string | null | undefined): boolean {
-  return illustratedDemoSkus.has(codigo) || (typeof image === 'string' && illustrativeAsset.test(image))
+  if (typeof image !== 'string' || !image) return false
+  if (illustrativeAsset.test(image)) return true
+  // Los nombres originales conservan el tipo real; la lista de SKU solo es
+  // necesaria después de que ADMIN reemplaza el nombre por un UUID.
+  return /\/api\/product-images\/[a-f0-9-]+\.webp(?:[?#]|$)/i.test(image) && illustratedDemoSkus.has(codigo)
 }

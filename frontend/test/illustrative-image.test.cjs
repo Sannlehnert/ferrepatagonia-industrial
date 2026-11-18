@@ -35,4 +35,6 @@ test('recognizes illustrative asset paths and leaves photographs unmarked', () =
   assert.equal(isIllustrativeDemoImage('SKU-OTHER', '/demo-catalog/ilustrativa-abr-hoja.webp'), true)
   assert.equal(isIllustrativeDemoImage('SKU-OTHER', '/api/product-images/00000000-0000-4000-8000-000000000000.webp'), false)
   assert.equal(isIllustrativeDemoImage('FP-DEMO-CON-CONO-NARANJA-30-CM', '/api/product-images/id.webp'), false)
+  assert.equal(isIllustrativeDemoImage('FP-DEMO-CAS-CASCO-ALA-AMARILLO', null), false)
+  assert.equal(isIllustrativeDemoImage('FP-DEMO-CAS-CASCO-ALA-AMARILLO', '/demo-catalog/casco-ala-completa-amarillo.webp'), false)
 })

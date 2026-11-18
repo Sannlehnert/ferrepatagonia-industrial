@@ -48,6 +48,7 @@ const dibujos = {
 };
 
 const dibujosDeVariante = {
+  'ABR-CORTE': `<circle cx="360" cy="235" r="135" fill="#374151" stroke="${tinta}" stroke-width="10"/><circle cx="360" cy="235" r="36" fill="#f4f7fa" stroke="#cbd5e1" stroke-width="14"/>`,
   'ABR-HOJA': `<path d="M260 110h150l70 70v250H260z" fill="#f3d9a8" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
     <path d="M410 110v70h70M295 225h150M295 270h150M295 315h150M295 360h150" ${trazoDe(azul, 12)}/>`,
   'ADH-COLA': `<path d="M290 175h140l25 185H265z" fill="#ffffff" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
@@ -56,9 +57,7 @@ const dibujosDeVariante = {
   'ADH-CINTA': `<circle cx="360" cy="250" r="128" fill="${ambar}" stroke="${tinta}" stroke-width="12"/>
     <circle cx="360" cy="250" r="58" fill="#f4f7fa" stroke="${tinta}" stroke-width="10"/>
     <path d="M360 122a128 128 0 0 1 104 54" ${trazoDe('#ffffff', 18)}/>`,
-  'ADH-SELLADOR': `<path d="M275 190h170l25 125-30 55H280l-30-55z" fill="#ffffff" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
-    <path d="M310 190v-45h100v45m-48-45l48-55h54" ${trazoDe(azul, 18)}/>
-    <rect x="300" y="255" width="120" height="48" rx="6" fill="${ambar}"/>`,
+  'ADH-SELLADOR': `<rect x="230" y="200" width="160" height="185" fill="#c9a475" stroke="${tinta}" stroke-width="8"/><path d="M230 200l35-35h125v35" ${trazoDe()}/><rect x="420" y="180" width="65" height="205" rx="10" fill="white" stroke="${tinta}" stroke-width="8"/><path d="M432 180l21-85 20 85" fill="white" stroke="${tinta}" stroke-width="8"/><path d="M435 265h35" ${trazoDe(azul, 18)}/>`,
   'ALT-BOLSO': `<path d="M260 190h200l25 180H235z" fill="${azul}" stroke="${tinta}" stroke-width="10" stroke-linejoin="round"/>
     <path d="M305 190v-35a55 55 0 0 1 110 0v35m-145 70h180" ${trazoDe(tinta, 12)}/>
     <rect x="320" y="278" width="80" height="52" rx="8" fill="${ambar}" stroke="${tinta}" stroke-width="8"/>`,
@@ -94,6 +93,27 @@ const dibujosDeVariante = {
     <path d="M360 170v60m-35 0h70" ${trazoDe()}/>`,
 };
 
+// Dibujos por atributo visible: no se imprimen medidas, potencias o certificaciones
+// que una representación esquemática no puede acreditar.
+const cable = (color, bipolar = false) => `<circle cx="330" cy="235" r="110" ${trazoDe(color, 28)}/><circle cx="330" cy="235" r="65" ${trazoDe(color, 22)}/><path d="M440 235h85v100" ${trazoDe(color, bipolar ? 32 : 22)}/><path d="M${bipolar ? 516 : 525} 335v35${bipolar ? 'm18-35v35' : ''}" ${trazoDe('#bd753d', 8)}/>`;
+const chaleco = (color, bolsillos = false, malla = false) => dibujos.CHA
+  .replace('#f2d10a', color) + `<path d="M360 175v170" ${trazoDe(tinta, 5)} stroke-dasharray="3 6"/>` +
+  (bolsillos ? `<path d="M285 290h48v35h-48zM388 290h48v35h-48z" ${trazoDe(tinta, 5)}/>` : '') +
+  (malla ? `<path d="M290 200h140m-140 16h140m-140 16h140m-140 72h140m-140 16h140" ${trazoDe(tinta, 3)} stroke-dasharray="3 8"/>` : '');
+Object.assign(dibujosDeVariante, {
+  'CAB-NEGRO': cable('#20252b'), 'CAB-MARRON': cable('#82532e'),
+  'CAB-BIPOLAR': cable('#20252b', true),
+  'CHA-CIERRE': chaleco('#f2d10a'), 'CHA-BOLSILLOS': chaleco('#f2d10a', true),
+  'CHA-NARANJA': chaleco('#f97316'), 'CHA-MALLA': chaleco('#f97316', false, true),
+  'CIN-LISA': `<circle cx="360" cy="235" r="125" fill="#f2d10a" stroke="${tinta}" stroke-width="10"/><circle cx="360" cy="235" r="60" fill="#f4f7fa" stroke="${tinta}" stroke-width="10"/>`,
+  'CAS-ALA': `<path d="M255 270a105 130 0 0 1 210 0" fill="${ambar}" stroke="${tinta}" stroke-width="10"/><ellipse cx="360" cy="280" rx="175" ry="40" fill="${ambar}" stroke="${tinta}" stroke-width="10"/><path d="M290 267a75 100 0 0 1 140 0" ${trazoDe('#eab308', 12)}/>`,
+  'FIJ-TARUGO': `<path d="M220 220h290v60H220z" fill="#cbd5e1" stroke="${tinta}" stroke-width="8"/><path d="M230 205v90m50-75v60m40-60v60m40-60v60m40-60v60m40-60v60m-135-30h205" ${trazoDe(tinta, 6)}/>`,
+  'FIJ-VARILLA': `<path d="M210 220h300v65H210z" fill="#cbd5e1" stroke="${tinta}" stroke-width="8"/><path d="M220 280l30-55m0 55l30-55m0 55l30-55m0 55l30-55m0 55l30-55m0 55l30-55m0 55l30-55m0 55l30-55m0 55l30-55" ${trazoDe(tinta, 5)}/>`,
+  'FIJ-ANCLAJE': `<path d="M220 220h280v65H220z" fill="#cbd5e1" stroke="${tinta}" stroke-width="8"/><path d="M235 205v95m35-95v95m50-80v65m50-65v65m70-65l-15 65m55-65l-15 65" ${trazoDe(tinta, 7)}/><path d="M315 195h50l15 25-15 25h-50l-15-25z" fill="#94a3b8" stroke="${tinta}" stroke-width="8"/>`,
+  'GUA-ALGODON': dibujos.GUA.replace('#d8b98a', '#eee9d6') + `<path d="M280 260h110m-110 18h110m-110 18h110m-110 18h110" ${trazoDe('#a8a18a', 4)} stroke-dasharray="3 6"/>`,
+  'GUA-DESCARNE': dibujos.GUA + `<path d="M270 335h125l20 65H250z" fill="#d8b98a" stroke="${tinta}" stroke-width="8"/>`,
+});
+
 const familias = {
   ABR: 'Abrasivos', ADH: 'Adhesivos y selladores', ALT: 'Trabajo en altura', AUD: 'Protección auditiva',
   CAB: 'Cables', CAL: 'Calzado de trabajo', CAS: 'Cascos', CHA: 'Chalecos reflectivos',
@@ -105,6 +125,23 @@ const claves = [...Object.keys(familias), ...Object.keys(dibujosDeVariante)];
 const familiaDe = clave => clave.split('-')[0];
 const archivoDe = clave => `ilustrativa-${clave.toLowerCase()}.webp`;
 const variantesPorSku = Object.freeze({
+  'FP-DEMO-ABR-DISCO-METAL-100-MM': 'ABR-CORTE',
+  'FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2': 'CAB-BIPOLAR',
+  'FP-DEMO-CAB-CABLE-MARRON-0-5-MM2': 'CAB-MARRON',
+  'FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2': 'CAB-NEGRO',
+  'FP-DEMO-CAS-CASCO-ALA-AMARILLO': 'CAS-ALA',
+  'FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL': 'CHA-CIERRE',
+  'FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL': 'CHA-BOLSILLOS',
+  'FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL': 'CHA-MALLA',
+  'FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL': 'CHA-NARANJA',
+  'FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA': 'CIN-LISA',
+  'FP-DEMO-CIN-CINTA-PISO-AMARILLA': 'CIN-LISA',
+  'FP-DEMO-CIN-CINTA-VISUAL-12-MM': 'CIN-LISA',
+  'FP-DEMO-FIJ-TARUGO-NYLON-10-MM': 'FIJ-TARUGO',
+  'FP-DEMO-FIJ-ANCLAJE-M10': 'FIJ-ANCLAJE',
+  'FP-DEMO-FIJ-VARILLA-M10': 'FIJ-VARILLA',
+  'FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL': 'GUA-ALGODON',
+  'FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL': 'GUA-DESCARNE',
   'FP-DEMO-ABR-LIJA-AGUA-GRANO-1000': 'ABR-HOJA',
   'FP-DEMO-ABR-LIJA-MADERA-GRANO-100': 'ABR-HOJA',
   'FP-DEMO-ADH-COLA-100-ML': 'ADH-COLA',
@@ -155,9 +192,10 @@ async function bytesDe(clave) {
   return sharp(Buffer.from(svg(clave))).webp({ quality: 85 }).toBuffer();
 }
 
-async function generar() {
-  const hashes = {};
-  for (const clave of claves) {
+async function generar(seleccion = claves) {
+  // Una corrección parcial conserva byte a byte los recursos ya revisados.
+  const hashes = seleccion === claves ? {} : JSON.parse(require('node:fs').readFileSync(join(destino, 'ilustraciones-manifest.json'), 'utf8'));
+  for (const clave of seleccion) {
     const archivo = archivoDe(clave);
     const bytes = await bytesDe(clave);
     writeFileSync(join(destino, archivo), bytes);

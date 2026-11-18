@@ -12,6 +12,9 @@ const rutaWebp = /^\/demo-catalog\/([a-z0-9-]+\.webp)$/;
 const manifiestoIlustraciones = JSON.parse(readFileSync(join(directorioFotos, 'ilustraciones-manifest.json'), 'utf8'));
 const informeCatalogo = JSON.parse(readFileSync(join(__dirname, 'catalog-validation.json'), 'utf8'));
 const imagenReportadaPorSku = new Map(informeCatalogo.imagenes.map(imagen => [imagen.sku, imagen.archivo]));
+const evidenciaPorSku = new Map(informeCatalogo.imagenes.map(imagen => [imagen.sku, imagen]));
+const familiaPorCodigo = new Map(familias.map(([codigo, , nombre]) => [codigo, nombre]));
+const creditos = readFileSync(join(directorioFotos, 'creditos.txt'), 'utf8').split(/\r?\n\s*\r?\n/);
 const fotoPorSku = new Map([
   ['FP-DEMO-ABR-DISCO-METAL-125-MM', 'disco-corte-metal.webp'],
   ['FP-DEMO-CAS-CASCO-ALA-AMARILLO', 'casco-ala-completa-amarillo.webp'],
@@ -46,6 +49,20 @@ function validarContenidoIlustrativo(archivo, bytes) {
   assert.equal(hash, manifiestoIlustraciones[archivo], `La ilustración ${archivo} no coincide con la versión con leyenda`);
 }
 
+function validarFuente(fila, bytes, informe = evidenciaPorSku.get(fila.sku)) {
+  const archivo = rutaWebp.exec(fila.ruta_final)?.[1];
+  assert.equal(fila.familia, familiaPorCodigo.get(fila.sku.split('-')[2]), `Familia incorrecta para ${fila.sku}`);
+  assert.ok(informe && informe.sku === fila.sku && informe.archivo === archivo, `Informe incompatible para ${fila.sku}`);
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), informe.sha256Origen, `Hash del informe incorrecto para ${fila.sku}`);
+  assert.equal(informe.http, 200);
+  assert.equal(informe.mime, 'image/webp');
+  const bloque = creditos.find(texto => texto.split(/\r?\n/)[0] === archivo);
+  assert.ok(bloque && ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia'].every(campo =>
+    fila[campo] && bloque.includes(fila[campo])), `Créditos o procedencia inconsistentes para ${fila.sku}`);
+  // La licencia de filas que comparten un activo debe conservar la misma evidencia.
+  return archivo;
+}
+
 function leerFuentes() {
   const productos = new Map(leerCsv(join(__dirname, 'productos-ferrepatagonia-demo.csv')).map(p => [p.codigo, p]));
   const fuentes = new Map();
@@ -71,6 +88,12 @@ function leerFuentes() {
         validarContenidoIlustrativo(archivo, bytes);
       }
       archivos.set(archivo, bytes);
+    }
+    validarFuente(fila, archivos.get(archivo));
+    for (const anterior of fuentes.values()) if (anterior.archivo === archivo) {
+      for (const campo of ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia']) {
+        assert.equal(fila[campo], anterior[campo], `Evidencia ${campo} inconsistente para ${archivo}`);
+      }
     }
     fuentes.set(fila.sku, { ...fila, nombre: producto.nombre, archivo, bytes: archivos.get(archivo) });
   }
@@ -132,5 +155,5 @@ function auditarCobertura(fuentes = leerFuentes()) {
 if (require.main === module) process.stdout.write(`${JSON.stringify(auditarCobertura(), null, 2)}\n`);
 
 module.exports = {
-  leerFuentes, auditarCobertura, validarAsociacion, validarContenidoIlustrativo,
+  leerFuentes, auditarCobertura, validarAsociacion, validarContenidoIlustrativo, validarFuente,
 };

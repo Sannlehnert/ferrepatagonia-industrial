@@ -51,8 +51,13 @@ async function asociarFotos(admin, { aplicar = false, fuentes = leerFuentes() } 
     assert.equal(actual.id_producto, id);
     assert.equal(actual.codigo, fuente.sku);
     assert.equal(actual.nombre, fuente.nombre);
-    if (actual.imagen || !aplicar) {
-      resultado.push({ sku: fuente.sku, archivo: fuente.archivo, estado: actual.imagen ? 'conservada' : 'pendiente', imagen: actual.imagen });
+    if (actual.imagen) {
+      resultado.push({ sku: fuente.sku, archivoPlanificado: fuente.archivo, estado: 'conservada',
+        imagen: actual.imagen, verificacionPendiente: true });
+      continue;
+    }
+    if (!aplicar) {
+      resultado.push({ sku: fuente.sku, archivo: fuente.archivo, estado: 'pendiente', imagen: actual.imagen });
       continue;
     }
     const guardado = await admin.subir(`${endpoint}/con-imagen`, fuente);
