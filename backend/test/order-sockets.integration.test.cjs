@@ -611,3 +611,80 @@ test('Stock ADMIN: REST responde mientras el aviso espera autorización y tolera
   assertSilent(client);
   assert.deepEqual(await inventory(f), [1, 2]);
 });
+
+test('#322 Transferencia Socket.IO: PARTICULAR y EMPRESA aprobada sin cuenta corriente reciben pedido.confirmado.v1, carrito.actualizado.v1 y stock.actualizado.v1 con aislamiento de salas', async t => {
+  const TRANSFER_ORDERS = '/api/pedidos/transferencia';
+
+  for (const profile of ['PARTICULAR', 'EMPRESA_SIN_CUENTA']) {
+    const f = await createOrderFixture(session);
+    const other = await createOrderFixture(session);
+
+    // El cliente comprador opera sin fila en CUENTA_CORRIENTE
+    await session.connection.query(
+      'DELETE FROM CUENTA_CORRIENTE WHERE id_cliente = ?',
+      [f.clientId],
+    );
+    if (profile === 'PARTICULAR') {
+      await session.connection.query(
+        "UPDATE CLIENTE SET tipo_cliente = 'PARTICULAR', estado_aprobacion_empresa = NULL WHERE id_cliente = ?",
+        [f.clientId],
+      );
+    }
+
+    const client = await connect(t, f.auth);
+    const secondSession = await connect(t, f.auth, { transport: 'polling' });
+    const outsider = await connect(t, other.auth);
+    const admin = await connect(t, { id: f.adminId, rol: 'ADMIN' });
+
+    await flush(client, secondSession, outsider, admin);
+    assert.deepEqual(
+      [...peer(client).rooms],
+      [client.socket.id, `orders:client:${f.clientId}`, 'catalog:authenticated'],
+    );
+
+    const { data: elig } = await request(f, TRANSFER_ORDERS + '/eligibilidad', 200);
+    assert.equal(elig.elegible, true);
+    assert.equal(elig.modalidadPago, 'TRANSFERENCIA');
+    assert.equal(typeof elig.cotizacion, 'string');
+
+    const key = randomUUID();
+    const receipt = await request(f, TRANSFER_ORDERS, 201, key, elig.cotizacion);
+    assert.equal(receipt.data.estado, 'CONFIRMADO');
+    assert.equal(receipt.data.modalidadPago, 'TRANSFERENCIA');
+
+    await flush(client, secondSession, outsider, admin);
+
+    assert.deepEqual(client.events, [{
+      version: 1,
+      idEvento: `pedido.confirmado.v1:${receipt.data.pedidoId}`,
+      pedidoId: receipt.data.pedidoId,
+      estado: 'CONFIRMADO',
+      notificadoEn: new Date(client.events[0].notificadoEn).toISOString(),
+    }], profile);
+    assert.deepEqual(secondSession.events, client.events, profile);
+    assert.deepEqual(outsider.events, [], profile);
+    assert.deepEqual(admin.events, [], profile);
+
+    for (const c of [client, secondSession]) {
+      assert.deepEqual(c.cart, [{ version: 1 }], profile);
+    }
+    for (const c of [outsider, admin]) {
+      assert.deepEqual(c.cart, [], profile);
+    }
+    for (const c of [client, secondSession, outsider, admin]) {
+      assert.deepEqual(c.stock, [{ version: 1, productosIds: [f.productId] }], profile);
+    }
+
+    // Replay idempotente y GET de recuperación no vuelven a emitir eventos por Socket.IO
+    assert.deepEqual(await request(f, TRANSFER_ORDERS, 200, key, elig.cotizacion), receipt);
+    assert.deepEqual(await request(f, TRANSFER_ORDERS + '/' + key, 200), receipt);
+    await flush(client, secondSession, outsider, admin);
+    assert.equal(client.events.length, 1, profile);
+    assert.equal(client.cart.length, 1, profile);
+    assert.equal(client.stock.length, 1, profile);
+
+    for (const c of [client, secondSession, outsider, admin]) {
+      c.socket.disconnect();
+    }
+  }
+});
