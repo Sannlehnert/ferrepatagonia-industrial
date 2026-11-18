@@ -1,8 +1,8 @@
 import type { EntityManager } from 'typeorm';
-import { inTransaction } from '../config/database.config';
+import { dataSource, inTransaction } from '../config/database.config';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
 import {
-    createCart, findCartId, findCartItem, findCartItems, lockCartClient, lockCartProduct, removeCartItem, saveCartItem
+    createCart, findCartClientId, findCartId, findCartItem, findCartItems, lockCartClient, lockCartProduct, removeCartItem, saveCartItem
 } from '../repositories/cart.repository';
 import { MariaDbPricingSource } from '../repositories/pricing.source';
 import type { AuthContext } from '../types/auth';
@@ -27,12 +27,16 @@ async function withClientCart<T>(auth: AuthContext, signal: AbortSignal,
     work: (manager: EntityManager, clientId: number, cartId: number | null) => Promise<T>): Promise<T> {
     for (let attempt = 0; ; attempt++) {
         signal.throwIfAborted();
+        // Don't start the cart/pricing snapshot before acquiring the client lock.
+        const clientId = await findCartClientId(dataSource.manager, auth.id);
+        if (clientId === null) throw new CartError('NO_AUTORIZADO', 403, 'Cuenta de cliente no habilitada.');
         let workFailure: { error: unknown } | undefined;
         try {
             return await inTransaction(async manager => {
                 try {
-                    const clientId = await lockCartClient(manager, auth.id);
-                    if (clientId === null) throw new CartError('NO_AUTORIZADO', 403, 'Cuenta de cliente no habilitada.');
+                    if (!await lockCartClient(manager, auth.id, clientId)) {
+                        throw new CartError('NO_AUTORIZADO', 403, 'Cuenta de cliente no habilitada.');
+                    }
                     const cartId = await findCartId(manager, clientId);
                     signal.throwIfAborted();
                     const result = await work(manager, clientId, cartId);

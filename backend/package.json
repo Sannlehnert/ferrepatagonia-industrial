@@ -1,4 +1,3 @@
-
 {
   "name": "ferrepatagonia-backend",
   "version": "0.1.0",
@@ -8,8 +7,8 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/cart-admission.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/env-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs test/auth.rate-limit.test.cjs test/productImport.test.cjs test/pricing.test.cjs test/pricing.http.test.cjs test/price-verification.test.cjs test/price-verification-runner.test.cjs test/account-order-request.test.cjs test/adminAccount.test.cjs test/order-sockets.test.cjs test/admin-orders.test.cjs test/prepare-local-storage.test.cjs test/schema-sql.test.cjs test/migration-loader.test.cjs test/admin-dashboard.test.cjs",
-    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs && npm run test:pricing:mariadb && npm run test:price-verification:isolated && node test/helpers/run-cart-mariadb.cjs && npm run test:cuenta-corriente:safety && node test/helpers/run-cuenta-corriente-mariadb.cjs && npm run test:cuenta-corriente:client && npm run test:orders:isolated && npm run test:orders:sockets && npm run test:receipts:isolated && npm run test:admin-orders && npm run test:company-approval:audit && npm run test:local-bootstrap:isolated",
+    "test:unit": "node --require ./test/helpers/test-env.cjs --test test/auth.me.test.cjs test/auth.middleware.test.cjs test/catalog.test.cjs test/cart-admission.test.cjs test/category.test.cjs test/clientes.test.cjs test/register.test.cjs test/database.test.cjs test/database-outcome.test.cjs test/dto.test.cjs test/auth.passport.test.cjs test/http-config.test.cjs test/env-config.test.cjs test/http-origin.test.cjs test/http-proxy.test.cjs test/auth.rate-limit.test.cjs test/productImport.test.cjs test/pricing.test.cjs test/pricing.http.test.cjs test/price-verification.test.cjs test/price-verification-runner.test.cjs test/account-order-request.test.cjs test/adminAccount.test.cjs test/order-sockets.test.cjs test/admin-orders.test.cjs test/credit-workflow.test.cjs test/prepare-local-storage.test.cjs test/schema-sql.test.cjs test/migration-loader.test.cjs test/admin-dashboard.test.cjs",
+    "test:integration": "node test/helpers/run-admin-products-mariadb.cjs && node test/helpers/run-category-mariadb.cjs && npm run test:pricing:mariadb && npm run test:price-verification:isolated && node test/helpers/run-cart-mariadb.cjs && npm run test:cuenta-corriente:safety && node test/helpers/run-cuenta-corriente-mariadb.cjs && npm run test:cuenta-corriente:client && npm run test:orders:isolated && npm run test:orders:sockets && npm run test:receipts:isolated && npm run test:admin-orders && npm run test:company-approval:audit && npm run test:local-bootstrap:isolated && npm run test:credit-workflow:isolated",
     "test:receipts:isolated": "node test/helpers/run-cuenta-corriente-mariadb.cjs receipts",
     "test:orders:isolated": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders",
     "test": "npm run build && npm run test:unit && npm run test:dto-source && npm run test:integration",
@@ -32,7 +31,12 @@
     "test:orders:sockets": "node test/helpers/run-cuenta-corriente-mariadb.cjs orders-sockets",
     "test:admin-orders": "node test/helpers/run-admin-orders-mariadb.cjs",
     "test:company-approval:audit": "node test/helpers/run-company-approval-audit.cjs",
-    "test:local-bootstrap:isolated": "node test/helpers/run-local-bootstrap-mariadb.cjs"
+    "test:local-bootstrap:isolated": "node test/helpers/run-local-bootstrap-mariadb.cjs",
+    "test:credit-workflow:isolated": "node test/helpers/run-credit-workflow-mariadb.cjs",
+    "test:credit-workflow": "npm run test:credit-workflow:isolated",
+    "test:price-verification": "npm run test:price-verification:isolated",
+    "test:company-approval": "npm run test:company-approval:audit",
+    "test:local-bootstrap": "npm run test:local-bootstrap:isolated"
   },
   "engines": {
     "node": ">=22"

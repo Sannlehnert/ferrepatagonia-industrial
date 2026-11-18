@@ -12,6 +12,25 @@ import { companyApprovalPolicy } from '../dtos/clients/company-approval.dto';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 import { adminAccountHandler } from '../controllers/adminAccount.controller';
 import { getAdminDashboardMetrics } from '../controllers/adminDashboard.controller';
+import {
+    getAdminCreditEvents,
+    getAdminCreditRequestById,
+    getAdminCreditRequests,
+    postApproveCreditRequest,
+    postDisableCreditAccount,
+    postEnableCreditAccount,
+    postRejectCreditRequest,
+    putCreditLimit,
+} from '../controllers/creditWorkflow.controller';
+import {
+    approveCreditRequestPolicy,
+    changeCreditLimitPolicy,
+    creditClientIdPolicy,
+    creditRequestIdPolicy,
+    disableCreditAccountPolicy,
+    enableCreditAccountPolicy,
+    rejectCreditRequestPolicy,
+} from '../dtos/credit/credit-workflow.dto';
 
 export const adminRouter = Router();
 
@@ -30,6 +49,46 @@ adminRouter.get('/clientes/:clienteId/cuenta-corriente/movimientos', adminAccoun
 adminRouter.get('/clientes/:clienteId/cuenta-corriente/vencimientos', adminAccountHandler('vencimientos'));
 adminRouter.get('/dashboard/metricas', getAdminDashboardMetrics);
 
+// Resolución de solicitudes y gestión comercial de la cuenta. La identidad ADMIN
+// se revalida dentro de cada transacción; el body nunca aporta actor ni estados.
+adminRouter.get('/solicitudes-credito', getAdminCreditRequests);
+adminRouter.get(
+    '/solicitudes-credito/:id',
+    validateDto('params', creditRequestIdPolicy),
+    getAdminCreditRequestById,
+);
+adminRouter.post(
+    '/solicitudes-credito/:id/aprobar',
+    validateDto('params', creditRequestIdPolicy),
+    validateDto('body', approveCreditRequestPolicy),
+    postApproveCreditRequest,
+);
+adminRouter.post(
+    '/solicitudes-credito/:id/rechazar',
+    validateDto('params', creditRequestIdPolicy),
+    validateDto('body', rejectCreditRequestPolicy),
+    postRejectCreditRequest,
+);
+adminRouter.get('/credito/eventos', getAdminCreditEvents);
+adminRouter.post(
+    '/clientes/:clienteId/cuenta-corriente/habilitar',
+    validateDto('params', creditClientIdPolicy),
+    validateDto('body', enableCreditAccountPolicy),
+    postEnableCreditAccount,
+);
+adminRouter.post(
+    '/clientes/:clienteId/cuenta-corriente/deshabilitar',
+    validateDto('params', creditClientIdPolicy),
+    validateDto('body', disableCreditAccountPolicy),
+    postDisableCreditAccount,
+);
+adminRouter.put(
+    '/clientes/:clienteId/cuenta-corriente/limite',
+    validateDto('params', creditClientIdPolicy),
+    validateDto('body', changeCreditLimitPolicy),
+    putCreditLimit,
+);
+
 adminRouter.get('/clientes', getClientes);
 adminRouter.patch(
   '/clientes/:id/estado-empresa',
@@ -42,13 +101,6 @@ adminRouter.put(
   validateDto('params', clientIdPolicy),
   validateDto('body', companyApprovalPolicy),
   patchClientCompanyApproval,
-);
-adminRouter.get('/dashboard/metricas',(_req, res, next) => {
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Pragma', 'no-cache');
-    next();
-  },
-  getAdminDashboardMetrics,
 );
 
 adminRouter.get('/listas-precio', getAdminPriceLists);

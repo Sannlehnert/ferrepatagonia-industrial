@@ -9,6 +9,7 @@ const { after, before, test } = require('node:test');
 const bcrypt = require('bcryptjs');
 const { childProfile } = require('./helpers/cc260-disposable.cjs');
 const { createDatabase, removeDatabase, connectProfile } = require('./helpers/local-bootstrap-db.cjs');
+const { assertSchemaInventory } = require('./helpers/schema-inventory.cjs');
 const { fetchFromBrowser } = require('./helpers/browser-request.cjs');
 const { startHttpApp } = require('./helpers/start-http-app.cjs');
 
@@ -131,6 +132,21 @@ after(async () => {
         }
         fs.rmSync(credentialsDir, { recursive: true, force: true });
     }
+});
+
+test('bootstrap rechaza un perfil parcial FER-20 sin crear usuarios ni credenciales', async () => {
+    const partial = await createDatabase(primary.database, { fer20Only: true });
+    extraDatabases.push(partial);
+    await withConnection(partial, db => assertSchemaInventory(sql => db.query(sql), 'fer20-only'));
+    const result = bootstrap(partial);
+    assert.equal(result.status, 1, result.stderr + result.stdout);
+    assert.match(result.stderr, /fer17_producto_precio_evento/);
+    assert.match(result.stderr, /FER17_AUDITORIA_TRIGGERS/);
+    assert.equal(fs.existsSync(credentialsFile()), false);
+    await withConnection(partial, async db => {
+        assert.deepEqual(await db.query('SELECT id_usuario FROM USUARIO'), []);
+        assert.deepEqual(await db.query('SELECT id_cliente FROM CLIENTE'), []);
+    });
 });
 
 test('bootstrap inicial crea cuatro perfiles y credenciales validas', async () => {
