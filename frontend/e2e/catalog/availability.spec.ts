@@ -36,9 +36,9 @@ test('mantiene visible el producto sin stock y deshabilita Agregar', async ({
     exact: true,
   })).toBeDisabled();
 
-  // El visitante necesita iniciar sesión para agregar productos.
+  // El precio sin evidencia impide agregar, independientemente de la sesión.
   await expect(withStock.getByText(
-    'Iniciá sesión para agregar productos.',
+    'El precio está pendiente de verificación y no se puede agregar.',
     { exact: true },
   )).toBeVisible();
   await page.reload();

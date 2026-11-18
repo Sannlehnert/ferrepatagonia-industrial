@@ -57,7 +57,7 @@ for (const width of [390, 1280]) {
     await expect(status).not.toContainText('crédito está disponible')
 
     if (width < 768) await page.getByRole('button', { name: 'Menú de navegación de cuenta' }).click()
-    const nav = page.getByRole('navigation', { name: width < 768 ? 'Menú de navegación de cuenta' : 'Menú de mi cuenta' })
+    const nav = page.getByRole('navigation', { name: 'Menú de mi cuenta' })
     await expect(nav.getByRole('link', { name: 'Cuenta corriente', exact: true })).toBeVisible()
   })
 }
