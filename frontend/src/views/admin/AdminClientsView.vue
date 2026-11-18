@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
+import { useAdminClientCredit } from '@/composables/useAdminClientCredit'
+import AdminClientCreditStatus from '@/components/AdminClientCreditStatus.vue'
+import AdminClientStatusDialog from '@/components/AdminClientStatusDialog.vue'
 import axios from 'axios'
 import AdminPriceListsPanel from './AdminPriceListsPanel.vue'
 import {
@@ -15,7 +19,33 @@ import type {
     CompanyApprovalStatus,
 } from '@/types/adminClient'
 
+const auth = useAuthStore()
+const allowed = () => auth.rol === 'ADMIN' && !auth.loggingIn && !auth.loggingOut
+const identity = () => [auth.user?.id, auth.rol, auth.sessionVersion].join(':')
+let generation = 0
+let active = true
+const isCurrent = (token: number) => active && generation === token && allowed()
+onBeforeUnmount(() => { active = false; generation++ })
 const clients = ref<AdminClient[]>([])
+const credit = useAdminClientCredit(() => clients.value)
+const selectedClientId = ref<number | null>(null)
+const approvalTarget = ref<CompanyApprovalStatus | null>(null)
+const selectedClient = computed(() => clients.value.find(client => client.id === selectedClientId.value) ?? null)
+function openClient(client: AdminClient, target: CompanyApprovalStatus | null = null) {
+    if (!allowed()) return
+    selectedClientId.value = client.id
+    approvalTarget.value = target
+}
+function closeClient() {
+    if (updatingApprovalClientId.value !== null || reconcilingApprovalClientId.value !== null) return
+    selectedClientId.value = null
+    approvalTarget.value = null
+}
+function confirmApproval() {
+    if (selectedClient.value && approvalTarget.value) {
+        return setCompanyApproval(selectedClient.value, approvalTarget.value)
+    }
+}
 const isLoading = ref(true)
 const errorMessage = ref<string | null>(null)
 const priceLists = ref<AdminPriceListOption[]>([])
@@ -44,18 +74,22 @@ function formatDate(value: string): string {
 }
 
 async function loadPriceLists() {
+    if (!allowed()) return
+    const token = generation
     priceListsLoading.value = true
     try {
         const data = await getAdminClientPriceLists()
+        if (!isCurrent(token)) return
         priceLists.value = data.listas
         assignments.value = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item]))
         selections.value = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item.idListaPrecio]))
         feedback.value = {}
         priceListsError.value = null
     } catch {
+        if (!isCurrent(token)) return
         priceListsError.value = 'No pudimos consultar las listas y asignaciones. Volvé a cargar para continuar.'
     } finally {
-        priceListsLoading.value = false
+        if (isCurrent(token)) priceListsLoading.value = false
     }
 }
 
@@ -69,22 +103,25 @@ function selectedList(id: number) {
 
 function canSavePriceList(id: number) {
     const selected = selectedList(id)
-    return savingClientId.value === null && !managingPriceLists.value && !priceListsLoading.value && !priceListsError.value &&
+    return allowed() && savingClientId.value === null && !managingPriceLists.value && !priceListsLoading.value && !priceListsError.value &&
         selected !== (assignments.value[id]?.idListaPrecio ?? null) &&
         (selected === null || hasAvailableList(selected))
 }
 
 async function savePriceList(id: number) {
     if (!canSavePriceList(id)) return
+    const token = generation
     savingClientId.value = id
     delete feedback.value[id]
     delete approvalFeedback.value[id]
     try {
         const list = await saveAdminClientPriceList(id, selectedList(id))
+        if (!isCurrent(token)) return
         assignments.value[id] = list
         selections.value[id] = list?.idListaPrecio ?? ''
         feedback.value[id] = { text: list ? 'Lista asignada.' : 'Asignación retirada.', error: false }
     } catch (error: unknown) {
+        if (!isCurrent(token)) return
         const response = axios.isAxiosError<{ message?: string }>(error) ? error.response : undefined
         if (!response || response.status >= 500) {
             priceListsError.value = 'No pudimos confirmar el cambio. Volvé a cargar las asignaciones para ver el resultado.'
@@ -92,21 +129,26 @@ async function savePriceList(id: number) {
             feedback.value[id] = { text: response.data?.message ?? 'No se pudo guardar la asignación.', error: true }
         }
     } finally {
-        savingClientId.value = null
+        if (isCurrent(token)) savingClientId.value = null
     }
 }
 
 async function reconcileCompanyApproval(clientId: number): Promise<void> {
+    if (!allowed() || reconcilingApprovalClientId.value !== null) return
+    const token = generation
     reconcilingApprovalClientId.value = clientId
     try {
         const freshClients = await getAdminClients()
+        if (!isCurrent(token)) return
         const fresh = freshClients.find(c => c.id === clientId)
         const current = clients.value.find(c => c.id === clientId)
+        if (!fresh || !current || fresh.tipoCliente !== 'EMPRESA' || !['APROBADA', 'RECHAZADA', 'PENDIENTE'].includes(fresh.estadoAprobacionEmpresa ?? '')) throw new Error('El cliente ya no está disponible en el listado.')
         if (fresh && current) {
             current.estadoAprobacionEmpresa = fresh.estadoAprobacionEmpresa
             current.nombreRazonSocial = fresh.nombreRazonSocial
             current.tipoCliente = fresh.tipoCliente
             current.cuit = fresh.cuit
+            current.docCliente = fresh.docCliente
             current.email = fresh.email
             current.fechaRegistro = fresh.fechaRegistro
         }
@@ -116,36 +158,42 @@ async function reconcileCompanyApproval(clientId: number): Promise<void> {
             error: false,
         }
     } catch {
+        if (!isCurrent(token)) return
         uncertainApprovalClientIds.value[clientId] = true
         approvalFeedback.value[clientId] = {
             text: 'No pudimos verificar el estado con el servidor. El resultado es incierto.',
             error: true,
         }
     } finally {
-        reconcilingApprovalClientId.value = null
+        if (isCurrent(token)) reconcilingApprovalClientId.value = null
     }
 }
 
 async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprovalStatus) {
     if (
+        !allowed() ||
         updatingApprovalClientId.value !== null ||
         reconcilingApprovalClientId.value !== null ||
         uncertainApprovalClientIds.value[client.id] ||
         client.tipoCliente !== 'EMPRESA' ||
         client.estadoAprobacionEmpresa === newStatus
     ) return
+    const token = generation
     updatingApprovalClientId.value = client.id
     delete approvalFeedback.value[client.id]
     delete feedback.value[client.id]
     try {
         const updated = await updateAdminCompanyApproval(client.id, newStatus)
-        client.estadoAprobacionEmpresa = updated.estadoAprobacionEmpresa ?? newStatus
+        if (!isCurrent(token)) return
+        if (updated.estadoAprobacionEmpresa !== newStatus || updated.id !== client.id) throw new Error('Respuesta de aprobación incompleta.')
+        client.estadoAprobacionEmpresa = updated.estadoAprobacionEmpresa
         delete uncertainApprovalClientIds.value[client.id]
         approvalFeedback.value[client.id] = {
             text: newStatus === 'APROBADA' ? 'Empresa aprobada.' : 'Empresa rechazada.',
             error: false,
         }
     } catch (error: unknown) {
+        if (!isCurrent(token)) return
         const response = axios.isAxiosError<{ message?: string }>(error) ? error.response : undefined
         if (!response || response.status >= 500) {
             uncertainApprovalClientIds.value[client.id] = true
@@ -162,18 +210,23 @@ async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprova
             }
         }
     } finally {
-        updatingApprovalClientId.value = null
+        if (isCurrent(token)) updatingApprovalClientId.value = null
     }
 }
 
 async function loadClients(): Promise<void> {
+    if (!allowed()) return
+    const token = generation
     isLoading.value = true
     errorMessage.value = null
 
     try {
-        clients.value = await getAdminClients()
+        const fresh = await getAdminClients()
+        if (!isCurrent(token)) return
+        clients.value = fresh
         uncertainApprovalClientIds.value = {}
     } catch (error: unknown) {
+        if (!isCurrent(token)) return
         const status = axios.isAxiosError(error)
             ? error.response?.status
             : undefined
@@ -183,21 +236,38 @@ async function loadClients(): Promise<void> {
                 ? 'No se pudo acceder al listado con la sesión actual.'
                 : 'No pudimos cargar los clientes. Intentá nuevamente.'
     } finally {
-        isLoading.value = false
+        if (isCurrent(token)) isLoading.value = false
     }
 }
 
-onMounted(() => {
-    void loadClients()
-    void loadPriceLists()
-})
+watch([identity, allowed], () => {
+    generation++
+    clients.value = []
+    priceLists.value = []
+    assignments.value = {}
+    selections.value = {}
+    feedback.value = {}
+    approvalFeedback.value = {}
+    uncertainApprovalClientIds.value = {}
+    updatingApprovalClientId.value = null
+    reconcilingApprovalClientId.value = null
+    savingClientId.value = null
+    selectedClientId.value = null
+    approvalTarget.value = null
+    errorMessage.value = null
+    priceListsError.value = null
+    if (allowed()) {
+        void loadClients()
+        void loadPriceLists()
+    }
+}, { immediate: true, flush: 'sync' })
 </script>
 
 <template>
-    <section class="min-w-0 text-[#0b2438]" aria-labelledby="clients-title">
+    <section v-if="allowed()" class="min-w-0 text-[#0b2438]" aria-labelledby="clients-title">
         <header class="mb-6">
             <h1 id="clients-title" class="m-0 mb-3 text-[28px] font-semibold">Clientes</h1>
-            <p class="m-0 leading-6 text-slate-600">Listado de clientes particulares y empresas registrados.</p>
+            <p class="m-0 leading-6 text-slate-600">Consultá clientes y gestioná el registro empresarial. Aprobar una empresa no habilita su crédito.</p>
         </header>
 
         <AdminPriceListsPanel :disabled="savingClientId !== null" @changed="loadPriceLists" @busy="managingPriceLists = $event" />
@@ -239,7 +309,9 @@ onMounted(() => {
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Tipo</th>
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Email</th>
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Fecha de registro</th>
-                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Estado de empresa</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Registro empresarial</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Cuenta corriente y crédito</th>
+                        <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Consulta</th>
                         <th class="bg-[#f4f7fa] p-4 text-left align-top leading-6" scope="col">Lista de precios</th>
                     </tr>
                 </thead>
@@ -266,27 +338,27 @@ onMounted(() => {
                                     :class="{
                                         'bg-emerald-100 text-emerald-800': client.estadoAprobacionEmpresa === 'APROBADA',
                                         'bg-rose-100 text-rose-800': client.estadoAprobacionEmpresa === 'RECHAZADA',
-                                        'bg-amber-100 text-amber-800': client.estadoAprobacionEmpresa === 'PENDIENTE' || !client.estadoAprobacionEmpresa,
+                                        'bg-amber-100 text-amber-800': client.estadoAprobacionEmpresa === 'PENDIENTE',
                                     }"
                                 >
-                                    {{ client.estadoAprobacionEmpresa === 'APROBADA' ? 'Aprobada' : client.estadoAprobacionEmpresa === 'RECHAZADA' ? 'Rechazada' : 'Pendiente' }}
+                                    {{ uncertainApprovalClientIds[client.id] ? 'Por verificar' : client.estadoAprobacionEmpresa === 'APROBADA' ? 'Aprobada' : client.estadoAprobacionEmpresa === 'RECHAZADA' ? 'Rechazada' : client.estadoAprobacionEmpresa === 'PENDIENTE' ? 'Pendiente' : 'No informado' }}
                                 </span>
                                 <div class="flex flex-wrap gap-1">
                                     <button
                                         type="button"
                                         :disabled="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null || !!uncertainApprovalClientIds[client.id] || client.estadoAprobacionEmpresa === 'APROBADA'"
-                                        class="rounded bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
+                                        class="min-h-11 rounded bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-700 disabled:opacity-40"
                                         :aria-label="`Aprobar cuenta empresa de ${client.nombreRazonSocial}`"
-                                        @click="setCompanyApproval(client, 'APROBADA')"
+                                        @click="openClient(client, 'APROBADA')"
                                     >
                                         {{ updatingApprovalClientId === client.id ? '…' : 'Aprobar' }}
                                     </button>
                                     <button
                                         type="button"
                                         :disabled="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null || !!uncertainApprovalClientIds[client.id] || client.estadoAprobacionEmpresa === 'RECHAZADA'"
-                                        class="rounded bg-rose-600 px-2 py-1 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40"
+                                        class="min-h-11 rounded bg-rose-600 px-3 py-2 text-xs font-semibold text-white hover:bg-rose-700 disabled:opacity-40"
                                         :aria-label="`Rechazar cuenta empresa de ${client.nombreRazonSocial}`"
-                                        @click="setCompanyApproval(client, 'RECHAZADA')"
+                                        @click="openClient(client, 'RECHAZADA')"
                                     >
                                         {{ updatingApprovalClientId === client.id ? '…' : 'Rechazar' }}
                                     </button>
@@ -294,7 +366,7 @@ onMounted(() => {
                                         v-if="uncertainApprovalClientIds[client.id]"
                                         type="button"
                                         :disabled="reconcilingApprovalClientId === client.id"
-                                        class="rounded border border-amber-600 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-40"
+                                        class="min-h-11 rounded border border-amber-600 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-40"
                                         :aria-label="`Reintentar verificación de cuenta empresa de ${client.nombreRazonSocial}`"
                                         @click="reconcileCompanyApproval(client.id)"
                                     >
@@ -310,7 +382,14 @@ onMounted(() => {
                                     {{ approvalFeedback[client.id]!.text }}
                                 </p>
                             </div>
-                            <span v-else class="text-slate-400">—</span>
+                            <span v-else class="text-slate-600">No aplica a particulares</span>
+                        </td>
+                        <td class="min-w-48 border-b border-slate-200 p-4 align-top">
+                            <AdminClientCreditStatus :company="client.tipoCliente === 'EMPRESA'" :credit="credit.status(client.id)" @retry="credit.refresh()" />
+                        </td>
+                        <td class="border-b border-slate-200 p-4 align-top">
+                            <button type="button" class="min-h-11 rounded border border-[#145a8d] px-3 font-semibold"
+                                :aria-label="`Ver detalle de ${client.nombreRazonSocial}`" @click="openClient(client)">Ver detalle</button>
                         </td>
                         <td class="min-w-64 border-b border-slate-200 p-4 align-top">
                             <div v-if="!priceListsLoading && !priceListsError">
@@ -357,5 +436,10 @@ onMounted(() => {
                 </tbody>
             </table>
         </div>
+        <AdminClientStatusDialog v-if="selectedClient" :key="selectedClient.id" :client="selectedClient"
+            :target="approvalTarget" :credit="credit.status(selectedClient.id)"
+            :busy="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null"
+            :uncertain="!!uncertainApprovalClientIds[selectedClient.id]" :feedback="approvalFeedback[selectedClient.id]"
+            @close="closeClient" @confirm="confirmApproval" @retry="reconcileCompanyApproval(selectedClient.id)" @refresh-credit="credit.refresh()" />
     </section>
 </template>

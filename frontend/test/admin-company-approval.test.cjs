@@ -66,6 +66,16 @@ const settle = async () => {
 };
 
 function load(file, mocks = {}, inlineTemplate = false) {
+  const defaults = {
+    '@/stores/auth': { useAuthStore: () => vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false }) },
+    '@/composables/useAdminClientCredit': { useAdminClientCredit: () => ({ status: () => null, refresh: async () => {} }) },
+    '@/components/AdminClientCreditStatus.vue': { __esModule: true, default: { render: () => null } },
+    '@/components/AdminClientStatusDialog.vue': { __esModule: true, default: {
+      emits: ['confirm'],
+      setup(_props, { emit }) { return () => vue.h('button', { 'aria-label': 'Confirmar aprobación de prueba', onClick: () => emit('confirm') }, 'Confirmar'); },
+    } },
+  };
+  mocks = { ...defaults, ...mocks };
   const filename = path.resolve(root, file);
   let source = fs.readFileSync(filename, 'utf8');
   if (file.endsWith('.vue')) {
@@ -252,6 +262,10 @@ test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea
 
   await approveBtn.props.onClick();
   await settle();
+  const confirmation = findNode(rootEl, n => n.props?.['aria-label'] === 'Confirmar aprobación de prueba');
+  assert.ok(confirmation, 'La aprobación requiere confirmar el diálogo');
+  await confirmation.props.onClick();
+  await settle();
 
   const html = dom.serialize(rootEl);
   assert.match(html, /Reintentar verificación/);
@@ -430,4 +444,51 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
     text: 'Estado verificado con el servidor.',
     error: false,
   });
+});
+
+test('descarta el listado de una sesión ADMIN anterior', async t => {
+  const auth = vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false });
+  let release;
+  const component = load('views/admin/AdminClientsView.vue', {
+    '@/stores/auth': { useAuthStore: () => auth },
+    '@/services/adminClientService': {
+      getAdminClients: () => new Promise(resolve => { release = resolve; }),
+      getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  }).default;
+  component.render = () => null;
+  const dom = createTestRenderer();
+  const app = dom.renderer.createApp(component);
+  app.mount(dom.createRoot());
+  t.after(() => app.unmount());
+  const state = app._instance.setupState;
+  auth.loggingOut = true;
+  await settle();
+  release(sampleClients());
+  await settle();
+  assert.deepEqual(state.clients, []);
+  assert.equal(state.selectedClient, null);
+});
+
+test('no declara verificado un cliente ausente de la respuesta de reconciliación', async t => {
+  let result = sampleClients();
+  const component = load('views/admin/AdminClientsView.vue', {
+    '@/services/adminClientService': {
+      getAdminClients: async () => result,
+      getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  }).default;
+  component.render = () => null;
+  const dom = createTestRenderer();
+  const app = dom.renderer.createApp(component);
+  app.mount(dom.createRoot());
+  t.after(() => app.unmount());
+  await settle();
+  const state = app._instance.setupState;
+  result = [];
+  await state.reconcileCompanyApproval(20);
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  assert.equal(state.approvalFeedback[20].error, true);
 });
