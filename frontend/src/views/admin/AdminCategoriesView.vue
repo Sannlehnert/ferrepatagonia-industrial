@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import axios from 'axios'
 import { computed, nextTick, ref, watch } from 'vue'
+import AdminCategoryDeactivationDialog from '@/components/AdminCategoryDeactivationDialog.vue'
 import AdminCategoryForm from '@/components/AdminCategoryForm.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
@@ -27,14 +28,19 @@ const editingCategory = ref<AdminCategory | null>(null)
 const formError = ref('')
 const formUncertain = ref(false)
 const pendingDeactivation = ref<AdminCategory | null>(null)
+const deactivationError = ref('')
+const deactivationUncertain = ref(false)
 const busy = ref(false)
-const mutationError = ref('')
 const notice = ref('')
+const titleHeading = ref<HTMLHeadingElement | null>(null)
 const newButton = ref<HTMLButtonElement | null>(null)
 const formTrigger = ref<HTMLElement | null>(null)
+const deactivationTrigger = ref<HTMLElement | null>(null)
 let formScrollY = 0
+let deactivationScrollY = 0
 
 const categoryUncertainMessage = 'No se pudo confirmar el resultado. El formulario quedó bloqueado para evitar duplicados; recargá el listado antes de reintentar.'
+const categoryDeactivationUncertainMessage = 'No se pudo confirmar la desactivación. El diálogo quedó bloqueado para evitar duplicados; recargá el listado antes de reintentar.'
 
 const collator = new Intl.Collator('es', { sensitivity: 'base' })
 
@@ -86,10 +92,23 @@ function rememberFormOrigin(event?: Event) {
   }
 }
 
+function rememberDeactivationOrigin(event?: Event) {
+  if (typeof HTMLElement !== 'undefined' && event?.currentTarget instanceof HTMLElement) {
+    deactivationTrigger.value = event.currentTarget
+  } else if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+    deactivationTrigger.value = document.activeElement
+  }
+
+  if (typeof window !== 'undefined') {
+    deactivationScrollY = window.scrollY
+  }
+}
+
 function clearFeedback() {
   formError.value = ''
   formUncertain.value = false
-  mutationError.value = ''
+  deactivationError.value = ''
+  deactivationUncertain.value = false
   notice.value = ''
 }
 
@@ -109,6 +128,14 @@ function openEdit(category: AdminCategory, event?: Event) {
   editingCategory.value = category
   rememberFormOrigin(event)
   formOpen.value = true
+}
+
+function openDeactivation(category: AdminCategory, event?: Event) {
+  if (busy.value || loading.value || formOpen.value || pendingDeactivation.value) return
+
+  clearFeedback()
+  rememberDeactivationOrigin(event)
+  pendingDeactivation.value = category
 }
 
 async function dismissForm() {
@@ -137,6 +164,36 @@ function closeForm() {
   void dismissForm()
 }
 
+async function dismissDeactivation() {
+  const selected = pendingDeactivation.value
+  pendingDeactivation.value = null
+  deactivationError.value = ''
+  deactivationUncertain.value = false
+  await nextTick()
+
+  const trigger = deactivationTrigger.value
+  deactivationTrigger.value = null
+  let target: HTMLElement | null = trigger?.isConnected ? trigger : null
+
+  if (!target && selected && typeof document !== 'undefined') {
+    target = document.querySelector<HTMLElement>(
+      `[data-category-edit-id="${selected.id_categoria}"]`,
+    )
+  }
+
+  target ??= titleHeading.value ?? newButton.value
+  target?.focus({ preventScroll: true })
+
+  if (typeof window !== 'undefined') {
+    window.scrollTo(0, deactivationScrollY)
+  }
+}
+
+function closeDeactivation() {
+  if (busy.value || deactivationUncertain.value) return
+  void dismissDeactivation()
+}
+
 watch(identity, () => {
   formOpen.value = false
   editingCategory.value = null
@@ -144,7 +201,9 @@ watch(identity, () => {
   formUncertain.value = false
   formTrigger.value = null
   pendingDeactivation.value = null
-  mutationError.value = ''
+  deactivationError.value = ''
+  deactivationUncertain.value = false
+  deactivationTrigger.value = null
   notice.value = ''
   busy.value = false
   void refreshCategories()
@@ -158,7 +217,6 @@ async function save(fields: { nombre: string; descripcion: string | null }) {
   busy.value = true
   formError.value = ''
   formUncertain.value = false
-  mutationError.value = ''
   notice.value = ''
 
   try {
@@ -212,11 +270,11 @@ async function reloadAfterUncertain() {
 
 async function confirmDeactivation() {
   const selected = pendingDeactivation.value
-  if (!selected || busy.value || !allowed()) return
+  if (!selected || busy.value || !allowed() || deactivationUncertain.value) return
 
   const session = identity()
   busy.value = true
-  mutationError.value = ''
+  deactivationError.value = ''
   notice.value = ''
 
   try {
@@ -224,14 +282,43 @@ async function confirmDeactivation() {
     if (session !== identity()) return
 
     upsertCategory(updated)
-    pendingDeactivation.value = null
     notice.value = 'Categoría desactivada.'
+    busy.value = false
+    await dismissDeactivation()
   } catch (cause) {
     if (session !== identity()) return
 
-    mutationError.value = isMutationResultUncertain(cause)
-      ? 'No se pudo confirmar la desactivación. Recargá el listado antes de reintentar.'
-      : categoryMutationErrorMessage(cause)
+    if (isMutationResultUncertain(cause)) {
+      deactivationUncertain.value = true
+      deactivationError.value = categoryDeactivationUncertainMessage
+    } else {
+      deactivationError.value = categoryMutationErrorMessage(cause)
+    }
+  } finally {
+    if (session === identity()) busy.value = false
+  }
+}
+
+async function reloadAfterDeactivationUncertain() {
+  if (busy.value || !pendingDeactivation.value || !deactivationUncertain.value) return
+
+  const session = identity()
+  busy.value = true
+  deactivationError.value = ''
+
+  try {
+    await refreshCategories()
+    if (session !== identity()) return
+
+    if (error.value) {
+      deactivationError.value = 'No se pudo recargar el listado. Reintentá antes de continuar.'
+      return
+    }
+
+    deactivationUncertain.value = false
+    notice.value = 'Listado actualizado.'
+    busy.value = false
+    await dismissDeactivation()
   } finally {
     if (session === identity()) busy.value = false
   }
@@ -241,7 +328,12 @@ async function confirmDeactivation() {
 <template>
   <section aria-labelledby="categories-title" class="space-y-4" :aria-busy="busy ? 'true' : 'false'">
     <div class="flex flex-wrap items-center justify-between gap-3">
-      <h2 id="categories-title" class="m-0 text-xl font-semibold text-[#0b2438]">
+      <h2
+        id="categories-title"
+        ref="titleHeading"
+        tabindex="-1"
+        class="m-0 text-xl font-semibold text-[#0b2438]"
+      >
         Categorías
       </h2>
       <button
@@ -264,14 +356,6 @@ async function confirmDeactivation() {
     >
       {{ notice }}
     </p>
-    <p
-      v-if="mutationError"
-      role="alert"
-      class="pointer-events-none fixed left-4 right-4 top-4 z-[60] m-0 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 shadow-lg sm:left-auto sm:max-w-sm"
-    >
-      {{ mutationError }}
-    </p>
-
     <AdminCategoryForm
       v-if="formOpen"
       :key="editingCategory?.id_categoria ?? 'new'"
@@ -284,30 +368,17 @@ async function confirmDeactivation() {
       @reload="reloadAfterUncertain"
     />
 
-    <div v-if="pendingDeactivation" class="space-y-2 rounded-md border border-slate-300 p-4">
-      <p class="m-0 break-words">
-        ¿Desactivar <strong>{{ pendingDeactivation.nombre }}</strong>?
-        La categoría dejará de aparecer en el catálogo público.
-      </p>
-      <div class="flex flex-wrap gap-2">
-        <button
-          type="button"
-          class="min-h-11 rounded-md bg-red-800 px-4 text-white disabled:opacity-60"
-          :disabled="busy"
-          @click="confirmDeactivation()"
-        >
-          Confirmar desactivación
-        </button>
-        <button
-          type="button"
-          class="min-h-11 rounded-md border border-slate-300 px-4 disabled:opacity-60"
-          :disabled="busy"
-          @click="pendingDeactivation = null"
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
+    <AdminCategoryDeactivationDialog
+      v-if="pendingDeactivation"
+      :key="pendingDeactivation.id_categoria"
+      :category="pendingDeactivation"
+      :busy="busy"
+      :error="deactivationError"
+      :uncertain="deactivationUncertain"
+      @confirm="confirmDeactivation"
+      @cancel="closeDeactivation"
+      @reload="reloadAfterDeactivationUncertain"
+    />
 
     <p v-if="loading" role="status">Cargando categorías…</p>
     <div v-else-if="error" class="space-y-2">
@@ -359,6 +430,7 @@ async function confirmDeactivation() {
               type="button"
               class="min-h-11 rounded-md border border-slate-300 px-4 disabled:opacity-60"
               :aria-label="`Editar ${category.nombre}`"
+              :data-category-edit-id="category.id_categoria"
               :disabled="busy || formOpen || !!pendingDeactivation"
               @click="openEdit(category, $event)"
             >
@@ -370,7 +442,7 @@ async function confirmDeactivation() {
               class="min-h-11 rounded-md border border-red-300 px-4 text-red-800 disabled:opacity-60"
               :aria-label="`Desactivar ${category.nombre}`"
               :disabled="busy || formOpen || !!pendingDeactivation"
-              @click="pendingDeactivation = category"
+              @click="openDeactivation(category, $event)"
             >
               Desactivar
             </button>

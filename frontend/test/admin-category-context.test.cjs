@@ -259,6 +259,7 @@ describe('AdminCategoriesView con formulario contextual', () => {
       },
       '@/stores/auth': { useAuthStore: () => auth },
       '@/components/AdminCategoryForm.vue': { default: {} },
+      '@/components/AdminCategoryDeactivationDialog.vue': { default: {} },
     }).default
     component.render = () => null
 
@@ -367,9 +368,11 @@ describe('AdminCategoriesView con formulario contextual', () => {
     assert.equal(state.notice, '')
   })
 
-  test('desactivar actualiza el estado local y conserva el resto del listado', async t => {
+  test('desactivar actualiza el listado en su lugar y cierra el diálogo sin recargar', async t => {
     const { state, listCalls } = await mountView(t)
-    state.pendingDeactivation = { ...baseCategories[0] }
+    state.openDeactivation({ ...baseCategories[0] })
+
+    assert.equal(state.pendingDeactivation.id_categoria, 1)
 
     await state.confirmDeactivation()
 
@@ -377,6 +380,121 @@ describe('AdminCategoriesView con formulario contextual', () => {
     assert.equal(state.categories.find(category => category.id_categoria === 1).activo, 0)
     assert.equal(state.categories.length, 2)
     assert.equal(state.notice, 'Categoría desactivada.')
+    assert.equal(state.deactivationError, '')
+    assert.equal(state.deactivationUncertain, false)
     assert.equal(listCalls(), 1)
+  })
+
+  test('cancelar la desactivación cierra sin mutar ni recargar el listado', async t => {
+    let deactivations = 0
+    const { state, listCalls } = await mountView(t, {
+      deactivateAdminCategory: async () => {
+        deactivations++
+        return { ...baseCategories[0], activo: 0 }
+      },
+    })
+
+    state.openDeactivation({ ...baseCategories[0] })
+    state.closeDeactivation()
+    await settle()
+
+    assert.equal(state.pendingDeactivation, null)
+    assert.equal(deactivations, 0)
+    assert.deepEqual(state.categories, baseCategories)
+    assert.equal(state.notice, '')
+    assert.equal(listCalls(), 1)
+  })
+
+  test('impide enviar dos desactivaciones mientras la primera está en vuelo', async t => {
+    let deactivations = 0
+    let release
+    const { state } = await mountView(t, {
+      deactivateAdminCategory: () => {
+        deactivations++
+        return new Promise(resolve => { release = resolve })
+      },
+    })
+
+    state.openDeactivation({ ...baseCategories[0] })
+    const first = state.confirmDeactivation()
+    const second = state.confirmDeactivation()
+
+    assert.equal(deactivations, 1)
+
+    release({ ...baseCategories[0], activo: 0 })
+    await first
+    await second
+
+    assert.equal(deactivations, 1)
+    assert.equal(state.pendingDeactivation, null)
+  })
+
+  test('un rechazo conserva el diálogo, la categoría y permite reintentar', async t => {
+    let attempts = 0
+    const { state, listCalls } = await mountView(t, {
+      deactivateAdminCategory: async () => {
+        attempts++
+        if (attempts === 1) throw httpError(400, 'La categoría tiene productos asociados.')
+        return { ...baseCategories[1], activo: 0 }
+      },
+    })
+
+    state.openDeactivation({ ...baseCategories[1] })
+    await state.confirmDeactivation()
+
+    assert.equal(state.pendingDeactivation.id_categoria, 2)
+    assert.equal(state.deactivationError, 'La categoría tiene productos asociados.')
+    assert.equal(state.deactivationUncertain, false)
+    assert.deepEqual(state.categories, baseCategories)
+
+    await state.confirmDeactivation()
+
+    assert.equal(attempts, 2)
+    assert.equal(state.pendingDeactivation, null)
+    assert.equal(state.categories.find(category => category.id_categoria === 2).activo, 0)
+    assert.equal(listCalls(), 1)
+  })
+
+  test('un resultado incierto bloquea el diálogo y exige recargar antes de cerrar', async t => {
+    let failReload = true
+    let deactivations = 0
+    const { state } = await mountView(t, {
+      listAdminCategories: async () => {
+        if (failReload) throw new Error('sin conexión')
+        return baseCategories
+      },
+      deactivateAdminCategory: async () => {
+        deactivations++
+        throw httpError(undefined, 'sin respuesta')
+      },
+    })
+
+    state.openDeactivation({ ...baseCategories[0] })
+    await state.confirmDeactivation()
+
+    assert.equal(state.pendingDeactivation.id_categoria, 1)
+    assert.equal(state.deactivationUncertain, true)
+    assert.match(state.deactivationError, /quedó bloqueado/)
+    assert.equal(deactivations, 1)
+
+    await state.confirmDeactivation()
+    state.closeDeactivation()
+    await settle()
+
+    assert.equal(deactivations, 1)
+    assert.equal(state.pendingDeactivation.id_categoria, 1)
+
+    await state.reloadAfterDeactivationUncertain()
+
+    assert.equal(state.pendingDeactivation.id_categoria, 1)
+    assert.equal(state.deactivationUncertain, true)
+    assert.equal(state.deactivationError, 'No se pudo recargar el listado. Reintentá antes de continuar.')
+
+    failReload = false
+    await state.reloadAfterDeactivationUncertain()
+
+    assert.equal(state.pendingDeactivation, null)
+    assert.equal(state.deactivationUncertain, false)
+    assert.equal(state.notice, 'Listado actualizado.')
   })
 })
