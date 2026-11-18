@@ -148,6 +148,13 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
     await expectBlocked()
 
     await row.getByRole('button', { name: 'Rechazar cuenta empresa de ' + company.name }).click()
+    {
+      const decision = page.getByRole('dialog', { name: 'Rechazar empresa', exact: true })
+      await decision.getByRole('button', { name: 'Confirmar rechazo', exact: true }).click()
+      await expect(decision.getByRole('status')).toHaveText('Empresa rechazada.')
+      await decision.getByRole('button', { name: 'Cerrar detalle del cliente', exact: true }).click()
+      await expect(decision).toHaveCount(0)
+    }
     await expect(row.getByText('Rechazada', { exact: true })).toBeVisible()
     await client.goto('/mi-cuenta')
     await commercial.getByRole('button', { name: 'Actualizar estado comercial' }).click()
@@ -158,6 +165,13 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
     await expectBlocked()
 
     await row.getByRole('button', { name: 'Aprobar cuenta empresa de ' + company.name }).click()
+    {
+      const decision = page.getByRole('dialog', { name: 'Aprobar empresa', exact: true })
+      await decision.getByRole('button', { name: 'Confirmar aprobación', exact: true }).click()
+      await expect(decision.getByRole('status')).toHaveText('Empresa aprobada.')
+      await decision.getByRole('button', { name: 'Cerrar detalle del cliente', exact: true }).click()
+      await expect(decision).toHaveCount(0)
+    }
     await expect(row.getByText('Aprobada', { exact: true })).toBeVisible()
     await client.goto('/mi-cuenta')
     await commercial.getByRole('button', { name: 'Actualizar estado comercial' }).click()

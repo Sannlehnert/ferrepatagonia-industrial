@@ -41,3 +41,16 @@ Las capturas se generan en los resultados locales de Playwright (clientes-1280.p
 ## Revisión
 
 Pendientes revisión técnica de Zahir, validación UX/UI de Lucci y CI del PR. Coordinar con Zahir los cambios de AdminClientsView.vue antes de integrar #346.
+
+
+## Ajuste de regresión del PR #133
+
+El CI de 4a7f559 pasó backend, auditoría de dependencias, TypeScript, pruebas unitarias y build del frontend. La suite integrada detectó que el recorrido previo de sprint6-journeys.real.spec.ts esperaba que aprobar/rechazar cambiara el estado sin confirmar. Se adaptó ese recorrido para confirmar cada decisión y cerrar el diálogo antes de continuar las comprobaciones de elegibilidad.
+
+Validación de la corrección:
+
+- npm run type-check --prefix frontend: aprobado.
+- node backend/test/helpers/run-e2e.cjs sprint6-journeys.real.spec.ts admin/client-status.real.spec.ts: 12 escenarios aprobados; limpieza temporal confirmada.
+- git diff --check: aprobado.
+
+El resultado de CI del PR debe volver a comprobarse después de publicar este ajuste.
