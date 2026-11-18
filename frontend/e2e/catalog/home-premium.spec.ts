@@ -21,13 +21,13 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta\/datos)$/)
+  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta)$/)
 }
 
 test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ page }) => {
   await page.goto('/')
   const search = header(page).getByRole('searchbox', { name: 'Buscar productos por nombre o código' })
-  await expect(header(page).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login')
+  await expect(header(page).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login?redirect=/')
   await expect(header(page).getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/registro')
   await expect(header(page).getByRole('button', { name: 'Carrito', exact: true })).toHaveCount(0)
   await expect(header(page).getByRole('link', { name: 'Panel de administración' })).toHaveCount(0)

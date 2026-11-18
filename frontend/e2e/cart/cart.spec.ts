@@ -12,7 +12,7 @@ test('sesión cliente conserva su carrito y la API rechaza totales calculados po
   await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test');
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!');
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/);
+  await expect(page).toHaveURL(/\/mi-cuenta$/);
 
   const firstResponse = await page.request.get('/api/carrito');
   expect(firstResponse.status()).toBe(200);

@@ -5,16 +5,21 @@ import type { PriceLine, USDPriceResult } from '@/types/pricing'
 const decimal = /^(0|[1-9]\d{0,9})\.\d{2}$/
 const states = ['DEFINIDO', 'PRECIO_AUSENTE', 'BASE_CERO', 'BASE_NO_VERIFICADA', 'FINAL_CERO', 'ARS_CERO']
 
-// Exact strings only. This predicate describes price eligibility, never stock or checkout authorization.
-export function precioComprable(line: PriceLine | undefined): boolean {
+function precioAcreditado(line: PriceLine | undefined): boolean {
   return !!line && line.estadoPrecio === 'DEFINIDO' && line.precioComprable === true &&
     typeof line.precioUnitarioUSD === 'string' && decimal.test(line.precioUnitarioUSD) &&
     line.precioUnitarioUSD !== '0.00' && typeof line.precioBaseUSD === 'string' &&
     decimal.test(line.precioBaseUSD) && line.precioBaseUSD !== '0.00' &&
     typeof line.evidenciaBaseUSD?.reference === 'string' && !!line.evidenciaBaseUSD.reference.trim() &&
     typeof line.evidenciaBaseUSD.verifiedAt === 'string' && Number.isFinite(Date.parse(line.evidenciaBaseUSD.verifiedAt)) &&
-    (line.evidenciaBaseUSD.synthetic === false ||
-      (line.evidenciaBaseUSD.synthetic === true && line.compraAcademica === true))
+    typeof line.evidenciaBaseUSD.synthetic === 'boolean'
+}
+
+// Exact strings only. This predicate describes price eligibility, never stock or checkout authorization.
+export function precioComprable(line: PriceLine | undefined): boolean {
+  return precioAcreditado(line) &&
+    (line?.evidenciaBaseUSD?.synthetic === false ||
+      (line?.evidenciaBaseUSD?.synthetic === true && line.compraAcademica === true))
 }
 
 export async function getPrices(ids: readonly number[], personalized: boolean, signal?: AbortSignal): Promise<PriceLine[]> {
@@ -32,18 +37,21 @@ export async function getPrices(ids: readonly number[], personalized: boolean, s
     const result = data.data
     if (!result || result.regla !== 'FER17-v1' || result.ivaIncluido !== true ||
       result.moneda !== 'USD' || !Array.isArray(result.productos) ||
-      (result.datosSinteticos !== false && !(personalized && result.datosSinteticos === true &&
-        result.productos.some(p => p.evidenciaBaseUSD?.synthetic === true) &&
-        result.productos.every(p => p.evidenciaBaseUSD?.synthetic !== true || p.compraAcademica === true))) ||
+      typeof result.datosSinteticos !== 'boolean' ||
+      result.datosSinteticos !== result.productos.some(p => p.evidenciaBaseUSD?.synthetic === true) ||
       result.productos.length !== batch.length || new Set(result.productos.map(p => p.productoId)).size !== batch.length ||
       result.productos.some(p => !batch.includes(p.productoId) || p.cantidad !== 1 || p.moneda !== 'USD' ||
         !states.includes(p.estadoPrecio) || typeof p.precioComprable !== 'boolean' ||
         !/^\d{1,2}\.\d{2}$/.test(p.descuentoAplicado) ||
         !['NINGUNO', 'LISTA', 'ESPECIAL_PUBLICO', 'AMBOS'].includes(p.origenDescuento) ||
-        (p.estadoPrecio === 'DEFINIDO' && !precioComprable(p)))) {
+        (p.estadoPrecio === 'DEFINIDO' && !precioAcreditado(p)))) {
       throw new Error('Respuesta de precios no acreditada.')
     }
-    lines.push(...result.productos)
+    lines.push(...result.productos.map(p =>
+      p.evidenciaBaseUSD?.synthetic === true && !(personalized && p.compraAcademica === true)
+        ? { ...p, compraAcademica: undefined, precioComprable: false, precioBaseUSD: null,
+            precioUnitarioUSD: null, subtotalUSD: null, subtotalARS: null }
+        : p))
   }
   return lines
 }
