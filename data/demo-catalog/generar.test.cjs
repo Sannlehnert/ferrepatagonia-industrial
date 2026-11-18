@@ -124,6 +124,25 @@ test('prepara la asociación al catálogo maestro de 100 SKU sin exigir los SKU 
   }
 });
 
+test('los primeros 50 SKU están cubiertos y la matriz publicada identifica cada tipo y archivo', () => {
+  const fuentes = leerFuentes();
+  const maestro = leerCatalogoMaestro().slice(0, 50);
+  const { data: matriz, errors } = require('../../backend/node_modules/papaparse').parse(
+    readFileSync(join(__dirname, '../../docs/310/matriz-verificada.csv'), 'utf8'), { header: true, skipEmptyLines: true });
+  assert.deepEqual(errors, []);
+  assert.equal(matriz.length, 50);
+  for (const [i, producto] of maestro.entries()) {
+    const fuente = fuentes.get(producto.sku);
+    assert.ok(fuente, `Falta imagen del alcance #310: ${producto.sku}`);
+    assert.equal(matriz[i].sku, producto.sku);
+    assert.equal(matriz[i].nombre, producto.nombre_propuesto);
+    assert.equal(matriz[i].familia, producto.familia);
+    assert.equal(matriz[i].archivo, fuente.archivo);
+    assert.equal(matriz[i].tipo, fuente.archivo.startsWith('ilustrativa-') ? 'Ilustración' : 'Fotografía');
+  }
+  assert.equal(matriz.filter(fila => fila.tipo === 'Fotografía').length, 9);
+});
+
 test('conservar una imagen existente no la declara verificada ni identifica su archivo con el plan nuevo', async () => {
   const fuente = leerFuentes().get('FP-DEMO-FIJ-TARUGO-NYLON-10-MM');
   const producto = { id_producto: 1, codigo: fuente.sku, nombre: fuente.nombre, imagen: '/api/product-images/anterior.webp' };

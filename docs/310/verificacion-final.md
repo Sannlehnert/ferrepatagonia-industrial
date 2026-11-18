@@ -6,7 +6,7 @@
 
 Partida remota: `8c8795c9874f449609e3f590dcc2ac517fbc5613`, árbol aislado limpio. Se leyeron las tres revisiones de Santiago en el PR, contra `628e412`, `616ab9f` y `34af44d`. Se contrastó el delta posterior a `34af44d` y el diff exclusivo frente a develop. Los cambios ajenos al alcance proceden de merges previos de develop, no se reescribieron.
 
-Se incorporaron los cinco commits pendientes de develop hasta `56ca40f`, sin conflictos, mediante `5884a4e`. Se conserva #144: `npm audit --audit-level=high` directo, sin excepción temporal ni sustitución del control. Las correcciones de imágenes y validadores están en `f727192`; el commit que contiene este informe agrega E2E y evidencias. El SHA final y el resultado remoto de CI se consignan en la descripción del [PR #125](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/125).
+Se incorporaron los cinco commits pendientes de develop hasta `56ca40f`, sin conflictos, mediante `5884a4e`. Durante la validación, develop recibió #130; se incorporaron sus siete commits hasta `8323219` mediante `aeb8043`, también sin conflictos. Se conserva #144: `npm audit --audit-level=high` directo, sin excepción temporal ni sustitución del control. Las correcciones de imágenes y validadores están en `f727192`; `83603f1` agrega E2E y evidencias. El SHA final y el resultado remoto de CI se consignan en la descripción del [PR #125](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/125).
 
 ## Hallazgos
 
@@ -32,19 +32,20 @@ Todas las ejecuciones finales usaron Node.js **22.22.2**. Las instalaciones inic
 
 | Comprobación | Resultado |
 | --- | --- |
-| `node --test data/demo-catalog/generar.test.cjs` | 10/10. Incluye maestro, conservación de imágenes, metadatos y decodificación de los 60 activos utilizados. |
+| `node --test data/demo-catalog/generar.test.cjs` | 11/11. Incluye cobertura de los primeros 50 y matriz, maestro, conservación de imágenes, metadatos y decodificación de los 60 activos utilizados. |
 | Frontend `npm run type-check` | Correcto. Incluye los specs TypeScript E2E. |
-| Frontend `npm test` | 227/227. |
+| Frontend `npm test` | 228/228 después de integrar #130 (227/227 antes). |
 | Frontend `npm run build` | Correcto, incluido type-check. |
 | Backend type-check y build | Correctos. |
 | Backend `npm run test:unit` | 1334 correctos, 3 omitidos, 0 fallos en ejecución con loopback. Un intento previo bajo sandbox no pudo hacer fetch local; no se contabiliza como aprobado. |
 | Backend `npm run test:dto-source` | 3/3. |
+| ADMIN sobre develop actualizado | 17/17 con su runner MariaDB aislado. Se corrigió la misma mezcla UTC_TIMESTAMP/Node en la fixture de evidencia de precio; sin cambios de lógica de negocio. El esquema permaneció idéntico antes/después. |
 | `npm audit --audit-level=high`, frontend y backend | 0 vulnerabilidades en ambos. Política #144 conservada. |
 | E2E de importación y catálogo con build de producción | 1/1, MariaDB 11.4 descartable y Chromium. Maestro real de 100 SKU: 61 subidas y 39 pendientes. Académico: 904 importados, 182 recursos, 722 pendientes; reimportación, cinco pedidos simulados, cinco cargos y cero pagos. |
 | Conciliación E2E/informe versionado | Coinciden los 182 SKU, archivos y ambos hashes. El origen no se confunde con el WebP recodificado por ADMIN. |
 | Accesibilidad móvil | Aviso visible, sin desborde y de al menos 14 px. Dos anchos en tres vistas; 182 pares de catálogo/ficha a 360 px. Capturas de carrito conservadas. |
 | Desfase temporal | MariaDB unos 27,5 s por delante del host. Además se adelantó un día la sesión SQL. La marca guardada coincide con Node; sin espera artificial. |
-| Limpieza | Ambos pases completos del E2E confirmaron eliminación del contenedor y datos tmpfs. |
+| Limpieza | Los pases completos del E2E confirmaron eliminación del contenedor y datos tmpfs. El pase final con #130 integrado también pasó. |
 | `git diff --check` | Correcto. |
 
 El CI completo se ejecuta en GitHub Actions al actualizar esta rama. El resultado de ese run se informa con el SHA final en el PR y en la entrega; esta tabla no atribuye ejecución local a las demás suites integradas de CI.
@@ -54,6 +55,7 @@ El CI completo se ejecuta en GitHub Actions al actualizar esta rama. El resultad
 - Generación, validación y fuentes: `data/demo-catalog/{ilustraciones.cjs,cobertura-visual.cjs,asociar-fotos.cjs,generar.test.cjs,image-sources.csv,catalog-validation.json,visual-audit.json,README.md}`.
 - Activos: 15 ilustraciones nuevas, una corregida (`ilustrativa-adh-sellador.webp`), manifiesto y créditos. Los demás binarios ya revisados se conservaron byte a byte.
 - Frontend: clasificación de imágenes y regresiones; E2E de importación/catálogo. No se cambiaron funcionalidades ajenas.
+- Backend: únicamente la fixture temporal de `backend/test/adminProduct.test.cjs` unifica la marca UTC de Node, igual que el E2E.
 - [Matriz de 50 SKU y límites de correspondencia](imagenes-productos-1-50.md), [CSV de matriz](matriz-verificada.csv), [resultado maestro](maestro-100-verificado.json), [relojes UTC](relojes-utc.json), [carrito 320](aviso-carrito-320.png), [carrito 360](aviso-carrito-360.png).
 
 Las capturas y JSON corresponden al entorno local descartable; sus URLs loopback no son enlaces persistentes de producción. El fixture del maestro solo usa los 100 SKU/nombres reales; los precios y existencias siguen siendo académicos. No se cargaron imágenes en una instalación compartida ni se modificó `sources/`.
