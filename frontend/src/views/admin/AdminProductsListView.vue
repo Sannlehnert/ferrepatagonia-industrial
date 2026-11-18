@@ -457,6 +457,8 @@ onBeforeUnmount(() => {
             </div>
         </template>
 
+        <p class="text-sm text-slate-600">El importe base no es necesariamente el precio final del catálogo. Guardarlo no reemplaza la verificación.</p>
+
         <!-- Barra Inferior -->
         <div class="bg-[#F1F5F9] border-t border-[#E2E8F0] py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
             <div v-if="result" class="text-sm text-slate-700 font-medium">

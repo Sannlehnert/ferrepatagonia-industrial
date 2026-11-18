@@ -11,6 +11,7 @@ import {
 } from '../../services/adminProductService';
 
 import { isMutationResultUncertain, uncertainMutationMessage, adminMutationErrorMessage } from '../../services/adminMutationError';
+import { basePriceLabels } from '@/types/pricing';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -407,7 +408,7 @@ const requestClose = () => {
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold uppercase text-[#64748B] mb-1">Precio Base (USD) *</label>
+                            <label class="block text-xs font-semibold uppercase text-[#64748B] mb-1">Importe base cargado (USD) *</label>
                             <input
                                 v-model="form.precio"
                                 type="number"
@@ -417,6 +418,17 @@ const requestClose = () => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.precio ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
+                            <p
+                                v-if="isEditMode"
+                                data-testid="estado-precio-base"
+                                class="mt-1 rounded-md border px-2 py-1 text-xs font-semibold"
+                                :class="product?.estado_precio_base === 'VERIFICADO'
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                    : 'border-amber-300 bg-amber-50 text-amber-900'"
+                            >
+                                Evidencia actual: {{ product?.estado_precio_base ? basePriceLabels[product.estado_precio_base] : 'No se pudo determinar el estado del precio base' }}
+                            </p>
+                            <p class="mt-1 text-xs text-[#64748B]">Guardar o cambiar el importe no verifica el precio e invalida la evidencia previa. Requiere nueva evidencia antes de ofrecerlo en el catálogo.</p>
                             <p v-if="fieldErrors.precio" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.precio }}</p>
                         </div>
 

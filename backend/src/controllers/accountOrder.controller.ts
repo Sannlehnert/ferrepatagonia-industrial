@@ -183,3 +183,5 @@ export function handleClientOrderRead(
     }
   };
 }
+
+export { handleTransferOrder } from './transferOrder.controller';
