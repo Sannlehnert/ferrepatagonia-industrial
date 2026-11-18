@@ -1,5 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { test, expect } from '@playwright/test';
+import { createRequire } from 'node:module';
+import { test, expect, type Locator } from '@playwright/test';
+
+const require = createRequire(import.meta.url);
+const { connectOwned } = require('../../../backend/test/helpers/cc260-disposable.cjs') as {
+  connectOwned(profile: unknown, runner: 'E2E'): Promise<{
+    connection: {
+      query(sql: string, values: unknown[]): Promise<{ affectedRows: number }>;
+      end(): Promise<void>;
+    };
+  }>;
+};
 
 test('crea y edita un producto con persistencia y reflejo público', async ({
   page,
@@ -36,6 +47,52 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
   const visitor = await visitorContext.newPage();
   const origin = new URL(page.url()).origin;
   const publicNames = visitor.getByRole('heading', { level: 3 });
+  const adminTable = page.getByRole('table', { name: 'Productos del catálogo' });
+  const filterAdminByCode = async (expectedName: string) => {
+    const searchInput = page.getByLabel('Buscar productos por nombre o SKU');
+    if ((await searchInput.inputValue()) !== code) {
+      const filtered = page.waitForResponse((response) => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/admin/productos'
+          && response.request().method() === 'GET'
+          && url.searchParams.get('busqueda') === code;
+      });
+      await searchInput.fill(code);
+      expect((await filtered).status()).toBe(200);
+    }
+    await expect(adminTable.getByRole('rowheader')).toHaveText([expectedName]);
+  };
+
+  const openAdminEditor = async (expectedName: string) => {
+    const edit = page.getByRole('button', {
+      name: `Editar ${expectedName}`,
+      exact: true,
+    });
+    await expect(edit).toBeEnabled();
+    await edit.focus();
+    await page.keyboard.press('Enter');
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible();
+    return { dialog, edit };
+  };
+
+  const expectBasePriceEvidence = async (dialog: Locator, state: string) => {
+    await expect(dialog.getByTestId('estado-precio-base')).toHaveText(
+      `Evidencia actual: ${state}`,
+    );
+  };
+
+  const closeAdminEditor = async (dialog: Locator, trigger: Locator) => {
+    await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  };
+
+  const checkAdminBasePriceEvidence = async (expectedName: string, state: string) => {
+    const { dialog, edit } = await openAdminEditor(expectedName);
+    await expectBasePriceEvidence(dialog, state);
+    await closeAdminEditor(dialog, edit);
+  };
 
   const checkPublicProduct = async (expectedName: string) => {
     await visitor.goto(
@@ -68,7 +125,7 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
     await form.getByRole('combobox').selectOption({
       label: 'Herramientas E2E',
     });
-    await field('Precio Base').fill('150');
+    await field('Importe base cargado').fill('150');
     await field('Stock').fill('8');
 
     const creation = page.waitForResponse((response) =>
@@ -95,22 +152,47 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
 
     // Comprobar que el visitante ve el producto recién creado.
     await checkPublicProduct(initialName);
+    await expect(visitor.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
+    await expect(visitor.getByRole('button', { name: 'Agregar', exact: true })).toBeDisabled();
+    await filterAdminByCode(initialName);
+    await checkAdminBasePriceEvidence(initialName, 'Precio pendiente de verificación');
+
+    // Esta evidencia ficticia solo se inserta en la base descartable del runner.
+    const profile = process.env.CCE2E_TEST_PROFILE;
+    if (!profile) throw new Error('Ejecutá la prueba con backend/test/helpers/run-e2e.cjs');
+    const { connection } = await connectOwned(JSON.parse(profile), 'E2E');
+    try {
+      const evidence = await connection.query(`INSERT INTO PRECIO_USD_EVIDENCIA
+        (id_producto, precio_verificado, evidencia, id_admin, verificado_utc, valida, sintetica)
+        SELECT ?, 150, 'Evidencia de prueba aislada', id_usuario, UTC_TIMESTAMP(), 1, 0
+        FROM USUARIO WHERE email=? AND rol='ADMIN'`, [createdId, 'admin@e2e.test']);
+      expect(evidence.affectedRows).toBe(1);
+    } finally {
+      await connection.end();
+    }
+    await page.reload();
+    await filterAdminByCode(initialName);
+    await checkAdminBasePriceEvidence(initialName, 'Precio base verificado');
+    await visitor.evaluate('window.dispatchEvent(new Event("focus"))');
+    await expect(visitor.getByText('USD 150.00', { exact: true })).toBeVisible();
+    await visitor.goto(`${origin}/producto/${createdId}`);
+    await expect(visitor.getByText('USD 150.00', { exact: true })).toBeVisible();
 
     // Comprobar persistencia en administración.
     await page.reload();
 
-    const edit = page.getByRole('button', { name: `Editar ${initialName}`, exact: true });
-    await edit.focus();
-    await page.keyboard.press('Enter');
+    const { dialog: editDialog } = await openAdminEditor(initialName);
+    await expectBasePriceEvidence(editDialog, 'Precio base verificado');
 
     await expect(field('Nombre del Producto')).toHaveValue(initialName);
     await expect(field('Código SKU')).toHaveValue(code);
-    await expect(field('Precio Base')).toHaveValue('150');
+    await expect(field('Importe base cargado')).toHaveValue('150');
     await expect(field('Stock')).toHaveValue('8');
     await expect(form.getByRole('combobox')).toHaveValue('1');
 
-    // Editar el nombre desde administración.
+    // Cambiar el importe invalida la evidencia vinculada al valor anterior.
     await field('Nombre del Producto').fill(editedName);
+    await field('Importe base cargado').fill('170');
 
     const update = page.waitForResponse((response) =>
       new URL(response.url()).pathname
@@ -128,23 +210,35 @@ test('crea y edita un producto con persistencia y reflejo público', async ({
       `"${editedName}" se actualizó correctamente.`,
     );
     await expect(form).toHaveCount(0);
+    await filterAdminByCode(editedName);
+    await checkAdminBasePriceEvidence(editedName, 'Precio pendiente de verificación');
 
-    // Comprobar que el visitante ve el nombre actualizado.
+    await visitor.evaluate('window.dispatchEvent(new Event("focus"))');
+    await expect(visitor.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
+    await expect(visitor.getByText('USD 150.00', { exact: true })).toHaveCount(0);
+    await expect(visitor.getByRole('button', { name: 'Agregar', exact: true })).toBeDisabled();
+
+    // Comprobar que el catálogo ve nombre y estado actualizados.
     await checkPublicProduct(editedName);
+    await expect(visitor.getByText('Precio pendiente de verificación', { exact: true })).toBeVisible();
 
     // Comprobar persistencia de la edición en administración.
     await page.reload();
 
-    await page.getByRole('button', {
-      name: `Editar ${editedName}`,
-      exact: true,
-    }).click();
+    const { dialog: persistedDialog, edit: persistedEdit } = await openAdminEditor(
+      editedName,
+    );
 
     await expect(field('Nombre del Producto')).toHaveValue(editedName);
     await expect(field('Código SKU')).toHaveValue(code);
-    await expect(field('Precio Base')).toHaveValue('150');
+    await expect(field('Importe base cargado')).toHaveValue('170');
     await expect(field('Stock')).toHaveValue('8');
     await expect(form.getByRole('combobox')).toHaveValue('1');
+    await expectBasePriceEvidence(
+      persistedDialog,
+      'Precio pendiente de verificación',
+    );
+    await closeAdminEditor(persistedDialog, persistedEdit);
   } finally {
     try {
       // Evitar que el producto altere las otras pruebas del catálogo.

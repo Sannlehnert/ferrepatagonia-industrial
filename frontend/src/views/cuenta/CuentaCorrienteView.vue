@@ -84,7 +84,11 @@ function emptyMessage(coverage: string): string {
 }
 
 onMounted(() => void cuenta.load())
-watch(() => auth.sessionVersion, () => void cuenta.load())
+watch(() => auth.sessionVersion, () => {
+    // Durante el cierre de sesión o sin usuario, consultar solo provoca un 401 y un redirect superpuesto.
+    if (auth.loggingOut || !auth.user) return
+    void cuenta.load()
+})
 onBeforeRouteLeave(() => cuenta.clear())
 </script>
 

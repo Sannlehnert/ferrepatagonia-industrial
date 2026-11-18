@@ -11,6 +11,7 @@ import {
 } from '../../services/adminProductService';
 
 import { isMutationResultUncertain, uncertainMutationMessage, adminMutationErrorMessage } from '../../services/adminMutationError';
+import { basePriceLabels } from '@/types/pricing';
 
 const props = defineProps<{
     isOpen: boolean;
@@ -376,7 +377,7 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                     <div
                         v-if="backendError && !uncertain"
                         role="alert"
-                        class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-start gap-3"
+                        class="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-md flex items-start gap-3"
                     >
                         <span class="wrap-anywhere min-w-0 flex-1">{{ backendError }}</span>
                         <button
@@ -396,7 +397,7 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                             class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                             :class="fieldErrors.nombre ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                         >
-                        <p v-if="fieldErrors.nombre" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.nombre }}</p>
+                        <p v-if="fieldErrors.nombre" class="text-xs text-red-700 mt-1">{{ fieldErrors.nombre }}</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -409,7 +410,7 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
                                 :class="fieldErrors.codigo ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
-                            <p v-if="fieldErrors.codigo" class="text-xs text-[#EF4444] mt-1 wrap-anywhere">{{ fieldErrors.codigo }}</p>
+                            <p v-if="fieldErrors.codigo" class="text-xs text-red-700 mt-1 wrap-anywhere">{{ fieldErrors.codigo }}</p>
                         </div>
 
                         <div>
@@ -419,7 +420,7 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                             </div>
                             <div v-if="categoriesError" role="alert" class="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
                                 <p class="wrap-anywhere">{{ categoriesError }}</p>
-                                <button type="button" @click="emit('retry-categories')" class="mt-1 font-semibold underline">
+                                <button type="button" @click="emit('retry-categories')" class="mt-1 min-h-11 px-1 inline-flex items-center font-semibold underline">
                                     Reintentar
                                 </button>
                             </div>
@@ -435,13 +436,13 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                                     {{ cat.nombre }}
                                 </option>
                             </select>
-                            <p v-if="fieldErrors.id_categoria" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.id_categoria }}</p>
+                            <p v-if="fieldErrors.id_categoria" class="text-xs text-red-700 mt-1">{{ fieldErrors.id_categoria }}</p>
                         </div>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold uppercase text-[#64748B] mb-1">Precio Base (USD) *</label>
+                            <label class="block text-xs font-semibold uppercase text-[#64748B] mb-1">Importe base cargado (USD) *</label>
                             <input
                                 v-model="form.precio"
                                 type="number"
@@ -451,7 +452,18 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.precio ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
-                            <p v-if="fieldErrors.precio" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.precio }}</p>
+                            <p
+                                v-if="isEditMode"
+                                data-testid="estado-precio-base"
+                                class="mt-1 rounded-md border px-2 py-1 text-xs font-semibold"
+                                :class="product?.estado_precio_base === 'VERIFICADO'
+                                    ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
+                                    : 'border-amber-300 bg-amber-50 text-amber-900'"
+                            >
+                                Evidencia actual: {{ product?.estado_precio_base ? basePriceLabels[product.estado_precio_base] : 'No se pudo determinar el estado del precio base' }}
+                            </p>
+                            <p class="mt-1 text-xs text-[#64748B]">Guardar o cambiar el importe no verifica el precio e invalida la evidencia previa. Requiere nueva evidencia antes de ofrecerlo en el catálogo.</p>
+                            <p v-if="fieldErrors.precio" class="text-xs text-red-700 mt-1">{{ fieldErrors.precio }}</p>
                         </div>
 
                         <div>
@@ -465,7 +477,7 @@ const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.stock ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
-                            <p v-if="fieldErrors.stock" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.stock }}</p>
+                            <p v-if="fieldErrors.stock" class="text-xs text-red-700 mt-1">{{ fieldErrors.stock }}</p>
                         </div>
                     </div>
 

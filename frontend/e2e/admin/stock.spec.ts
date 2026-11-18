@@ -111,10 +111,10 @@ test('valida stock y refleja los cambios en el catálogo público', async ({
         exact: true,
       });
 
-      // El visitante consulta stock, pero necesita sesión para agregar.
+      // El stock se muestra, pero el precio sin evidencia impide agregar.
       await expect(add).toBeDisabled();
       await expect(add).toHaveAccessibleDescription(
-        'Iniciá sesión para agregar productos.',
+        'El precio está pendiente de verificación y no se puede agregar.',
       );
       await expect(product.getByText('Precio pendiente de verificación', {
         exact: true,
