@@ -1,5 +1,49 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test } from '@playwright/test'
+import { expect, test as base } from '@playwright/test'
+
+type CreditCompany = { email: string; clientId: number }
+
+// Cada escenario crea su empresa: la fixture compartida de Home debe seguir sin cuenta.
+const test = base.extend<{ company: CreditCompany }>({
+  company: async ({ request, playwright, baseURL }, use) => {
+    const headers = { Origin: new URL(baseURL!).origin }
+    const email = `credit-330-${randomUUID()}@e2e.test`
+    const password = 'E2eLocal-214!'
+    const cuit = '30-' + String(Math.floor(Math.random() * 100000000)).padStart(8, '0') + '-9'
+    const registered = await request.post('/api/auth/register', {
+      headers,
+      data: { tipoCliente: 'EMPRESA', nombreRazonSocial: 'Empresa E2E crédito #330', cuit, email, password },
+    })
+    expect(registered.status(), await registered.text()).toBe(201)
+
+    const admin = await playwright.request.newContext({ baseURL })
+    let clientId: number
+    try {
+      const login = await admin.post('/api/auth/login', {
+        headers, data: { email: 'admin@e2e.test', password },
+      })
+      expect(login.ok(), await login.text()).toBe(true)
+      const clients = await admin.get('/api/admin/clientes')
+      expect(clients.ok(), await clients.text()).toBe(true)
+      const company = ((await clients.json()).data.clientes as Array<{ id: number; email: string }>)
+        .find(client => client.email === email)
+      if (!company) throw new Error('La empresa propia del escenario no aparece en el listado ADMIN.')
+      clientId = company.id
+      const approval = await admin.patch(`/api/admin/clientes/${clientId}/estado-empresa`, {
+        headers, data: { estado: 'APROBADA' },
+      })
+      expect(approval.status(), await approval.text()).toBe(200)
+      const account = await admin.get(`/api/admin/clientes/${clientId}/cuenta-corriente`)
+      expect(account.ok(), await account.text()).toBe(true)
+      expect((await account.json()).data.estado).toBe('SIN_CUENTA')
+    } finally {
+      await admin.dispose()
+    }
+
+    // Las cuentas y su historial pertenecen a la base descartable del runner.
+    await use({ email, clientId })
+  },
+})
 
 for (const width of [1280, 360]) {
   test.describe(`Controles ADMIN de crédito a ${width}px`, () => {
@@ -9,6 +53,7 @@ for (const width of [1280, 360]) {
       page,
       request,
       baseURL,
+      company,
     }) => {
       test.setTimeout(60_000)
       expect(baseURL).toBeTruthy()
@@ -20,7 +65,7 @@ for (const width of [1280, 360]) {
       // La sesión de empresa prepara solicitudes reales para el panel.
       const companyLogin = await request.post('/api/auth/login', {
         headers,
-        data: { email: 'empresa-cuenta@e2e.test', password },
+        data: { email: company.email, password },
       })
       expect(companyLogin.ok()).toBe(true)
 
@@ -74,6 +119,7 @@ for (const width of [1280, 360]) {
       expect(resolved.ok()).toBe(true)
       const approved = (await resolved.json()).data.solicitud
       expect(approved.estado).toBe('APROBADA')
+      expect(approved.clienteId).toBe(company.clientId)
       expect(approved.limiteAutorizado).toBe('1500.00')
       // Cada prueba comienza con la cuenta inhabilitada.
       const accountUrl = `/api/admin/clientes/${approved.clienteId}/cuenta-corriente`
@@ -197,13 +243,14 @@ test('recupera una aprobación con respuesta perdida usando la misma clave', asy
   page,
   request,
   baseURL,
+  company,
 }) => {
   const headers = { Origin: new URL(baseURL!).origin }
   const password = 'E2eLocal-214!'
 
   const companyLogin = await request.post('/api/auth/login', {
     headers,
-    data: { email: 'empresa-cuenta@e2e.test', password },
+    data: { email: company.email, password },
   })
   expect(companyLogin.ok()).toBe(true)
 
@@ -287,6 +334,7 @@ test('recupera una aprobación con respuesta perdida usando la misma clave', asy
 
   const approved = (await result.json()).data.solicitud
   expect(approved.estado).toBe('APROBADA')
+  expect(approved.clienteId).toBe(company.clientId)
   expect(approved.limiteAutorizado).toBe('2000.00')
 })
 

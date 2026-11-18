@@ -73,11 +73,10 @@ function loadDetail(clientId: number, kind?: 'movimientos' | 'vencimientos', cur
   selected.value = clientId
   const previous = selectedData.value
   return detail.load(async signal => {
-    const [summary, movements, dues] = await Promise.all([
-      getAdminAccount(clientId, signal),
-      getAdminAccountDetail(clientId, 'movimientos', kind === 'movimientos' ? cursor : undefined, signal),
-      getAdminAccountDetail(clientId, 'vencimientos', kind === 'vencimientos' ? cursor : undefined, signal),
-    ])
+    // La recarga del listado también consulta la BD; evitar ráfagas de autenticación y lecturas.
+    const summary = await getAdminAccount(clientId, signal)
+    const movements = await getAdminAccountDetail(clientId, 'movimientos', kind === 'movimientos' ? cursor : undefined, signal)
+    const dues = await getAdminAccountDetail(clientId, 'vencimientos', kind === 'vencimientos' ? cursor : undefined, signal)
     if (summary.revision !== movements.revision || summary.revision !== dues.revision ||
       (cursor && previous?.summary.revision !== summary.revision) ||
       [movements, dues].some(page => (page.estado === 'SIN_CUENTA') !== (summary.estado === 'SIN_CUENTA')) ||
