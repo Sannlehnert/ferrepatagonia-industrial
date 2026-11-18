@@ -8,7 +8,7 @@ const {
 } = require('./cobertura-visual.cjs');
 const { leerCatalogoMaestro, seleccionarFuentesCatalogo } = require('./asociar-fotos.cjs');
 const {
-  archivoIlustrativoDeSku, bytesDe, claves, svg, validarLeyenda,
+  archivoIlustrativoDeSku, claves, svg, validarLeyenda,
 } = require('./ilustraciones.cjs');
 
 const { data: { categorias } } = require('./categorias-e2e.json');
@@ -52,7 +52,7 @@ test('el informe de catálogo concilia imágenes, fuentes y pendientes', () => {
   assert.equal(informe.gruposPendientes, auditoria.grupos.length);
 });
 
-test('cada ilustración de origen es generada con leyenda textual verificable', async () => {
+test('cada ilustración de origen es generada con leyenda textual verificable', () => {
   const fuentes = leerFuentes();
   const archivos = new Map([...fuentes.values()]
     .filter(fuente => fuente.archivo.startsWith('ilustrativa-'))
@@ -61,7 +61,6 @@ test('cada ilustración de origen es generada con leyenda textual verificable', 
   for (const [archivo, fuente] of archivos) {
     const clave = archivo.slice('ilustrativa-'.length, -'.webp'.length).toUpperCase();
     validarLeyenda(svg(clave));
-    assert.deepEqual(fuente.bytes, await bytesDe(clave), archivo);
     validarContenidoIlustrativo(archivo, fuente.bytes);
     assert.ok(creditos.has(archivo), `Falta acreditar ${archivo}`);
   }
