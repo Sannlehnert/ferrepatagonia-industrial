@@ -132,7 +132,14 @@ export async function mockCart(page: Page) {
     }
 
     if (path === '/api/pedidos/transferencia/eligibilidad' && method === 'GET') {
-      return route.fulfill({ json: { data: state.transferEligibility } })
+      return route.fulfill({
+        json: {
+          data: {
+            ...state.transferEligibility,
+            ...(state.transferEligibility.elegible ? { totalUSD: amounts[state.quantity] } : {}),
+          },
+        },
+      })
     }
 
     if (path === '/api/pedidos/transferencia' && method === 'POST') {

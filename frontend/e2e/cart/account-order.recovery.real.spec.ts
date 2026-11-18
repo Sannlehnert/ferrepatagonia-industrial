@@ -159,6 +159,7 @@ for (const width of [360, 1280]) {
       const summary = page.getByRole('region', { name: 'Resumen del carrito' })
       const eligibility = await addFromCatalog()
       expect(eligibility).toMatchObject({ elegible: true, totalUSD: '10.00', creditoDisponibleUSD: '15.00' })
+      await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
       await expect(summary).toContainText('USD 10.00')
       await expect(summary).toContainText('USD 15.00')
 

@@ -309,7 +309,6 @@ export function createTransferOrderStore(
       clearState(userId)
       if (key !== null) {
         const scheduled = revision
-        void loadEligibility()
         if (pendingKey.value) {
           queueMicrotask(() => {
             if (scheduled === revision && sessionKey.value === key) void consultResult()

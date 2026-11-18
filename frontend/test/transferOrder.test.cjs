@@ -137,6 +137,7 @@ test('keeps the same attempt key while the order result is pending', async t => 
     recover: async () => ({ estado: 'PENDIENTE', result: pending }),
   })
   await tick()
+  await runtime.store.loadEligibility()
 
   assert.equal(await runtime.store.confirm(), false)
   assert.equal(runtime.store.attemptState, 'pending')
