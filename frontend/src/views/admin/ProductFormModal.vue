@@ -349,7 +349,7 @@ const requestClose = () => {
                         role="alert"
                         class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-center justify-between"
                     >
-                        <span>{{ backendError }}</span>
+                        <span class="wrap-anywhere">{{ backendError }}</span>
                         <button type="button" @click="backendError = ''" class="border-0 bg-transparent font-bold ml-4">✕</button>
                     </div>
 
@@ -375,7 +375,7 @@ const requestClose = () => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
                                 :class="fieldErrors.codigo ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
-                            <p v-if="fieldErrors.codigo" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.codigo }}</p>
+                            <p v-if="fieldErrors.codigo" class="text-xs text-[#EF4444] mt-1 wrap-anywhere">{{ fieldErrors.codigo }}</p>
                         </div>
 
                         <div>
@@ -384,7 +384,7 @@ const requestClose = () => {
                                 Cargando categorías...
                             </div>
                             <div v-if="categoriesError" role="alert" class="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-                                <p>{{ categoriesError }}</p>
+                                <p class="wrap-anywhere">{{ categoriesError }}</p>
                                 <button type="button" @click="emit('retry-categories')" class="mt-1 font-semibold underline">
                                     Reintentar
                                 </button>

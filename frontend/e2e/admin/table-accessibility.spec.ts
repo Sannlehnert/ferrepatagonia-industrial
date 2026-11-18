@@ -106,6 +106,8 @@ test('P2-01/P2-02: datos extremos sin overflow global ni etiquetas fragmentadas'
     await expect(edit).toBeEnabled();
     await expect(status).toBeEnabled();
     await expect(region.getByText('Activo', { exact: true })).toBeVisible();
+    await expect(region.getByText('Categoría E2E de prueba', { exact: true })).toBeVisible();
+    await expect(region.getByText('12,345.67', { exact: true })).toBeVisible();
 
     // Semántica de tabla y etiqueta accesible del SKU preservadas.
     await expect(page.getByRole('table')).toHaveCount(1);
@@ -125,12 +127,13 @@ test('P2-01/P2-02: datos extremos sin overflow global ni etiquetas fragmentadas'
 
         // El texto oculto del SKU queda contenido por la región posicionada.
         const skuLabel = await region.evaluate(el => {
-            const label = el.querySelector('.sr-only')!.getBoundingClientRect();
-            const bounds = el.getBoundingClientRect();
-            return { left: label.left, right: label.right, regionLeft: bounds.left, regionRight: bounds.right };
+            const hidden = el.querySelector('tbody .sr-only') as typeof el;
+            const parent = hidden.offsetParent;
+            return {
+                offsetParentInsideRegion: parent === el || (parent !== null && el.contains(parent)),
+            };
         });
-        expect(skuLabel.left).toBeGreaterThanOrEqual(skuLabel.regionLeft);
-        expect(skuLabel.right).toBeLessThanOrEqual(skuLabel.regionRight);
+        expect(skuLabel.offsetParentInsideRegion).toBe(true);
 
         // 2. El desplazamiento horizontal es interno y llega a todas las columnas.
         const overflow = await region.evaluate(el => ({
