@@ -15,7 +15,7 @@ const labels: Record<PriceState, string> = {
 <template>
   <div class="my-2 min-w-0 break-words text-sm" aria-live="polite">
     <p v-if="loading" class="m-0 text-slate-500">Consultando precios…</p>
-    <p v-else-if="error" class="m-0 text-slate-600">Precio no disponible</p>
+    <p v-else-if="error" class="m-0 text-slate-600">No se pudo consultar el precio</p>
     <template v-else-if="precioComprable(line)">
       <p class="m-0 text-base font-semibold">USD {{ line!.precioUnitarioUSD }}</p>
       <p class="m-0 text-xs text-slate-500">{{ line?.compraAcademica ? 'Precio simulado académico' : personalized ? 'Tu precio' : 'Precio público' }} · IVA incluido</p>
@@ -24,6 +24,6 @@ const labels: Record<PriceState, string> = {
         <span v-if="['ESPECIAL_PUBLICO', 'AMBOS'].includes(line!.origenDescuento)"> · Promoción especial</span>
       </p>
     </template>
-    <p v-else class="m-0 text-slate-600">{{ line ? labels[line.estadoPrecio] : 'Precio a confirmar' }}</p>
+    <p v-else class="m-0 text-slate-600">{{ line?.estadoPrecio === 'DEFINIDO' && line.evidenciaBaseUSD?.synthetic ? 'Precio sintético no disponible' : line ? labels[line.estadoPrecio] : 'Precio a confirmar' }}</p>
   </div>
 </template>

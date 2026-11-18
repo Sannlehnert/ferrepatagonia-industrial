@@ -151,7 +151,7 @@ jobs:
 
             - name: Run frontend security audit
               working-directory: frontend
-              run: npm audit --audit-level=high
+              run: npm run audit:ci
 
             - name: Type check frontend
               working-directory: frontend
