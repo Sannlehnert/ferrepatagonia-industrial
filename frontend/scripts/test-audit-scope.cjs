@@ -32,11 +32,9 @@ try {
     const production = JSON.parse(results.production.stdout);
     const full = JSON.parse(results.full.stdout);
     assert.equal(results.production.status, 0);
-    assert.equal(production.metadata.vulnerabilities.total, 0);
-    assert.equal(results.full.status, 1);
-    assert.equal(full.metadata.vulnerabilities.high, 10);
-    assert.equal(evaluate({ ...results, now: Date.now() }).length, 10);
-    console.log(`${configuration.name}: producción 0, completa 10 altas; excepción aplicada explícitamente.`);
+    assert.equal(results.full.status, 0);
+    evaluate(results);
+    console.log(`${configuration.name}: producción ${production.metadata.vulnerabilities.total}, completa ${full.metadata.vulnerabilities.total}; sin altas ni críticas.`);
   }
 } finally {
   process.env = savedEnv;

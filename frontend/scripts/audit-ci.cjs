@@ -5,8 +5,6 @@ const { mkdtempSync, readFileSync, rmSync, writeFileSync } = require('node:fs');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 
-const advisory = 'https://github.com/advisories/GHSA-fc5q-39xc-vjpf';
-const expires = '2026-11-24T00:00:00.000Z';
 const severity = ['info', 'low', 'moderate', 'high', 'critical'];
 const requiresBlock = level => level === 'high' || level === 'critical';
 const object = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -14,45 +12,6 @@ function requireValid(condition, message) {
   if (!condition) throw new Error(message);
 }
 
-// npm audit's reviewed via graph. An empty list denotes the single direct advisory.
-const via = {
-  '@vue/language-core': ['picomatch'],
-  fdir: ['picomatch'],
-  'npm-run-all2': ['picomatch'],
-  picomatch: [],
-  tinyglobby: ['fdir', 'picomatch'],
-  'unplugin-utils': ['picomatch'],
-  vite: ['picomatch', 'tinyglobby'],
-  'vite-plugin-inspect': ['unplugin-utils'],
-  'vite-plugin-vue-devtools': ['vite-plugin-inspect'],
-  'vue-tsc': ['@vue/language-core'],
-};
-
-// Reviewed incoming lockfile edges into the graph, including optional peers and root declarations.
-const edges = [
-  '|devDependencies|npm-run-all2|^9.0.3',
-  '|devDependencies|vite|^8.2.2',
-  '|devDependencies|vite-plugin-vue-devtools|^8.2.1',
-  '|devDependencies|vue-tsc|^3.3.11',
-  'node_modules/@tailwindcss/vite|peerDependencies|vite|^5.2.0 || ^6 || ^7 || ^8',
-  'node_modules/@vitejs/plugin-vue|peerDependencies|vite|^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0',
-  'node_modules/@vue/language-core|dependencies|picomatch|^4.0.4',
-  'node_modules/fdir|peerDependencies|picomatch|^3 || ^4',
-  'node_modules/npm-run-all2|dependencies|picomatch|^4.0.2',
-  'node_modules/tinyglobby|dependencies|fdir|^6.5.0',
-  'node_modules/tinyglobby|dependencies|picomatch|^4.0.4',
-  'node_modules/unplugin-utils|dependencies|picomatch|^4.0.4',
-  'node_modules/vite|dependencies|picomatch|^4.0.7',
-  'node_modules/vite|dependencies|tinyglobby|^0.2.17',
-  'node_modules/vite-dev-rpc|peerDependencies|vite|^2.9.0 || ^3.0.0-0 || ^4.0.0-0 || ^5.0.0-0 || ^6.0.1 || ^7.0.0-0 || ^8.0.0',
-  'node_modules/vite-hot-client|peerDependencies|vite|^2.6.0 || ^3.0.0 || ^4.0.0 || ^5.0.0-0 || ^6.0.0-0 || ^7.0.0-0 || ^8.0.0',
-  'node_modules/vite-plugin-inspect|dependencies|unplugin-utils|^0.3.1',
-  'node_modules/vite-plugin-inspect|peerDependencies|vite|^6.0.0 || ^7.0.0-0 || ^8.0.0-0',
-  'node_modules/vite-plugin-vue-devtools|dependencies|vite-plugin-inspect|^11.3.3',
-  'node_modules/vite-plugin-vue-devtools|peerDependencies|vite|^6.0.0 || ^7.0.0 || ^8.0.0',
-  'node_modules/vite-plugin-vue-inspector|peerDependencies|vite|^3.0.0 || ^4.0.0 || ^5.0.0 || ^6.0.0 || ^7.0.0 || ^8.0.0',
-  'node_modules/vue-tsc|dependencies|@vue/language-core|3.3.14',
-];
 const same = (left, right) =>
   JSON.stringify([...left].sort()) === JSON.stringify([...right].sort());
 
@@ -124,69 +83,16 @@ function parseAudit(result, label, lock, inventory, omitDev = false) {
   return records;
 }
 
-function verifyLockfile(lock) {
-  const packages = lock?.packages;
-  requireValid(lock?.lockfileVersion === 3 && object(packages) && object(packages['']),
-    'Lockfile del frontend inválido.');
-  const locked = Object.entries(packages).filter(([node, entry]) =>
-    /(^|\/)node_modules\/picomatch$/.test(node) || entry?.name === 'picomatch');
-  requireValid(locked.length === 1 && locked[0][0] === 'node_modules/picomatch' &&
-    locked[0][1].version === '4.0.7' && locked[0][1].dev === true,
-  'La excepción exige una sola instalación de picomatch@4.0.7, de desarrollo.');
-
-  const actualEdges = [];
-  for (const [node, entry] of Object.entries(packages)) {
-    requireValid(object(entry), 'Entrada inválida en el lockfile.');
-    for (const kind of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
-      for (const [name, range] of Object.entries(entry[kind] ?? {})) {
-        if (!Object.hasOwn(via, name) && !String(range).startsWith('npm:picomatch@')) continue;
-        requireValid(node ? entry.dev === true : kind === 'devDependencies',
-          'La ruta revisada de picomatch alcanza dependencias de producción.');
-        actualEdges.push(`${node}|${kind}|${name}|${range}`);
-      }
-    }
-  }
-  requireValid(same(actualEdges, edges) &&
-    Object.keys(via).every(name => packages[`node_modules/${name}`]?.dev === true),
-  'Cambió el árbol de desarrollo autorizado para picomatch.');
-}
-
-function evaluate({ production, full, lock, now }) {
+function evaluate({ production, full, lock }) {
   const inventory = auditInventory(lock);
   const prodRecords = parseAudit(production, 'producción', lock, inventory, true);
   const fullRecords = parseAudit(full, 'completa', lock, inventory);
-  const knownAffected = Object.entries(lock.packages).some(([node, entry]) =>
-    (/(^|\/)node_modules\/picomatch$/.test(node) || entry.name === 'picomatch') &&
-    entry.version === '4.0.7');
-  // npm's inventory counters are unchanged by --omit. A clean report cannot
-  // attest coverage of a package that still has the known, authorized advisory.
-  requireValid(!knownAffected || fullRecords.picomatch?.via.some(cause => cause?.url === advisory),
-    'La auditoría completa no acredita la cobertura del advisory conocido de picomatch@4.0.7.');
   requireValid(!Object.values(prodRecords).some(row => requiresBlock(row.severity)),
     'Producción tiene vulnerabilidades altas o críticas.');
   requireValid(Object.keys(prodRecords).every(name => Object.hasOwn(fullRecords, name)),
     'La auditoría completa omite hallazgos de producción.');
-  const severe = Object.keys(fullRecords).filter(name => requiresBlock(fullRecords[name].severity));
-  if (!severe.length) return [];
-
-  requireValid(Number.isFinite(now) && now < Date.parse(expires),
-    `La excepción GHSA-fc5q-39xc-vjpf venció (${expires}).`);
-  requireValid(!Object.hasOwn(prodRecords, 'picomatch'),
-    'La auditoría de producción detectó picomatch.');
-  verifyLockfile(lock);
-  requireValid(same(severe, Object.keys(via)), 'Hay hallazgos altos o críticos fuera del conjunto autorizado.');
-  requireValid(same(Object.keys(fullRecords), severe), 'Hay hallazgos nuevos que invalidan la excepción.');
-  for (const [name, expected] of Object.entries(via)) {
-    const row = fullRecords[name];
-    // npm 10 omits some reverse edges in effects. The full via graph and lockfile are authoritative.
-    requireValid(row.severity === 'high' && same(row.nodes, [`node_modules/${name}`]),
-      `Cambió el alcance autorizado de ${name}.`);
-    requireValid(name === 'picomatch'
-      ? row.via.length === 1 && row.via[0]?.url === advisory && row.via[0].severity === 'high'
-      : same(row.via, expected),
-    `Advisory o cadena transitiva no autorizada en ${name}.`);
-  }
-  return severe.sort();
+  requireValid(!Object.values(fullRecords).some(row => requiresBlock(row.severity)),
+    'La auditoría completa tiene vulnerabilidades altas o críticas.');
 }
 
 function readJson(file) {
@@ -248,10 +154,8 @@ if (require.main === module) {
     for (const [label, result] of [['producción', production], ['completa', full]]) {
       console.log(`Informe de auditoría ${label} (npm exit ${result.status}):\n${result.stdout ?? ''}`);
     }
-    const excepted = evaluate({ production, full, lock, now: Date.now() });
-    console.log(excepted.length
-      ? `Excepción temporal GHSA-fc5q-39xc-vjpf hasta ${expires}: ${excepted.join(', ')}.`
-      : 'Auditoría aprobada sin excepciones.');
+    evaluate({ production, full, lock });
+    console.log('Auditoría aprobada sin excepciones.');
   } catch (error) {
     console.error(`Auditoría bloqueada: ${error.message}`);
     process.exitCode = 1;
