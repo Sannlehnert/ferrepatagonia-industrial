@@ -262,3 +262,88 @@ test('N-01 C: error de categorías de 160 caracteres se ajusta y el reintento es
         await expectControlReachable(retry, width);
     }
 });
+
+test('N-02: el clic exterior y Escape no descartan cambios sin guardar', async ({ page }) => {
+    await login(page);
+    await mockLongProduct(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    const dialog = await openEdit(page);
+    const name = field(dialog, 'Nombre del Producto');
+    await name.fill('Borrador E2E sin guardar');
+
+    // El clic sobre el fondo no cierra ni borra el borrador.
+    await dialog.click({ position: { x: 2, y: 2 } });
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Borrador E2E sin guardar');
+    const notice = dialog.getByRole('alert').filter({ hasText: 'no se pierden los datos' });
+    await expect(notice).toBeVisible();
+
+    // El aviso se mantiene legible y dentro del panel en móvil y escritorio.
+    for (const width of [320, 390, 768, 1280]) {
+        await page.setViewportSize({ width, height: 800 });
+        const metrics = await notice.evaluate((el) => {
+            const rect = el.getBoundingClientRect();
+            return {
+                docScroll: el.ownerDocument.documentElement.scrollWidth,
+                client: el.clientWidth,
+                scroll: el.scrollWidth,
+                left: rect.left,
+                right: rect.right,
+            };
+        });
+        expect(metrics.docScroll, `documento a ${width}`).toBeLessThanOrEqual(width);
+        expect(metrics.scroll, `aviso a ${width}`).toBeLessThanOrEqual(metrics.client + 1);
+        expect(metrics.left, `aviso izquierda a ${width}`).toBeGreaterThanOrEqual(0);
+        expect(metrics.right, `aviso derecha a ${width}`).toBeLessThanOrEqual(width);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    // Escape tampoco descarta el borrador de forma inadvertida.
+    await name.focus();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Borrador E2E sin guardar');
+    await expect(notice).toBeVisible();
+
+    // Cerrar es explícito: primero se cancela el descarte y luego se confirma.
+    page.once('dialog', confirm => confirm.dismiss());
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Borrador E2E sin guardar');
+
+    page.once('dialog', confirm => confirm.accept());
+    await dialog.getByRole('button', { name: 'Cancelar' }).click();
+    await expect(dialog).toHaveCount(0);
+});
+
+test('N-03: un error de guardado sigue visible tras un clic exterior y se descarta con teclado', async ({ page }) => {
+    await login(page);
+    await mockLongProduct(page);
+    await page.setViewportSize({ width: 360, height: 800 });
+    const dialog = await openEdit(page);
+    const message = 'No se pudo guardar el borrador del producto.';
+    await page.route('**/api/admin/productos/2', async (route) => {
+        if (route.request().method() !== 'PUT') return route.continue();
+        await route.fulfill({ status: 400, json: { message } });
+    });
+
+    const name = field(dialog, 'Nombre del Producto');
+    await name.fill('Borrador E2E con error');
+    await dialog.getByRole('button', { name: 'Guardar Cambios', exact: true }).click();
+    const alert = dialog.getByRole('alert').filter({ hasText: message });
+    await expect(alert).toBeVisible();
+
+    await dialog.click({ position: { x: 2, y: 2 } });
+    await expect(dialog).toBeVisible();
+    await expect(alert).toBeVisible();
+    await expect(name).toHaveValue('Borrador E2E con error');
+    await expect(dialog.getByRole('alert').filter({ hasText: 'no se pierden los datos' })).toBeVisible();
+
+    const dismiss = alert.getByRole('button', { name: 'Descartar error', exact: true });
+    await dismiss.focus();
+    await expect(dismiss).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(alert).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Borrador E2E con error');
+});

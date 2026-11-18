@@ -54,6 +54,7 @@ const containDialogFocus = (event: KeyboardEvent) => {
 const isSubmitting = ref(false);
 const backendError = ref('');
 const uncertain = ref(false);
+const closeAttemptNotice = ref('');
 const formDisabled = computed(() => isSubmitting.value || uncertain.value || props.mutationBlocked);
 const fieldErrors = ref<Record<string, string>>({});
 const imageFile = ref<File>();
@@ -102,6 +103,14 @@ const form = ref({
     activo: true
 });
 
+const formSnapshot = () => JSON.stringify(form.value);
+// Los cambios se comparan con el estado con el que se abrió el formulario.
+const initialSnapshot = ref('');
+const isDirty = computed(() => Boolean(imageFile.value)
+    || (initialSnapshot.value !== '' && formSnapshot() !== initialSnapshot.value));
+const hasPendingError = computed(() => Boolean(backendError.value) || uncertain.value
+    || Object.keys(fieldErrors.value).length > 0 || Boolean(imageError.value));
+
 const availableCategories = computed<CategoryOption[]>(() => {
     const list = props.categories ? [...props.categories] : [];
     const currentCatId = props.product?.id_categoria;
@@ -137,6 +146,7 @@ watch(
         });
         backendError.value = '';
         uncertain.value = false;
+        closeAttemptNotice.value = '';
         fieldErrors.value = {};
 
         if (props.product) {
@@ -166,6 +176,7 @@ watch(
                 activo: true
             };
         }
+        initialSnapshot.value = formSnapshot();
     },
     { immediate: true }
 );
@@ -175,7 +186,10 @@ watch(
     (newCats) => {
         const firstCategory = newCats?.[0];
         if (props.isOpen && !isEditMode.value && !form.value.id_categoria && firstCategory) {
+            // Solo la categoría sugerida por la carga: no debe contar como edición.
+            const untouched = formSnapshot() === initialSnapshot.value;
             form.value.id_categoria = firstCategory.id_categoria;
+            if (untouched && !imageFile.value) initialSnapshot.value = formSnapshot();
         }
     }
 );
@@ -231,6 +245,7 @@ const handleSubmit = async () => {
         return;
     }
     backendError.value = '';
+    closeAttemptNotice.value = '';
     if (!validateForm()) return;
 
     if (isEditMode.value && Boolean(props.product?.activo) && !form.value.activo &&
@@ -305,8 +320,15 @@ const handleSubmit = async () => {
     }
 };
 
-const requestClose = () => {
-    if (!isSubmitting.value && !props.isReloading) emit('close');
+const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
+    if (isSubmitting.value || props.isReloading) return;
+    if (source === 'implicit' && (isDirty.value || hasPendingError.value)) {
+        closeAttemptNotice.value = 'Para cerrar el formulario usá «Cancelar» o el botón ×; así no se pierden los datos ni el detalle del error.';
+        return;
+    }
+    if (source === 'explicit' && isDirty.value
+        && !window.confirm('¿Descartar los cambios sin guardar del producto?')) return;
+    emit('close');
 };
 </script>
 
@@ -316,9 +338,9 @@ const requestClose = () => {
         v-if="isOpen"
         aria-labelledby="product-form-title"
         class="fixed inset-0 m-auto h-full max-h-none w-full max-w-none box-border border-0 bg-[#0B2438]/75 p-2 sm:p-4 open:flex items-center justify-center"
-        @cancel.prevent="requestClose"
+        @cancel.prevent="requestClose('implicit')"
         @keydown="containDialogFocus"
-        @click.self="requestClose"
+        @click.self="requestClose('implicit')"
     >
         <div class="bg-[#F8FAFC] w-full max-w-3xl rounded-lg shadow-xl border border-[#E2E8F0] flex flex-col max-h-[90dvh]">
             <!-- Encabezado fijo -->
@@ -328,7 +350,7 @@ const requestClose = () => {
                 </h3>
                 <button
                     type="button"
-                    @click="requestClose"
+                    @click="requestClose()"
                     :disabled="isSubmitting || isReloading"
                     aria-label="Cerrar formulario"
                     class="box-border min-h-11 min-w-11 flex items-center justify-center border-0 bg-transparent text-[#64748B] hover:text-[#0B2438] text-2xl"
@@ -340,17 +362,29 @@ const requestClose = () => {
             <!-- Formulario con cuerpo scrollable y botones fijos abajo -->
             <form @submit.prevent="handleSubmit" novalidate class="flex flex-col flex-1 min-h-0">
                 <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+                    <p
+                        v-if="closeAttemptNotice"
+                        role="alert"
+                        class="rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 wrap-anywhere"
+                    >
+                        {{ closeAttemptNotice }}
+                    </p>
                     <div v-if="uncertain || mutationBlocked" role="alert" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        <p>{{ uncertainMutationMessage }}</p>
-                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 border-0 bg-transparent underline">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
+                        <p class="wrap-anywhere">{{ uncertainMutationMessage }}</p>
+                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 border-0 bg-transparent underline disabled:opacity-50">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
                     </div>
                     <div
                         v-if="backendError && !uncertain"
                         role="alert"
-                        class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-center justify-between"
+                        class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-start gap-3"
                     >
-                        <span class="wrap-anywhere">{{ backendError }}</span>
-                        <button type="button" @click="backendError = ''" class="border-0 bg-transparent font-bold ml-4">✕</button>
+                        <span class="wrap-anywhere min-w-0 flex-1">{{ backendError }}</span>
+                        <button
+                            type="button"
+                            aria-label="Descartar error"
+                            class="box-border -my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center border-0 bg-transparent font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                            @click="backendError = ''"
+                        >✕</button>
                     </div>
 
                     <div>
@@ -496,7 +530,7 @@ const requestClose = () => {
                 <div class="shrink-0 p-4 sm:px-6 bg-white border-t border-[#E2E8F0] rounded-b-lg flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
                     <button
                         type="button"
-                        @click="requestClose"
+                        @click="requestClose()"
                         :disabled="isSubmitting || isReloading"
                         class="box-border min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto"
                     >
