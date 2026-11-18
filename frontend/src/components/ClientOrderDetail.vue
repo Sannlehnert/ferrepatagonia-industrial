@@ -18,7 +18,7 @@ const { data: detail, loading, error, load } = usePrivateAccountRead<ClientOrder
   allowed,
 )
 const showsReceipts = computed(() =>
-  (auth.user?.tipo_cliente === 'PARTICULAR' && detail.value?.modalidadPago === 'TRANSFERENCIA') ||
+  detail.value?.modalidadPago === 'TRANSFERENCIA' ||
   (auth.user?.tipo_cliente === 'EMPRESA' && detail.value?.modalidadPago === 'CUENTA_CORRIENTE'),
 )
 

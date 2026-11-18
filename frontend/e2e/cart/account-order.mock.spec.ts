@@ -31,13 +31,11 @@ for (const width of [1280, 360]) {
         name: 'Confirmar pedido a cuenta corriente',
       })
 
+      await option.check()
       await expect(summary).toContainText('Total del pedido')
       await expect(summary).toContainText('USD 80.00')
       await expect(summary).toContainText('USD 500.00')
       await expect(option).toBeVisible()
-      await expect(confirm).toBeDisabled()
-
-      await option.check()
       await expect(confirm).toBeEnabled()
       const postObserved = page.waitForRequest(request =>
         request.method() === 'POST' && request.url().includes('/pedidos/cuenta-corriente'))
@@ -69,7 +67,7 @@ for (const width of [1280, 360]) {
   })
 }
 
-test('no ofrece cuenta corriente cuando el backend confirma que no hay cuenta', async ({
+test('mantiene transferencia disponible cuando el backend no habilita cuenta corriente', async ({
   page,
 }) => {
   const state = await mockCart(page)
@@ -79,9 +77,10 @@ test('no ofrece cuenta corriente cuando el backend confirma que no hay cuenta', 
   await expect(summary.getByRole('radio', {
     name: 'Cuenta corriente',
   })).toHaveCount(0)
+  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   await expect(summary.getByRole('button', {
-    name: 'Finalizar compra',
-  })).toBeDisabled()
+    name: 'Confirmar pedido por transferencia',
+  })).toBeEnabled()
   expect(state.orderRequests).toEqual([])
 })
 
@@ -100,10 +99,12 @@ test('muestra el rechazo real de crédito insuficiente', async ({ page }) => {
   await expect(summary.getByRole('alert')).toContainText(
     'El crédito disponible no alcanza para confirmar este pedido.',
   )
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   expect(state.orderRequests).toHaveLength(1)
 })
 
-test('oculta la modalidad y muestra el rechazo de elegibilidad del backend', async ({
+test('oculta cuenta corriente cuando el backend rechaza elegibilidad y conserva transferencia', async ({
   page,
 }) => {
   const state = await mockCart(page)
@@ -122,12 +123,9 @@ test('oculta la modalidad y muestra el rechazo de elegibilidad del backend', asy
   await expect(summary.getByRole('radio', {
     name: 'Cuenta corriente',
   })).toHaveCount(0)
-  await expect(summary).toContainText('Total del pedido')
+  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+  await expect(summary).toContainText('Total a transferir')
   await expect(summary).toContainText('USD 80.00')
-  await expect(summary).toContainText('USD 20.00')
-  await expect(summary).toContainText(
-    'El crédito disponible no alcanza para confirmar el pedido.',
-  )
   expect(state.orderRequests).toEqual([])
 })
 
