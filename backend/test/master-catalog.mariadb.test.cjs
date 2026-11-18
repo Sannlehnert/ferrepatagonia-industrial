@@ -9,7 +9,8 @@ const { createServer } = require('node:net');
 const { resolve } = require('node:path');
 const { setTimeout: delay } = require('node:timers/promises');
 const mariadb = require('mariadb');
-const { parseMasterCatalog, masterCsv } = require('../dist/scripts/import-master-catalog.js');
+const { parseMasterCatalog, masterCsv, masterCatalogLockName } =
+  require('../dist/scripts/import-master-catalog.js');
 const { withTestSignals } = require('./helpers/disposable-test-process.cjs');
 
 const docker = (args, input) =>
@@ -29,10 +30,14 @@ const sqlSocket = container => {
   docker(['exec', container, 'test', '-S', socket]);
   return socket;
 };
-const applySql = (container, socket, file) => docker(['exec', '-i', '-e', `MARIADB_LOCAL_SOCKET=${socket}`,
-  container, 'sh', '-c',
-  'exec mariadb --protocol=socket --socket="$MARIADB_LOCAL_SOCKET" --skip-ssl -uroot -p"$MARIADB_ROOT_PASSWORD" "$MARIADB_DATABASE"'],
-readFileSync(resolve(backend, '../database', file)));
+const applySql = (container, socket, file, database) => {
+  if (database !== undefined) assert.match(database, /^[a-z0-9_]+$/, 'Nombre de base descartable inválido');
+  return docker(['exec', '-i', '-e', `MARIADB_LOCAL_SOCKET=${socket}`,
+    container, 'sh', '-c',
+    'exec mariadb --protocol=socket --socket="$MARIADB_LOCAL_SOCKET" --skip-ssl -uroot -p"$MARIADB_ROOT_PASSWORD" '
+      + (database === undefined ? '"$MARIADB_DATABASE"' : `--database=${database}`)],
+  readFileSync(resolve(backend, '../database', file)));
+};
 
 async function backendPort() {
   const probe = createServer().listen(0, '127.0.0.1');
@@ -182,7 +187,16 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
       assert.deepEqual(await events(), [unrelatedEvent]);
       await connection.query('DROP TRIGGER catalog_test_fail');
 
-      // Keep both processes at the same first INSERT until we observe both reaching it.
+      const lockName = masterCatalogLockName(database);
+      const assertLockReleased = async label => {
+        const [owner] = await connection.query('SELECT IS_USED_LOCK(?) AS owner', [lockName]);
+        assert.equal(owner.owner, null, `${label}: el bloqueo cooperativo no debe persistir`);
+      };
+      await assertLockReleased('fallo a mitad de lote');
+
+      // El importador serializa con GET_LOCK antes de escribir. Frenamos al
+      // primero dentro de la transacción y comprobamos que el segundo espera el
+      // bloqueo cooperativo en lugar de competir por el índice único.
       const gate = 'catalog_master_test_start';
       await connection.query(`
         CREATE TRIGGER catalog_test_gate BEFORE INSERT ON PRODUCTO FOR EACH ROW
@@ -197,20 +211,33 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
       const [locked] = await connection.query('SELECT GET_LOCK(?, 0) AS acquired', [gate]);
       assert.equal(Number(locked.acquired), 1);
       const importAsync = () => promisify(execFile)(process.execPath, args(target()), {
-        cwd: backend, env, encoding: 'utf8', timeout: 30000, signal
+        cwd: backend, env, encoding: 'utf8', timeout: 60000, signal
       }).then(result => JSON.parse(result.stdout));
-      const imports = Promise.allSettled([importAsync(), importAsync()]);
+      const firstImport = importAsync();
+      let secondImport;
       let barrierError;
       try {
-        const deadline = performance.now() + 4000;
+        const startDeadline = performance.now() + 8000;
         while (true) {
           checkAbort();
           const processes = await connection.query('SHOW FULL PROCESSLIST');
-          const inserting = processes.filter(p => p.db === database &&
-            /INSERT INTO PRODUCTO|GET_LOCK\('catalog_master_test_start'/.test(p.Info ?? '') &&
-            Number(p.Id) !== connection.threadId);
-          if (inserting.length === 2) break;
-          assert.ok(performance.now() < deadline, 'Ambos procesos deben alcanzar el primer INSERT');
+          const inserting = processes.some(p => p.db === database && Number(p.Id) !== connection.threadId &&
+            /INSERT INTO PRODUCTO|GET_LOCK\('catalog_master_test_start'/.test(p.Info ?? ''));
+          if (inserting) break;
+          assert.ok(performance.now() < startDeadline, 'El primer importador debe alcanzar el primer INSERT');
+          await delay(25, undefined, { signal });
+        }
+        // El INSERT frenado tiene max_statement_time=5: liberar la barrera en
+        // menos de 4 segundos desde que lo observamos bloqueado.
+        const releaseDeadline = performance.now() + 4000;
+        secondImport = importAsync();
+        while (true) {
+          checkAbort();
+          const processes = await connection.query('SHOW FULL PROCESSLIST');
+          const waiting = processes.some(p => p.db === database && Number(p.Id) !== connection.threadId &&
+            (p.Info ?? '').includes(`GET_LOCK('${lockName}'`));
+          if (waiting) break;
+          assert.ok(performance.now() < releaseDeadline, 'El segundo importador debe esperar el bloqueo cooperativo');
           await delay(25, undefined, { signal });
         }
       } catch (error) {
@@ -218,7 +245,7 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
       } finally {
         await connection.query('SELECT RELEASE_LOCK(?)', [gate]);
       }
-      const outcomes = await imports;
+      const outcomes = await Promise.allSettled([firstImport, secondImport]);
       if (barrierError) throw barrierError;
       const concurrent = outcomes.map(outcome => {
         if (outcome.status === 'rejected') throw outcome.reason;
@@ -229,7 +256,8 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci�
       assert.deepEqual(concurrent[1], {
         insertados: [], conservados: rows.map(row => ({ sku: row.sku, codigoExistente: row.sku }))
       });
-      t.diagnostic('Concurrencia con barrera: un proceso insertó 100 SKU y el otro conservó los 100.');
+      await assertLockReleased('importación concurrente');
+      t.diagnostic('Concurrencia serializada: un proceso insertó 100 SKU y el otro conservó los 100 tras esperar GET_LOCK.');
       const first = await products();
       const firstEvents = await events();
       assert.equal(first.length, 101);
@@ -434,7 +462,7 @@ test('valida el trigger FER-17 y bloquea DDL concurrente antes de las altas', as
       const imported = await pendingImport;
       await Promise.race([
         ddlQuery,
-        delay(60000, undefined, { signal }).then(() => {
+        delay(60000, undefined, { signal, ref: false }).then(() => {
           throw Error('El DDL concurrente no se completó al liberar la transacción');
         })
       ]);
@@ -459,10 +487,10 @@ test('valida el trigger FER-17 y bloquea DDL concurrente antes de las altas', as
         assert.equal(result.conservados.length, 100, `${label}: debe conservar los 100 SKU`);
         t.diagnostic(`Trigger aceptado: ${label}.`);
       };
-      const rejected = async (label, options) => {
+      const rejected = async (label, options, pattern = /Aplicá las migraciones FER-17/) => {
         const result = invoke(options);
         assert.equal(result.status, 1, `${label}: debe rechazarse`);
-        assert.match(result.stderr, /Aplicá las migraciones FER-17/, `${label}: mensaje de auditoría`);
+        assert.match(result.stderr, pattern, `${label}: mensaje de auditoría`);
         t.diagnostic(`Trigger rechazado: ${label}.`);
       };
       await setTrigger(canonicalBody);
@@ -483,9 +511,335 @@ test('valida el trigger FER-17 y bloquea DDL concurrente antes de las altas', as
       await rejected('permisos insuficientes', { user: limitedUser, pass: limitedPassword });
       assert.equal((await admin.query('SELECT id_producto FROM PRODUCTO')).length, 100);
       assert.equal((await admin.query('SELECT id_evento FROM FER17_PRECIO_EVENTO')).length, 100);
+
+      // A-03: cada tabla y cada trigger obligatorio de FER-17 es imprescindible.
+      // Se retira uno por vez y se comprueba que el importador rechaza sin escribir.
+      const productsUnchanged = async label => {
+        const [row] = await admin.query('SELECT COUNT(*) AS total FROM PRODUCTO');
+        assert.equal(Number(row.total), 100, `${label}: PRODUCTO no debe cambiar`);
+      };
+      const eventsUnchanged = async label => {
+        const [row] = await admin.query('SELECT COUNT(*) AS total FROM FER17_PRECIO_EVENTO');
+        assert.equal(Number(row.total), 100, `${label}: FER17_PRECIO_EVENTO no debe cambiar`);
+      };
+      const restoreFer17 = () => {
+        applySql(run, socket, 'migrate-fer-17-pricing-evidence.sql');
+        applySql(run, socket, 'migrate-fer-17-price-verification.sql');
+      };
+      for (const trigger of ['fer17_producto_precio_evento', 'fer17_precio_evento_no_update',
+        'fer17_precio_evento_no_delete']) {
+        await admin.query(`DROP TRIGGER ${trigger}`);
+        await rejected(`trigger ausente ${trigger}`);
+        await productsUnchanged(trigger);
+        await eventsUnchanged(trigger);
+        restoreFer17();
+      }
+      for (const table of ['FER17_PRECIO_EVENTO', 'PRECIO_USD_EVIDENCIA']) {
+        await admin.query(`DROP TABLE ${table}`);
+        // Sin PRECIO_USD_EVIDENCIA la guarda DEMO rechaza primero por no poder
+        // verificar la ausencia de datos DEMO; ambas rutas abortan sin escribir.
+        await rejected(`tabla ausente ${table}`, undefined,
+          table === 'PRECIO_USD_EVIDENCIA'
+            ? /faltan tablas obligatorias \(PRECIO_USD_EVIDENCIA\)/
+            : /Aplicá las migraciones FER-17/);
+        await productsUnchanged(table);
+        restoreFer17();
+      }
+      await admin.query('DROP TRIGGER fer17_precio_evento_no_delete');
+      await admin.query(`CREATE TRIGGER fer17_precio_evento_no_delete
+        BEFORE DELETE ON FER17_PRECIO_EVENTO FOR EACH ROW SET @fer17_alterado = 1`);
+      await rejected('definición alterada fer17_precio_evento_no_delete');
+      await productsUnchanged('definición alterada');
+      restoreFer17();
+      await admin.query('DROP TRIGGER fer17_producto_alta_evento');
+      await admin.query(`CREATE TRIGGER fer17_producto_alta_evento
+        AFTER INSERT ON PRODUCTO FOR EACH ROW SET @fer17_alterado = 1`);
+      await rejected('definición alterada fer17_producto_alta_evento');
+      await productsUnchanged('definición alterada');
+      restoreFer17();
+      await admin.query('DROP TABLE FER17_PRECIO_EVENTO');
+      await admin.query(`CREATE TABLE FER17_PRECIO_EVENTO (
+        id_evento BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        id_producto INT NOT NULL)`);
+      await rejected('tabla FER17_PRECIO_EVENTO incompleta', undefined, /Auditoría FER-17 incoherente/);
+      await productsUnchanged('tabla incompleta');
+      await admin.query('DROP TABLE FER17_PRECIO_EVENTO');
+      restoreFer17();
+      const [lockOwner] = await admin.query('SELECT IS_USED_LOCK(?) AS owner',
+        [masterCatalogLockName(database)]);
+      assert.equal(lockOwner.owner, null, 'Los rechazos de FER-17 no deben dejar bloqueos');
+      t.diagnostic('FER-17 completo: al faltar cada tabla o trigger individual el importador rechaza sin escribir.');
     } finally {
       try { gate?.destroy(); } catch { /* el cierre libera el LOCK TABLES */ }
       try { ddl?.destroy(); } catch { /* DDL pendiente descartado */ }
+      try { if (admin) await admin.end(); } catch { /* conexión ya cerrada */ }
+      try {
+        if (inventory('container', '-a')) docker(['rm', '-f', '-v', run]);
+      } finally {
+        if (volumeCreated) docker(['volume', 'rm', volume]);
+      }
+      assert.equal(inventory('container', '-a'), '');
+      assert.equal(inventory('volume'), '');
+      t.diagnostic(`Aislamiento ${run}: cero contenedores y volúmenes residuales.`);
+    }
+  });
+});
+
+test('rechaza bases DEMO vacías, parciales y completas antes de escribir', async t => {
+  await withTestSignals(async signal => {
+    const run = `master-catalog-demo-${randomUUID()}`;
+    const volume = `${run}-data`;
+    const label = `ferrepatagonia.master-catalog=${run}`;
+    const password = randomUUID();
+    const demoPassword = randomUUID();
+    let admin;
+    let port;
+    let volumeCreated = false;
+    const inventory = (type, ...args) => docker([type, 'ls', ...args, '-q', '--filter', `label=${label}`]);
+    const checkAbort = () => signal.throwIfAborted();
+    const open = async () => {
+      for (let attempt = 0; attempt < 45; attempt++) {
+        checkAbort();
+        try {
+          return await mariadb.createConnection({
+            host: '127.0.0.1', port, user: 'root', password,
+            database: 'master_catalog_guard_bootstrap', connectTimeout: 1000
+          });
+        } catch (error) {
+          if (attempt === 44) throw error;
+          await delay(1000, undefined, { signal });
+        }
+      }
+    };
+    let env;
+    const invoke = (database, overrides = {}) => {
+      checkAbort();
+      const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs',
+        'dist/scripts/import-master-catalog.js', '--confirmar-destino', `127.0.0.1:${port}/${database}`],
+      { cwd: backend, env: { ...env, DB_NAME: database, ...overrides }, encoding: 'utf8', timeout: 60000 });
+      if (result.error) throw result.error;
+      return result;
+    };
+    const snapshot = async database => {
+      const tables = await admin.query(`SELECT TABLE_NAME AS name FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME`, [database]);
+      const counts = {};
+      for (const { name } of tables) {
+        const [row] = await admin.query(`SELECT COUNT(*) AS total FROM \`${database}\`.\`${name}\``);
+        counts[name] = Number(row.total);
+      }
+      return counts;
+    };
+    const assertRejected = async (database, pattern, overrides = {}) => {
+      const before = await snapshot(database);
+      const result = invoke(database, overrides);
+      assert.equal(result.status, 1, `${database}: debe rechazarse antes de escribir`);
+      assert.match(result.stderr, pattern, `${database}: motivo de la guarda`);
+      assert.doesNotMatch(result.stderr, /No se completó la carga/,
+        `${database}: debe informar la guarda, no un error genérico`);
+      assert.deepEqual(await snapshot(database), before, `${database}: no debe mutar registros`);
+      t.diagnostic(`Rechazo sin mutaciones: ${database}.`);
+    };
+    try {
+      docker(['volume', 'create', '--label', label, volume]);
+      volumeCreated = true;
+      docker(['run', '-d', '--name', run, '--label', label, '-p', '127.0.0.1::3306',
+        '-v', `${volume}:/var/lib/mysql`, '-e', `MARIADB_ROOT_PASSWORD=${password}`,
+        '-e', 'MARIADB_DATABASE=master_catalog_guard_bootstrap', 'mariadb:11.4']);
+      const binding = docker(['port', run, '3306/tcp']);
+      assert.match(binding, /^127\.0\.0\.1:\d+$/);
+      port = Number(binding.split(':').at(-1));
+      admin = await open();
+      const socket = sqlSocket(run);
+      env = {
+        ...process.env, DOTENV_CONFIG_PATH: resolve(__dirname, 'helpers/nonexistent.env'),
+        DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: '', DB_USER: 'root', DB_PASSWORD: password,
+        JWT_SECRET: randomUUID(), PORT: '3999',
+        PRODUCT_IMAGE_STORAGE_DIR: '', RECEIPT_STORAGE_DIR: '', IMPORT_STORAGE_DIR: ''
+      };
+      const create = name => admin.query(
+        `CREATE DATABASE IF NOT EXISTS \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+      const full = async name => {
+        await create(name);
+        for (const file of ['schema.sql', 'migrate-fer-20-account-movements.sql',
+          'migrate-fer-17-pricing-evidence.sql', 'migrate-fer-17-price-verification.sql']) {
+          applySql(run, socket, file, name);
+        }
+      };
+      const categories = async name => {
+        for (const category of names) {
+          await admin.query(`INSERT INTO \`${name}\`.CATEGORIA (nombre, activo) VALUES (?, 1)`, [category]);
+        }
+      };
+      const client = async name => (await admin.query(`INSERT INTO \`${name}\`.CLIENTE
+        (tipo_cliente, nombre_razon_social, es_fiel, activo)
+        VALUES ('PARTICULAR', 'Cliente de guarda', 0, 1)`)).insertId;
+
+      // Bases vacías: nombre reservado, inventario incompleto y combinación completa.
+      await create('ferre_demo_vacia');
+      await create('e2e_test_parcial');
+      await create('master_catalog_vacia_312');
+      await create('master_catalog_parcial_312');
+      applySql(run, socket, 'schema.sql', 'master_catalog_parcial_312');
+
+      await full('ferre_demo_completa');
+      await admin.query(`INSERT INTO \`ferre_demo_completa\`.CUENTA_CORRIENTE
+        (id_cliente, limite_credito, habilitada, origen_datos) VALUES (?, 0, 0, 'DEMO')`,
+      [await client('ferre_demo_completa')]);
+      await admin.query('CREATE TABLE `ferre_demo_completa`.DEMO286_IDENTIDAD (id INT NOT NULL PRIMARY KEY)');
+
+      await full('master_catalog_identidad_demo');
+      await admin.query('CREATE TABLE `master_catalog_identidad_demo`.DEMO286_IDENTIDAD (id INT NOT NULL PRIMARY KEY)');
+
+      await assertRejected('ferre_demo_vacia', /nombre reservado para DEMO/);
+      await assertRejected('e2e_test_parcial', /nombre reservado para DEMO/);
+      await assertRejected('master_catalog_vacia_312', /faltan tablas obligatorias/);
+      await assertRejected('master_catalog_parcial_312', /Auditoría FER-17 incompleta/);
+      await assertRejected('ferre_demo_completa', /nombre reservado para DEMO/);
+      await assertRejected('master_catalog_identidad_demo', /existe la tabla DEMO286_IDENTIDAD/);
+
+      // Evidencia DEMO individual en cada tabla auditada.
+      const accountDb = 'master_catalog_demo_cuenta';
+      await full(accountDb);
+      await admin.query(`INSERT INTO \`${accountDb}\`.CUENTA_CORRIENTE
+        (id_cliente, limite_credito, habilitada, origen_datos) VALUES (?, 0, 0, 'DEMO')`,
+      [await client(accountDb)]);
+      await assertRejected(accountDb, /origen_datos = DEMO/);
+
+      const priceDb = 'master_catalog_demo_precio';
+      await full(priceDb);
+      const priceAdmin = (await admin.query(`INSERT INTO \`${priceDb}\`.USUARIO
+        (email, password_hash, rol, activo) VALUES ('demo.precio@example.test', 'x', 'ADMIN', 1)`)).insertId;
+      const priceCategory = (await admin.query(`INSERT INTO \`${priceDb}\`.CATEGORIA
+        (nombre, activo) VALUES ('Guarda', 1)`)).insertId;
+      const priceProduct = (await admin.query(`INSERT INTO \`${priceDb}\`.PRODUCTO
+        (id_categoria, codigo, nombre, stock, activo) VALUES (?, 'FP-GUARD-PRECIO', 'Guarda', 1, 0)`,
+      [priceCategory])).insertId;
+      await admin.query(`INSERT INTO \`${priceDb}\`.PRECIO_USD_EVIDENCIA
+        (id_producto, precio_verificado, evidencia, id_admin, verificado_utc, sintetica)
+        VALUES (?, 1, 'evidencia sintetica', ?, UTC_TIMESTAMP(3), 1)`, [priceProduct, priceAdmin]);
+      await assertRejected(priceDb, /evidencias de precio sintéticas/);
+
+      const orderDb = 'master_catalog_demo_pedido';
+      await full(orderDb);
+      await admin.query(`INSERT INTO \`${orderDb}\`.PEDIDO
+        (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
+        VALUES (?, 'DEMO_PRUEBA', 'EFECTIVO', 0, 0, 0)`, [await client(orderDb)]);
+      await assertRejected(orderDb, /estado o modalidad de pago DEMO_/);
+
+      const modalityDb = 'master_catalog_demo_modalidad';
+      await full(modalityDb);
+      await admin.query(`INSERT INTO \`${modalityDb}\`.PEDIDO
+        (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
+        VALUES (?, 'REGISTRADO', 'DEMO_DIRECTO', 0, 0, 0)`, [await client(modalityDb)]);
+      await assertRejected(modalityDb, /estado o modalidad de pago DEMO_/);
+
+      const skuDb = 'master_catalog_demo_sku';
+      await full(skuDb);
+      const skuCategory = (await admin.query(`INSERT INTO \`${skuDb}\`.CATEGORIA
+        (nombre, activo) VALUES ('Guarda', 1)`)).insertId;
+      for (let index = 0; index < 101; index++) {
+        await admin.query(`INSERT INTO \`${skuDb}\`.PRODUCTO
+          (id_categoria, codigo, nombre, stock, activo) VALUES (?, ?, ?, 1, 0)`,
+        [skuCategory, `FP-DEMO-GUARD-${index}`, `Guarda ${index}`]);
+      }
+      await assertRejected(skuDb, /más de 100 SKU/);
+
+      // Usuario de conexión demo286, incluso sobre una base sana.
+      const userDb = 'master_catalog_demo_usuario';
+      await full(userDb);
+      await admin.query(`CREATE USER 'demo286'@'%' IDENTIFIED BY '${demoPassword}'`);
+      await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON \`${userDb}\`.* TO 'demo286'@'%'`);
+      await assertRejected(userDb, /usuario "demo286"/, { DB_USER: 'demo286', DB_PASSWORD: demoPassword });
+
+      // Control positivo: una base sana se importa y sigue siendo idempotente.
+      const cleanDb = 'master_catalog_limpia_312';
+      await full(cleanDb);
+      await categories(cleanDb);
+      const first = invoke(cleanDb);
+      assert.equal(first.status, 0, first.stderr);
+      assert.equal(JSON.parse(first.stdout).insertados.length, 100);
+      const second = invoke(cleanDb);
+      assert.equal(second.status, 0, second.stderr);
+      assert.deepEqual(JSON.parse(second.stdout), {
+        insertados: [], conservados: rows.map(row => ({ sku: row.sku, codigoExistente: row.sku }))
+      });
+      const [cleanProducts] = await admin.query(`SELECT COUNT(*) AS total FROM \`${cleanDb}\`.PRODUCTO`);
+      const [cleanEvents] = await admin.query(`SELECT COUNT(*) AS total FROM \`${cleanDb}\`.FER17_PRECIO_EVENTO`);
+      assert.equal(Number(cleanProducts.total), 100);
+      assert.equal(Number(cleanEvents.total), 100);
+      const [cleanLock] = await admin.query('SELECT IS_USED_LOCK(?) AS owner',
+        [masterCatalogLockName(cleanDb)]);
+      assert.equal(cleanLock.owner, null, 'La importación exitosa debe liberar el bloqueo');
+      await admin.query(`INSERT INTO \`${cleanDb}\`.PRODUCTO
+        (id_categoria, codigo, nombre, stock, activo)
+        SELECT id_categoria, 'FP-DEMO-GUARD-EXTRA', 'Extra', 1, 0 FROM \`${cleanDb}\`.CATEGORIA LIMIT 1`);
+      await assertRejected(cleanDb, /más de 100 SKU/);
+      t.diagnostic('Control positivo: 100 altas, segunda ejecución idempotente y rechazo al superar 100 SKU DEMO.');
+    } finally {
+      try { if (admin) await admin.end(); } catch { /* conexión ya cerrada */ }
+      try {
+        if (inventory('container', '-a')) docker(['rm', '-f', '-v', run]);
+      } finally {
+        if (volumeCreated) docker(['volume', 'rm', volume]);
+      }
+      assert.equal(inventory('container', '-a'), '');
+      assert.equal(inventory('volume'), '');
+      t.diagnostic(`Aislamiento ${run}: cero contenedores y volúmenes residuales.`);
+    }
+  });
+});
+
+test('rechaza servidores con hostname demo286- antes de escribir', async t => {
+  await withTestSignals(async signal => {
+    const run = `master-catalog-host-${randomUUID()}`;
+    const volume = `${run}-data`;
+    const label = `ferrepatagonia.master-catalog=${run}`;
+    const database = 'master_catalog_host_312';
+    const password = randomUUID();
+    let admin;
+    let port;
+    let volumeCreated = false;
+    const inventory = (type, ...args) => docker([type, 'ls', ...args, '-q', '--filter', `label=${label}`]);
+    try {
+      docker(['volume', 'create', '--label', label, volume]);
+      volumeCreated = true;
+      docker(['run', '-d', '--name', run, '--hostname', 'demo286-auditoria', '--label', label,
+        '-p', '127.0.0.1::3306', '-v', `${volume}:/var/lib/mysql`,
+        '-e', `MARIADB_ROOT_PASSWORD=${password}`, '-e', `MARIADB_DATABASE=${database}`, 'mariadb:11.4']);
+      const binding = docker(['port', run, '3306/tcp']);
+      assert.match(binding, /^127\.0\.0\.1:\d+$/);
+      port = Number(binding.split(':').at(-1));
+      for (let attempt = 0; ; attempt++) {
+        signal.throwIfAborted();
+        try {
+          admin = await mariadb.createConnection({
+            host: '127.0.0.1', port, user: 'root', password, database, connectTimeout: 1000
+          });
+          break;
+        } catch (error) {
+          if (attempt === 44) throw error;
+          await delay(1000, undefined, { signal });
+        }
+      }
+      const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs',
+        'dist/scripts/import-master-catalog.js', '--confirmar-destino', `127.0.0.1:${port}/${database}`],
+      {
+        cwd: backend, encoding: 'utf8', timeout: 60000,
+        env: {
+          ...process.env, DOTENV_CONFIG_PATH: resolve(__dirname, 'helpers/nonexistent.env'),
+          DB_HOST: '127.0.0.1', DB_PORT: String(port), DB_NAME: database, DB_USER: 'root',
+          DB_PASSWORD: password, JWT_SECRET: randomUUID(), PORT: '3999',
+          PRODUCT_IMAGE_STORAGE_DIR: '', RECEIPT_STORAGE_DIR: '', IMPORT_STORAGE_DIR: ''
+        }
+      });
+      if (result.error) throw result.error;
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /hostname de demostración/);
+      assert.equal((await admin.query(`SELECT TABLE_NAME AS name FROM information_schema.TABLES
+        WHERE TABLE_SCHEMA = ?`, [database])).length, 0, 'No debe crear ni modificar nada');
+      t.diagnostic('Hostname demo286- rechazado antes de cualquier escritura.');
+    } finally {
       try { if (admin) await admin.end(); } catch { /* conexión ya cerrada */ }
       try {
         if (inventory('container', '-a')) docker(['rm', '-f', '-v', run]);

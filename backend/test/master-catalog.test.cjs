@@ -2,9 +2,14 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
-const { parseMasterCatalog, masterCsv, triggerBodiesEquivalent } = require('../dist/scripts/import-master-catalog.js');
+const {
+  parseMasterCatalog, masterCsv, triggerBodiesEquivalent, expectedFer17Triggers,
+  demoServerReasons, masterCatalogLockName,
+} = require('../dist/scripts/import-master-catalog.js');
 
 const csv = readFileSync(masterCsv, 'utf8');
+const migration = readFileSync(
+  resolve(__dirname, '../../database/migrate-fer-17-price-verification.sql'), 'utf8');
 
 test('el CSV versionado contiene 100 SKU originales y ocho categorías', () => {
   const rows = parseMasterCatalog(csv);
@@ -33,8 +38,6 @@ test('rechaza lotes incompletos, duplicados, campos inválidos y CSV mal formado
 });
 
 test('compara el trigger FER-17 sin ocultar literales ni identificadores', () => {
-  const migration = readFileSync(
-    resolve(__dirname, '../../database/migrate-fer-17-price-verification.sql'), 'utf8');
   const canonical = migration.match(
     /CREATE OR REPLACE TRIGGER fer17_producto_alta_evento\s+AFTER INSERT ON PRODUCTO\s+FOR EACH ROW\s+([\s\S]+?)\/\//
   )?.[1];
@@ -53,6 +56,85 @@ test('compara el trigger FER-17 sin ocultar literales ni identificadores', () =>
   assert.equal(triggerBodiesEquivalent(canonical, canonical.replace("'ALTA'", "'alta'")), false);
   assert.equal(triggerBodiesEquivalent(canonical, canonical.replace('NEW.precio', 'OLD.precio')), false);
   assert.equal(triggerBodiesEquivalent("INSERT INTO t VALUES ('ALTA')", "insert into t values ('ALTA')"), true);
-  assert.equal(triggerBodiesEquivalent("INSERT INTO `T` VALUES ('ALTA')", "insert into `t` values ('ALTA')"), false);
+  assert.equal(triggerBodiesEquivalent("INSERT INTO `T` VALUES ('ALTA')", "insert into `t` values ('ALTA')"), true);
   assert.equal(triggerBodiesEquivalent('SELECT 1 WHERE a = 1 AND b = 2', 'select 1 where a = 1 or b = 2'), false);
+});
+
+test('tokeniza comentarios, comentarios ejecutables y backticks sin alterar la semántica', () => {
+  // "--" only starts a comment when followed by whitespace or a control char.
+  assert.equal(triggerBodiesEquivalent('SELECT 1--1', 'SELECT 1'), false);
+  assert.equal(triggerBodiesEquivalent('SELECT 1--1', 'SELECT 1 - -1'), true);
+  assert.equal(triggerBodiesEquivalent('SELECT 1 -- comentario', 'SELECT 1'), true);
+  assert.equal(triggerBodiesEquivalent('SELECT 1 --comentario', 'SELECT 1 - -comentario'), true);
+  assert.equal(triggerBodiesEquivalent('SELECT 1#comentario', 'SELECT 1'), true);
+
+  // MariaDB executable comments are code and must never be discarded.
+  const executable = 'BEGIN SET @v = 1 /*M!100100 + 2 */; END';
+  assert.equal(triggerBodiesEquivalent(executable, executable), true);
+  assert.equal(triggerBodiesEquivalent(executable, 'BEGIN SET @v = 1; END'), false);
+  assert.equal(triggerBodiesEquivalent(executable, 'BEGIN SET @v = 1 /*M!100100 + 3 */; END'), false);
+  assert.equal(triggerBodiesEquivalent('BEGIN /*!40101 SET @v = 1 */ END',
+    'BEGIN /*!40101 SET @v = 1 */ END'), true);
+  assert.equal(triggerBodiesEquivalent('BEGIN /*!40101 SET @v = 1 */ END',
+    'BEGIN /*!40101 SET @v = 2 */ END'), false);
+
+  // Backticks around a simple identifier do not change the object.
+  assert.equal(triggerBodiesEquivalent('INSERT INTO `t` (`a`) VALUES (1)',
+    'insert into t (a) values (1)'), true);
+  assert.equal(triggerBodiesEquivalent('SELECT `con espacio` FROM t',
+    'SELECT `con espacio` FROM t'), true);
+  assert.equal(triggerBodiesEquivalent('SELECT `con espacio` FROM t',
+    'SELECT `otro espacio` FROM t'), false);
+  // A quoted identifier is never confused with a keyword.
+  assert.equal(triggerBodiesEquivalent('SELECT `select` FROM t', 'SELECT select FROM t'), false);
+
+  // Identifiers (columns, aliases, variables) compare case-insensitively;
+  // literals and keywords remain distinct.
+  assert.equal(triggerBodiesEquivalent('SELECT NEW.Precio FROM USUARIO U',
+    'select new.precio from usuario u'), true);
+  assert.equal(triggerBodiesEquivalent("SET @Mensaje = 'ALTA'", "set @mensaje = 'ALTA'"), true);
+  assert.equal(triggerBodiesEquivalent('SIGNAL SQLSTATE \'45000\'', 'SIGNAL SQLSTATE \'45001\''), false);
+  assert.equal(triggerBodiesEquivalent('UPDATE t SET a = 1', 'DELETE FROM t'), false);
+});
+
+test('la auditoría FER-17 exige las cuatro definiciones versionadas', () => {
+  const triggers = expectedFer17Triggers(migration);
+  assert.deepEqual(triggers.map(trigger => trigger.name), [
+    'fer17_producto_alta_evento', 'fer17_producto_precio_evento',
+    'fer17_precio_evento_no_update', 'fer17_precio_evento_no_delete',
+  ]);
+  assert.deepEqual(triggers.map(trigger => `${trigger.timing} ${trigger.event} ${trigger.table}`), [
+    'AFTER INSERT PRODUCTO', 'AFTER UPDATE PRODUCTO',
+    'BEFORE UPDATE FER17_PRECIO_EVENTO', 'BEFORE DELETE FER17_PRECIO_EVENTO',
+  ]);
+  for (const trigger of triggers) assert.ok(trigger.body.trim().length > 0);
+  assert.throws(() => expectedFer17Triggers(migration.replace(
+    /CREATE OR REPLACE TRIGGER fer17_precio_evento_no_delete[\s\S]*?END\/\//, '')), /triggers obligatorios/);
+});
+
+test('la guarda DEMO clasifica base, servidor y usuario sin falsos negativos', () => {
+  assert.deepEqual(demoServerReasons({ database: 'ferrepatagonia', hostname: 'produccion-01', users: ['app'] }), []);
+  assert.equal(demoServerReasons({
+    database: 'FERRE_DEMO_286', hostname: 'host', users: ['app'],
+  }).length, 1);
+  assert.equal(demoServerReasons({
+    database: 'e2e_test_catalogo', hostname: 'host', users: ['app'],
+  }).length, 1);
+  assert.equal(demoServerReasons({
+    database: 'ferrepatagonia', hostname: 'DEMO286-auditoria', users: ['app'],
+  }).length, 1);
+  assert.equal(demoServerReasons({
+    database: 'ferrepatagonia', hostname: 'host', users: ['app', 'DEMO286'],
+  }).length, 1);
+  assert.equal(demoServerReasons({
+    database: 'ferre_demo_x', hostname: 'demo286-x', users: ['demo286'],
+  }).length, 3);
+});
+
+test('el bloqueo cooperativo depende de la base y respeta el límite de MariaDB', () => {
+  const first = masterCatalogLockName('ferrepatagonia');
+  assert.equal(first, masterCatalogLockName('ferrepatagonia'));
+  assert.notEqual(first, masterCatalogLockName('otra_base'));
+  assert.match(first, /^ferre\.s7\.catalogo\.[0-9a-f]{40}$/);
+  assert.ok(first.length <= 64);
 });
