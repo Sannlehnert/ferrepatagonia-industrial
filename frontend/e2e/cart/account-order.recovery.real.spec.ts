@@ -84,7 +84,7 @@ async function signIn(page: Page, f: Awaited<ReturnType<typeof customer>>) {
   await page.getByLabel('Email', { exact: true }).fill(f.email)
   await page.getByLabel(/^Contraseña/).fill(f.password)
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(/\/mi-cuenta$/)
 }
 
 async function attemptInTab(page: Page, userId: number, key: string, quoteToken?: string) {
