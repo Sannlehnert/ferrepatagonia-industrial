@@ -6,7 +6,9 @@
 
 Partida remota: `8c8795c9874f449609e3f590dcc2ac517fbc5613`, árbol aislado limpio. Se leyeron las tres revisiones de Santiago en el PR, contra `628e412`, `616ab9f` y `34af44d`. Se contrastó el delta posterior a `34af44d` y el diff exclusivo frente a develop. Los cambios ajenos al alcance proceden de merges previos de develop, no se reescribieron.
 
-Se incorporaron los cinco commits pendientes de develop hasta `56ca40f`, sin conflictos, mediante `5884a4e`. Durante la validación, develop recibió #130; se incorporaron sus siete commits hasta `8323219` mediante `aeb8043`, también sin conflictos. Se conserva #144: `npm audit --audit-level=high` directo, sin excepción temporal ni sustitución del control. Las correcciones de imágenes y validadores están en `f727192`; `83603f1` agrega E2E y evidencias. El SHA final y el resultado remoto de CI se consignan en la descripción del [PR #125](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/125).
+Se incorporaron los cinco commits pendientes de develop hasta `56ca40f`, sin conflictos, mediante `5884a4e`. Durante la validación, develop recibió #130; se incorporaron sus siete commits hasta `8323219` mediante `aeb8043`, también sin conflictos. Se conserva #144: `npm audit --audit-level=high` directo, sin excepción temporal ni sustitución del control. Las correcciones de imágenes y validadores están en `f727192`; `83603f1` agrega E2E y evidencias. El SHA final y el resultado remoto de CI se consignan en la entrega del chat.
+
+La descripción corregida del [PR #125](https://github.com/Sannlehnert/ferrepatagonia-industrial/pull/125) quedó preparada para copiar. El conector GitHub devolvió HTTP 403 al intentar publicarla. La revisión automática rechazó reutilizar la credencial Git para esta mutación y el usuario eligió dejar el texto listo para copiar. Por ello, la descripción pública sigue pendiente de actualización manual; no se declara esa acción realizada.
 
 ## Hallazgos
 
@@ -21,7 +23,7 @@ Se incorporaron los cinco commits pendientes de develop hasta `56ca40f`, sin con
 | F-03 · Cono/tarugo de otra medida y ala del casco | Resuelto | Cono de 30 cm restringido a ese SKU. Foto de tarugo de 8 mm sustituida en el SKU de 10 mm; casco de ala completa pasa a ilustración. Ranuras laterales del otro casco indicadas en el esquema. |
 | F-04 · Validadores permisivos | Resuelto | Mutaciones negativas de bytes, renombrado, familia, autor, fuente, licencia, medidas e informe; decodificación y ambas huellas. |
 | F-05 · Persistencia y archivo conservado ambiguo | Resuelto en herramienta/documentación | No recarga la demo persistente. Devuelve archivoPlanificado y verificacionPendiente para recursos existentes; reemplazo manual por SKU documentado. No se migró ninguna instalación persistente. |
-| F-06 · Documentación y descripción desactualizadas | Documentación resuelta | Matriz y cifras conciliadas; descripción del PR actualizada en la entrega. |
+| F-06 · Documentación y descripción desactualizadas | Documentación resuelta; publicación del cuerpo pendiente | Matriz y cifras conciliadas. Descripción corregida lista para copiar, según la elección del usuario tras el 403 del conector. |
 | F-07 · Asociador rechaza maestro de 100 | Resuelto | Carga y asociación reales por API, 61 disponibles/39 pendientes, antes del fixture de 904. |
 | Fixture Node/MariaDB | Resuelto | Marca única UTC de Node; E2E adelanta SQL un día y prueba la marca persistida sin sleep. |
 | Aprobación funcional, revisión final y cierre | Pendiente | Corresponde a Santiago y Lucci. No se presupone aprobación ni se cierra #310. |
