@@ -14,6 +14,7 @@ import {
 } from '../../services/adminProductService';
 
 import { isMutationResultUncertain, adminMutationErrorMessage, uncertainMutationMessage } from '../../services/adminMutationError';
+import { basePriceLabels } from '@/types/pricing';
 
 const router = useRouter();
 const route = useRoute();
@@ -300,6 +301,7 @@ onBeforeUnmount(() => {
             role="alert"
             class="rounded-md border border-red-200 bg-red-50 p-5 text-red-700 my-4"
         >
+            <p class="font-semibold">No se pudieron consultar los productos y sus estados de precio.</p>
             <p class="font-semibold">{{ loadError }}</p>
             <div class="mt-3 flex gap-3">
                 <button
@@ -385,15 +387,22 @@ onBeforeUnmount(() => {
                             </span>
                         </div>
                         <div class="flex flex-col min-w-0 text-right">
-                            <span class="text-[10px] text-[#64748B] uppercase font-semibold">Precio USD</span>
+                            <span class="text-[10px] text-[#64748B] uppercase font-semibold">Importe base cargado</span>
                             <span class="font-bold text-[#103A5C] text-lg">
-                                {{ prod.precio !== null && prod.precio !== undefined ? `USD $${formatPrice(prod.precio)}` : 'Sin precio' }}
+                                {{ prod.precio !== null && prod.precio !== undefined
+                                    ? `${prod.estado_precio_base === 'VERIFICADO' ? 'USD ' : ''}${formatPrice(prod.precio)}`
+                                    : '—' }}
+                            </span>
+                            <span class="text-xs text-slate-600">
+                                {{ prod.estado_precio_base ? basePriceLabels[prod.estado_precio_base] : 'No se pudo determinar el estado del precio base' }}
                             </span>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <p class="text-sm text-slate-600">El importe base no es necesariamente el precio final del catálogo. Guardarlo no reemplaza la verificación.</p>
 
         <!-- Barra Inferior -->
         <div class="bg-[#F1F5F9] border-t border-[#E2E8F0] py-4 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">

@@ -2,6 +2,7 @@ import { dataSource, inTransaction } from '../config/database.config';
 import type { EntityManager } from 'typeorm';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
+import { nonBlankPriceEvidence, priceEvidenceAdmin, productPriceEvidence, sqlUTC } from './product-price-evidence.sql';
 
 export interface ProductRecord {
     id_producto: number;
@@ -9,7 +10,7 @@ export interface ProductRecord {
     codigo: string;
     nombre: string;
     descripcion: string | null;
-    precio: string;
+    precio: string | null;
     stock: number;
     imagen: string | null;
     activo: number | boolean;
@@ -47,11 +48,30 @@ function productQuery(manager?: EntityManager) {
     return query;
 }
 
+export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' | 'VERIFICADO' | 'SINTETICO';
+export type AdminProductRow = ProductRecord & { estado_precio_base: AdminBasePriceState };
+type RawAdminProductRow = ProductRecord & { price_verifier: number | null; price_synthetic: number | null };
+
 const adminListQuery = (manager?: EntityManager) => productQuery(manager)
     .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
+    .leftJoin('PRECIO_USD_EVIDENCIA', 'e', productPriceEvidence(':at', ':nonBlank'), {
+        at: sqlUTC(new Date()), nonBlank: nonBlankPriceEvidence,
+    })
+    .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
+    .addSelect('ea.id_usuario', 'price_verifier')
+    .addSelect('e.sintetica', 'price_synthetic')
     .orderBy('p.id_producto', 'DESC');
 
-export const findAllAdmin = (): Promise<ProductRecord[]> => adminListQuery().getRawMany<ProductRecord>();
+const withBasePriceState = ({ price_verifier, price_synthetic, ...product }: RawAdminProductRow): AdminProductRow => ({
+    ...product,
+    estado_precio_base: product.precio === null ? 'SIN_PRECIO'
+        : Number(product.precio) === 0 ? 'BASE_CERO'
+        : price_verifier === null ? 'NO_VERIFICADO'
+        : price_synthetic === 1 ? 'SINTETICO' : 'VERIFICADO',
+});
+
+export const findAllAdmin = async (): Promise<AdminProductRow[]> =>
+    (await adminListQuery().getRawMany<RawAdminProductRow>()).map(withBasePriceState);
 
 export const findAdminPage = (requestedPage: number, limit: number, search?: string) =>
     inTransaction(async manager => {
@@ -63,9 +83,9 @@ export const findAdminPage = (requestedPage: number, limit: number, search?: str
         const total = await query.getCount();
         const totalPages = Math.ceil(total / limit);
         const page = Math.min(requestedPage, Math.max(1, totalPages));
-        const data = total === 0 ? [] : await query
-            .offset((page - 1) * limit).limit(limit).getRawMany<ProductRecord>();
-        return { data, page, limit, total, totalPages };
+        const rows = total === 0 ? [] : await query
+            .offset((page - 1) * limit).limit(limit).getRawMany<RawAdminProductRow>();
+        return { data: rows.map(withBasePriceState), page, limit, total, totalPages };
     }, { isolation: 'REPEATABLE READ' });
 
 export const findById = async (id: number): Promise<ProductRecord | null> =>
