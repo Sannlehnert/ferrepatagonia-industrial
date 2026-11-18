@@ -3,7 +3,7 @@ import ProductPrices from '@/components/ProductPrices.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
 import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import axios from 'axios'
 import CatalogFilters from '@/components/CatalogFilters.vue'
 import { getCatalog, getCatalogCategories } from '@/services/catalogService'
@@ -12,6 +12,11 @@ import {
   MAX_PAGINA_CATALOGO,
   normalizarQueryPagina,
 } from '@/utils/catalogPagination'
+import {
+  CATALOG_ORDER_OPTIONS,
+  normalizarQueryOrden,
+  type CatalogOrder,
+} from '@/utils/catalogOrder'
 import type {
   CatalogProduct,
   CatalogPagination,
@@ -40,6 +45,15 @@ function entero(v: unknown): number | undefined {
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
 const pagina = computed(() => normalizarQueryPagina(route.query).pagina)
+const orden = computed(() => normalizarQueryOrden(route.query).orden)
+
+// Cambiar el orden reinicia la paginación y conserva búsqueda y categoría.
+function cambiarOrden(event: Event) {
+  const value = (event.target as HTMLSelectElement).value as CatalogOrder
+  const query: LocationQueryRaw = { ...route.query, orden: value }
+  delete query.page
+  return router.push({ name: 'catalogo', query: normalizarQueryOrden(query).query })
+}
 
 const busqueda = computed(() => {
   const value = route.query.busqueda
@@ -139,10 +153,11 @@ async function cargar() {
   error.value = null
 
   const paginaNormalizada = normalizarQueryPagina(route.query)
-  if (!paginaNormalizada.esCanonica) {
+  const ordenNormalizado = normalizarQueryOrden(paginaNormalizada.query)
+  if (!paginaNormalizada.esCanonica || !ordenNormalizado.esCanonica) {
     await router.replace({
       name: 'catalogo',
-      query: paginaNormalizada.query,
+      query: ordenNormalizado.query,
     })
     return
   }
@@ -159,6 +174,7 @@ async function cargar() {
         limit: LIMITE,
         categoria: categoriaId.value,
         busqueda: busqueda.value,
+        ...(orden.value !== 'predeterminado' ? { orden: orden.value } : {}),
       },
       actual.signal,
     )
@@ -197,7 +213,7 @@ async function cargar() {
 }
 
 // Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
-watch([categoriaId, () => route.query.page, busqueda], cargar)
+watch([categoriaId, () => route.query.page, busqueda, () => route.query.orden], cargar)
 refreshOnStock(ids => cargando.value || productos.value.some(product => ids.has(product.id)), () => void cargar())
 onMounted(() => {
   void cargar()
@@ -224,9 +240,15 @@ onBeforeUnmount(() => {
         <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
         <p class="fp-section-copy">{{ total }} productos</p>
       </div>
-      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
-      <select class="box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" disabled aria-label="Ordenar productos">
-        <option>Ordenar: Relevancia</option>
+      <select
+        :value="orden"
+        class="fp-focus box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+        aria-label="Ordenar productos"
+        @change="cambiarOrden"
+      >
+        <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
+          Ordenar: {{ option.label }}
+        </option>
       </select>
     </header>
 

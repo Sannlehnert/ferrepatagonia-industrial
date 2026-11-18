@@ -54,6 +54,7 @@ async function mount(t, page, handler = query => response(query.page)) {
       return { default: {} }
     }
     if (name === '@/utils/catalogPagination') return require('../src/utils/catalogPagination.ts')
+    if (name === '@/utils/catalogOrder') return require('../src/utils/catalogOrder.ts')
     return require(name)
   }, module, module.exports)
   const component = module.exports.default
