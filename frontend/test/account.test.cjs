@@ -48,12 +48,14 @@ test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedi
 
 test('MiCuentaDashboardView renders greeting, 3 metric cards and no orders table', () => {
  const dashboardSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaDashboardView.vue'), 'utf8');
+ assert.match(dashboardSource, /<h1 class="text-2xl\s+font-bold\s+text-\[#0B2438\]\s+text-center\s+my-6">/);
  assert.match(dashboardSource, /text-2xl\s+font-bold\s+text-\[#0B2438\]\s+text-center\s+my-6/);
  assert.match(dashboardSource, /Pedidos Realizados/);
  assert.match(dashboardSource, /text-\[#10B981\]/);
  assert.match(dashboardSource, /Pedidos con Cuenta Corriente/);
  assert.match(dashboardSource, /text-\[#0EA5E9\]/);
  assert.match(dashboardSource, /Pedidos sin comprobante/);
+ assert.equal((dashboardSource.match(/\{\{ error \|\| \(loading && !orders\) \? '-' :/g) || []).length, 3);
  assert.doesNotMatch(dashboardSource, /<table/);
  assert.doesNotMatch(dashboardSource, /Monto Total/);
 });

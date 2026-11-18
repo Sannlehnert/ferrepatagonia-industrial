@@ -60,13 +60,16 @@ async function logout() {
     <header class="md:hidden bg-[#0B2438] text-white px-4 py-3 flex items-center justify-between gap-2">
       <button
         type="button"
-        class="min-h-[44px] text-sm font-medium text-white bg-transparent border-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-white"
+        class="min-h-[44px] rounded-[8px] text-sm font-medium text-white bg-transparent border-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         @click="handleGoBack"
       >← Volver a tienda</button>
-      <RouterLink :to="{ name: 'cuenta-dashboard' }" class="font-bold text-white no-underline">Mi Cuenta</RouterLink>
+      <RouterLink
+        :to="{ name: 'cuenta-dashboard' }"
+        class="inline-flex min-h-[44px] items-center rounded-[8px] px-2 font-bold text-white no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+      >Mi Cuenta</RouterLink>
       <button
         type="button"
-        class="min-h-[44px] min-w-[44px] text-white bg-transparent border-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-white"
+        class="min-h-[44px] min-w-[44px] rounded-[8px] text-white bg-transparent border-0 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         aria-label="Menú de navegación de cuenta"
         aria-controls="account-mobile-menu"
         :aria-expanded="isMobileMenuOpen"
@@ -77,26 +80,35 @@ async function logout() {
     <div id="account-mobile-menu" v-show="isMobileMenuOpen" class="md:hidden bg-[#0B2438] px-4 pb-4" @keydown.esc="isMobileMenuOpen = false">
       <AccountMenu :permissions="permissions" @click="isMobileMenuOpen = false" />
       <p v-if="logoutError" role="alert" class="text-red-400 text-xs mt-2">{{ logoutError }}</p>
-      <button
-        type="button"
-        class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] disabled:opacity-60 cursor-pointer"
-        :disabled="isLoggingOut"
-        @click="logout"
-      >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
+      <div class="mt-3 border-t border-[#35556F] pt-3">
+        <button
+          type="button"
+          class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          :disabled="isLoggingOut"
+          @click="logout"
+        >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
+      </div>
     </div>
 
     <div class="flex flex-1 min-w-0">
-      <aside class="hidden md:flex md:w-64 shrink-0 flex-col self-start sticky top-0 h-screen overflow-y-auto bg-[#0B2438] p-6 text-white">
+      <aside class="hidden md:flex md:w-72 box-border shrink-0 flex-col self-start sticky top-0 h-screen overflow-y-auto bg-[#0B2438] p-6 text-white">
         <h2 class="text-xl font-bold mb-6">
-          <RouterLink :to="{ name: 'cuenta-dashboard' }" class="text-white no-underline">Mi Cuenta</RouterLink>
+          <RouterLink
+            :to="{ name: 'cuenta-dashboard' }"
+            class="inline-flex min-h-[44px] items-center rounded-[8px] px-2 text-white no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >Mi Cuenta</RouterLink>
         </h2>
-        <AccountMenu :permissions="permissions" />
+        <AccountMenu class="mt-0" :permissions="permissions" />
         <div class="mt-auto pt-6">
-          <button type="button" class="min-h-[44px] w-full text-left text-sm text-[#A7B6C4] bg-transparent border-0 cursor-pointer hover:text-white" @click="handleGoBack">← Volver a tienda</button>
+          <button
+            type="button"
+            class="min-h-[44px] w-full rounded-[8px] text-left text-sm text-[#A7B6C4] bg-transparent border-0 cursor-pointer hover:text-white hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            @click="handleGoBack"
+          >← Volver a tienda</button>
           <p v-if="logoutError" role="alert" class="text-red-400 text-xs mb-2">{{ logoutError }}</p>
           <button
             type="button"
-            class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] disabled:opacity-60 cursor-pointer"
+            class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             :disabled="isLoggingOut"
             @click="logout"
           >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
