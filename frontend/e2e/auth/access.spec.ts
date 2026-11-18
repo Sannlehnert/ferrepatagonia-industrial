@@ -27,7 +27,7 @@ for (const account of [
   {
     role: 'cliente',
     email: 'cliente@e2e.test',
-    allowed: '/mi-cuenta/datos',
+    allowed: '/mi-cuenta',
     forbidden: '/admin/productos',
   },
   {
