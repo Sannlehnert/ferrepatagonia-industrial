@@ -52,7 +52,7 @@ const cards = computed<readonly DashboardCard[]>(() => {
       id: 'credit-orders',
       label: 'Pedidos con cuenta corriente',
       value: indicadores.pedidosCuentaCorriente,
-      hint: 'Operaciones reales abonadas mediante cuenta corriente.',
+      hint: 'Pedidos reales registrados con modalidad de cuenta corriente.',
       to: '/admin/pedidos',
     },
     {

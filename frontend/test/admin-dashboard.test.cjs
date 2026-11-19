@@ -55,4 +55,19 @@ describe('Task #347 — Frontend AdminDashboardView y servicio de métricas real
     assert.match(viewSource, /\/admin\/pedidos/);
     assert.match(viewSource, /\/admin\/comprobantes/);
   });
+
+  it('AdminDashboardView describe la métrica de cuenta corriente por modalidad y no como operaciones abonadas (H02)', () => {
+    const viewSource = fs.readFileSync(viewPath, 'utf8');
+
+    assert.doesNotMatch(
+      viewSource,
+      /abonadas/i,
+      'La vista no debe describir pedidos con cuenta corriente como operaciones abonadas',
+    );
+    assert.match(
+      viewSource,
+      /modalidad de cuenta corriente/i,
+      'La vista debe describir el indicador por modalidad de cuenta corriente',
+    );
+  });
 });
