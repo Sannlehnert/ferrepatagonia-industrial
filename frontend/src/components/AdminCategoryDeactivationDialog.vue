@@ -20,6 +20,11 @@ const cancelButton = ref<HTMLButtonElement | null>(null)
 
 let previousOverflow = ''
 let previousPaddingRight = ''
+let lastFocused: HTMLElement | null = null
+let suppressCancel = false
+let restorePending = false
+let closingAuthorized = false
+let unmounting = false
 
 function lockPageScroll() {
   if (typeof document === 'undefined' || typeof window === 'undefined') return
@@ -62,9 +67,46 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  unmounting = true
   if (dialog.value?.open) dialog.value.close()
   unlockPageScroll()
 })
+
+function restoreNativeDialog() {
+  const element = dialog.value
+  if (unmounting || element?.open || !element) return
+
+  try {
+    element.showModal()
+  } catch {
+    return
+  }
+
+  const target = lastFocused
+  if (target?.isConnected && element.contains(target) && !target.matches(':disabled')) {
+    target.focus({ preventScroll: true })
+  } else if (!cancelButton.value?.disabled) {
+    cancelButton.value?.focus({ preventScroll: true })
+  }
+}
+
+function handleNativeClose() {
+  if (unmounting || closingAuthorized) return
+
+  if (props.busy || props.uncertain) {
+    if (restorePending) return
+    restorePending = true
+    void nextTick(() => {
+      restorePending = false
+      restoreNativeDialog()
+    })
+    return
+  }
+
+  // Cierre nativo sin bloqueos: sincronizamos el estado Vue con el diálogo.
+  closingAuthorized = true
+  emit('cancel')
+}
 
 function getFocusableElements(): HTMLElement[] {
   const element = dialog.value
@@ -75,7 +117,22 @@ function getFocusableElements(): HTMLElement[] {
   )).filter(item => item.getClientRects().length > 0)
 }
 
+function rememberFocus(event: FocusEvent) {
+  const target = event.target
+  if (target instanceof HTMLElement && dialog.value?.contains(target)) {
+    lastFocused = target
+  }
+}
+
 function handleKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    event.preventDefault()
+    suppressCancel = true
+    globalThis.setTimeout(() => { suppressCancel = false }, 0)
+    requestCancel()
+    return
+  }
+
   if (event.key !== 'Tab') return
 
   const focusables = getFocusableElements()
@@ -98,8 +155,16 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function handleCancel(event: Event) {
+  event.preventDefault()
+  if (suppressCancel) return
+  requestCancel()
+}
+
 function requestCancel() {
   if (props.busy || props.uncertain) return
+
+  closingAuthorized = true
   emit('cancel')
 }
 
@@ -124,20 +189,22 @@ function reload() {
       ref="dialog"
       aria-labelledby="category-deactivation-title"
       aria-describedby="category-deactivation-description"
-      class="m-auto w-[calc(100%-1rem)] max-w-md border-0 bg-transparent p-0 text-left text-[#0b2438] backdrop:bg-[#0b2438]/70 sm:w-[calc(100%-2rem)]"
-      @cancel.prevent="requestCancel"
+      class="box-border m-auto w-[calc(100%-1rem)] max-w-md border-0 bg-transparent p-0 text-left text-[#0b2438] backdrop:bg-[#0b2438]/70 sm:w-[calc(100%-2rem)]"
+      @cancel="handleCancel"
+      @close="handleNativeClose"
       @click="handleBackdropClick"
+      @focusin="rememberFocus"
       @keydown="handleKeydown"
     >
-      <div class="flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-[#f8fafc] shadow-2xl">
-        <header class="shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
+      <div class="box-border flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-[#f8fafc] shadow-2xl">
+        <header class="box-border shrink-0 border-b border-slate-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
           <h2 id="category-deactivation-title" class="m-0 text-lg font-bold text-[#0b2438] sm:text-xl">
             Desactivar categoría
           </h2>
         </header>
 
-        <div class="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 text-sm sm:p-6">
-          <p id="category-deactivation-description" class="m-0 break-words">
+        <div class="box-border min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 text-sm sm:p-6">
+          <p id="category-deactivation-description" class="m-0 wrap-anywhere">
             ¿Desactivar <strong>{{ category.nombre }}</strong>?
             La categoría dejará de aparecer en el catálogo público.
           </p>
@@ -145,12 +212,12 @@ function reload() {
           <div
             v-if="uncertain"
             role="alert"
-            class="rounded-md border border-red-200 bg-red-50 p-3 text-red-800"
+            class="box-border rounded-md border border-red-200 bg-red-50 p-3 text-red-800"
           >
-            <p class="m-0">{{ error || 'No se pudo confirmar la desactivación. Recargá el listado antes de reintentar.' }}</p>
+            <p class="m-0 wrap-anywhere">{{ error || 'No se pudo confirmar la desactivación. Recargá el listado antes de reintentar.' }}</p>
             <button
               type="button"
-              class="mt-2 min-h-11 border-0 bg-transparent font-semibold text-red-900 underline disabled:opacity-60"
+              class="mt-2 min-h-11 border-0 bg-transparent font-[inherit] font-semibold text-red-900 underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :disabled="busy"
               @click="reload"
             >
@@ -160,17 +227,17 @@ function reload() {
           <p
             v-else-if="error"
             role="alert"
-            class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800"
+            class="m-0 box-border rounded-md border border-red-200 bg-red-50 p-3 text-red-800 wrap-anywhere"
           >
             {{ error }}
           </p>
         </div>
 
-        <footer class="flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
+        <footer class="box-border flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
           <button
             ref="cancelButton"
             type="button"
-            class="min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             :disabled="busy || uncertain"
             @click="requestCancel"
           >
@@ -178,7 +245,7 @@ function reload() {
           </button>
           <button
             type="button"
-            class="min-h-11 w-full rounded-md border-0 bg-red-800 px-5 text-sm font-semibold text-white hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+            class="box-border min-h-11 w-full rounded-md border-0 bg-red-800 px-5 font-[inherit] text-sm font-semibold text-white hover:bg-red-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             :disabled="busy || uncertain"
             @click="confirm"
           >

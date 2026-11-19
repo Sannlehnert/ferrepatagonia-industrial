@@ -339,7 +339,7 @@ async function reloadAfterDeactivationUncertain() {
       <button
         ref="newButton"
         type="button"
-        class="box-border min-h-11 rounded-md bg-[#103a5c] px-4 text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        class="box-border min-h-11 rounded-md bg-[#103a5c] px-4 font-[inherit] text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         :disabled="busy || loading || formOpen || !!pendingDeactivation"
         @click="openCreate($event)"
       >
@@ -386,7 +386,7 @@ async function reloadAfterDeactivationUncertain() {
       <p role="alert" class="text-red-800 wrap-anywhere">No se pudieron cargar las categorías.</p>
       <button
         type="button"
-        class="box-border min-h-11 rounded-md border border-slate-300 px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        class="box-border min-h-11 rounded-md border border-slate-300 px-4 font-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="refreshCategories()"
       >
         Reintentar
@@ -396,7 +396,7 @@ async function reloadAfterDeactivationUncertain() {
     <template v-else-if="categories">
       <label class="flex flex-wrap items-center gap-2 text-sm font-medium">
         Estado
-        <select v-model="filter" class="box-border min-h-11 rounded-md border border-slate-300 px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
+        <select v-model="filter" class="box-border min-h-11 rounded-md border border-slate-300 px-3 font-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
           <option value="all">Todas</option>
           <option value="active">Activas</option>
           <option value="inactive">Inactivas</option>
@@ -429,7 +429,7 @@ async function reloadAfterDeactivationUncertain() {
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="box-border min-h-11 rounded-md border border-slate-300 px-4 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+              class="box-border min-h-11 rounded-md border border-slate-300 px-4 font-[inherit] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :aria-label="`Editar ${category.nombre}`"
               :data-category-edit-id="category.id_categoria"
               :disabled="busy || formOpen || !!pendingDeactivation"
@@ -440,7 +440,7 @@ async function reloadAfterDeactivationUncertain() {
             <button
               v-if="category.activo === 1"
               type="button"
-              class="box-border min-h-11 rounded-md border border-red-300 px-4 text-red-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+              class="box-border min-h-11 rounded-md border border-red-300 px-4 font-[inherit] text-red-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :aria-label="`Desactivar ${category.nombre}`"
               :disabled="busy || formOpen || !!pendingDeactivation"
               @click="openDeactivation(category, $event)"
