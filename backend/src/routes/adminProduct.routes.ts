@@ -3,12 +3,13 @@ import { getProducts, getProductById, createProduct, updateProduct, deactivatePr
 import { validateDto } from '../middlewares/validate-dto.middleware';
 import { productIdPolicy, createProductPolicy, updateProductPolicy, updateProductWithImagePolicy, stockPolicy } from '../dtos/policies';
 import { uploadProductImage } from '../middlewares/productImageUpload.middleware';
+import { adminProductQueryPolicy } from '../dtos/products/admin-product-query.dto';
 
 export const adminProductRouter = Router();
 
 // Mounted only beneath adminRouter's authentication and ADMIN guard.
 
-adminProductRouter.get('/', getProducts);
+adminProductRouter.get('/', validateDto('query', adminProductQueryPolicy), getProducts);
 adminProductRouter.get('/:id', validateDto('params', productIdPolicy), getProductById);
 adminProductRouter.post('/', validateDto('body', createProductPolicy), createProduct);
 adminProductRouter.post('/con-imagen', uploadProductImage, validateDto('body', createProductPolicy), createProduct);

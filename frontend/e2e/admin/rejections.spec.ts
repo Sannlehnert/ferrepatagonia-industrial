@@ -13,7 +13,7 @@ for (const status of [400, 404, 409]) {
     }).click();
     await expect(page).toHaveURL(/\/admin\/dashboard$/);
 
-    await page.goto('/admin/productos');
+    await page.goto('/admin/productos?busqueda=E2E-02');
     await page.getByRole('button', {
       name: 'Editar Producto E2E 02',
       exact: true,
