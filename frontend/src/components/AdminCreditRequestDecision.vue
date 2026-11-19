@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { onBeforeUnmount, ref } from 'vue'
+import { nextTick, onBeforeUnmount, ref } from 'vue'
 import {
   approveAdminCreditRequest,
   rejectAdminCreditRequest,
@@ -21,11 +21,14 @@ const retrySameRequest = ref(false)
 const error = ref('')
 
 let idempotencyKey: string | undefined
+const fields = ref<HTMLFieldSetElement | null>(null)
+const primaryTrigger = ref<HTMLButtonElement | null>(null)
+const secondaryTrigger = ref<HTMLButtonElement | null>(null)
 let active = true
 
 onBeforeUnmount(() => { active = false })
 
-function openDecision(nextAction: 'approve' | 'reject') {
+async function openDecision(nextAction: 'approve' | 'reject') {
   action.value = nextAction
   limit.value = props.request.montoSolicitado
   term.value = props.request.plazoDias
@@ -34,6 +37,23 @@ function openDecision(nextAction: 'approve' | 'reject') {
   error.value = ''
   idempotencyKey = undefined
   retrySameRequest.value = false
+  await nextTick()
+  if (active && action.value === nextAction) fields.value?.querySelector<HTMLElement>('input, select, textarea')?.focus()
+}
+
+async function cancel() {
+  if (submitting.value || retrySameRequest.value || !action.value) return
+  const previous = action.value
+  action.value = null
+  await nextTick()
+  if (active && !action.value) (previous === 'reject' ? secondaryTrigger.value : primaryTrigger.value)?.focus()
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (submitting.value || retrySameRequest.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  void cancel()
 }
 
 async function submitDecision() {
@@ -113,6 +133,7 @@ async function submitDecision() {
 <template>
   <div v-if="!action" class="credit-decision flex flex-wrap gap-2">
     <button
+      ref="primaryTrigger"
       type="button"
       class="rounded border border-slate-300 px-3 py-2"
       :aria-label="`Aprobar solicitud ${request.id}`"
@@ -121,6 +142,7 @@ async function submitDecision() {
       Aprobar
     </button>
     <button
+      ref="secondaryTrigger"
       type="button"
       class="rounded border border-slate-300 px-3 py-2"
       :aria-label="`Rechazar solicitud ${request.id}`"
@@ -130,12 +152,12 @@ async function submitDecision() {
     </button>
   </div>
 
-  <form v-else class="credit-decision w-full rounded border border-slate-200 p-3" @submit.prevent="submitDecision">
+  <form v-else class="credit-decision w-full rounded border border-slate-200 p-3" @keydown.esc="onEscape" @submit.prevent="submitDecision">
     <h3 class="font-semibold">
       {{ action === 'approve' ? 'Aprobar' : 'Rechazar' }} solicitud #{{ request.id }}
     </h3>
 
-    <fieldset :disabled="submitting || retrySameRequest" class="mt-3 grid gap-3">
+    <fieldset ref="fields" :disabled="submitting || retrySameRequest" class="mt-3 grid gap-3">
       <template v-if="action === 'approve'">
         <label class="grid gap-1">
           Límite autorizado (USD)
@@ -195,7 +217,7 @@ async function submitDecision() {
         type="button"
         :disabled="submitting"
         class="rounded border border-slate-300 px-3 py-2"
-        @click="action = null"
+        @click="cancel"
       >
         Cancelar
       </button>

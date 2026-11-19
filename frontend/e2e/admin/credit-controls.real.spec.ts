@@ -69,6 +69,23 @@ async function verifyCreditControls(scope: Locator, page: Page) {
   expect(await page.locator('html').evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
 }
 
+async function verifyInlineFocus(scope: Locator, page: Page, triggerName: string, fieldName: string) {
+  const trigger = scope.getByRole('button', { name: triggerName, exact: true })
+  for (const method of ['escape', 'cancel']) {
+    await trigger.click()
+    const first = scope.getByLabel(fieldName, { exact: true })
+    await expect(first).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(first).not.toBeFocused()
+    await page.keyboard.press('Shift+Tab')
+    await expect(first).toBeFocused()
+    if (method === 'escape') await page.keyboard.press('Escape')
+    else await scope.getByRole('button', { name: 'Cancelar', exact: true }).click()
+    await expect(trigger).toBeFocused()
+    await expect(first).toHaveCount(0)
+  }
+}
+
 for (const width of [1280, 768, 360]) {
   test.describe(`Controles ADMIN de crédito a ${width}px`, () => {
     test.use({ viewport: { width, height: 850 } })
@@ -121,6 +138,9 @@ for (const width of [1280, 768, 360]) {
         }),
       }).last()
 
+      await verifyInlineFocus(requests, page, `Aprobar solicitud ${requestId}`, 'Límite autorizado (USD)')
+      await verifyInlineFocus(requests, page, `Rechazar solicitud ${requestId}`, 'Motivo')
+      await verifyCreditControls(requests, page)
       await requests.getByRole('button', {
         name: `Aprobar solicitud ${requestId}`,
         exact: true,
@@ -178,6 +198,10 @@ for (const width of [1280, 768, 360]) {
         has: page.getByRole('heading', { name: 'Gestión de crédito', exact: true }),
       })
 
+      await verifyInlineFocus(controls, page, 'Habilitar cuenta', 'Motivo (opcional)')
+      await verifyInlineFocus(controls, page, 'Editar límite', 'Nuevo límite (USD)')
+      await verifyCreditControls(controls, page)
+
       await expect(controls.getByRole('button', {
         name: 'Habilitar cuenta',
         exact: true,
@@ -204,6 +228,7 @@ for (const width of [1280, 768, 360]) {
         name: 'Deshabilitar cuenta',
         exact: true,
       })).toBeVisible()
+      await verifyInlineFocus(controls, page, 'Deshabilitar cuenta', 'Motivo')
       await controls.getByRole('button', {
         name: 'Deshabilitar cuenta',
         exact: true,
@@ -342,6 +367,10 @@ test('recupera una aprobación con respuesta perdida usando la misma clave', asy
   )
   await expect(limit).toBeDisabled()
   await expect(limit).toHaveValue('2000.00')
+  await requests.getByRole('button', { name: 'Reintentar operación', exact: true }).focus()
+  await page.keyboard.press('Escape')
+  await expect(limit).toBeDisabled()
+  await expect(requests.getByRole('button', { name: 'Cancelar', exact: true })).toHaveCount(0)
 
   await requests.getByRole('button', {
     name: 'Reintentar operación',

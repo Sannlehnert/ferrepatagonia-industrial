@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref } from 'vue'
 import {
   changeAdminCreditLimit,
   disableAdminCreditAccount,
@@ -29,11 +29,14 @@ const error = ref('')
 const formTitle = computed(() => action.value ? actions[action.value].title : '')
 
 let operationKey: string | undefined
+const fields = ref<HTMLFieldSetElement | null>(null)
+const primaryTrigger = ref<HTMLButtonElement | null>(null)
+const secondaryTrigger = ref<HTMLButtonElement | null>(null)
 let active = true
 
 onBeforeUnmount(() => { active = false })
 
-function openForm(nextAction: Action) {
+async function openForm(nextAction: Action) {
   action.value = nextAction
   limit.value = props.account.limite ?? ''
   reason.value = ''
@@ -41,6 +44,23 @@ function openForm(nextAction: Action) {
   error.value = ''
   retry.value = false
   operationKey = undefined
+  await nextTick()
+  if (active && action.value === nextAction) fields.value?.querySelector<HTMLElement>('input, select, textarea')?.focus()
+}
+
+async function cancel() {
+  if (submitting.value || retry.value || !action.value) return
+  const previous = action.value
+  action.value = null
+  await nextTick()
+  if (active && !action.value) (previous === 'limit' ? secondaryTrigger.value : primaryTrigger.value)?.focus()
+}
+
+function onEscape(event: KeyboardEvent) {
+  if (submitting.value || retry.value) return
+  event.preventDefault()
+  event.stopPropagation()
+  void cancel()
 }
 
 async function submit() {
@@ -122,26 +142,27 @@ async function submit() {
 
     <div v-if="!action" class="mt-3 flex flex-wrap gap-2">
       <button
+        ref="primaryTrigger"
         v-if="account.estado === 'INHABILITADA'"
         type="button"
         @click="openForm('enable')"
       >
         Habilitar cuenta
       </button>
-      <button v-else type="button" @click="openForm('disable')">
+      <button v-else ref="primaryTrigger" type="button" @click="openForm('disable')">
         Deshabilitar cuenta
       </button>
-      <button type="button" @click="openForm('limit')">Editar límite</button>
+      <button ref="secondaryTrigger" type="button" @click="openForm('limit')">Editar límite</button>
     </div>
 
-    <form v-else class="mt-3" @submit.prevent="submit">
+    <form v-else class="mt-3" @keydown.esc="onEscape" @submit.prevent="submit">
       <h4 class="font-medium">{{ formTitle }}</h4>
       <p v-if="action === 'disable'" class="mt-1 text-sm text-slate-600">
         Se suspende el uso de la cuenta para nuevas compras a crédito.
         El historial sigue disponible.
       </p>
 
-      <fieldset :disabled="submitting || retry" class="mt-3 grid gap-3">
+      <fieldset ref="fields" :disabled="submitting || retry" class="mt-3 grid gap-3">
         <label v-if="action === 'limit'" class="grid gap-1">
           Nuevo límite (USD)
           <input
@@ -184,7 +205,7 @@ async function submit() {
           v-if="!retry"
           type="button"
           :disabled="submitting"
-          @click="action = null"
+          @click="cancel"
         >
           Cancelar
         </button>
