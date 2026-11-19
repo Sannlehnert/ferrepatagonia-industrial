@@ -156,17 +156,22 @@ describe('Admin Products Endpoints (#197)', () => {
         };
         try {
             assert.equal(await state(), 'NO_VERIFICADO');
+            // Usar el reloj de la API también en la fixture: el contenedor SQL
+            // puede estar adelantado respecto de Node en el entorno local.
+            const now = Date.now();
+            const utc = ms => new Date(ms).toISOString().slice(0, 23).replace('T', ' ');
+            const verifiedUtc = utc(now);
             await pool.query(`INSERT INTO PRECIO_USD_EVIDENCIA
                 (id_producto, precio_verificado, evidencia, id_admin, verificado_utc, valida, sintetica)
-                VALUES (?, 150, 'test evidence', ?, UTC_TIMESTAMP(), 1, 0)`, [id, admin.id]);
+                VALUES (?, 150, 'test evidence', ?, ?, 1, 0)`, [id, admin.id, verifiedUtc]);
             assert.equal(await state(), 'VERIFICADO');
             await pool.query('UPDATE PRODUCTO SET activo=0 WHERE id_producto=?', [id]);
             assert.equal(await state(), 'VERIFICADO');
             await pool.query('UPDATE PRODUCTO SET activo=1, precio=160 WHERE id_producto=?', [id]);
             assert.equal(await state(), 'NO_VERIFICADO');
-            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=160, valida=1, verificado_utc=UTC_TIMESTAMP() + INTERVAL 1 DAY WHERE id_producto=?', [id]);
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET precio_verificado=160, valida=1, verificado_utc=? WHERE id_producto=?', [utc(now + 86400000), id]);
             assert.equal(await state(), 'NO_VERIFICADO');
-            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET verificado_utc=UTC_TIMESTAMP(), evidencia=CHAR(9) WHERE id_producto=?', [id]);
+            await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET verificado_utc=?, evidencia=CHAR(9) WHERE id_producto=?', [verifiedUtc, id]);
             assert.equal(await state(), 'NO_VERIFICADO');
             await pool.query('UPDATE PRECIO_USD_EVIDENCIA SET evidencia=? WHERE id_producto=?', [' \tFactura 123\n ', id]);
             assert.equal(await state(), 'VERIFICADO');
