@@ -155,10 +155,10 @@ async function retryTransferAfterRejection() {
 
 <template>
   <section aria-label="Confirmación de pedido" class="mt-5 border-t border-slate-200 pt-4">
-    <p v-if="selected === 'CUENTA_CORRIENTE' && order.eligibilityLoading" role="status" class="mb-3 text-sm text-slate-600">
+    <p v-if="showTotal && !hasLockedAttempt && order.eligibilityLoading" role="status" class="mb-3 text-sm text-slate-600">
       Verificando si este pedido puede confirmarse a crédito…
     </p>
-    <div v-if="selected === 'CUENTA_CORRIENTE' && order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
+    <div v-if="showTotal && !hasLockedAttempt && order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
       <p role="alert" class="mb-2 mt-0 text-sm">{{ order.eligibilityError }}</p>
       <button type="button" class="inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.loadEligibility()">
         Volver a consultar elegibilidad

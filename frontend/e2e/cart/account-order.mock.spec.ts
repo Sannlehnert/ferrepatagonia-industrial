@@ -84,6 +84,61 @@ test('mantiene transferencia disponible cuando el backend no habilita cuenta cor
   expect(state.orderRequests).toEqual([])
 })
 
+test('permite reconsultar crédito fallido sin bloquear transferencia ni habilitar crédito prematuramente', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = eligibleOrder
+  state.creditEligibilityFails = true
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  const transfer = summary.getByRole('button', { name: 'Confirmar pedido por transferencia' })
+  const credit = summary.getByRole('radio', { name: 'Cuenta corriente' })
+  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
+  await expect(transfer).toBeEnabled()
+  await expect(credit).toHaveCount(0)
+  const failedRetry = page.waitForResponse(response =>
+    response.url().endsWith('/pedidos/cuenta-corriente/eligibilidad') && response.status() === 500)
+  await retry.click()
+  await failedRetry
+  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
+  await expect(retry).toBeVisible()
+  await expect(credit).toHaveCount(0)
+
+  let release = () => {}
+  state.creditEligibilityFails = false
+  state.creditEligibilityGate = new Promise<void>(resolve => { release = resolve })
+  try {
+    await retry.click()
+    await expect(summary.getByRole('status').filter({ hasText: 'Verificando si este pedido' })).toBeVisible()
+    await expect(credit).toHaveCount(0)
+    await expect(transfer).toBeEnabled()
+    expect(state.orderRequests).toEqual([])
+    release()
+    await expect(credit).toBeVisible()
+    await expect(summary.getByRole('alert')).toHaveCount(0)
+    await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeChecked()
+    await credit.check()
+    await expect(summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' })).toBeEnabled()
+  } finally {
+    release()
+  }
+})
+
+test('un reintento de crédito no elegible conserva transferencia y no habilita crédito', async ({ page }) => {
+  const state = await mockCart(page)
+  state.creditEligibilityFails = true
+  await page.goto('/carrito')
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
+  state.creditEligibilityFails = false
+  await summary.getByRole('button', { name: 'Volver a consultar elegibilidad' }).click()
+  await expect(summary.getByRole('alert')).toHaveCount(0)
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  await expect(summary.getByRole('button', { name: 'Confirmar pedido por transferencia' })).toBeEnabled()
+  expect(state.orderRequests).toEqual([])
+})
+
 test('muestra el rechazo real de crédito insuficiente', async ({ page }) => {
   const state = await mockCart(page)
   state.eligibility = eligibleOrder
