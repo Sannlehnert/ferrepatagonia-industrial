@@ -129,7 +129,7 @@ test('volver a tienda conserva el origen y usa catálogo ante acceso directo', a
   await expect(page).toHaveURL('/catalogo')
 })
 
-for (const width of [320, 360]) {
+for (const width of [320, 360, 390, 768, 1280]) {
   test(`detalle de pedido de empresa sin desborde a ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 })
     await mockApi(page, 'EMPRESA')
@@ -146,7 +146,7 @@ for (const width of [320, 360]) {
       }
       if (path === '/api/pedidos/1') {
         return route.fulfill({ json: { data: { ...order, items: [{
-          detalleId: 1, productoId: 1, codigo: 'E2E-01',
+          detalleId: 1, productoId: 1, codigo: 'CODIGO'.repeat(20),
           nombre: 'Llave industrial para taller ' + 'EXTRALARGA'.repeat(8),
           cantidad: 2, precioUnitario: '10.00', descuento: '0.00', subtotal: '20.00',
         }] } } })
@@ -160,6 +160,16 @@ for (const width of [320, 360]) {
     const toggle = page.getByRole('button', { name: 'Ver detalle de PED-000001' })
     await toggle.click()
     await expect(page.getByText('EXTRALARGA'.repeat(8), { exact: false })).toBeVisible()
+    await expect(page.getByText('CODIGO'.repeat(20), { exact: false })).toBeVisible()
+    await expect(page.getByText('Cantidad: 2', { exact: true })).toBeVisible()
+    await expect(page.getByText('Precio unitario: 10.00 USD', { exact: true })).toBeVisible()
+    await expect(page.getByText('Subtotal de la línea: 20.00 USD', { exact: true })).toBeVisible()
+    if (width === 768) await expect(page.getByRole('table')).toHaveCount(0)
+    if (width === 1280) {
+      expect(await page.getByRole('table').evaluate(table =>
+        table.parentElement!.scrollWidth <= table.parentElement!.clientWidth,
+      )).toBe(true)
+    }
     const dimensions = await page.locator('html').evaluate(html => ({
       scrollWidth: html.scrollWidth,
       width: html.clientWidth,
@@ -177,6 +187,96 @@ for (const width of [320, 360]) {
     expect(dimensions.scrollWidth, overflow).toBeLessThanOrEqual(dimensions.width)
   })
 }
+
+for (const width of [320, 360, 390, 768, 1280]) {
+  for (const tipo of ['PARTICULAR', 'EMPRESA'] as const) {
+    test(`${tipo} ${width}px: resumen verificado, detalle y cierre de sesión`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await mockApi(page, tipo)
+      const method = tipo === 'EMPRESA' ? 'CUENTA_CORRIENTE' : 'TRANSFERENCIA'
+      const unsupported = tipo === 'EMPRESA' ? 'TRANSFERENCIA' : 'CUENTA_CORRIENTE'
+      const makeOrder = (pedidoId: number, modalidadPago: string, estado: string) => ({
+        pedidoId, numero: `PED-${String(pedidoId).padStart(6, '0')}`,
+        fecha: '2026-11-16T12:00:00.000Z', estado, modalidadPago, moneda: 'USD',
+        subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+        cantidadLineas: 1, cantidadUnidades: 2,
+      })
+      const orders = [
+        makeOrder(1, method, 'CONFIRMADO'),
+        makeOrder(2, method, 'PENDIENTE'),
+        makeOrder(3, unsupported, 'PENDIENTE'),
+      ]
+      await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+        const path = new URL(route.request().url()).pathname
+        if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: orders } } })
+        if (/\/comprobantes$/.test(path)) {
+          const items = path === '/api/pedidos/2/comprobantes' ? [{ estadoRevision: 'PENDIENTE' }] : []
+          return route.fulfill({ json: { data: { items, paginaSiguiente: null } } })
+        }
+        return route.continue()
+      })
+
+      await page.goto('/mi-cuenta')
+      await expect(page.getByRole('heading', { name: 'Mi cuenta', exact: true, level: 1 })).toBeVisible()
+      const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+      await expect(summary.getByRole('link', { name: /Pedidos Realizados/ })).toContainText('3')
+      const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+      await expect(missing).toContainText('1')
+      await expect(summary.getByRole('link', { name: /Pedidos con Cuenta Corriente/ }))
+        .toHaveCount(tipo === 'EMPRESA' ? 1 : 0)
+      await missing.click()
+      await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+      await expect(page.getByRole('heading', { name: 'PED-000001' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'PED-000002' })).toHaveCount(0)
+      await expect(page.getByRole('heading', { name: 'PED-000003' })).toHaveCount(0)
+      expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+      if (width < 768) await page.getByRole('button', { name: 'Menú de navegación de cuenta' }).click()
+      const logout = page.getByRole('button', { name: 'Cerrar sesión', exact: true })
+      await expect(logout).toBeVisible()
+      expect((await logout.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+      await logout.click()
+      await expect(page).toHaveURL('/login')
+    })
+  }
+}
+
+test('el resumen no muestra cifras parciales de comprobantes y permite reintentar', async ({ page }) => {
+  await mockApi(page, 'PARTICULAR')
+  let fails = true
+  let release = () => {}
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: [{
+      pedidoId: 1, numero: 'PED-000001', fecha: '2026-11-16T12:00:00.000Z',
+      estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', moneda: 'USD',
+      subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+      cantidadLineas: 1, cantidadUnidades: 2,
+    }] } } })
+    if (path === '/api/pedidos/1/comprobantes') {
+      await held
+      return fails
+        ? route.fulfill({ status: 500, json: { message: 'No disponible' } })
+        : route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
+    }
+    return route.continue()
+  })
+  try {
+    await page.goto('/mi-cuenta')
+    const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+    const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+    await expect(missing).toContainText('Cargando…')
+    release()
+    await expect(summary.getByRole('alert')).toContainText('No se pudo consultar')
+    await expect(missing).toContainText('No disponible')
+    fails = false
+    await summary.getByRole('button', { name: 'Reintentar comprobantes' }).click()
+    await expect(summary.getByRole('alert')).toHaveCount(0)
+    await expect(missing).toContainText('1')
+  } finally {
+    release()
+  }
+})
 
 test('login respeta contexto público, protegido y destino inválido', async ({ page }) => {
   await mockApi(page, 'PARTICULAR', false)

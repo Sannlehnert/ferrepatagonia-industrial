@@ -45,18 +45,18 @@ function toggleOrder(orderId: number) {
   expandedOrderId.value = expandedOrderId.value === orderId ? null : orderId
 }
 
-const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 1280 : false)
 
 function updateIsMobile() {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 768
+    isMobile.value = window.innerWidth < 1280
   }
 }
 
 onMounted(() => {
   updateIsMobile()
   window.addEventListener('resize', updateIsMobile)
-  const mql = window.matchMedia('(max-width: 767px)')
+  const mql = window.matchMedia('(max-width: 1279px)')
   const handler = (e: MediaQueryListEvent) => {
     isMobile.value = e.matches
   }
@@ -132,11 +132,11 @@ const filteredOrders = computed(() => {
 
 function getOrderStatusBadgeClasses(status: string) {
   const s = status.toUpperCase().replaceAll(' ', '_')
-  if (s === 'PENDIENTE') return 'bg-[#FEF3C7] text-[#D97706]'
+  if (s === 'PENDIENTE') return 'bg-amber-100 text-amber-900'
   if (s === 'ENVIADO') return 'bg-emerald-50 text-emerald-700'
-  if (s === 'ENTREGADO') return 'bg-[#DCFCE7] text-[#16A34A]'
-  if (s === 'CONFIRMADO') return 'bg-sky-50 text-[#0EA5E9]'
-  if (s === 'CANCELADO' || s === 'RECHAZADO') return 'bg-[#FEE2E2] text-[#DC2626]'
+  if (s === 'ENTREGADO') return 'bg-green-100 text-green-800'
+  if (s === 'CONFIRMADO') return 'bg-sky-50 text-sky-800'
+  if (s === 'CANCELADO' || s === 'RECHAZADO') return 'bg-red-100 text-red-800'
   return 'bg-slate-100 text-slate-700'
 }
 
@@ -247,7 +247,7 @@ function getOrderStatusBadgeClasses(status: string) {
 
     <!-- Content with Orders -->
     <div v-else class="space-y-6">
-      <!-- Desktop Table (>= 768px) -->
+      <!-- Desktop Table -->
       <div v-if="!isMobile" class="rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm" role="list">
         <table class="w-full min-w-[640px] border-collapse text-left">
           <thead class="bg-slate-50 border-b border-[#E2E8F0]">
@@ -287,7 +287,7 @@ function getOrderStatusBadgeClasses(status: string) {
               <td class="py-4 px-6 text-sm">
                 <span
                   :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                    ? 'text-[#0EA5E9] font-medium'
+                    ? 'text-sky-800 font-medium'
                     : 'text-slate-700'"
                 >
                   {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
@@ -342,16 +342,16 @@ function getOrderStatusBadgeClasses(status: string) {
         </table>
       </div>
 
-      <!-- Mobile Order Cards (< 768px) -->
+      <!-- Order Cards -->
       <div v-else role="list" class="space-y-4">
         <div
           v-for="order in filteredOrders"
           :key="order.pedidoId"
           role="listitem"
-          class="rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
+          class="min-w-0 rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
         >
-          <div class="flex items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
-            <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
+            <div class="min-w-0">
               <h3 role="heading" class="m-0 font-bold text-[#0B2438] text-base">
                 {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
               </h3>
@@ -369,17 +369,17 @@ function getOrderStatusBadgeClasses(status: string) {
           </div>
 
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Monto Total:</span>
               <span class="font-bold text-[#0B2438] text-base">
                 {{ order.total }} {{ order.moneda || 'USD' }}
               </span>
             </div>
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Método de Pago:</span>
               <span
                 :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                  ? 'text-[#0EA5E9] font-medium'
+                  ? 'text-sky-800 font-medium'
                   : 'text-slate-700'"
               >
                 {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
