@@ -63,6 +63,9 @@ async function verificarAviso(page: Page, ilustrativa: boolean) {
   await expect(aviso).toHaveCount(ilustrativa ? 1 : 0)
   if (!ilustrativa) return
   await expect(aviso).toBeVisible()
+  const noticeId = await aviso.getAttribute('id')
+  expect(noticeId).toBeTruthy()
+  await expect(page.locator(`img[aria-describedby="${noticeId}"]`)).toHaveCount(1)
   const medidas = await aviso.evaluate(element => {
     const rect = element.getBoundingClientRect()
     return { font: parseFloat(element.ownerDocument.defaultView!.getComputedStyle(element).fontSize), left: rect.left, right: rect.right,
@@ -399,6 +402,34 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
         sha256Origen: createHash('sha256').update(fuentes.get(producto.codigo)!.bytes).digest('hex'),
         http: 200, mime: 'image/webp' })
     }
+    await page.goto('/')
+    for (const producto of dbFilas.slice(0, 4).filter(p => p.imagen)) {
+      const card = page.getByRole('listitem').filter({
+        has: page.getByRole('heading', { name: producto.nombre, level: 3, exact: true }),
+      })
+      const esIlustrativa = fuentes.get(producto.codigo)!.archivo.startsWith('ilustrativa-')
+      const aviso = card.getByRole('note').filter({ hasText: 'Imagen ilustrativa' })
+      await expect(aviso).toHaveCount(esIlustrativa ? 1 : 0)
+      if (esIlustrativa) {
+        const noticeId = await aviso.getAttribute('id')
+        expect(noticeId).toBeTruthy()
+        await expect(card.getByRole('img', { name: producto.nombre, exact: true }))
+          .toHaveAttribute('aria-describedby', noticeId!)
+      }
+    }
+    const imagenIlustrativaHome = dbFilas.slice(0, 4).find(p =>
+      p.imagen && fuentes.get(p.codigo)!.archivo.startsWith('ilustrativa-'))
+    if (imagenIlustrativaHome?.imagen) {
+      const imageUrl = new URL(imagenIlustrativaHome.imagen, baseURL).href
+      await page.route(imageUrl, route => route.fulfill({ status: 404, body: 'missing' }))
+      await page.reload()
+      const card = page.getByRole('listitem').filter({
+        has: page.getByRole('heading', { name: imagenIlustrativaHome.nombre, level: 3, exact: true }),
+      })
+      await expect(card.getByRole('img', { name: imagenIlustrativaHome.nombre, exact: true })).toHaveCount(0)
+      await expect(card.getByRole('note')).toHaveCount(0)
+      await page.unroute(imageUrl)
+    }
     for (const producto of dbFilas.filter(p => p.imagen)) {
       await page.goto(`/catalogo?busqueda=${encodeURIComponent(producto.codigo)}&categoria=${producto.id_categoria}`)
       await expect(page.getByRole('form', { name: 'Buscar y filtrar productos' })).toBeVisible()
@@ -406,6 +437,7 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await expect(enlace).toBeVisible()
       const url = new URL(producto.imagen, baseURL).href
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
+      expect(await enlace.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
       const esIlustrativa = fuentes.get(producto.codigo)!.archivo.startsWith('ilustrativa-')
       await verificarAviso(page, esIlustrativa)
       await enlace.focus()
@@ -426,6 +458,20 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
         await verificarAviso(page, ilustrativa)
       }
     }
+    const imagenIlustrativa = dbFilas.find(p =>
+      p.imagen && fuentes.get(p.codigo)!.archivo.startsWith('ilustrativa-'))!
+    const urlImagenIlustrativa = new URL(imagenIlustrativa.imagen, baseURL).href
+    await page.route(urlImagenIlustrativa, route => route.fulfill({ status: 404, body: 'missing' }))
+    await page.goto(`/catalogo?busqueda=${encodeURIComponent(imagenIlustrativa.codigo)}`)
+    const tarjetaSinImagen = page.getByRole('listitem').filter({
+      has: page.getByRole('link', { name: imagenIlustrativa.nombre, exact: true }),
+    })
+    await expect(tarjetaSinImagen.getByText('Sin imagen', { exact: true })).toBeVisible()
+    await expect(tarjetaSinImagen.getByRole('note')).toHaveCount(0)
+    await page.goto(`/producto/${imagenIlustrativa.id}`)
+    await expect(page.getByText('Sin imagen disponible', { exact: true })).toBeVisible()
+    await expect(page.getByRole('note')).toHaveCount(0)
+    await page.unroute(urlImagenIlustrativa)
     expect(imagenes).toHaveLength(182)
     const sinImagen = dbFilas.filter(p => !p.imagen)
     expect(sinImagen).toHaveLength(722)
@@ -451,6 +497,13 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     expect((await page.request.post('/api/carrito/items', {
       data: { productoId: productoIlustrativo.id, cantidad: 1 }, headers: { Origin: baseURL! },
     })).status()).toBe(204)
+    const urlImagenCarrito = new URL(productoIlustrativo.imagen, baseURL).href
+    await page.route(urlImagenCarrito, route => route.fulfill({ status: 404, body: 'missing' }))
+    await page.goto('/carrito')
+    const lineaCarrito = page.getByRole('listitem').filter({ hasText: productoIlustrativo.codigo })
+    await expect(lineaCarrito.getByText('Sin imagen', { exact: true })).toBeVisible()
+    await expect(lineaCarrito.getByRole('note')).toHaveCount(0)
+    await page.unroute(urlImagenCarrito)
     for (const width of [320, 360]) {
       await page.setViewportSize({ width, height: 800 })
       await page.goto('/carrito')

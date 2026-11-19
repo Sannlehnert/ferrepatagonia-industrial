@@ -2,6 +2,24 @@
 
 18 de noviembre de 2026. Rama existente `task/310-imagenes-productos-1-50-pr`. No se abrió otro PR, no se hizo merge a develop ni se cerró #310.
 
+## Addendum UX/UI · 19 de noviembre de 2026
+
+Se atendieron los cuatro ajustes del gate UX/UI sin cambiar imágenes, fuentes,
+licencias ni asociación de SKU:
+
+- Home ahora muestra el aviso ilustrativo para sus productos demo.
+- En el catálogo, la miniatura y el aviso comparten un único hijo directo de la
+  grilla `subgrid`; el enlace del título mide al menos 44 px.
+- El aviso tiene un `id` opcional y las imágenes lo referencian con
+  `aria-describedby` en Home, catálogo, ficha y carrito.
+- Si falla la carga de la imagen, se ocultan el aviso y la referencia accesible
+  que quedaría colgante.
+
+Validación local de este addendum: `frontend` `npm test`,
+`npm run build` y `node backend/test/helpers/run-e2e.cjs --demo-catalog`
+(1/1). El E2E comprueba los avisos y sus vínculos en las vistas, fallos de
+carga en Home/catálogo/ficha/carrito y el área táctil del título.
+
 ## Estado revisado
 
 Partida remota: `8c8795c9874f449609e3f590dcc2ac517fbc5613`, árbol aislado limpio. Se leyeron las tres revisiones de Santiago en el PR, contra `628e412`, `616ab9f` y `34af44d`. Se contrastó el delta posterior a `34af44d` y el diff exclusivo frente a develop. Los cambios ajenos al alcance proceden de merges previos de develop, no se reescribieron.

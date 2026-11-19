@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import CartQuantityControl from '@/components/CartQuantityControl.vue'
 import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
+import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import type { CartItem } from '@/types/cart'
 import { precioCarritoComprable } from '@/services/cartService'
 import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
@@ -21,6 +22,7 @@ const failedImage = ref(false)
 const isIllustrativeImage = computed(() =>
   isIllustrativeDemoImage(props.item.codigo, props.item.imagen),
 )
+const noticeId = computed(() => `cart-image-note-${props.item.id_item_carrito}`)
 
 watch(() => props.item.imagen, () => {
   failedImage.value = false
@@ -57,22 +59,17 @@ const availabilityMessage = computed(() => {
       border-0 border-b border-solid border-slate-200 py-4
       sm:grid-cols-[72px_minmax(0,1fr)_auto]"
   >
-    <img
-      v-if="item.imagen && !failedImage"
-      :src="item.imagen"
+    <ProductThumbnail
+      :image="item.imagen"
       :alt="item.nombre"
-      class="size-16 rounded-lg object-contain sm:size-[72px]"
-      loading="lazy"
-      @error="failedImage = true"
-    />
-
-    <div
-      v-else
-      class="grid size-16 place-items-center rounded-lg
-        bg-slate-100 text-[11px] text-slate-500 sm:size-[72px]"
+      image-class="size-16 rounded-lg object-contain sm:size-[72px]"
+      :described-by="isIllustrativeImage && !failedImage ? noticeId : undefined"
+      @image-error="failedImage = true"
     >
-      Sin imagen
-    </div>
+      <div class="grid size-16 place-items-center rounded-lg bg-slate-100 text-[11px] text-slate-500 sm:size-[72px]">
+        Sin imagen
+      </div>
+    </ProductThumbnail>
 
     <div class="min-w-0">
       <h3
@@ -86,7 +83,8 @@ const availabilityMessage = computed(() => {
         {{ item.codigo }}
       </p>
       <IllustrativeImageNotice
-        v-if="isIllustrativeImage"
+        v-if="isIllustrativeImage && !failedImage"
+        :id="noticeId"
         class="mb-2"
       />
 

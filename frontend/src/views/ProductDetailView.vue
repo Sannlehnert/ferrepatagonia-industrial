@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import CatalogCartButton from '@/components/CatalogCartButton.vue'
 import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
+import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
 import ProductPrices from '@/components/ProductPrices.vue'
 import { getCatalogProduct } from '@/services/catalogService'
@@ -45,6 +46,7 @@ const returnLabel = computed(() => {
 })
 
 const imageSource = computed(() => getProductImageSource(product.value?.imagen))
+const illustrativeNoticeId = 'product-detail-image-note'
 const isIllustrativeImage = computed(() =>
   product.value ? isIllustrativeDemoImage(product.value.codigo, product.value.imagen) : false,
 )
@@ -117,17 +119,18 @@ onBeforeUnmount(() => controller?.abort())
     <ProductPrices v-else-if="product" :products="pricedProducts" :catalog-loading="loading" v-slot="pricing">
       <article class="grid gap-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:grid-cols-2 lg:gap-10">
         <div class="grid min-h-64 place-items-center overflow-hidden rounded-lg bg-slate-100 sm:min-h-80">
-          <img
-            v-if="imageSource && !imageFailed"
-            :src="imageSource"
+          <ProductThumbnail
+            :image="imageSource"
             :alt="product.nombre"
-            class="max-h-[520px] w-full object-contain"
-            loading="lazy"
-            @error="imageFailed = true"
-          />
-          <span v-else class="text-sm text-slate-500">Sin imagen disponible</span>
+            image-class="max-h-[520px] w-full object-contain"
+            :described-by="isIllustrativeImage && !imageFailed ? illustrativeNoticeId : undefined"
+            @image-error="imageFailed = true"
+          >
+            <span class="text-sm text-slate-500">Sin imagen disponible</span>
+          </ProductThumbnail>
           <IllustrativeImageNotice
-            v-if="isIllustrativeImage"
+            v-if="isIllustrativeImage && !imageFailed"
+            :id="illustrativeNoticeId"
             class="mx-3 mb-3"
           />
         </div>
