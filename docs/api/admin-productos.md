@@ -13,18 +13,34 @@ un 403 de origen no significa que el usuario tenga el rol incorrecto.
 
 | Método y ruta | Uso | Respuesta satisfactoria |
 | --- | --- | --- |
-| `GET /api/admin/productos` | Lista productos ordenados por `id_producto` descendente. | 200 con array JSON; sin resultados devuelve `[]`. |
+| `GET /api/admin/productos` | Lista productos ordenados por `id_producto` descendente. | 200 con un array si se omite toda la query, o un objeto paginado al enviar parámetros. |
 | `GET /api/admin/productos/:id` | Obtiene un producto por ID. | 200 con objeto; 404 si no existe. |
 | `POST /api/admin/productos` | Crea un producto. | 201 con el producto creado. |
 | `PUT /api/admin/productos/:id` | Actualiza uno o más campos permitidos. | 200 con el producto actualizado. |
 | `PATCH /api/admin/productos/:id/desactivar` | Desactiva el producto; repetirlo es seguro. | 200 con mensaje y producto. |
 | `PATCH /api/admin/productos/:id/stock` | Asigna un valor absoluto de stock. | 200 con mensaje y producto. |
 
-El listado no ofrece filtros ni paginación. Los endpoints de detalle y escritura
-devuelven la proyección del producto; el listado agrega `categoria_nombre`.
+Los endpoints de detalle y escritura devuelven la proyección del producto.
+El listado agrega `categoria_nombre`.
 `precio` es un decimal de base de datos y puede serializarse como texto. El
 contrato público de catálogo, que actualmente no publica ese precio, está en
 [catalogo.md](catalogo.md).
+
+## Paginación y búsqueda
+
+La vista ADMIN usa `GET /api/admin/productos?page=1`. También se admiten
+`limit` (1 a 100, predeterminado 20) y `busqueda` (hasta 200 caracteres,
+sin controles). La búsqueda compara una subcadena literal con el nombre o el
+código SKU según la intercalación de MariaDB. Incluye productos activos e
+inactivos. Los parámetros desconocidos, repetidos o inválidos devuelven 400.
+`page` admite enteros de 1 a 1.000.000 y su valor predeterminado es 1.
+
+La respuesta paginada contiene `{ data, page, limit, total, totalPages }`.
+`total` cuenta todos los resultados de la búsqueda. Si se solicita una página
+posterior a la última, `page` y `data` corresponden a la última disponible.
+Con cero resultados, `data` es `[]`, `page` es 1 y ambos totales son 0.
+La vista conserva `page` y `busqueda` en la URL y vuelve a la primera página
+al cambiar o limpiar la búsqueda.
 
 ## Crear y actualizar
 

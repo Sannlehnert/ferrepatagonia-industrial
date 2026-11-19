@@ -37,12 +37,20 @@ function claims(req: IncomingMessage) {
 async function authorizeSocket(req: IncomingMessage) {
   const auth = claims(req);
   if (!auth || !await restoreUsuario(auth)) return null;
-  if (auth.rol === 'ADMIN') return { room: adminRoom, canReceiveOrders: false };
+  if (auth.rol === 'ADMIN') {
+    return { room: adminRoom, canReceiveOrders: false, canReceiveTransferOrders: false };
+  }
 
-  const [client] = await dataSource.query<{ clientId: number; canReceiveOrders: number }[]>(`
+  const [client] = await dataSource.query<{
+    clientId: number;
+    canReceiveOrders: number;
+    canReceiveTransferOrders: number;
+  }[]>(`
     SELECT c.id_cliente AS clientId,
            COALESCE(c.tipo_cliente = 'EMPRESA' AND c.estado_aprobacion_empresa = 'APROBADA'
-             AND cc.habilitada = 1, 0) AS canReceiveOrders
+             AND cc.habilitada = 1, 0) AS canReceiveOrders,
+           COALESCE(c.tipo_cliente = 'PARTICULAR'
+             OR (c.tipo_cliente = 'EMPRESA' AND c.estado_aprobacion_empresa = 'APROBADA'), 0) AS canReceiveTransferOrders
     FROM USUARIO u
     JOIN CLIENTE c ON c.id_cliente = u.id_cliente
     LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = c.id_cliente
@@ -50,7 +58,9 @@ async function authorizeSocket(req: IncomingMessage) {
   `, [auth.id]);
 
   return client && {
-    room: clientRoom(client.clientId), canReceiveOrders: client.canReceiveOrders === 1,
+    room: clientRoom(client.clientId),
+    canReceiveOrders: client.canReceiveOrders === 1,
+    canReceiveTransferOrders: client.canReceiveTransferOrders === 1,
   };
 }
 
@@ -122,7 +132,10 @@ export function attachOrderSockets(
         }
         if (access.room === room) {
           socket.emit('carrito.actualizado.v1', { version: 1 });
-          if (orderPayload && access.canReceiveOrders) socket.emit(orderEvent, orderPayload);
+          const canReceiveOrder = change.kind === 'order' && change.order.modalidadPago === 'TRANSFERENCIA'
+            ? access.canReceiveTransferOrders
+            : access.canReceiveOrders;
+          if (orderPayload && canReceiveOrder) socket.emit(orderEvent, orderPayload);
         }
       } catch {
         console.error('No se pudo notificar a una conexión autorizada.');
