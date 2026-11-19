@@ -8,7 +8,7 @@ const { categoriasRequeridas, csv, familias, generar } = require('../../../data/
 const { connectOwned } = require('../../../backend/test/helpers/cc260-disposable.cjs')
 const { credentials } = require('../../../backend/test/helpers/e2e-fixtures.cjs')
 const { leerFuentes, auditarCobertura } = require('../../../data/demo-catalog/cobertura-visual.cjs')
-const { asociarFotos } = require('../../../data/demo-catalog/asociar-fotos.cjs')
+const { asociarFotos, leerCatalogoMaestro, seleccionarFuentesCatalogo } = require('../../../data/demo-catalog/asociar-fotos.cjs')
 const importar = '/api/admin/productos/importar'
 const pedidos = '/api/pedidos/cuenta-corriente'
 
@@ -56,6 +56,25 @@ async function verificarImagen(locator: Locator, ruta: string) {
     await imagen.decode()
     return imagen.naturalWidth
   })).toBeGreaterThan(0)
+}
+
+async function verificarAviso(page: Page, ilustrativa: boolean) {
+  const aviso = page.getByRole('note').filter({ hasText: 'Imagen ilustrativa' })
+  await expect(aviso).toHaveCount(ilustrativa ? 1 : 0)
+  if (!ilustrativa) return
+  await expect(aviso).toBeVisible()
+  const noticeId = await aviso.getAttribute('id')
+  expect(noticeId).toBeTruthy()
+  await expect(page.locator(`img[aria-describedby="${noticeId}"]`)).toHaveCount(1)
+  const medidas = await aviso.evaluate(element => {
+    const rect = element.getBoundingClientRect()
+    return { font: parseFloat(element.ownerDocument.defaultView!.getComputedStyle(element).fontSize), left: rect.left, right: rect.right,
+      scroll: element.scrollWidth, width: element.clientWidth }
+  })
+  expect(medidas.font).toBeGreaterThanOrEqual(14)
+  expect(medidas.left).toBeGreaterThanOrEqual(0)
+  expect(medidas.right).toBeLessThanOrEqual(page.viewportSize()!.width)
+  expect(medidas.scroll).toBeLessThanOrEqual(medidas.width)
 }
 
 async function compraEnNavegador(page: Page, browser: Browser, origen: string, producto: Producto,
@@ -217,6 +236,37 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     const activas = await categorias()
     const usadas = activas.filter(c => categoriasRequeridas.includes(c.nombre))
     const filas: Fila[] = generar(activas)
+    if (!persistent) {
+      // Primera carga real del maestro de 100 en la misma base descartable.
+      // Se retira este fixture antes de la prueba académica de 904; no toca demos persistentes.
+      const maestro = leerCatalogoMaestro()
+      const porCodigo = new Map(filas.map(f => [f.codigo, f]))
+      const filasMaestro = maestro.map((m: { sku: string; nombre_propuesto: string }) =>
+        ({ ...porCodigo.get(m.sku)!, nombre: m.nombre_propuesto }))
+      const preMaestro = await preview(admin, csv(filasMaestro))
+      expect(preMaestro.validRowsCount).toBe(100)
+      expect((await confirmar(admin, preMaestro.previewToken)).importados).toBe(100)
+      const seleccion = seleccionarFuentesCatalogo(leerFuentes(), maestro)
+      const apiMaestro = {
+        get: (ruta: string) => admin.get(ruta).then(r => respuesta(r)),
+        subir: (ruta: string, f: Foto) => admin.put(ruta, {
+          multipart: { producto: '{}', imagen: { name: f.archivo, mimeType: 'image/webp', buffer: f.bytes } },
+        }).then(r => respuesta(r)),
+      }
+      const asociaciones = await asociarFotos(apiMaestro, { aplicar: true, fuentes: seleccion.fuentes })
+      expect(asociaciones).toHaveLength(61)
+      expect(seleccion.pendientes).toHaveLength(39)
+      for (const asociacion of asociaciones) {
+        const recurso = await publico.get(asociacion.imagen)
+        expect(recurso.status()).toBe(200)
+        expect(createHash('sha256').update(await recurso.body()).digest('hex')).toBe(
+          require('../../../data/demo-catalog/catalog-validation.json').imagenes.find((i: { sku: string }) => i.sku === asociacion.sku).sha256Publicado)
+      }
+      expect(Number((await db.query('SELECT COUNT(*) AS total FROM PRODUCTO WHERE imagen IS NULL'))[0].total)).toBe(39)
+      await reporte('catalogo-maestro-100.json', { total: 100, conFuente: 61, pendientes: seleccion.pendientes, asociaciones })
+      expect((await db.query(`DELETE FROM PRODUCTO WHERE codigo IN (${maestro.map(() => '?').join(',')})`,
+        maestro.map((m: { sku: string }) => m.sku))).affectedRows).toBe(100)
+    }
     const archivo = csv(filas)
     const plantilla = csv(generar(activas))
     const hash = createHash('sha256').update(plantilla).digest('hex')
@@ -281,7 +331,8 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     const conservadas: Asociacion[] = await asociarFotos({ ...apiFotos, subir: () => {
       throw new Error('Una segunda ejecución no debe reemplazar imágenes existentes')
     } }, { aplicar: true, fuentes })
-    expect(conservadas).toEqual(fotos.map(foto => ({ ...foto, estado: 'conservada' })))
+    expect(conservadas).toEqual(fotos.map(({ archivo, ...foto }) =>
+      ({ ...foto, archivoPlanificado: archivo, estado: 'conservada', verificacionPendiente: true })))
 
     const catalogo = async (params: Record<string, string>) =>
       (await respuesta(await publico.get('/api/catalogo', { params }))).data
@@ -315,12 +366,22 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     const sinEvidencia = await auditarPrecios(publico, '/api/precios', dbFilas, 0, false)
     // Evidencia de prueba únicamente en la MariaDB descartable que acredita connectOwned.
     // El cotejo previo garantiza que el importe persistido coincide con el CSV revisado.
+    const verificadoUtc = new Date().toISOString().slice(0, 23).replace('T', ' ')
+    // Adelantar deliberadamente el reloj SQL de esta conexión: la evidencia
+    // debe conservar la marca UTC de Node aunque UTC_TIMESTAMP sea futura.
+    const [reloj] = await db.query('SELECT UTC_TIMESTAMP(3) AS utc')
+    await db.query('SET timestamp = ?', [Math.floor(Date.now() / 1000) + 86400])
     const evidencia = await db.query(`
       INSERT INTO PRECIO_USD_EVIDENCIA
         (id_producto, precio_verificado, evidencia, id_admin, verificado_utc, valida, sintetica)
-      SELECT id_producto, precio, ?, 1, UTC_TIMESTAMP(3), 1, 1 FROM PRODUCTO WHERE codigo LIKE 'FP-DEMO-%'
-    `, [`SINTETICO ACADEMICO #286 SHA256:${hash}`])
+      SELECT id_producto, precio, ?, 1, ?, 1, 1 FROM PRODUCTO WHERE codigo LIKE 'FP-DEMO-%'
+    `, [`SINTETICO ACADEMICO #286 SHA256:${hash}`, verificadoUtc])
+    await db.query('SET timestamp = 0')
     expect(evidencia.affectedRows).toBe(filas.length)
+    const [marca] = await db.query("SELECT DATE_FORMAT(MIN(verificado_utc), '%Y-%m-%d %H:%i:%s.%f') AS utc FROM PRECIO_USD_EVIDENCIA")
+    expect(marca.utc.slice(0, 23)).toBe(verificadoUtc)
+    await reporte('relojes-utc.json', { nodeUtc: verificadoUtc, mariaDbUtc: String(reloj.utc),
+      pruebaSqlAdelantadoSegundos: 86400, marcaPersistida: marca.utc, esperaArtificial: false })
     const publicoUSD = await auditarPrecios(publico, '/api/precios', dbFilas, 0, true)
     const empresaUSD = await auditarPrecios(empresa, '/api/precios/mios', dbFilas, 10, true)
     await page.setViewportSize({ width: 360, height: 800 })
@@ -336,8 +397,38 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       if (huellas.has(archivo)) expect(huella).toBe(huellas.get(archivo))
       else huellas.set(archivo, huella)
       if (dbFilas.slice(0, 4).includes(producto)) await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), new URL(producto.imagen, baseURL).href)
+      expect(huella).toBe(require('../../../data/demo-catalog/catalog-validation.json').imagenes.find((i: { sku: string }) => i.sku === producto.codigo).sha256Publicado)
       imagenes.push({ sku: producto.codigo, archivo, sha256Publicado: huella,
+        sha256Origen: createHash('sha256').update(fuentes.get(producto.codigo)!.bytes).digest('hex'),
         http: 200, mime: 'image/webp' })
+    }
+    await page.goto('/')
+    for (const producto of dbFilas.slice(0, 4).filter(p => p.imagen)) {
+      const card = page.getByRole('listitem').filter({
+        has: page.getByRole('heading', { name: producto.nombre, level: 3, exact: true }),
+      })
+      const esIlustrativa = fuentes.get(producto.codigo)!.archivo.startsWith('ilustrativa-')
+      const aviso = card.getByRole('note').filter({ hasText: 'Imagen ilustrativa' })
+      await expect(aviso).toHaveCount(esIlustrativa ? 1 : 0)
+      if (esIlustrativa) {
+        const noticeId = await aviso.getAttribute('id')
+        expect(noticeId).toBeTruthy()
+        await expect(card.getByRole('img', { name: producto.nombre, exact: true }))
+          .toHaveAttribute('aria-describedby', noticeId!)
+      }
+    }
+    const imagenIlustrativaHome = dbFilas.slice(0, 4).find(p =>
+      p.imagen && fuentes.get(p.codigo)!.archivo.startsWith('ilustrativa-'))
+    if (imagenIlustrativaHome?.imagen) {
+      const imageUrl = new URL(imagenIlustrativaHome.imagen, baseURL).href
+      await page.route(imageUrl, route => route.fulfill({ status: 404, body: 'missing' }))
+      await page.reload()
+      const card = page.getByRole('listitem').filter({
+        has: page.getByRole('heading', { name: imagenIlustrativaHome.nombre, level: 3, exact: true }),
+      })
+      await expect(card.getByRole('img', { name: imagenIlustrativaHome.nombre, exact: true })).toHaveCount(0)
+      await expect(card.getByRole('note')).toHaveCount(0)
+      await page.unroute(imageUrl)
     }
     for (const producto of dbFilas.filter(p => p.imagen)) {
       await page.goto(`/catalogo?busqueda=${encodeURIComponent(producto.codigo)}&categoria=${producto.id_categoria}`)
@@ -346,16 +437,44 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await expect(enlace).toBeVisible()
       const url = new URL(producto.imagen, baseURL).href
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
+      expect(await enlace.evaluate(element => element.getBoundingClientRect().height)).toBeGreaterThanOrEqual(44)
+      const esIlustrativa = fuentes.get(producto.codigo)!.archivo.startsWith('ilustrativa-')
+      await verificarAviso(page, esIlustrativa)
       await enlace.focus()
       await page.keyboard.press('Enter')
       await expect(page.getByRole('heading', { name: producto.nombre, level: 1, exact: true })).toBeVisible()
       await verificarImagen(page.getByRole('img', { name: producto.nombre, exact: true }), url)
+      await verificarAviso(page, esIlustrativa)
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
     }
-    expect(imagenes).toHaveLength(132)
+    for (const width of [320, 360]) {
+      await page.setViewportSize({ width, height: 800 })
+      for (const ilustrativa of [true, false]) {
+        const producto = dbFilas.find(p => p.imagen && fuentes.get(p.codigo)!.archivo.startsWith('ilustrativa-') === ilustrativa)!
+        await page.goto(`/catalogo?busqueda=${encodeURIComponent(producto.codigo)}`)
+        await verificarAviso(page, ilustrativa)
+        await page.goto(`/producto/${producto.id}`)
+        await verificarAviso(page, ilustrativa)
+      }
+    }
+    const imagenIlustrativa = dbFilas.find(p =>
+      p.imagen && fuentes.get(p.codigo)!.archivo.startsWith('ilustrativa-'))!
+    const urlImagenIlustrativa = new URL(imagenIlustrativa.imagen, baseURL).href
+    await page.route(urlImagenIlustrativa, route => route.fulfill({ status: 404, body: 'missing' }))
+    await page.goto(`/catalogo?busqueda=${encodeURIComponent(imagenIlustrativa.codigo)}`)
+    const tarjetaSinImagen = page.getByRole('listitem').filter({
+      has: page.getByRole('link', { name: imagenIlustrativa.nombre, exact: true }),
+    })
+    await expect(tarjetaSinImagen.getByText('Sin imagen', { exact: true })).toBeVisible()
+    await expect(tarjetaSinImagen.getByRole('note')).toHaveCount(0)
+    await page.goto(`/producto/${imagenIlustrativa.id}`)
+    await expect(page.getByText('Sin imagen disponible', { exact: true })).toBeVisible()
+    await expect(page.getByRole('note')).toHaveCount(0)
+    await page.unroute(urlImagenIlustrativa)
+    expect(imagenes).toHaveLength(182)
     const sinImagen = dbFilas.filter(p => !p.imagen)
-    expect(sinImagen).toHaveLength(772)
+    expect(sinImagen).toHaveLength(722)
     const muestra = sinImagen[0]!
     const listado = `/catalogo?busqueda=${encodeURIComponent(muestra.codigo)}&categoria=${muestra.id_categoria}`
     await page.goto(listado)
@@ -371,6 +490,29 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     await expect(enlace).toBeVisible()
     await page.goForward()
     await expect(page.getByRole('heading', { name: muestra.nombre, level: 1, exact: true })).toBeVisible()
+    const productoIlustrativo = dbFilas.find(p => fuentes.get(p.codigo)?.archivo.startsWith('ilustrativa-'))!
+    await respuesta(await page.request.post('/api/auth/login', {
+      data: credentials.account, headers: { Origin: baseURL! },
+    }))
+    expect((await page.request.post('/api/carrito/items', {
+      data: { productoId: productoIlustrativo.id, cantidad: 1 }, headers: { Origin: baseURL! },
+    })).status()).toBe(204)
+    const urlImagenCarrito = new URL(productoIlustrativo.imagen, baseURL).href
+    await page.route(urlImagenCarrito, route => route.fulfill({ status: 404, body: 'missing' }))
+    await page.goto('/carrito')
+    const lineaCarrito = page.getByRole('listitem').filter({ hasText: productoIlustrativo.codigo })
+    await expect(lineaCarrito.getByText('Sin imagen', { exact: true })).toBeVisible()
+    await expect(lineaCarrito.getByRole('note')).toHaveCount(0)
+    await page.unroute(urlImagenCarrito)
+    for (const width of [320, 360]) {
+      await page.setViewportSize({ width, height: 800 })
+      await page.goto('/carrito')
+      await verificarAviso(page, true)
+      await page.screenshot({ path: testInfo.outputPath(`aviso-carrito-${width}.png`), fullPage: true })
+    }
+    expect((await page.request.delete(`/api/carrito/items/${productoIlustrativo.id}`, {
+      headers: { Origin: baseURL! },
+    })).status()).toBe(204)
     if (process.env.E2E_DEMO_INTERACTIVE === '1') {
       expect(empresaUSD.comprablesAcademico).toBe(904)
       expect((await respuesta(await empresa.get('/api/pedidos'))).data.items).toHaveLength(0)

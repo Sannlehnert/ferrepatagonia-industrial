@@ -45,931 +45,1463 @@
       "archivo": "llave-ajustable.webp",
       "sha256Publicado": "b3168d3c50207a2775628ac431447723ee10a99dc4f8c90a5d7761edbf72fe57",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "81175b8d272469703e9a4dfff4c55c0120716869ee8ee093c0af84d127800550"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-30-CM",
       "archivo": "cono-naranja-30-cm.webp",
       "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ea1a4d05f0126f109d3e5ec2893c38a51c11bfd60d7c9c5ea92979458376d0a3"
     },
     {
       "sku": "FP-DEMO-CAS-CASCO-BLANCO-BARBOQUEJO",
       "archivo": "casco-blanco-barboquejo.webp",
       "sha256Publicado": "54c0e4d7a09848c81a5975a1cd808754ca7a4317eae632b5cf8b55bf1a1ab341",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "e64eb39d14dbf3815482761ca0b74a620b9e25f53f1d1c2f769d484c95cbe83c"
     },
     {
       "sku": "FP-DEMO-TOR-HEX-ACABADO-DORADO",
       "archivo": "tornillo-hexagonal.webp",
       "sha256Publicado": "ab0432b7addc269ff7184ba049efa0bd8d9b6592f103d42d357322cf53d7bb6c",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "60995eb1a601afc3e73455fba4a8b1e8b0c5629dfb8cb7d2c0b3a7fafb7e19e8"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-2-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-2-5-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-3-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-3-5-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-4-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-4-5-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-5-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-6-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
     },
     {
       "sku": "FP-DEMO-MAN-DESTORNILLADOR-PLANO-8-MM",
       "archivo": "destornillador-plano.webp",
       "sha256Publicado": "33583cd2f2c0733391241f138016cbe0627bdcae4caf467489c6639d5fc8716e",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "4c44371b3911569986914793ec29852f7dcd266497dea57f0311027b1bea4982"
+    },
+    {
+      "sku": "FP-DEMO-ELE-TALADRO-500-W",
+      "archivo": "ilustrativa-ele.webp",
+      "sha256Publicado": "9bfd7306685ce42024155e314cc9cff6fcc8a4e86bc6660815ae9e4216709517",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "4831d692c31c8714026e762dcd602a95468799ec8e316ffbbf3749d528948f9c"
+    },
+    {
+      "sku": "FP-DEMO-ELE-AMOLADORA-1000-W",
+      "archivo": "ilustrativa-ele-amoladora.webp",
+      "sha256Publicado": "cfdd6353953cb940e8fc1d82682ebf3097e49ee68c62ef5dacafc4e07cff7a6f",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "559b723d19a85353168b205d2e6976b3741a60baaa4be50d454cb2fda928cf23"
     },
     {
       "sku": "FP-DEMO-ELE-CALADORA-500-W",
       "archivo": "caladora-500w.webp",
       "sha256Publicado": "4a386a6ff966d4e7251165478360565174f463649ee8e3b3345c16592260aa37",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "68bea604436770fb0356112f32a82debb4ea4388b27a38fe1a6493d52a24886f"
+    },
+    {
+      "sku": "FP-DEMO-ELE-LIJADORA-150-W",
+      "archivo": "ilustrativa-ele-lijadora.webp",
+      "sha256Publicado": "0fe9a47d0b29b4a842eb67f4973b427c8fc0f22b4d14fddb9c222fb1c0f58f0a",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "0074104897fe64cf723852c7c06ba045892769fd43388f1d9a1a7aadc6581cbf"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-ALA-AMARILLO",
+      "archivo": "ilustrativa-cas-ala.webp",
+      "sha256Publicado": "cf654c513d34670ef49468a3afe0223e10ba702688961a92bca482dd8c4487b6",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "8e3d921263862db7276e39f5b33d72f389bfc62b238cb6d977b191a191c45270"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-CORTO-AMARILLO",
+      "archivo": "casco-visera-corta-amarillo.webp",
+      "sha256Publicado": "77ef34091a205ac69cf42282c2125c6018c2c6b077728bbba11e7a045bda2128",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "813c81e94707b2f4f64e33319a6d9bbf9b02b414e0899b74b7e2f067ea1376db"
+    },
+    {
+      "sku": "FP-DEMO-CAS-CASCO-RANURAS-AMARILLO",
+      "archivo": "ilustrativa-cas.webp",
+      "sha256Publicado": "7445e74c2fbe68cb0ce30ac881accbefb0f79202ac34184f865bbf793c31af05",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "154a417aad6ab64c7fefb3bef6e82a3df5503c5af618ec2dcfe18a543e270a0f"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL",
+      "archivo": "ilustrativa-cha-naranja.webp",
+      "sha256Publicado": "b5dc6b5b049fa231ed820cc266c4004bf98cdc801f6cff0f065bb1efc7fcb48e",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "4446beb4e9c97a580ad56b7ab4493131705a3f1b882e67dceac593e1a1e7f0b3"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL",
+      "archivo": "ilustrativa-cha-cierre.webp",
+      "sha256Publicado": "efa2345f2cd90ec7d154bc855d91d8a02f956788031a75c644d9df83b50004b6",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "76b3d3d84c264c1b652ccf7d9ad7f9c3d5344c70408afcf83eb2e4236d4aff26"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL",
+      "archivo": "ilustrativa-cha-malla.webp",
+      "sha256Publicado": "0c8fee0ea9d2d0fdd2e05ac5aedea2c2a1bd6977883ac8919f4d10c12f0f5e76",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "23463ba344480d98e2c4721591a90de0d009a769e91be88bf237717b07bf4665"
+    },
+    {
+      "sku": "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL",
+      "archivo": "ilustrativa-cha-bolsillos.webp",
+      "sha256Publicado": "1bd644623c1074b5616be7405667d0b2bdf3b92842fb84b383909457e3647351",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "ac2cd0d8a1f8145d107eddcb2d974c2f28a44607e85b0d95ff6317fa2edba2f0"
+    },
+    {
+      "sku": "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL",
+      "archivo": "ilustrativa-gua-descarne.webp",
+      "sha256Publicado": "8b854f385155fdaa1feaefd4a7afffb7ebd41c14f3688c1f55f619f807bab884",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "f30afdfafa6503ef49a48dce2b021915a4b41550f9ec42fc874e1ca1392bbe36"
+    },
+    {
+      "sku": "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL",
+      "archivo": "ilustrativa-gua-algodon.webp",
+      "sha256Publicado": "f382ba74eaf5088c25c70ae6c88bebeeacea30ee3762be3ec125c3ea3c4e2e1d",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "6c468f5fcc7739a117655f0f28e8d05c4519807976651e13dd2d20d34c20b82a"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-5-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-10-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-15-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-20-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-25-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-40-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-50-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-75-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-TRANSPARENTE-PACK-DE-100-UNIDADES",
       "archivo": "anteojo-transparente.webp",
       "sha256Publicado": "de5032a612ab3388ff1500f4b982af2c6c1766a2488238288aedb9ef947a04d3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5377a5c2efd8bc0cff52eb8574189cc2e6fc8980cff2579ba0a26caf2efa07ca"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-5-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-10-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-15-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-20-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-25-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-40-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-50-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-75-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-LENTE-GRIS-PACK-DE-100-UNIDADES",
       "archivo": "anteojo-lente-gris.webp",
       "sha256Publicado": "19b2978b4b325b95b053c5f6cfff43ad7e3568fa4297fa6ceae5053a8439e677",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "70feee5c90d5f48fd4bdb6fe77add16b26d8ea230c4eaeda397f3c22bfecb761"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-5-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-10-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-15-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-20-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-25-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-40-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-50-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-75-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-OCU-ANTIPARRA-BANDA-PACK-DE-100-UNIDADES",
       "archivo": "antiparra-transparente.webp",
       "sha256Publicado": "c7d3a8188937e5337c471442b0b0b242dbee2ae238c16b8081e8a38262810d45",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "5008b7c21ea8da7dcdaef64e08b0e7b51a16dcac2dfb8f4e5703c2dbad939fd7"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-5-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-10-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-15-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-20-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-25-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-40-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-50-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-75-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-100-UNIDADES",
       "archivo": "tapones-espuma.webp",
       "sha256Publicado": "04bdb683ed1a3da9a9b1270637993256ea5e2f8697518d2c08a2479c20e12da2",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
+    },
+    {
+      "sku": "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES",
+      "archivo": "ilustrativa-aud-tapon.webp",
+      "sha256Publicado": "805a4e42cb53cbbf5047c2137619ed719b060a5e7f651668d587265caec14da6",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "c636caca57f77aed2273a25a0ceef5f7d10745d2f27ee117188e716c3ab46526"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-5-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-10-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-15-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-20-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-25-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-40-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-50-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-75-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
     },
     {
       "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-100-UNIDADES",
       "archivo": "tapones-aletas-cordon.webp",
       "sha256Publicado": "f12b64427e8f485e7d477c11594f8b76cd35b079dd725c137cdae524a19fe5f4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
+    },
+    {
+      "sku": "FP-DEMO-AUD-OREJERA-AMARILLO",
+      "archivo": "ilustrativa-aud.webp",
+      "sha256Publicado": "9d96986fc0b4997bfb2546a3cb7ff4851d8328429344fce6b191be35a7d41381",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "0e25988638855e79a1751579e660a2d218d6a95110c256b9842421a3b9d1ab40"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-38-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-39-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-40-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-41-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-42-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-43-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-44-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-45-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
     },
     {
       "sku": "FP-DEMO-CAL-BOTIN-46-AR",
       "archivo": "botin-trabajo-negro.webp",
       "sha256Publicado": "238470cd7e8f30435d4e6fe955de3c05c5124c444e368ba28460413d617df00f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-38-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-39-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-40-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-41-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-42-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-43-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-44-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-45-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BORCEGUI-46-AR",
+      "archivo": "borcegui-marron.webp",
+      "sha256Publicado": "39e0ec9b2f47a1bef6c6d8fcb12344b72d82afa2b742c577a59aaa29290b6de5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-38-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-39-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-40-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-41-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-42-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-43-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-44-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-45-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
     },
     {
       "sku": "FP-DEMO-CAL-ZAPATO-46-AR",
       "archivo": "zapato-trabajo-bajo.webp",
       "sha256Publicado": "848e08bb4ce501d006f6629ba076c2ef12458843e7776b527fdb06efd1abf13b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
+    },
+    {
+      "sku": "FP-DEMO-CAL-BOTA-PVC-38-AR",
+      "archivo": "ilustrativa-cal-bota-pvc.webp",
+      "sha256Publicado": "0f7293e5528643496fb04aa7c0fd4a9d392387fce9a41d0778810187bef4bef5",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "89a2a9d810e64651a68b0d72bb1efe079faa80416082060b9786f87c23a89c9a"
+    },
+    {
+      "sku": "FP-DEMO-ALT-BOLSO-ARNES-10-L",
+      "archivo": "ilustrativa-alt-bolso.webp",
+      "sha256Publicado": "6572bdd7de8eb00378eeea918f0674a896a4f3a47b30bd2ea01db85535d03ee1",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "7c431848edd90bf3ae64c4403bc5f8787701ea4f48e85ba9fa1bc2583b058d45"
+    },
+    {
+      "sku": "FP-DEMO-ALT-PROTECTOR-CINTA-150-MM",
+      "archivo": "ilustrativa-alt-protector.webp",
+      "sha256Publicado": "c1563c8a2939f05fa07d4164185c0a15db0fb8b0940169a6e1fbf16225549986",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "a5e361ec8e7f4e132e7a1f920e3f97550d40bce2df04f2ea7ca0957d7ab09bd2"
+    },
+    {
+      "sku": "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES",
+      "archivo": "ilustrativa-alt-etiqueta.webp",
+      "sha256Publicado": "9058e0e7e9910431de3704b83eca76535813bfe6695799e6e1da4da753df6621",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "0c12b80316700186d5c51d4ad0f3611a02f3255b9c7cd96107b1df5853fb07b8"
+    },
+    {
+      "sku": "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-AZUL",
+      "archivo": "ilustrativa-alt.webp",
+      "sha256Publicado": "eb94fa0741d217864e664e0fc5a38d6ab27cbeabf0769f0e6687458de95d9faf",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "0e42c757e964eff7286a1de995c0fddb18f359ec8a6a9f260ae71b33c0f26bae"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-18-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-23-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-25-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-35-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-45-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-50-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-60-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-70-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
     },
     {
       "sku": "FP-DEMO-CON-CONO-NARANJA-90-CM",
-      "archivo": "cono-naranja-30-cm.webp",
-      "sha256Publicado": "38f3d766ec6028d7c64f7419ea7475e2911710a81f193473aa2b8fa6c9fa303c",
+      "archivo": "ilustrativa-con.webp",
+      "sha256Publicado": "d5e19c2edbf30806a9d49bd2bdb22ed572c59ba863ec8ab2dec8bbd32527b8b3",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
+    },
+    {
+      "sku": "FP-DEMO-CON-CADENA-100-M",
+      "archivo": "ilustrativa-con-cadena.webp",
+      "sha256Publicado": "b32e4f05c5d1eba709623edeb8857692317c2e5e0bb6b790ab70e91de172605d",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "ddd40a39c30e65bcf43fe9e754913d87081eef00f2a97e09a487e28042a07236"
+    },
+    {
+      "sku": "FP-DEMO-CON-BARRA-CONOS-0-6-M",
+      "archivo": "ilustrativa-con-barra.webp",
+      "sha256Publicado": "80e2102f287e4c41b0b0004ad3b2307bdb6e2ff6557a593d3448e416d94c5c7f",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "3a693ccf3581dfb3c25de5f3e7f03a42b951dcb0cc7601240256ffe9066a1b2c"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA",
+      "archivo": "ilustrativa-cin-lisa.webp",
+      "sha256Publicado": "86a03d9587abb56e221003cb603508b9a9ba210393fbfa4577b1ae6ff888e931",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "b768c4add49e3afc2cdb53a41df915f0c6317c94a9179f6b9ac1f137d76dd717"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-PISO-AMARILLA",
+      "archivo": "ilustrativa-cin-lisa.webp",
+      "sha256Publicado": "86a03d9587abb56e221003cb603508b9a9ba210393fbfa4577b1ae6ff888e931",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "b768c4add49e3afc2cdb53a41df915f0c6317c94a9179f6b9ac1f137d76dd717"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-VISUAL-12-MM",
+      "archivo": "ilustrativa-cin-lisa.webp",
+      "sha256Publicado": "86a03d9587abb56e221003cb603508b9a9ba210393fbfa4577b1ae6ff888e931",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "b768c4add49e3afc2cdb53a41df915f0c6317c94a9179f6b9ac1f137d76dd717"
+    },
+    {
+      "sku": "FP-DEMO-CIN-CINTA-TEXTO-100-M",
+      "archivo": "ilustrativa-cin.webp",
+      "sha256Publicado": "ffd74d86f6e42ca2551865f57e7aa8e929ddee5632a17ae87ba9beb473efc72e",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "c28773ccca8ae17d97f5c9121f642e728fba6dc2f8cc4ff30597a1dbb88a78fa"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M3",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M4",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M5",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M6",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M8",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M10",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M12",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M14",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-TUERCA-M16",
       "archivo": "tuercas-hexagonales.webp",
       "sha256Publicado": "4511882245bdc9fa48848ad43b50359b1fdc3d1acce0526eac9cb6cd1687adfe",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "ce1ca41c312dd98642ff1e646681a716fe0073c818ec558633bc4438af638c27"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M3",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M4",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M5",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M6",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M8",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M10",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M12",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M14",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-TOR-ARANDELA-PLANA-M16",
       "archivo": "arandela-plana.webp",
       "sha256Publicado": "8439b23c82489aeaa9142a9fb98291e0987a4b8a8f561e657e691df831a833e5",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "1092acf11fc159c320e0303b2ac28a38f507c44f292d6f25d40d197f2f446c82"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-4-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-5-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-6-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-7-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-8-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-10-MM",
-      "archivo": "tarugo-nailon.webp",
-      "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
+      "archivo": "ilustrativa-fij-tarugo.webp",
+      "sha256Publicado": "be737b0395cd65836e72a60f0f12281d33404d5bde892197bed22450a1685813",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "d537dc500570b9c16d3115b44b6d56152c21e5df0bfd244e4e0757eba1b6ddd5"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-12-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-14-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
     },
     {
       "sku": "FP-DEMO-FIJ-TARUGO-NYLON-16-MM",
       "archivo": "tarugo-nailon.webp",
       "sha256Publicado": "ca9046cab50c78f637e3709de5cc90b361cf7adb627fdf1e180641e9113dd43b",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "f3450ca17680ea3ea9878614f696bbe313864024d352b7cf11c9d73e59e4f36d"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-VARILLA-M10",
+      "archivo": "ilustrativa-fij-varilla.webp",
+      "sha256Publicado": "4374bce8ff0aca40e869ed8416c2bec42d5813127e9bcfb686625824e751f19d",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "584b0c2a39f507d55e357b0445d536533350f8b3a98ae15ba5f5fb123c1c8bd1"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-ANCLAJE-M10",
+      "archivo": "ilustrativa-fij-anclaje.webp",
+      "sha256Publicado": "b55bebfea24fca616526843274a3faefc780072e51debdd95629d971cc163998",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "ca03309843a38ea7821c102568eb71a45e6ce8f3ab88eecef89709995d99abeb"
+    },
+    {
+      "sku": "FP-DEMO-FIJ-ABRAZADERA-12-MM",
+      "archivo": "ilustrativa-fij-abrazadera.webp",
+      "sha256Publicado": "1de82482f91affdbc283a242bbc188143e877847dea49cd188084beeefd8f4e3",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "cf02362a2b15a55909ec4d3f308870b5746e46d77aa761def37b3f413e95d033"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
+      "archivo": "ilustrativa-cab-negro.webp",
+      "sha256Publicado": "db12003d3b8f99bf04025df1e798a417780a651095f153408228cc71fd149064",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "7c8674632695b3e21723e45d9ef1c8ffda992279d69996596a289808ed3c3369"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-AZUL-0-5-MM2",
+      "archivo": "ilustrativa-cab.webp",
+      "sha256Publicado": "4ed780f91f9360e40b6b273518eebea093bdd090b512dd0f880fee765cce431a",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "75b6dc94118a58863671ed8024426f154a258ca9b210362c163264ca995816c7"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-MARRON-0-5-MM2",
+      "archivo": "ilustrativa-cab-marron.webp",
+      "sha256Publicado": "0e071e192136d4141e8acaf5da02978389dd813034a287b288c0bc07148acb96",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "e5a605dcc4d9445bf53c1945ed0855717d3214f087ffc1af393223f226f6f893"
+    },
+    {
+      "sku": "FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2",
+      "archivo": "ilustrativa-cab-bipolar.webp",
+      "sha256Publicado": "298843c1391ab992df7aa3e305614dc10c023d9642ee53d6cac685168e44ebc4",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "f0e7fd128fad9859aa9074ad50b99b4e8b8cecd4df52e112f290efb10c7689cd"
+    },
+    {
+      "sku": "FP-DEMO-ADH-COLA-100-ML",
+      "archivo": "ilustrativa-adh-cola.webp",
+      "sha256Publicado": "aad26b70e6fe9ffbf01c8827bfaa424611c139b78590e5df6671e115b1f992ff",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "c2753fc17893e76cd5281cc05e6fa9586da68fecd29d0d99ae352d3d18da885c"
+    },
+    {
+      "sku": "FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS",
+      "archivo": "ilustrativa-adh-sellador.webp",
+      "sha256Publicado": "2d3be82a4d6c18ccc275c43ea709cc2a5acdd772d5085272e0092e96cb49f520",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "cc939f7ed89c68148ee6ce17a1c27e31f99aa2cef36bbd3b4099e2118ab1115b"
+    },
+    {
+      "sku": "FP-DEMO-ADH-CONTACTO-100-ML",
+      "archivo": "ilustrativa-adh.webp",
+      "sha256Publicado": "14922ce30b4c60211b584093cdf2b7b5fac88b29f08787de82145b69badd0d24",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "c228e266796e11de01d8fdc3786316e36a8a11997c62c5ead4660c4a4094cc8a"
+    },
+    {
+      "sku": "FP-DEMO-ADH-CINTA-DOBLE-12-MM",
+      "archivo": "ilustrativa-adh-cinta.webp",
+      "sha256Publicado": "3fbc053324cab98fc06b6819facdad653b68a867af676cf17afbd10f95a8d04a",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "94809838fb2139d07e5c8bd9759825f5e016694c5917f30e2d5f53b3bc247e0b"
+    },
+    {
+      "sku": "FP-DEMO-ABR-DISCO-METAL-100-MM",
+      "archivo": "ilustrativa-abr-corte.webp",
+      "sha256Publicado": "b6630a5f4033be24818004568d8f0a90ef30e66932b6d8840457acf9892527cd",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "eaaf6eb24a9f2817fcb720723de911147aff74fd8ea768cf542af9a2621602b2"
+    },
+    {
+      "sku": "FP-DEMO-ABR-DISCO-METAL-125-MM",
+      "archivo": "disco-corte-metal.webp",
+      "sha256Publicado": "f0e81702c3701497761e5e859f47757bddb8b7042ce1dd2752ac4cfd85a86d7a",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "b33b41aa63e6b87fc025d4328452d2c5a8d60a493453e1983e7c106b8b7e0bc7"
+    },
+    {
+      "sku": "FP-DEMO-ABR-LIJA-MADERA-GRANO-100",
+      "archivo": "ilustrativa-abr-hoja.webp",
+      "sha256Publicado": "ce6650b59f542689333bf2c96a21f482fbee7a325ed9ba4fdcf2aa7f3450c03d",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "b51861dd1634ac5e1aec37a4cf0588be1dc204ded7fb882eb182ca92f679236a"
+    },
+    {
+      "sku": "FP-DEMO-ABR-LIJA-AGUA-GRANO-1000",
+      "archivo": "ilustrativa-abr-hoja.webp",
+      "sha256Publicado": "ce6650b59f542689333bf2c96a21f482fbee7a325ed9ba4fdcf2aa7f3450c03d",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "b51861dd1634ac5e1aec37a4cf0588be1dc204ded7fb882eb182ca92f679236a"
+    },
+    {
+      "sku": "FP-DEMO-ABR-DISCO-LIJA-100-MM",
+      "archivo": "ilustrativa-abr.webp",
+      "sha256Publicado": "14c447dd62cad7b45643ecbe12c3aa86e6d930ef092e73f63ef436e0b922bd7a",
+      "http": 200,
+      "mime": "image/webp",
+      "sha256Origen": "ae949a2e48ca97f5c31ff84adb4a1f5594df5ca410976f11deae9e0cab505b6e"
     },
     {
       "sku": "FP-DEMO-MEC-MECHA-HSS-3-MM",
       "archivo": "mecha-hss-3mm.webp",
       "sha256Publicado": "d40e4635cd7a4ed8ff206b7cb0bb3cf805aa44a691d5590e1302392d708b4ad4",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "e548df084e8e63f0c3b4efd3324eb0f0ac5b568fc5f8407cdf91538d84570d08"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-80-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-100-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-120-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-150-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-180-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-200-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-250-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-300-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-PRECINTO-370-MM",
       "archivo": "precinto-negro.webp",
       "sha256Publicado": "717c3d2d577fb2d4deae9ced2aa22e8fe0293256053c12abfabcdd593b660852",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "8f35871600da46551b453beb96a3220ef168b84e7865cb195147e0273f1b9b62"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-5-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-10-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-15-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-20-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-25-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-40-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-50-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-75-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     },
     {
       "sku": "FP-DEMO-SUM-CEPILLO-PACK-DE-100-UNIDADES",
       "archivo": "cepillo-alambre.webp",
       "sha256Publicado": "db147887a9d33c73d6ea4068deaa0d06de16f14d50e7c78d4467460cf92bd17f",
       "http": 200,
-      "mime": "image/webp"
+      "mime": "image/webp",
+      "sha256Origen": "12ee1b6a273d32ac8b5cb294b5ac9bf2532e911b8c5a67007f2af95b6d963052"
     }
   ],
-  "conImagenVerificada": 132,
-  "pendientesDeImagen": 772,
-  "archivosFotograficos": 19,
-  "gruposPendientes": 295,
-  "asociacionesConservadasAlRepetir": 132,
+  "conImagenVerificada": 182,
+  "pendientesDeImagen": 722,
+  "archivosFotograficos": 22,
+  "gruposPendientes": 286,
+  "asociacionesConservadasAlRepetir": 182,
   "vistasConFotoVerificada": [
     "Home",
     "catálogo",
