@@ -75,7 +75,7 @@ test('alta y reemplazo con vista previa, estado de carga y catálogo a 360 px', 
     baseURL: new URL(page.url()).origin, viewport: { width: 360, height: 780 },
   })
   try {
-    await expectLoaded(page.getByRole('img', { name, exact: true }), 24)
+    await expectLoaded(page.getByRole('rowheader', { name, exact: true }).locator('img[alt=""]'), 24)
     const visitor = await visitorContext.newPage()
     await visitor.goto('/catalogo?busqueda=' + code)
     await expectLoaded(visitor.getByRole('img', { name, exact: true }), 24)
