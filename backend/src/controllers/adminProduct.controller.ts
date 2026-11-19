@@ -14,7 +14,7 @@ import {
 
 export const getProducts = async (_req: Request, res: Response) => {
     try {
-        const products = await listAdminProducts();
+        const products = await listAdminProducts(res.locals.dto.query);
         return res.status(200).json(products);
     } catch (error) {
         console.error('Error al listar productos:');
