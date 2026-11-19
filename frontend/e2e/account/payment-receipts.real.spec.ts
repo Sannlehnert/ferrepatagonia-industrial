@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=',
@@ -33,8 +34,11 @@ async function download(page: Page, row: Locator) {
   expect(await readFile(await file.path())).toEqual(png)
 }
 
-async function openOrder(page: Page) {
+async function openOrder(page: Page, beforeDetail?: () => Promise<unknown>) {
   await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByRole('button', { name: /^Ver detalle de PED-/ })).toBeVisible()
+  await expect(page.getByText('Consultando estados de comprobantes…', { exact: true })).toHaveCount(0)
+  await beforeDetail?.()
   await page.getByRole('button', { name: /^Ver detalle de PED-/ }).click()
   return page.getByRole('region', { name: 'Comprobantes de pago' })
 }
@@ -154,7 +158,7 @@ test('permite reintentar la consulta y la carga después de un error', async ({
   let failRead = true
   let failUpload = true
 
-  await page.route(/\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/, async route => {
+  const interceptDetail = () => page.route(/\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/, async route => {
     const method = route.request().method()
 
     if (method === 'GET' && failRead) {
@@ -180,7 +184,7 @@ test('permite reintentar la consulta y la carga después de un error', async ({
     await route.continue()
   })
 
-  const region = await openOrder(page)
+  const region = await openOrder(page, interceptDetail)
   await expect(region.getByRole('alert')).toHaveText(
     'No se pudieron cargar los comprobantes.',
   )
@@ -288,7 +292,7 @@ test('descarta una consulta de comprobantes de la sesión anterior', async ({
   let delayed = false
   let previousOrderPath = ''
 
-  await page.route(
+  const interceptDetail = () => page.route(
     /\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/,
     async route => {
       if (route.request().method() !== 'GET' || delayed) {
@@ -307,7 +311,7 @@ test('descarta una consulta de comprobantes de la sesión anterior', async ({
   )
 
   try {
-    const previousRegion = await openOrder(page)
+    const previousRegion = await openOrder(page, interceptDetail)
     await readStarted
 
     await expect(previousRegion.getByRole('status')).toHaveText(
@@ -353,3 +357,187 @@ test('descarta una consulta de comprobantes de la sesión anterior', async ({
     releaseRead()
   }
 })
+
+for (const width of [1280, 360]) {
+  test(`listado y detalle comparten comprobantes persistidos a ${width} px`, async ({ page, browser }) => {
+    test.setTimeout(45_000)
+    await page.setViewportSize({ width, height: 850 })
+    await page.addInitScript(() => {
+      localStorage.setItem('ferrepatagonia_uploaded_receipts', '[1,999999]')
+    })
+    await signIn(page, 'cliente@e2e.test')
+    const orders = await page.request.get('/api/pedidos')
+    expect(orders.ok()).toBe(true)
+    const order = (await orders.json()).data.items[0]
+    const path = `/api/pedidos/${order.pedidoId}/comprobantes`
+    const before = await page.request.get(path)
+    expect(before.ok()).toBe(true)
+    const previousReceipts = (await before.json()).data.items
+    const initialStatus = previousReceipts.some((item: { estadoRevision: string }) =>
+      item.estadoRevision === 'PENDIENTE') ? 'Pendiente de revisión'
+      : previousReceipts.length ? 'Revisado' : 'No adjunto'
+
+    await page.goto('/mi-cuenta/pedidos')
+    const row = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: order.numero, exact: true }),
+    })
+    await expect(row.getByText(initialStatus, { exact: true })).toBeVisible()
+    const opener = row.getByRole('button', { name: `Ver comprobantes de ${order.numero}` })
+    await opener.click()
+    const dialog = page.getByRole('dialog', { name: `Comprobantes · ${order.numero}` })
+    const receipts = dialog.getByRole('region', { name: 'Comprobantes de pago' })
+
+    // Un PNG distinto por escenario evita que la deduplicación reutilice el archivo de otro test.
+    const sharp = createRequire(import.meta.url)('../../../backend/node_modules/sharp')
+    const image: Buffer = await sharp({ create: {
+      width: 2, height: 2, channels: 3, background: { r: width === 1280 ? 30 : 80, g: 120, b: 40 },
+    } }).png().toBuffer()
+    await receipts.getByLabel(/Archivo \(PDF/).setInputFiles({
+      name: 'comprobante-327.png', mimeType: 'image/png', buffer: image,
+    })
+    const savedResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === path && response.request().method() === 'POST')
+    await receipts.getByRole('button', { name: 'Adjuntar comprobante' }).click()
+    const saved = await savedResponse
+    expect(saved.status()).toBe(201)
+    const receiptId = (await saved.json()).data.id
+    const href = `${path}/${receiptId}`
+    await expect(receipts.getByText('Comprobante recibido. La acreditación del pago se gestiona por separado.')).toBeVisible()
+    await expect(row.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+
+    const downloaded = page.waitForEvent('download')
+    await receipts.locator('a').filter({ hasText: 'Descargar comprobante' })
+      .and(receipts.locator(`a[href="${href}"]`)).click()
+    expect(await readFile(await (await downloaded).path())).toEqual(image)
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(opener).toBeFocused()
+
+    await row.getByRole('button', { name: `Ver detalle de ${order.numero}`, exact: true }).click()
+    const detailReceipts = row.getByRole('region', { name: 'Comprobantes de pago' })
+    await expect(detailReceipts.locator(`a[href="${href}"]`)).toBeVisible()
+    await expect(detailReceipts.getByText('Pendiente de revisión', { exact: true }).first()).toBeVisible()
+
+    const admin = await browser.newPage()
+    try {
+      await signIn(admin, 'admin@e2e.test')
+      await admin.getByRole('link', { name: 'Comprobantes de pago', exact: true }).click()
+      const pendingIds = previousReceipts
+        .filter((item: { estadoRevision: string }) => item.estadoRevision === 'PENDIENTE')
+        .map((item: { id: string }) => item.id)
+      for (const id of [...pendingIds, receiptId]) {
+        const adminRow = admin.getByRole('listitem').filter({
+          has: admin.locator(`a[href="/api/admin/comprobantes/${id}"]`),
+        })
+        await adminRow.getByRole('button', { name: 'Marcar revisado' }).click()
+        await expect(adminRow.getByText('Revisado', { exact: true })).toBeVisible()
+      }
+    } finally {
+      await admin.close()
+    }
+
+    await page.reload()
+    await expect(row.getByText('Revisado', { exact: true })).toBeVisible()
+    await page.getByLabel('Estado del Comprobante').selectOption('REVISADO')
+    await expect(row).toBeVisible()
+    await page.getByLabel('Estado del Comprobante').selectOption('NO_ADJUNTO')
+    await expect(row).toHaveCount(0)
+    await page.getByRole('button', { name: 'Limpiar filtros' }).click()
+    await expect(row).toBeVisible()
+    expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+  })
+}
+
+test('un error de consulta no se presenta como ausencia de comprobantes', async ({ page }) => {
+  await signIn(page, 'cliente@e2e.test')
+  let fail = true
+  await page.route(/\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/, async route => {
+    if (fail && route.request().method() === 'GET') {
+      await route.fulfill({ status: 503, json: { message: 'Consulta no disponible.' } })
+    } else {
+      await route.continue()
+    }
+  })
+  await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByText('Estado no disponible', { exact: true })).toBeVisible()
+  await expect(page.getByRole('listitem').getByText('No adjunto', { exact: true })).toHaveCount(0)
+  fail = false
+  await page.getByRole('button', { name: 'Reintentar estados de comprobantes', exact: true }).click()
+  await expect(page.getByRole('listitem').getByText('Revisado', { exact: true })).toBeVisible()
+  await expect(page.getByText('Estado no disponible', { exact: true })).toHaveCount(0)
+})
+
+for (const client of [
+  { email: 'cliente@e2e.test', other: 'empresa-cuenta@e2e.test', company: false },
+  { email: 'empresa-cuenta@e2e.test', other: 'cliente@e2e.test', company: true },
+]) {
+  test(`transferencia y comprobante privado en historial: ${client.email}`, async ({ page, browser }) => {
+    test.setTimeout(60_000)
+    await page.route('**/socket.io/**', route => route.abort())
+    await signIn(page, client.email)
+    const before = client.company ? (await (await page.request.get('/api/cuenta-corriente')).json()).data : null
+    await page.goto('/catalogo?busqueda=E2E-24')
+    const card = page.locator('li').filter({
+      has: page.getByRole('heading', { name: 'Producto E2E 24', exact: true }),
+    })
+    const added = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/carrito/items' && response.request().method() === 'POST')
+    await card.getByRole('button', { name: 'Agregar', exact: true }).click()
+    expect((await added).status()).toBe(204)
+    await page.goto('/carrito')
+
+    const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+    await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+    if (client.company) {
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
+    } else {
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+    }
+    const submitted = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/pedidos/transferencia' &&
+      response.request().method() === 'POST')
+    await summary.getByRole('button', { name: 'Confirmar pedido por transferencia' }).click()
+    const response = await submitted
+    expect(response.status()).toBe(201)
+    const orderId: number = (await response.json()).data.pedidoId
+    await expect(page.getByRole('status').filter({
+      hasText: 'El pago por transferencia está pendiente de acreditación',
+    })).toContainText('no significa que el pago haya sido aprobado')
+    await expect(page.getByRole('region', { name: 'Comprobantes de pago' })).toBeVisible()
+
+    await page.goto('/mi-cuenta/pedidos')
+    const history = (await (await page.request.get('/api/pedidos')).json()).data.items
+    const savedOrder = history.find((order: { pedidoId: number }) => order.pedidoId === orderId)
+    expect(savedOrder).toBeDefined()
+    const orderNumber: string = savedOrder.numero
+    const row = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: orderNumber, exact: true }),
+    })
+    await expect(row.getByText('No adjunto', { exact: true })).toBeVisible()
+    await row.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
+    const detailReceipts = row.getByRole('region', { name: 'Comprobantes de pago' })
+    await expect(detailReceipts).toBeVisible()
+    await upload(detailReceipts)
+    await expect(row.getByRole('row').first().getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+
+    await row.getByRole('button', { name: `Ver comprobantes de ${orderNumber}` }).click()
+    const dialog = page.getByRole('dialog', { name: `Comprobantes · ${orderNumber}` })
+    await expect(detailReceipts).toHaveCount(0)
+    await expect(dialog.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(detailReceipts).toBeVisible()
+
+    const other = await browser.newPage()
+    try {
+      await signIn(other, client.other)
+      expect((await other.request.get(`/api/pedidos/${orderId}/comprobantes`)).status()).toBe(404)
+    } finally {
+      await other.close()
+    }
+    if (before) {
+      const after = (await (await page.request.get('/api/cuenta-corriente')).json()).data
+      expect({ saldo: after.saldo, revision: after.revision }).toEqual({ saldo: before.saldo, revision: before.revision })
+    }
+  })
+}
