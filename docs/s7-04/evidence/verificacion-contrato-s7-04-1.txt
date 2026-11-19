@@ -1027,3 +1027,29 @@ ok 20 - el perfil de pedidos rechaza un destino distinto aun con ALLOW_DEV_DB
 # skipped 0
 # todo 0
 # duration_ms 6267.2056
+
+=== VERIFICACIÓN CONCURRENTE H01 [P2] — ARMONIZACIÓN §10 CON FER-20 (T-S7-04.1 #316 / HU-S7-04 #290) ===
+Fecha UTC: 2026-11-19T05:13:20Z
+Rama: feature/s7-04-1-order-payment-state-contract
+Commit base: ab98e66abfc659e7711ab41a616683d42f848d9d
+
+--- 9. Ensayo concurrente controlado en MariaDB 11.4 descartable (cc260-disposable.cjs) ---
+
+{"suite":"H01-concurrency-verification","database":"cc260_test_08221ede8ea24c18a00342fc4e91c920","host":"127.0.0.1","port":57678,"container":"cc260-test-08221ede8ea24c18a00342fc4e91c920","version":"11.4.13-MariaDB-ubu2404","image":"sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6","migrationApplications":2}
+PASS [Control H01 - orden antiguo invertido]: ER_LOCK_DEADLOCK (1213) reproducido determinísticamente -> {"tx1":{"outcome":"ERROR","errno":1213,"code":"ER_LOCK_DEADLOCK","sqlState":"40001"},"tx2":{"outcome":"OK"}}
+PASS [Escenario A - orden armonizado FER-20 vs §10.3]: 0 deadlocks (1 carrera sincronizada + 10 carreras concurrentes), serialización verificada -> {"events":["tx1:locked_cc","tx2:preread_no_lock","tx1:abono_registrado:2","tx1:committed","tx2:locked_cc_after_tx1","tx2:committed"],"deadlocks":0,"resumenA":{"total_cargos":"350.00","total_abonos":"150.00","deuda_vigente":"200.00","credito_disponible":"800.00"},"abonoCount":1}
+PASS [Escenario B - revalidación bajo lock]: estado concurrente (ACREDITADO / RECHAZADO) y cambio de destino detectados y rechazados limpiamente -> {"subcasoB1":{"tx1":{"outcome":"ACREDITADO","movId":3},"tx2":{"outcome":"RECHAZADO_TRANSICION_PAGO_INVALIDA","estadoObservadoBajoLock":"ACREDITADO"}},"subcasoB2":{"tx1":{"outcome":"RECHAZADO"},"tx2":{"outcome":"RECHAZADO_TRANSICION_PAGO_INVALIDA","estadoObservadoBajoLock":"RECHAZADO"}},"subcasoB3":{"outcome":"ABORTADO_CAMBIO_DESTINO","esperadoCC":1,"actualCC":2},"resumenFinal":{"total_cargos":"350.00","total_abonos":"250.00","deuda_vigente":"100.00","credito_disponible":"900.00"},"abonoCountFinal":2}
+CLEANUP OK #260: contenedor cc260-test-08221ede8ea24c18a00342fc4e91c920 eliminado, datos tmpfs, sin volumen persistente.
+Verificación Docker residual (docker ps -a --filter label=ferrepatagonia.cc260-test): 0 contenedores activos o detenidos.
+
+--- 10. Type-check TypeScript (npm --prefix backend run type-check) ---
+
+> ferrepatagonia-backend@0.1.0 type-check
+> tsc --noEmit
+
+Exit code: 0
+
+--- 11. Verificación de higiene de diff (git diff --check) ---
+
+git diff --check
+Exit code: 0 (sin errores de espacios al final de línea ni conflictos)
