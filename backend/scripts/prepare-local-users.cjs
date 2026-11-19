@@ -6,7 +6,7 @@
 //
 // Reglas de seguridad:
 // - Solo NODE_ENV=development. Nunca test ni production.
-// - Identifica la instalacion completa antes de escribir: 24 tablas,
+// - Identifica la instalacion completa antes de escribir: 25 tablas,
 //   siete triggers y la vista de auditoria FER-17. Las bases parciales
 //   o anteriores se rechazan sin mutaciones.
 // - Nunca actualiza ni borra filas existentes: si el email ya tiene USUARIO lo

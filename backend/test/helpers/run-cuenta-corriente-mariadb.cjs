@@ -10,11 +10,12 @@ const backend = path.resolve(__dirname, '../..');
 async function run(mode = process.argv[2] || 'all') {
   assert.ok([
     'all', 'baseline', 'cleanup-success',
-    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets', 'receipts',
+    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets', 'receipts', 'transfer-orders',
   ].includes(mode));
   const acceptance = mode === 'orders-acceptance';
   const sockets = mode === 'orders-sockets';
-  const orders = sockets || acceptance || mode === 'orders';
+  const transferOnly = mode === 'transfer-orders';
+  const orders = sockets || acceptance || transferOnly || mode === 'orders';
   const receipts = mode === 'receipts';
   const p = newProfile();
   let session, child, storage, interrupted = false;
@@ -41,7 +42,7 @@ async function run(mode = process.argv[2] || 'all') {
       if (result.status !== 0) throw Error(`SQL ${path.basename(file)}: ${result.stderr}`);
     };
     apply(path.join(backend, '../database/schema.sql'));
-    if (receipts) {
+    if (receipts || orders) {
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-275-payment-receipts.sql'));
       storage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-test-'));
     }
@@ -52,11 +53,19 @@ async function run(mode = process.argv[2] || 'all') {
           backend,
           '../database/migrate-fer-20-order-confirmation.sql',
         ));
+        for (let i = 0; i < 2; i++) {
+          apply(path.join(
+            backend,
+            '../database/migrate-s7-06-1-transfer-order-confirmation.sql',
+          ));
+        }
       }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
     const files = receipts ? ['test/payment-receipts.test.cjs'] : sockets
       ? ['test/order-sockets.integration.test.cjs']
+      : transferOnly
+      ? ['test/transfer-order.mariadb.test.cjs']
       : acceptance
       ? ['test/account-order-http.test.cjs', 'test/account-order-transaction.test.cjs']
       : orders
@@ -73,6 +82,7 @@ async function run(mode = process.argv[2] || 'all') {
           'test/account-order-process.test.cjs',
           'test/client-orders.test.cjs',
           'test/order-history-load.test.cjs',
+          'test/transfer-order.mariadb.test.cjs',
         ]
       : mode === 'baseline'
         ? ['test/cc260.regression.test.cjs']
