@@ -1,7 +1,7 @@
 import type { LocationQueryRaw } from 'vue-router'
 
 export const CATALOG_ORDER_OPTIONS = [
-  { value: 'predeterminado', label: 'Relevancia' },
+  { value: 'predeterminado', label: 'Predeterminado' },
   { value: 'nombre_asc', label: 'Nombre: A a Z' },
   { value: 'nombre_desc', label: 'Nombre: Z a A' },
   { value: 'precio_asc', label: 'Precio: menor a mayor' },

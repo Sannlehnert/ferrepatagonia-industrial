@@ -244,11 +244,11 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="fp-shell py-6 sm:py-9">
-    <p class="m-0 mb-2 text-xs text-slate-500">
+    <p class="m-0 mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
       Inicio /
       <RouterLink
         v-if="categoriaId"
-        class="fp-focus text-[var(--fp-blue)]"
+        class="fp-focus box-border inline-flex min-h-11 items-center px-1 text-[var(--fp-blue)]"
         :to="{ name: 'catalogo', query: { ...route.query, categoria: undefined, page: undefined } }"
       >Catálogo</RouterLink>
       <template v-else>Catálogo</template>
@@ -260,16 +260,19 @@ onBeforeUnmount(() => {
         <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
         <p class="fp-section-copy">{{ total }} productos</p>
       </div>
-      <div>
+      <div class="w-full min-[801px]:w-auto">
+        <label for="catalog-order" class="mb-1 block text-sm font-medium text-[var(--fp-navy)]">
+          Ordenar por
+        </label>
         <select
+          id="catalog-order"
           :value="orden"
-          class="fp-focus box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-          aria-label="Ordenar productos"
+          class="fp-focus box-border min-h-11 w-full rounded-md border border-[var(--fp-control-line)] bg-white px-3 py-2 text-base text-[var(--fp-navy)] sm:text-sm"
           :aria-describedby="orden.startsWith('precio_') ? 'catalog-order-help' : undefined"
           @change="cambiarOrden"
         >
           <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
-            Ordenar: {{ option.label }}
+            {{ option.label }}
           </option>
         </select>
         <p
@@ -375,7 +378,7 @@ onBeforeUnmount(() => {
         >
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
+            class="fp-focus box-border min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasPrevious"
             @click="cambiarPagina(pagina - 1)"
           >
@@ -384,7 +387,7 @@ onBeforeUnmount(() => {
           <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
+            class="fp-focus box-border min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasNext"
             @click="cambiarPagina(pagina + 1)"
           >
