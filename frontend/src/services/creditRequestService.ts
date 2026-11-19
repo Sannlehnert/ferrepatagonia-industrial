@@ -27,6 +27,18 @@ export async function createClientCreditRequest(
     return response.data.data.solicitud
 }
 
+export function isDefinitiveCreditRequestRejection(error: unknown): boolean {
+    if (!axios.isAxiosError<{ code?: string }>(error)) return false
+    const status = error.response?.status
+    return status === 400 || status === 422 ||
+        (status === 409 && error.response?.data?.code === 'SOLICITUD_PENDIENTE')
+}
+
+export function isPendingCreditRequestConflict(error: unknown): boolean {
+    return axios.isAxiosError<{ code?: string }>(error) &&
+        error.response?.status === 409 && error.response.data?.code === 'SOLICITUD_PENDIENTE'
+}
+
 export function creditRequestErrorMessage(error: unknown): string {
     if (!axios.isAxiosError<{ code?: string; message?: string }>(error)) {
         return 'No se pudo completar la operación de crédito. Intentá nuevamente.'

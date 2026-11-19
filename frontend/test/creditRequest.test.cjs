@@ -94,7 +94,7 @@ test('no consulta solicitudes ni ofrece formulario a empresas no aprobadas', asy
             },
         })
 
-        const html = await renderToString(createSSRApp(panel))
+        const html = await renderToString(createSSRApp(panel, { refreshVersion: 0 }))
 
         assert.match(html, message)
         assert.match(html, /no es elegible/)

@@ -5,10 +5,13 @@ import {
     createClientCreditRequest,
     creditRequestErrorMessage,
     getClientCreditRequests,
+    isDefinitiveCreditRequestRejection,
+    isPendingCreditRequestConflict,
 } from '@/services/creditRequestService'
 import type { CreateCreditRequestPayload, CreditRequest } from '@/types/creditRequest'
 import { formatInstant, formatUsd } from '@/utils/cuentaCorriente'
 
+const props = defineProps<{ refreshVersion: number }>()
 const auth = useAuthStore()
 const requests = ref<CreditRequest[]>([])
 const loading = ref(false)
@@ -21,10 +24,13 @@ const plazoDias = ref<30 | 60>(30)
 const observaciones = ref('')
 const retrySubmission = ref<{ key: string; payload: CreateCreditRequestPayload } | null>(null)
 let loadId = 0
+let submitId = 0
 
 const isCompany = computed(() => auth.user?.tipo_cliente === 'EMPRESA')
 const approvalStatus = computed(() => auth.user?.estadoAprobacionEmpresa)
-const canRequest = computed(() => isCompany.value && approvalStatus.value === 'APROBADA')
+const canRequest = computed(() => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.loggingOut &&
+    isCompany.value && approvalStatus.value === 'APROBADA')
+const identity = () => `${auth.user?.id ?? ''}:${auth.sessionVersion}:${canRequest.value}`
 const pendingRequest = computed(() => requests.value.some(request => request.estado === 'PENDIENTE'))
 
 async function loadRequests() {
@@ -48,13 +54,26 @@ async function loadRequests() {
 }
 
 watch(
-    () => `${auth.user?.id ?? ''}:${auth.sessionVersion}:${canRequest.value}`,
-    () => void loadRequests(),
-    { immediate: true },
+    identity,
+    () => {
+        submitId += 1
+        submitting.value = false
+        retrySubmission.value = null
+        submitError.value = ''
+        successMessage.value = ''
+        montoSolicitado.value = ''
+        plazoDias.value = 30
+        observaciones.value = ''
+        void loadRequests()
+    },
+    { immediate: true, flush: 'sync' },
 )
+
+watch(() => props.refreshVersion, () => void loadRequests())
 
 onBeforeUnmount(() => {
     loadId += 1
+    submitId += 1
 })
 
 function requestStatusLabel(status: CreditRequest['estado']): string {
@@ -99,20 +118,31 @@ async function submitRequest() {
     submitting.value = true
     submitError.value = ''
     successMessage.value = ''
+    const currentSubmit = ++submitId
+    const currentIdentity = identity()
+    const valid = () => currentSubmit === submitId && currentIdentity === identity() && canRequest.value
+    const attempt = retrySubmission.value
     try {
         const created = await createClientCreditRequest(
-            retrySubmission.value.payload,
-            retrySubmission.value.key,
+            attempt.payload,
+            attempt.key,
         )
+        if (!valid()) return
+        loadId += 1
+        loading.value = false
+        loadError.value = ''
         requests.value = [created, ...requests.value.filter(request => request.id !== created.id)]
         retrySubmission.value = null
         montoSolicitado.value = ''
         observaciones.value = ''
         successMessage.value = 'Solicitud registrada. El equipo comercial debe revisarla; no se aprobó automáticamente.'
     } catch (error: unknown) {
+        if (!valid()) return
         submitError.value = creditRequestErrorMessage(error)
+        if (isDefinitiveCreditRequestRejection(error)) retrySubmission.value = null
+        if (isPendingCreditRequestConflict(error)) void loadRequests()
     } finally {
-        submitting.value = false
+        if (valid()) submitting.value = false
     }
 }
 </script>
@@ -138,6 +168,10 @@ async function submitRequest() {
         <template v-else>
             <p class="mb-4 text-slate-600">
                 Enviá el monto y plazo que necesitás. La solicitud queda pendiente de evaluación y no habilita crédito automáticamente.
+            </p>
+            <p v-if="submitError" role="alert"
+                class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-800">
+                {{ submitError }}
             </p>
             <p v-if="loading" role="status" class="mb-4">Consultando tus solicitudes de crédito…</p>
             <div v-else-if="loadError" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
@@ -173,6 +207,9 @@ async function submitRequest() {
                     Ya hay una solicitud pendiente. Podrás enviar otra cuando se resuelva.
                 </p>
                 <form v-else class="grid gap-4 sm:grid-cols-2" @submit.prevent="submitRequest">
+                    <p v-if="retrySubmission" role="status" class="m-0 text-sm text-slate-700 sm:col-span-2">
+                        El resultado del envío no está confirmado. Reintentá con los mismos datos para evitar solicitudes duplicadas.
+                    </p>
                     <label class="grid gap-1 text-sm font-medium" for="credit-amount">
                         Monto solicitado (USD)
                         <input id="credit-amount" v-model="montoSolicitado" required
@@ -199,10 +236,6 @@ async function submitRequest() {
                             :disabled="submitting || retrySubmission !== null"
                             class="rounded-md border border-slate-300 px-3 py-2 font-normal"></textarea>
                     </label>
-                    <p v-if="submitError" role="alert"
-                        class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 sm:col-span-2">
-                        {{ submitError }}
-                    </p>
                     <p v-if="successMessage" role="status"
                         class="m-0 rounded-md border border-green-200 bg-green-50 p-3 text-green-800 sm:col-span-2">
                         {{ successMessage }}

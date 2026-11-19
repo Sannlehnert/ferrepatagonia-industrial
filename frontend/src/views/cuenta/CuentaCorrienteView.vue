@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import CompanyStatus from '@/components/CompanyStatus.vue'
 import CreditRequestPanel from '@/components/CreditRequestPanel.vue'
@@ -18,6 +18,11 @@ import {
 
 const auth = useAuthStore()
 const cuenta = useCuentaCorrienteStore()
+const creditRefreshVersion = ref(0)
+function refreshAccount() {
+    creditRefreshVersion.value += 1
+    void cuenta.load()
+}
 const resumen = computed(() => {
     const consulta = cuenta.consulta
     return consulta && consulta.estado !== 'SIN_CUENTA'
@@ -101,13 +106,13 @@ onBeforeRouteLeave(() => cuenta.clear())
                 <p class="m-0 leading-6 text-slate-600">Saldo, límite de crédito y movimientos de tu cuenta.</p>
             </div>
             <button type="button" class="min-h-11 rounded-md border border-slate-300 px-4 py-2 hover:bg-slate-50"
-                :disabled="cuenta.consultaCargando" @click="cuenta.load()">
+                :disabled="cuenta.consultaCargando" @click="refreshAccount()">
                 {{ cuenta.consultaCargando ? 'Actualizando…' : 'Actualizar' }}
             </button>
         </header>
 
         <CompanyStatus class="mb-6" />
-        <CreditRequestPanel />
+        <CreditRequestPanel :refresh-version="creditRefreshVersion" />
 
         <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando ||
             cuenta.movimientosMasCargando || cuenta.vencimientosMasCargando" role="status"
