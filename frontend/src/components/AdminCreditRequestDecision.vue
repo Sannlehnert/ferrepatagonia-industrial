@@ -111,7 +111,7 @@ async function submitDecision() {
 </script>
 
 <template>
-  <div v-if="!action" class="flex flex-wrap gap-2">
+  <div v-if="!action" class="credit-decision flex flex-wrap gap-2">
     <button
       type="button"
       class="rounded border border-slate-300 px-3 py-2"
@@ -130,7 +130,7 @@ async function submitDecision() {
     </button>
   </div>
 
-  <form v-else class="w-full rounded border border-slate-200 p-3" @submit.prevent="submitDecision">
+  <form v-else class="credit-decision w-full rounded border border-slate-200 p-3" @submit.prevent="submitDecision">
     <h3 class="font-semibold">
       {{ action === 'approve' ? 'Aprobar' : 'Rechazar' }} solicitud #{{ request.id }}
     </h3>
@@ -184,7 +184,7 @@ async function submitDecision() {
       <button
         type="submit"
         :disabled="submitting"
-        class="rounded bg-slate-900 px-3 py-2 text-white disabled:opacity-50"
+        class="rounded bg-[#103A5C] px-3 py-2 text-white disabled:opacity-50"
       >
         {{ submitting ? 'Guardando…'
           : retrySameRequest ? 'Reintentar operación'
@@ -202,3 +202,17 @@ async function submitDecision() {
     </div>
   </form>
 </template>
+<style scoped>
+.credit-decision, .credit-decision * { box-sizing: border-box; min-width: 0; }
+.credit-decision { max-width: 100%; color: #0b2438; }
+.credit-decision fieldset { margin-inline: 0; border: 0; padding: 0; }
+.credit-decision :is(button, input, select, textarea) { min-height: 44px; max-width: 100%; font: inherit; font-size: 14px; }
+.credit-decision :is(input, select, textarea) { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #0b2438; padding: 8px; }
+.credit-decision textarea { min-height: 88px; resize: vertical; }
+.credit-decision button { min-width: 44px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 16px; background: white; color: #103a5c; font-weight: 600; cursor: pointer; }
+.credit-decision button:hover:not(:disabled) { background: #f1f5f9; }
+.credit-decision button[type="submit"] { border-color: transparent; background: #103a5c; color: white; }
+.credit-decision button[type="submit"]:hover:not(:disabled) { background: #145a8d; }
+.credit-decision :is(button, input, select, textarea):focus-visible { outline: 2px solid #145a8d; outline-offset: 2px; }
+.credit-decision :is(button, input, select, textarea):disabled { opacity: .5; cursor: not-allowed; }
+</style>

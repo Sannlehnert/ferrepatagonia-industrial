@@ -117,7 +117,7 @@ async function submit() {
 </script>
 
 <template>
-  <section class="my-4 rounded-lg border border-slate-200 bg-white p-4">
+  <section class="credit-controls my-4 rounded-lg border border-slate-200 bg-white p-4">
     <h3 class="font-semibold">Gestión de crédito</h3>
 
     <div v-if="!action" class="mt-3 flex flex-wrap gap-2">
@@ -192,3 +192,17 @@ async function submit() {
     </form>
   </section>
 </template>
+<style scoped>
+.credit-controls, .credit-controls * { box-sizing: border-box; min-width: 0; }
+.credit-controls { max-width: 100%; color: #0b2438; }
+.credit-controls fieldset { margin-inline: 0; border: 0; padding: 0; }
+.credit-controls :is(button, input, select, textarea) { min-height: 44px; max-width: 100%; font: inherit; font-size: 14px; }
+.credit-controls :is(input, select, textarea) { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #0b2438; padding: 8px; }
+.credit-controls textarea { min-height: 88px; resize: vertical; }
+.credit-controls button { min-width: 44px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 16px; background: white; color: #103a5c; font-weight: 600; cursor: pointer; }
+.credit-controls button:hover:not(:disabled) { background: #f1f5f9; }
+.credit-controls button[type="submit"] { border-color: transparent; background: #103a5c; color: white; }
+.credit-controls button[type="submit"]:hover:not(:disabled) { background: #145a8d; }
+.credit-controls :is(button, input, select, textarea):focus-visible { outline: 2px solid #145a8d; outline-offset: 2px; }
+.credit-controls :is(button, input, select, textarea):disabled { opacity: .5; cursor: not-allowed; }
+</style>

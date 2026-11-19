@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test as base } from '@playwright/test'
+import { expect, test as base, type Locator, type Page } from '@playwright/test'
 
 type CreditCompany = { email: string; clientId: number }
 
@@ -45,7 +45,31 @@ const test = base.extend<{ company: CreditCompany }>({
   },
 })
 
-for (const width of [1280, 360]) {
+
+async function verifyCreditControls(scope: Locator, page: Page) {
+  const elements = scope.locator('button:visible, input:visible, select:visible, textarea:visible')
+  expect(await elements.count()).toBeGreaterThan(0)
+  for (const element of await elements.all()) {
+    const geometry = await element.evaluate(el => {
+      const box = el.getBoundingClientRect()
+      const parent = el.parentElement!.getBoundingClientRect()
+      const style = el.ownerDocument.defaultView!.getComputedStyle(el)
+      return { height: box.height, right: box.right, parentRight: parent.right, sizing: style.boxSizing }
+    })
+    expect(geometry.height).toBeGreaterThanOrEqual(44)
+    expect(geometry.right).toBeLessThanOrEqual(geometry.parentRight + 1)
+    expect(geometry.sizing).toBe('border-box')
+  }
+  const focusable = elements.first()
+  await focusable.focus()
+  await page.keyboard.press('Tab')
+  const focused = page.locator(':focus')
+  await expect(focused).toHaveCSS('outline-style', 'solid')
+  await expect(focused).toHaveCSS('outline-width', '2px')
+  expect(await page.locator('html').evaluate(el => el.scrollWidth)).toBeLessThanOrEqual(page.viewportSize()!.width)
+}
+
+for (const width of [1280, 768, 360]) {
   test.describe(`Controles ADMIN de crédito a ${width}px`, () => {
     test.use({ viewport: { width, height: 850 } })
 
@@ -102,6 +126,8 @@ for (const width of [1280, 360]) {
         exact: true,
       }).click()
 
+      await verifyCreditControls(requests, page)
+      await expect(requests.getByRole('button', { name: 'Confirmar aprobación', exact: true })).toHaveCSS('background-color', 'rgb(16, 58, 92)')
       await requests.getByLabel('Límite autorizado (USD)', { exact: true }).fill('1500.00')
       await requests.getByLabel('Motivo', { exact: true }).fill('Aprobación de prueba #330')
       await requests.getByLabel('Evidencia comercial', { exact: true }).fill('TEST-ONLY #330')
@@ -204,6 +230,7 @@ for (const width of [1280, 360]) {
       })).toBeVisible()
 
       await controls.getByRole('button', { name: 'Editar límite', exact: true }).click()
+      await verifyCreditControls(controls, page)
       await controls.getByLabel('Nuevo límite (USD)', { exact: true }).fill('2000.00')
       await controls.getByLabel('Motivo', { exact: true }).fill('Ampliación de prueba')
       await controls.getByLabel('Evidencia comercial', { exact: true }).fill('TEST-ONLY límite')
