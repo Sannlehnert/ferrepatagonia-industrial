@@ -224,6 +224,7 @@ test('Cancelar pide confirmación solo cuando hay cambios', async t => {
 
 test('un alta rechazada conserva los campos y el error ante un cierre accidental', async t => {
  const {state,events}=await mount(t,true,{saveAdminProduct:async()=>{throw httpError(400);}},{product:null});
+ state.form.id_categoria=2;
  state.form.nombre='Producto nuevo';
  state.form.codigo='SKU-NUEVO';
  state.form.precio=10;

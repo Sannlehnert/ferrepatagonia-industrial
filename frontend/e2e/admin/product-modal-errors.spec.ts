@@ -347,3 +347,139 @@ test('N-03: un error de guardado sigue visible tras un clic exterior y se descar
     await expect(dialog).toBeVisible();
     await expect(name).toHaveValue('Borrador E2E con error');
 });
+
+async function pressEscapeThrice(page: Page) {
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+}
+
+test('N-04: Escape repetido no cierra un borrador sin autorización y el listado recupera sus acciones', async ({ page }) => {
+    await login(page);
+    await mockLongProduct(page);
+    await page.setViewportSize({ width: 360, height: 740 });
+    const dialog = await openEdit(page);
+    const name = field(dialog, 'Nombre del Producto');
+    await name.fill('Borrador conservado tras Escape ×3');
+    await name.focus();
+
+    const scrollBefore = await page.evaluate('window.scrollY') as number;
+    await pressEscapeThrice(page);
+
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Borrador conservado tras Escape ×3');
+    await expect(dialog.getByRole('alert').filter({ hasText: 'no se pierden los datos' })).toBeVisible();
+
+    // El cierre explícito sigue disponible y respeta la confirmación.
+    page.once('dialog', confirm => confirm.dismiss());
+    await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Borrador conservado tras Escape ×3');
+
+    page.once('dialog', confirm => confirm.accept());
+    await dialog.getByRole('button', { name: 'Cancelar', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+
+    const edit = page.getByRole('button', { name: `Editar ${longName}`, exact: true });
+    await expect(edit).toBeFocused();
+    expect(await page.evaluate('window.scrollY') as number).toBe(scrollBefore);
+
+    // Editar vuelve a abrir el modal con los datos del servidor.
+    await edit.click();
+    const reopened = page.getByRole('dialog');
+    await expect(reopened).toBeVisible();
+    await expect(field(reopened, 'Nombre del Producto')).toHaveValue(longName);
+    await reopened.getByRole('button', { name: 'Cerrar formulario', exact: true }).click();
+    await expect(reopened).toHaveCount(0);
+
+    // Nuevo Producto vuelve a abrir el alta.
+    await page.getByRole('button', { name: '+ Nuevo Producto', exact: true }).click();
+    const create = page.getByRole('dialog');
+    await expect(create.getByRole('heading', { name: 'Crear Nuevo Producto', exact: true })).toBeVisible();
+    await create.getByRole('button', { name: 'Cerrar formulario', exact: true }).click();
+    await expect(create).toHaveCount(0);
+
+    // Desactivar sigue disponible: la confirmación se abre y se puede cancelar.
+    const deactivate = page.getByRole('button', { name: `Desactivar ${longName}`, exact: true });
+    await expect(deactivate).toBeEnabled();
+    page.once('dialog', confirm => confirm.dismiss());
+    await deactivate.click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(deactivate).toBeEnabled();
+});
+
+test('N-05: Escape repetido conserva un error pendiente y el aviso se limpia al revertir', async ({ page }) => {
+    await login(page);
+    await mockLongProduct(page);
+    await page.setViewportSize({ width: 360, height: 740 });
+    const dialog = await openEdit(page);
+    const name = field(dialog, 'Nombre del Producto');
+    const originalName = await name.inputValue();
+    const message = 'No se pudo guardar el producto por un conflicto de catálogo.';
+    await page.route('**/api/admin/productos/2', async (route) => {
+        if (route.request().method() !== 'PUT') return route.continue();
+        await route.fulfill({ status: 400, json: { message } });
+    });
+
+    await name.fill('Borrador con error pendiente');
+    await dialog.getByRole('button', { name: 'Guardar Cambios', exact: true }).click();
+    const alert = dialog.getByRole('alert').filter({ hasText: message });
+    await expect(alert).toBeVisible();
+    await name.focus();
+
+    await pressEscapeThrice(page);
+
+    await expect(dialog).toBeVisible();
+    await expect(alert).toBeVisible();
+    await expect(name).toHaveValue('Borrador con error pendiente');
+
+    // Descartar el error y revertir el cambio limpia el aviso de cierre.
+    await alert.getByRole('button', { name: 'Descartar error', exact: true }).click();
+    await expect(alert).toHaveCount(0);
+    await name.fill(originalName);
+    await expect(dialog.getByRole('alert').filter({ hasText: 'no se pierden los datos' })).toHaveCount(0);
+    await expect(dialog).toBeVisible();
+
+    // Sin cambios ni errores, Escape vuelve a cerrar de forma autorizada.
+    await name.focus();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByRole('button', { name: `Editar ${longName}`, exact: true })).toBeFocused();
+});
+
+test('N-06: Escape repetido durante un guardado bloqueante no desincroniza el modal', async ({ page }) => {
+    await login(page);
+    await mockLongProduct(page);
+    await page.setViewportSize({ width: 390, height: 800 });
+    const dialog = await openEdit(page);
+    const name = field(dialog, 'Nombre del Producto');
+
+    let releaseRequest: (() => void) | undefined;
+    let putRequests = 0;
+    await page.route('**/api/admin/productos/2', async (route) => {
+        if (route.request().method() !== 'PUT') return route.continue();
+        putRequests++;
+        await new Promise<void>(resolve => { releaseRequest = resolve });
+        await route.fulfill({
+            status: 200,
+            json: { id_producto: 2, nombre: 'Producto guardado durante Escape' },
+        });
+    });
+
+    await name.fill('Producto guardado durante Escape');
+    await dialog.getByRole('button', { name: 'Guardar Cambios', exact: true }).click();
+    const saving = dialog.getByRole('button', { name: 'Guardando...', exact: true });
+    await expect(saving).toBeDisabled();
+
+    await pressEscapeThrice(page);
+
+    await expect(dialog).toBeVisible();
+    await expect(name).toHaveValue('Producto guardado durante Escape');
+    expect(putRequests).toBe(1);
+
+    expect(releaseRequest).toBeTruthy();
+    releaseRequest!();
+    await expect(dialog).toHaveCount(0);
+    await expect(page.getByText('Producto guardado durante Escape', { exact: false })).toBeVisible();
+    expect(putRequests).toBe(1);
+});
