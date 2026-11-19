@@ -28,14 +28,21 @@ function destinationQuery(scope: ClientReceiptScope, userId: number, reference: 
     return {
       sql: `
         SELECT c.id_cliente AS clientId, p.id_pedido AS orderId,
-               cc.id_cuenta_corriente AS accountId
+               CASE WHEN p.modalidad_pago = 'CUENTA_CORRIENTE' THEN cc.id_cuenta_corriente ELSE NULL END AS accountId
         FROM USUARIO u
         INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente AND c.activo = 1
         INNER JOIN PEDIDO p ON p.id_cliente = c.id_cliente
         LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = c.id_cliente AND c.tipo_cliente = 'EMPRESA'
         WHERE u.id_usuario = ? AND u.activo = 1 AND u.rol = 'CLIENTE' AND p.id_pedido = ?
-          AND ((c.tipo_cliente = 'PARTICULAR' AND p.modalidad_pago = 'TRANSFERENCIA')
-            OR (cc.id_cuenta_corriente IS NOT NULL AND p.modalidad_pago = 'CUENTA_CORRIENTE'))
+          AND ((
+            p.modalidad_pago = 'TRANSFERENCIA'
+            AND (
+              c.tipo_cliente = 'PARTICULAR'
+              OR (c.tipo_cliente = 'EMPRESA' AND c.estado_aprobacion_empresa = 'APROBADA')
+            )
+          ) OR (
+            cc.id_cuenta_corriente IS NOT NULL AND p.modalidad_pago = 'CUENTA_CORRIENTE'
+          ))
       `,
       params: [userId, scope.orderId],
     };

@@ -326,20 +326,20 @@ async function reloadAfterDeactivationUncertain() {
 </script>
 
 <template>
-  <section aria-labelledby="categories-title" class="space-y-4" :aria-busy="busy ? 'true' : 'false'">
+  <section aria-labelledby="categories-title" class="min-w-0 space-y-4" :aria-busy="busy ? 'true' : 'false'">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <h2
         id="categories-title"
         ref="titleHeading"
         tabindex="-1"
-        class="m-0 text-xl font-semibold text-[#0b2438]"
+        class="m-0 min-w-0 text-xl font-semibold text-[#0b2438] wrap-anywhere"
       >
         Categorías
       </h2>
       <button
         ref="newButton"
         type="button"
-        class="min-h-11 rounded-md bg-[#103a5c] px-4 text-white disabled:opacity-60"
+        class="box-border min-h-11 rounded-md bg-[#103a5c] px-4 text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         :disabled="busy || loading || formOpen || !!pendingDeactivation"
         @click="openCreate($event)"
       >
@@ -352,10 +352,11 @@ async function reloadAfterDeactivationUncertain() {
       role="status"
       aria-live="polite"
       aria-atomic="true"
-      class="pointer-events-none fixed left-4 right-4 top-4 z-[60] m-0 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 shadow-lg sm:left-auto sm:max-w-sm"
+      class="pointer-events-none fixed left-4 right-4 top-4 z-[60] m-0 box-border rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900 shadow-lg wrap-anywhere sm:left-auto sm:max-w-sm"
     >
       {{ notice }}
     </p>
+
     <AdminCategoryForm
       v-if="formOpen"
       :key="editingCategory?.id_categoria ?? 'new'"
@@ -382,10 +383,10 @@ async function reloadAfterDeactivationUncertain() {
 
     <p v-if="loading" role="status">Cargando categorías…</p>
     <div v-else-if="error" class="space-y-2">
-      <p role="alert" class="text-red-800">No se pudieron cargar las categorías.</p>
+      <p role="alert" class="text-red-800 wrap-anywhere">No se pudieron cargar las categorías.</p>
       <button
         type="button"
-        class="min-h-11 rounded-md border border-slate-300 px-4"
+        class="box-border min-h-11 rounded-md border border-slate-300 px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="refreshCategories()"
       >
         Reintentar
@@ -395,7 +396,7 @@ async function reloadAfterDeactivationUncertain() {
     <template v-else-if="categories">
       <label class="flex flex-wrap items-center gap-2 text-sm font-medium">
         Estado
-        <select v-model="filter" class="min-h-11 rounded-md border border-slate-300 px-3">
+        <select v-model="filter" class="box-border min-h-11 rounded-md border border-slate-300 px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
           <option value="all">Todas</option>
           <option value="active">Activas</option>
           <option value="inactive">Inactivas</option>
@@ -409,12 +410,12 @@ async function reloadAfterDeactivationUncertain() {
         <li
           v-for="category in visibleCategories"
           :key="category.id_categoria"
-          class="space-y-2 rounded-lg border border-slate-200 bg-white p-4"
+          class="box-border min-w-0 space-y-2 rounded-lg border border-slate-200 bg-white p-4"
         >
           <div class="flex flex-wrap items-center gap-2">
-            <h3 class="m-0 min-w-0 break-words font-semibold">{{ category.nombre }}</h3>
+            <h3 class="m-0 min-w-0 font-semibold wrap-anywhere">{{ category.nombre }}</h3>
             <span
-              class="rounded-full px-2 py-1 text-xs font-medium"
+              class="box-border rounded-full px-2 py-1 text-xs font-medium"
               :class="category.activo === 1
                 ? 'bg-green-100 text-green-900'
                 : 'bg-slate-100 text-slate-700'"
@@ -422,13 +423,13 @@ async function reloadAfterDeactivationUncertain() {
               {{ category.activo === 1 ? 'Activa' : 'Inactiva' }}
             </span>
           </div>
-          <p class="m-0 whitespace-pre-wrap break-words text-sm text-slate-700">
+          <p class="m-0 whitespace-pre-wrap text-sm text-slate-700 wrap-anywhere">
             {{ category.descripcion ?? 'Sin descripción' }}
           </p>
           <div class="flex flex-wrap gap-2">
             <button
               type="button"
-              class="min-h-11 rounded-md border border-slate-300 px-4 disabled:opacity-60"
+              class="box-border min-h-11 rounded-md border border-slate-300 px-4 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :aria-label="`Editar ${category.nombre}`"
               :data-category-edit-id="category.id_categoria"
               :disabled="busy || formOpen || !!pendingDeactivation"
@@ -439,7 +440,7 @@ async function reloadAfterDeactivationUncertain() {
             <button
               v-if="category.activo === 1"
               type="button"
-              class="min-h-11 rounded-md border border-red-300 px-4 text-red-800 disabled:opacity-60"
+              class="box-border min-h-11 rounded-md border border-red-300 px-4 text-red-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :aria-label="`Desactivar ${category.nombre}`"
               :disabled="busy || formOpen || !!pendingDeactivation"
               @click="openDeactivation(category, $event)"

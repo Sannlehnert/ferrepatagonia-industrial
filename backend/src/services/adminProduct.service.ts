@@ -1,4 +1,5 @@
-import {findAllAdmin,findById,categoryExists,create,update,updateStock,CreateProductDTO,UpdateProductDTO} from '../repositories/adminProduct.repository';
+import {findAllAdmin,findAdminPage,findById,categoryExists,create,update,updateStock,CreateProductDTO,UpdateProductDTO} from '../repositories/adminProduct.repository';
+import type { AdminProductQuery } from '../dtos/products/admin-product-query.dto';
 
 import { validateDtoInput } from '../dtos/validation';
 import { createProductPolicy, updateProductPolicy, updateProductWithImagePolicy, stockPolicy } from '../dtos/policies';
@@ -27,8 +28,9 @@ const validateProductFields = async (data: unknown, policy: typeof updateProduct
     }
 };
 
-export const listAdminProducts = async () => {
-    return await findAllAdmin();
+export const listAdminProducts = ({ page, limit, busqueda }: AdminProductQuery = {}) => {
+    if (page === undefined && limit === undefined && busqueda === undefined) return findAllAdmin();
+    return findAdminPage(page ?? 1, limit ?? 20, busqueda?.trim());
 };
 
 export const getAdminProductById = async (id: number) => {
