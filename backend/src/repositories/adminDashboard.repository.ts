@@ -20,11 +20,7 @@ const REAL_ORDER_SQL_FILTER = `
   AND p.modalidad_pago NOT LIKE 'DEMO_%'
   AND (p.evidencia_total_usd IS NULL OR p.evidencia_total_usd NOT LIKE ?)
   AND (c.email IS NULL OR c.email NOT LIKE '%@demo.local')
-  AND (
-    p.modalidad_pago <> 'CUENTA_CORRIENTE'
-    OR cc.id_cuenta_corriente IS NULL
-    OR cc.origen_datos = 'REAL'
-  )
+  AND (cc.id_cuenta_corriente IS NULL OR cc.origen_datos = 'REAL')
 `;
 
 export async function queryAdminDashboardAggregates(
@@ -69,17 +65,17 @@ export async function queryAdminDashboardAggregates(
         COALESCE(SUM(CASE WHEN cp.id_admin_revision IS NULL THEN 1 ELSE 0 END), 0) AS sin_revisar
       FROM COMPROBANTE_PAGO cp
       INNER JOIN CLIENTE c_cp ON c_cp.id_cliente = cp.id_cliente
+      LEFT JOIN CUENTA_CORRIENTE cc_cp ON cc_cp.id_cliente = cp.id_cliente
+      LEFT JOIN CUENTA_CORRIENTE cc_direct ON cc_direct.id_cuenta_corriente = cp.id_cuenta_corriente
       LEFT JOIN PEDIDO p ON p.id_pedido = cp.id_pedido
       LEFT JOIN CLIENTE c ON c.id_cliente = p.id_cliente
-      LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cuenta_corriente = COALESCE(
-        cp.id_cuenta_corriente,
-        (SELECT cc_p.id_cuenta_corriente FROM CUENTA_CORRIENTE cc_p WHERE cc_p.id_cliente = p.id_cliente LIMIT 1)
-      )
+      LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = p.id_cliente
       WHERE (c_cp.email IS NULL OR c_cp.email NOT LIKE '%@demo.local')
-        AND (cp.id_cuenta_corriente IS NULL OR cc.origen_datos = 'REAL')
+        AND (cc_cp.id_cuenta_corriente IS NULL OR cc_cp.origen_datos = 'REAL')
+        AND (cp.id_cuenta_corriente IS NULL OR cc_direct.origen_datos = 'REAL')
         AND (
           (cp.id_pedido IS NOT NULL AND ${REAL_ORDER_SQL_FILTER})
-          OR (cp.id_pedido IS NULL AND cp.id_cuenta_corriente IS NOT NULL AND cc.origen_datos = 'REAL')
+          OR (cp.id_pedido IS NULL AND cp.id_cuenta_corriente IS NOT NULL AND cc_direct.origen_datos = 'REAL')
         )
     `,
     [academicPrefix],
@@ -107,11 +103,13 @@ export async function queryAdminDashboardAggregates(
     `
       SELECT COUNT(*) AS empresas_fieles
       FROM CLIENTE c
+      LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = c.id_cliente
       WHERE c.tipo_cliente = 'EMPRESA'
         AND c.activo = 1
         AND c.estado_aprobacion_empresa = 'APROBADA'
         AND c.es_fiel = 1
         AND (c.email IS NULL OR c.email NOT LIKE '%@demo.local')
+        AND (cc.id_cuenta_corriente IS NULL OR cc.origen_datos = 'REAL')
     `,
   );
 
