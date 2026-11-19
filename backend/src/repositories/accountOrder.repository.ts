@@ -78,10 +78,11 @@ function prepare(quote: AccountOrderQuote, simulated: boolean) {
   return { lines, gross, net };
 }
 
-export async function persistAccountOrder(
+async function persistOrderByModality(
   manager: EntityManager,
   clientId: number,
   quote: AccountOrderQuote,
+  modalidadPago: 'CUENTA_CORRIENTE' | 'TRANSFERENCIA',
   academic?: { policy: AcademicCheckout; origin: string },
 ): Promise<number> {
   if (!manager.queryRunner?.isTransactionActive) {
@@ -101,9 +102,10 @@ export async function persistAccountOrder(
       id_cliente, estado, modalidad_pago,
       subtotal, descuento, total,
       moneda_total, evidencia_total_usd, observaciones, fecha_utc
-    ) VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', ?, ?, ?, 'USD', ?, ?, UTC_TIMESTAMP(3))
+    ) VALUES (?, 'CONFIRMADO', ?, ?, ?, ?, 'USD', ?, ?, UTC_TIMESTAMP(3))
   `, [
     clientId,
+    modalidadPago,
     format(prepared.gross),
     format(prepared.gross - prepared.net),
     format(prepared.net),
@@ -146,6 +148,24 @@ export async function persistAccountOrder(
   }
 
   return orderId;
+}
+
+export async function persistAccountOrder(
+  manager: EntityManager,
+  clientId: number,
+  quote: AccountOrderQuote,
+  academic?: { policy: AcademicCheckout; origin: string },
+): Promise<number> {
+  return persistOrderByModality(manager, clientId, quote, 'CUENTA_CORRIENTE', academic);
+}
+
+export async function persistTransferOrder(
+  manager: EntityManager,
+  clientId: number,
+  quote: AccountOrderQuote,
+  academic?: { policy: AcademicCheckout; origin: string },
+): Promise<number> {
+  return persistOrderByModality(manager, clientId, quote, 'TRANSFERENCIA', academic);
 }
 
 interface OrderSummaryRow {
