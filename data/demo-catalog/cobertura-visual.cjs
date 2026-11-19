@@ -1,17 +1,83 @@
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { readFileSync } = require('node:fs');
 const { join } = require('node:path');
 const { parse } = require('../../backend/node_modules/papaparse');
+const { archivoIlustrativoDeSku, variantesPorSku } = require('./ilustraciones.cjs');
 const familias = require('./variantes.cjs');
 
 const archivoFotos = join(__dirname, 'image-sources.csv');
 const directorioFotos = join(__dirname, '../../frontend/public/demo-catalog');
 const rutaWebp = /^\/demo-catalog\/([a-z0-9-]+\.webp)$/;
+const manifiestoIlustraciones = JSON.parse(readFileSync(join(directorioFotos, 'ilustraciones-manifest.json'), 'utf8'));
+const informeCatalogo = JSON.parse(readFileSync(join(__dirname, 'catalog-validation.json'), 'utf8'));
+const imagenReportadaPorSku = new Map(informeCatalogo.imagenes.map(imagen => [imagen.sku, imagen.archivo]));
+const evidenciaPorSku = new Map(informeCatalogo.imagenes.map(imagen => [imagen.sku, imagen]));
+const familiaPorCodigo = new Map(familias.map(([codigo, , nombre]) => [codigo, nombre]));
+const creditos = readFileSync(join(directorioFotos, 'creditos.txt'), 'utf8');
+const camposCredito = ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia'];
+const fotoPorSku = new Map([
+  ['FP-DEMO-ABR-DISCO-METAL-125-MM', 'disco-corte-metal.webp'],
+  ['FP-DEMO-CAS-CASCO-ALA-AMARILLO', 'casco-ala-completa-amarillo.webp'],
+  ['FP-DEMO-CAS-CASCO-CORTO-AMARILLO', 'casco-visera-corta-amarillo.webp'],
+  ['FP-DEMO-CON-CONO-NARANJA-30-CM', 'cono-naranja-30-cm.webp'],
+]);
+// Las ilustraciones genéricas no son fotos: se reutilizan en toda su familia y
+// deben declararse como obra propia para que no se confundan con evidencia visual.
+const ilustrativaPrefijo = 'ilustrativa-';
 
 function leerCsv(path) {
   const { data, errors } = parse(readFileSync(path, 'utf8'), { header: true, skipEmptyLines: true });
   assert.deepEqual(errors, [], `CSV inválido: ${path}`);
   return data;
+}
+
+function validarAsociacion(sku, archivo) {
+  const conoDeOtraMedida = sku.startsWith('FP-DEMO-CON-CONO-NARANJA-') &&
+    sku !== 'FP-DEMO-CON-CONO-NARANJA-30-CM';
+  const debeSerIlustrativa = conoDeOtraMedida || Object.prototype.hasOwnProperty.call(variantesPorSku, sku);
+  if (debeSerIlustrativa || archivo.startsWith(ilustrativaPrefijo)) {
+    assert.equal(archivo, archivoIlustrativoDeSku(sku), `Ilustración incompatible con el SKU ${sku}`);
+  }
+  assert.equal(archivo, imagenReportadaPorSku.get(sku), `Archivo renombrado o no verificado para ${sku}`);
+  if (!archivo.startsWith(ilustrativaPrefijo) && fotoPorSku.has(sku)) {
+    assert.equal(archivo, fotoPorSku.get(sku), `La medida de la foto no corresponde al SKU ${sku}`);
+  }
+}
+
+function validarContenidoIlustrativo(archivo, bytes) {
+  const hash = createHash('sha256').update(bytes).digest('hex');
+  assert.equal(hash, manifiestoIlustraciones[archivo], `La ilustración ${archivo} no coincide con la versión con leyenda`);
+}
+
+function leerRegistroCredito(archivo, contenido = creditos) {
+  // Solo exigir el formato estructurado para el activo consultado: hay
+  // créditos históricos sin asociación que conservan su formato anterior.
+  const bloques = contenido.split(/\r?\n\s*\r?\n/)
+    .filter(bloque => bloque.split(/\r?\n/)[0] === archivo);
+  assert.equal(bloques.length, 1, `Créditos ausentes o duplicados para ${archivo}`);
+  const registros = bloques[0].split(/\r?\n/).filter(linea => /^\s*Registro\s*:/i.test(linea));
+  assert.equal(registros.length, 1, `Registro ausente o duplicado para ${archivo}`);
+  assert.match(registros[0], /^Registro: /, `Registro ambiguo para ${archivo}`);
+  const valores = registros[0].slice('Registro: '.length).split(' · ');
+  assert.ok(valores.length === camposCredito.length && valores.every(valor => valor && valor === valor.trim()),
+    `Registro incompleto o ambiguo para ${archivo}`);
+  return Object.fromEntries(camposCredito.map((campo, indice) => [campo, valores[indice]]));
+}
+
+function validarFuente(fila, bytes, informe = evidenciaPorSku.get(fila.sku)) {
+  const archivo = rutaWebp.exec(fila.ruta_final)?.[1];
+  assert.equal(fila.familia, familiaPorCodigo.get(fila.sku.split('-')[2]), `Familia incorrecta para ${fila.sku}`);
+  assert.ok(informe && informe.sku === fila.sku && informe.archivo === archivo, `Informe incompatible para ${fila.sku}`);
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), informe.sha256Origen, `Hash del informe incorrecto para ${fila.sku}`);
+  assert.equal(informe.http, 200);
+  assert.equal(informe.mime, 'image/webp');
+  const registro = leerRegistroCredito(archivo);
+  for (const campo of camposCredito) {
+    assert.equal(fila[campo], registro[campo], `Créditos o procedencia inconsistentes para ${fila.sku}: ${campo}`);
+  }
+  // La licencia de filas que comparten un activo debe conservar la misma evidencia.
+  return archivo;
 }
 
 function leerFuentes() {
@@ -23,6 +89,11 @@ function leerFuentes() {
     assert.ok(producto && !fuentes.has(fila.sku), `SKU desconocido o duplicado: ${fila.sku}`);
     const archivo = rutaWebp.exec(fila.ruta_final)?.[1];
     assert.ok(archivo && fila.autor && fila.licencia && fila.modificaciones, `Falta evidencia visual para ${fila.sku}`);
+    validarAsociacion(fila.sku, archivo);
+    if (archivo.startsWith(ilustrativaPrefijo)) {
+      assert.ok(fila.licencia.startsWith('Obra propia') && /no corresponde a la variante exacta/.test(fila.modificaciones),
+        `La ilustración de ${fila.sku} debe declararse como obra propia y no exacta`);
+    }
     for (const url of [fila.fuente, fila.url_original, fila.referencia_licencia]) {
       assert.equal(new URL(url).protocol, 'https:', `Enlace de procedencia inválido para ${fila.sku}`);
     }
@@ -30,7 +101,16 @@ function leerFuentes() {
       const bytes = readFileSync(join(directorioFotos, archivo));
       assert.ok(bytes.length <= 5 * 1024 * 1024 && bytes.toString('ascii', 0, 4) === 'RIFF' &&
         bytes.toString('ascii', 8, 12) === 'WEBP', `El archivo ${archivo} debe ser WebP de hasta 5 MiB`);
+      if (archivo.startsWith(ilustrativaPrefijo)) {
+        validarContenidoIlustrativo(archivo, bytes);
+      }
       archivos.set(archivo, bytes);
+    }
+    validarFuente(fila, archivos.get(archivo));
+    for (const anterior of fuentes.values()) if (anterior.archivo === archivo) {
+      for (const campo of ['autor', 'fuente', 'url_original', 'licencia', 'referencia_licencia']) {
+        assert.equal(fila[campo], anterior[campo], `Evidencia ${campo} inconsistente para ${archivo}`);
+      }
     }
     fuentes.set(fila.sku, { ...fila, nombre: producto.nombre, archivo, bytes: archivos.get(archivo) });
   }
@@ -45,7 +125,7 @@ const separar = new Set([
   'AUD-orejera', 'ALT-bolso-arnes', 'CON-poste', 'CIN-cinta-delimitar', 'CIN-cinta-piso',
   'SEN-cartel-pvc', 'SEN-cartel-aluminio', 'SEN-cartel-vinilo', 'SEN-cartel-acrilico',
   'MAT-bornera', 'ILU-reflector', 'ILU-lampara-e27', 'ADH-cola', 'ADH-contacto',
-  'ABR-lija-madera', 'ABR-lija-agua',
+  'ABR-lija-madera', 'ABR-lija-agua', 'ABR-disco-metal', 'CON-cono',
 ]);
 
 function auditarCobertura(fuentes = leerFuentes()) {
@@ -56,8 +136,9 @@ function auditarCobertura(fuentes = leerFuentes()) {
   const grupoPorArchivo = new Map();
   for (const producto of productos) {
     const [nombre, variante] = producto.nombre.split(' · ');
-    const esCono30 = producto.codigo === 'FP-DEMO-CON-CONO-NARANJA-30-CM';
-    const nombreModelo = esCono30 ? 'Cono de señalización naranja' : nombre;
+    const nombreModelo = producto.codigo.startsWith('FP-DEMO-CON-CONO-NARANJA-')
+      ? 'Cono de señalización naranja'
+      : nombre;
     const modelo = modelos.get(nombreModelo);
     assert.ok(modelo || !variante, `Falta modelo para ${producto.codigo}`);
     const criterio = !modelo || separar.has(modelo.clave) ? variante :
@@ -70,20 +151,26 @@ function auditarCobertura(fuentes = leerFuentes()) {
     });
     const grupo = grupos.get(clave);
     const fuente = fuentes.get(producto.codigo);
-    if (fuente && !grupo.archivos.includes(fuente.archivo)) {
+    const ilustrativa = fuente?.archivo.startsWith('ilustrativa-');
+    if (fuente && !ilustrativa && !grupo.archivos.includes(fuente.archivo)) {
       assert.ok(!grupoPorArchivo.has(fuente.archivo), `Foto ${fuente.archivo} reutilizada entre grupos no equivalentes`);
       grupoPorArchivo.set(fuente.archivo, clave);
       grupo.archivos.push(fuente.archivo);
     }
     if (!fuente) grupo.pendientes.push(producto.codigo);
   }
+  const archivosDe = ilustrativas => new Set([...fuentes.values()]
+    .filter(f => f.archivo.startsWith(ilustrativaPrefijo) === ilustrativas).map(f => f.archivo));
+  const skuIlustrativos = [...fuentes.values()].filter(f => f.archivo.startsWith(ilustrativaPrefijo)).length;
   return {
-    sku: productos.length, skuConFuente: fuentes.size, skuPendientes: productos.length - fuentes.size,
-    archivos: new Set([...fuentes.values()].map(f => f.archivo)).size,
+    sku: productos.length, skuConFuente: fuentes.size, skuIlustrativos, skuPendientes: productos.length - fuentes.size,
+    archivos: archivosDe(false).size, archivosIlustrativos: archivosDe(true).size,
     grupos: [...grupos.values()].filter(g => g.pendientes.length),
   };
 }
 
 if (require.main === module) process.stdout.write(`${JSON.stringify(auditarCobertura(), null, 2)}\n`);
 
-module.exports = { leerFuentes, auditarCobertura };
+module.exports = {
+  leerFuentes, auditarCobertura, validarAsociacion, validarContenidoIlustrativo, validarFuente, leerRegistroCredito,
+};
