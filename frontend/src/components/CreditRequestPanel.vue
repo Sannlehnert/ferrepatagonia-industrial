@@ -166,7 +166,7 @@ async function submitRequest() {
                         <p class="m-0 text-sm">{{ requestStatusMessage(request.estado) }}</p>
                     </li>
                 </ul>
-                <p v-else role="status" class="mb-5 text-slate-600">Todavía no tenés solicitudes de crédito.</p>
+                <p v-else class="mb-5 text-slate-600">Todavía no tenés solicitudes de crédito.</p>
 
                 <p v-if="pendingRequest" role="status"
                     class="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900">
