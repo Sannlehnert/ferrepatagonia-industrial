@@ -25,6 +25,12 @@ function categoryRow(page: Page, nombre: string) {
   })
 }
 
+async function pressEscapeThrice(page: Page) {
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+}
+
 test.describe('diálogo de desactivación de categorías', () => {
   test.use({ viewport: { width: 360, height: 800 } })
 
@@ -86,6 +92,37 @@ test.describe('diálogo de desactivación de categorías', () => {
     await expect(row.getByRole('button', { name: `Editar ${target}`, exact: true })).toBeFocused()
     expect(await page.evaluate('window.scrollY')).toBe(scrollBefore)
   })
+
+  test('el cierre nativo sincroniza el estado Vue y restaura foco y scroll', async ({ page }) => {
+    test.setTimeout(60_000)
+    await login(page)
+
+    const suffix = randomUUID().slice(0, 8)
+    const name = `Categoría cierre nativo ${suffix}`
+    await createCategory(page, name)
+
+    await page.goto('/admin/categorias')
+    const row = categoryRow(page, name)
+    await expect(row).toBeVisible()
+    await row.scrollIntoViewIfNeeded()
+    const scrollBefore = await page.evaluate('window.scrollY') as number
+
+    const deactivate = row.getByRole('button', { name: `Desactivar ${name}`, exact: true })
+    await deactivate.click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+
+    await page.evaluate(() => {
+      const native = (globalThis as any).document.querySelector('dialog')
+      native?.close()
+    })
+
+    await expect(dialog).toHaveCount(0)
+    await expect(deactivate).toBeFocused()
+    await expect(row.getByText('Activa', { exact: true })).toBeVisible()
+    expect(await page.evaluate('window.scrollY')).toBe(scrollBefore)
+    expect(await page.evaluate(() => (globalThis as any).document.body.style.overflow)).toBe('')
+  })
 })
 
 test.describe('errores y envíos duplicados al desactivar categorías', () => {
@@ -128,6 +165,8 @@ test.describe('errores y envíos duplicados al desactivar categorías', () => {
 
     const busyButton = dialog.getByRole('button', { name: 'Desactivando…' })
     await expect(busyButton).toBeDisabled()
+    await pressEscapeThrice(page)
+    await expect(dialog).toBeVisible()
     await page.keyboard.press('Enter')
     await expect.poll(() => patchRequests).toBe(1)
     expect(releaseRequest).toBeTruthy()
@@ -188,6 +227,16 @@ test.describe('errores y envíos duplicados al desactivar categorías', () => {
     await expect(dialog.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
     await expect(dialog.getByRole('button', { name: 'Confirmar desactivación' })).toBeDisabled()
     expect(patchRequests).toBe(1)
+
+    // Un cierre nativo durante el estado incierto debe reabrir el diálogo y mantener el bloqueo.
+    await page.evaluate(() => {
+      const native = (globalThis as any).document.querySelector('dialog')
+      native?.close()
+    })
+    await expect(dialog).toBeVisible()
+    await expect(dialog.getByRole('alert')).toContainText('El diálogo quedó bloqueado')
+    await pressEscapeThrice(page)
+    await expect(dialog).toBeVisible()
 
     await page.unroute('**/api/admin/categorias/*/desactivar', loseResponse)
     await dialog.getByRole('button', { name: 'Recargar listado' }).click()
