@@ -328,3 +328,9 @@ export async function confirmAccountOrder(
   if (committed.change) notifyAfterCommit(notify, committed.change);
   return committed.result;
 }
+
+export {
+  confirmTransferOrder,
+  getTransferOrderEligibility,
+  getTransferOrderResult,
+} from './transfer-order.service';

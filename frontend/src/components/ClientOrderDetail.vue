@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
-import PaymentReceipts from '@/components/PaymentReceipts.vue'
+import { watch } from 'vue'
+import OrderPaymentReceipts from '@/components/OrderPaymentReceipts.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { getClientOrderDetail } from '@/services/clientOrderService'
 import { onRealtime } from '@/services/realtime'
-import { orderReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderDetail } from '@/types/clientOrder'
 
-const props = defineProps<{ orderId: number }>()
+const props = withDefaults(defineProps<{ orderId: number; showReceipts?: boolean }>(), {
+  showReceipts: true,
+})
+const emit = defineEmits<{ receiptUpdated: [] }>()
 const auth = useAuthStore()
 const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}:${props.orderId}`
 const allowed = () => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.loggingOut
@@ -16,10 +18,6 @@ const allowed = () => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.logging
 const { data: detail, loading, error, load } = usePrivateAccountRead<ClientOrderDetail>(
   identity,
   allowed,
-)
-const showsReceipts = computed(() =>
-  (auth.user?.tipo_cliente === 'PARTICULAR' && detail.value?.modalidadPago === 'TRANSFERENCIA') ||
-  (auth.user?.tipo_cliente === 'EMPRESA' && detail.value?.modalidadPago === 'CUENTA_CORRIENTE'),
 )
 
 function loadDetail() {
@@ -64,7 +62,7 @@ onRealtime(change => {
           <p class="m-0 mt-0.5 font-medium">Subtotal de la línea {{ item.subtotal }} {{ detail.moneda ?? '' }}</p>
         </li>
       </ul>
-      <PaymentReceipts v-if="showsReceipts" :path="orderReceiptsPath(orderId)" mode="pedido" />
+      <OrderPaymentReceipts v-if="showReceipts" :order="detail" @updated="emit('receiptUpdated')" />
     </template>
   </div>
 </template>

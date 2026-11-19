@@ -7,6 +7,7 @@ const { parse, compileScript } = require('@vue/compiler-sfc');
 const ts = require('typescript');
 const errors = require('../src/services/adminMutationError.ts');
 const product = {id_producto: 7, id_categoria: 2, codigo: 'SKU-7', nombre: 'Taladro', precio: 10, stock: 5, activo: 1, descripcion: 'Original', imagen: 'https://example.test/image'};
+const firstPage = () => ({data:[{...product}],page:1,limit:20,total:1,totalPages:1});
 const httpError = status => Object.assign(new Error('rechazo'), {isAxiosError:true, response: status ? {status, data:{message:'rechazo'}} : undefined});
 const renderer = vue.createRenderer({createElement:()=>({}),createText:()=>({}),createComment:()=>({}),insert(){},remove(){},setText(){},setElementText(){},patchProp(){},parentNode:()=>null,nextSibling:()=>null});
 const settle = async () => { for(let i=0;i<5;i++){await new Promise(r=>setImmediate(r)); await vue.nextTick();} };
@@ -21,13 +22,15 @@ function load(file, mocks={}) {
 }
 async function mount(t, modal=false, overrides={}, props={}) {
  const calls=[];
- const service={getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
- const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRouter:()=>({push(){}})}}).default;
+ const route=vue.reactive({query:{}});
+ const navigate=({query})=>{route.query=query;};
+ const service={getAdminProductPage:async()=>firstPage(),getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
+ const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
  component.render=()=>null;
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
  app.mount({}); t.after(()=>app.unmount()); await settle();
- return {state:app._instance.setupState,calls,events};
+ return {state:app._instance.setupState,calls,events,route,props:app._instance.props};
 }
 test('status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation',async t=>{
  const {state,calls}=await mount(t); let confirmations=0;
@@ -45,15 +48,33 @@ test('status: pending mutation prevents duplicate and opening any modal',async t
 });
 for(const status of [undefined,500,502]) test(`uncertain status ${status}: failed reload retains lock; successful reload unlocks`,async t=>{
  let fail=false;let attempts=0;
- const {state}=await mount(t,false,{getAdminProducts:async()=>{if(fail)throw Error('offline');return [{...product}];},setAdminProductActive:async()=>{attempts++;throw httpError(status);}});
+ const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('offline');return firstPage();},setAdminProductActive:async()=>{attempts++;throw httpError(status);}});
  global.window={confirm:()=>true};await state.toggleStatus(product);assert.equal(state.needsReload,true);
  fail=true;await state.fetchProductos();await state.toggleStatus(product);state.openCreateModal();assert.equal(attempts,1);assert.equal(state.isModalOpen,false);assert.equal(state.actionsDisabled,true);
  fail=false;await state.fetchProductos();assert.equal(state.needsReload,false);assert.equal(state.actionsDisabled,false);
 });
 test('successful mutation or modal save followed by failed read stays locked',async t=>{
- let fail=false;const {state}=await mount(t,false,{getAdminProducts:async()=>{if(fail)throw Error('read failed');return [{...product}];}});
+ let fail=false;const {state}=await mount(t,false,{getAdminProductPage:async()=>{if(fail)throw Error('read failed');return firstPage();}});
  fail=true;global.window={confirm:()=>true};await state.toggleStatus(product);assert.equal(state.needsReload,true);
  fail=false;await state.fetchProductos();fail=true;await state.handleSaved('guardado');assert.equal(state.needsReload,true);assert.equal(state.actionsDisabled,true);
+});
+
+test('paginated list discards an earlier request after the route changes', async t => {
+ const requests=[];
+ const {state,route}=await mount(t,false,{
+  getAdminProductPage:(page,search,signal)=>new Promise(resolve=>requests.push({page,search,signal,resolve})),
+ });
+ route.query={page:'3',busqueda:'SKU'};
+ await settle();
+ assert.equal(requests.length,2);
+ assert.equal(requests[0].signal.aborted,true);
+ assert.deepEqual([requests[1].page,requests[1].search],[3,'SKU']);
+ requests[1].resolve({data:[product],page:3,limit:20,total:41,totalPages:3});
+ requests[0].resolve({data:[],page:1,limit:20,total:0,totalPages:0});
+ await settle();
+ assert.equal(state.result.page,3);
+ assert.equal(state.result.data[0].id_producto,product.id_producto);
+ assert.equal(state.isLoading,false);
 });
 for(const status of [400,401,403,404,409,422]) test(`known rejection ${status} does not count as uncertain`,async t=>{
  const {state}=await mount(t,false,{setAdminProductActive:async()=>{throw httpError(status);}});
@@ -140,4 +161,91 @@ describe('Product Form & Actions - Regression Tests (#240)', () => {
         assert.equal(payload.precio, undefined, 'El payload no debe incluir precio: 0');
         assert.notEqual(payload.precio, 0, 'El precio no debe coaccionarse a cero');
     });
+});
+test('modal refuses a submit when selection changes after draft initialization', async t => {
+ const {state,calls,props}=await mount(t,true);
+ props.product={...product,id_producto:8,nombre:'Otro'};
+ await settle();
+ await state.handleSubmit();
+ assert.equal(calls.length,0);
+ assert.match(state.backendError,/seleccionado cambió/);
+ assert.equal(state.draftProduct.id_producto,7);
+});
+test('an active edit cannot be replaced or switched to creation', async t => {
+ const {state}=await mount(t);
+ state.openEditModal(product);
+ state.openEditModal({...product,id_producto:8});
+ state.openCreateModal();
+ assert.equal(state.selectedProduct.id_producto,7);
+});
+
+test('un clic exterior no cierra un borrador con cambios y conserva los campos', async t => {
+ const {state,events}=await mount(t,true);
+ state.form.nombre='Borrador sin guardar';
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.nombre,'Borrador sin guardar');
+ assert.match(state.closeAttemptNotice,/Cancelar/);
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.nombre,'Borrador sin guardar');
+});
+
+test('una imagen elegida cuenta como cambio sin guardar', async t => {
+ const {state,events}=await mount(t,true);
+ state.imageFile={name:'foto.png',size:10,type:'image/png'};
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.ok(state.closeAttemptNotice);
+});
+
+test('un formulario sin cambios se cierra por clic exterior o Escape', async t => {
+ const {state,events}=await mount(t,true);
+ state.requestClose('implicit');
+ state.requestClose('implicit');
+ assert.deepEqual(events,[['close'],['close']]);
+ assert.equal(state.closeAttemptNotice,'');
+});
+
+test('Cancelar pide confirmación solo cuando hay cambios', async t => {
+ const {state,events}=await mount(t,true);
+ let asked=0;
+ global.window={confirm:()=>{asked++;return false;}};
+ state.form.nombre='Cambio pendiente';
+ state.requestClose();
+ assert.equal(asked,1);
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.nombre,'Cambio pendiente');
+ global.window.confirm=()=>{asked++;return true;};
+ state.requestClose();
+ assert.equal(asked,2);
+ assert.deepEqual(events,[['close']]);
+});
+
+test('un alta rechazada conserva los campos y el error ante un cierre accidental', async t => {
+ const {state,events}=await mount(t,true,{saveAdminProduct:async()=>{throw httpError(400);}},{product:null});
+ state.form.id_categoria=2;
+ state.form.nombre='Producto nuevo';
+ state.form.codigo='SKU-NUEVO';
+ state.form.precio=10;
+ state.form.stock=1;
+ await state.handleSubmit();
+ assert.equal(state.backendError,'rechazo');
+ assert.equal(state.form.nombre,'Producto nuevo');
+ assert.deepEqual(events,[]);
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.codigo,'SKU-NUEVO');
+ assert.ok(state.closeAttemptNotice);
+});
+
+test('un error visible bloquea el cierre accidental aunque no haya cambios', async t => {
+ global.window={confirm:()=>true};
+ const {state,events}=await mount(t,true,{saveAdminProduct:async()=>{throw httpError(400);}});
+ await state.handleSubmit();
+ assert.equal(state.isDirty,false);
+ assert.ok(state.backendError);
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.ok(state.closeAttemptNotice);
 });
