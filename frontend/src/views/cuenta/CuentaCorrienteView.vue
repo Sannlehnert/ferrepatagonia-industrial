@@ -2,6 +2,7 @@
 import { computed, onMounted, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import CompanyStatus from '@/components/CompanyStatus.vue'
+import CreditRequestPanel from '@/components/CreditRequestPanel.vue'
 import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { accountReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
@@ -106,6 +107,7 @@ onBeforeRouteLeave(() => cuenta.clear())
         </header>
 
         <CompanyStatus class="mb-6" />
+        <CreditRequestPanel />
 
         <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando ||
             cuenta.movimientosMasCargando || cuenta.vencimientosMasCargando" role="status"
