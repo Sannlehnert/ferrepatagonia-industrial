@@ -22,9 +22,18 @@ export const accountReceiptsPath = '/cuenta-corriente/comprobantes'
 export const adminReceiptsPath = '/admin/comprobantes'
 export const orderReceiptsPath = (orderId: number) => '/pedidos/' + orderId + '/comprobantes'
 
-export function supportsOrderReceipts(clientType: string | null | undefined, paymentMethod: string) {
-  return (clientType === 'PARTICULAR' && paymentMethod === 'TRANSFERENCIA')
-    || (clientType === 'EMPRESA' && paymentMethod === 'CUENTA_CORRIENTE')
+export function supportsOrderReceipts(
+  clientType: string | null | undefined,
+  paymentMethod: string,
+  companyApproval?: string | null,
+  companyAccountEnabled?: boolean | null,
+) {
+  return (paymentMethod === 'TRANSFERENCIA'
+      && (clientType === 'PARTICULAR'
+        || (clientType === 'EMPRESA' && companyApproval === 'APROBADA')))
+    || (clientType === 'EMPRESA'
+      && paymentMethod === 'CUENTA_CORRIENTE'
+      && companyAccountEnabled !== null)
 }
 
 export async function listPaymentReceipts(path: string, pagina: number, signal: AbortSignal) {
