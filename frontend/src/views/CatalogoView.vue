@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ProductPrices from '@/components/ProductPrices.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
+import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
 import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
@@ -24,16 +25,31 @@ import type {
   CatalogCategory,
 } from '@/types/catalog'
 import CatalogCartButton from '@/components/CatalogCartButton.vue'
+import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
 
 const LIMITE = 12
 const route = useRoute()
 const router = useRouter()
 
 const productos = ref<CatalogProduct[]>([])
+const failedImages = ref<Record<number, string>>({})
 const pagination = ref<CatalogPagination | null>(null)
 const total = ref(0)
 const cargando = ref(true)
 const error = ref<string | null>(null)
+
+function imageHasFailed(product: CatalogProduct): boolean {
+  return Boolean(product.imagen && failedImages.value[product.id] === product.imagen)
+}
+
+function markImageFailed(product: CatalogProduct): void {
+  if (!product.imagen) return
+  failedImages.value = { ...failedImages.value, [product.id]: product.imagen }
+}
+
+function imageNoticeId(productId: number): string {
+  return `catalog-product-image-note-${productId}`
+}
 
 // Número entero positivo a partir de un parámetro de la URL, o undefined
 function entero(v: unknown): number | undefined {
@@ -310,17 +326,29 @@ onBeforeUnmount(() => {
 
         <ul v-else class="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-4 m-0 list-none p-0 [@media(max-width:560px)]:grid-cols-2 [@media(max-width:560px)]:gap-3">
           <li v-for="p in productos" :key="p.id" class="box-border grid min-w-0 row-span-7 grid-rows-subgrid gap-y-0 rounded-lg border border-slate-200 bg-white p-4 [@media(max-width:560px)]:p-3">
-            <div class="mb-3 grid h-[140px] place-items-center overflow-hidden rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]">
-              <ProductThumbnail :image="p.imagen" :alt="p.nombre" image-class="h-full min-h-0 w-full object-contain">
-                <span aria-hidden="true">Sin imagen</span>
-              </ProductThumbnail>
+            <div class="mb-3 grid min-w-0 content-start gap-2">
+              <div class="grid h-[140px] place-items-center overflow-hidden rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]">
+                <ProductThumbnail
+                  :image="p.imagen"
+                  :alt="p.nombre"
+                  image-class="h-full min-h-0 w-full object-contain"
+                  :described-by="isIllustrativeDemoImage(p.codigo, p.imagen) && !imageHasFailed(p) ? imageNoticeId(p.id) : undefined"
+                  @image-error="markImageFailed(p)"
+                >
+                  <span aria-hidden="true">Sin imagen</span>
+                </ProductThumbnail>
+              </div>
+              <IllustrativeImageNotice
+                v-if="isIllustrativeDemoImage(p.codigo, p.imagen) && !imageHasFailed(p)"
+                :id="imageNoticeId(p.id)"
+              />
             </div>
 
             <p class="m-0 min-w-0 max-w-full text-[.75rem] text-[var(--fp-muted)] [overflow-wrap:anywhere]">COD. {{ p.codigo }}</p>
             <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">
               <RouterLink
                 :to="{ name: 'producto-detalle', params: { id: p.id }, query: { returnTo: route.fullPath } }"
-                class="rounded-sm text-inherit underline-offset-2 hover:text-[var(--fp-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fp-blue)]"
+                class="inline-flex min-h-[44px] items-center rounded-sm text-inherit underline-offset-2 hover:text-[var(--fp-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fp-blue)]"
               >
                 {{ p.nombre }}
               </RouterLink>

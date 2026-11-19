@@ -1,0 +1,51 @@
+numero,sku,familia,nombre,tipo,archivo,observacion
+1,FP-DEMO-ABR-DISCO-LIJA-100-MM,ABR,Disco de lija con respaldo adhesivo · 100 mm,Ilustración,ilustrativa-abr.webp,Disco abrasivo; respaldo adhesivo y diámetro no acreditados por el esquema.
+2,FP-DEMO-ABR-DISCO-METAL-100-MM,ABR,Disco de corte para metal · 100 mm,Ilustración,ilustrativa-abr-corte.webp,Disco de corte oscuro con orificio central; sin marcado de otra medida.
+3,FP-DEMO-ABR-LIJA-AGUA-GRANO-1000,ABR,Hoja de lija al agua 230 × 280 mm · grano 1000,Ilustración,ilustrativa-abr-hoja.webp,Hoja abrasiva; grano y dimensiones no acreditados.
+4,FP-DEMO-ABR-LIJA-MADERA-GRANO-100,ABR,Hoja de lija para madera 230 × 280 mm · grano 100,Ilustración,ilustrativa-abr-hoja.webp,Hoja abrasiva; grano y dimensiones no acreditados.
+5,FP-DEMO-ADH-CINTA-DOBLE-12-MM,ADH,Cinta de montaje doble faz · 12 mm,Ilustración,ilustrativa-adh-cinta.webp,Rollo de cinta; ancho y doble adhesivo no acreditados.
+6,FP-DEMO-ADH-COLA-100-ML,ADH,Cola vinílica para madera · 100 ml,Ilustración,ilustrativa-adh-cola.webp,Envase de cola con pico; capacidad no acreditada.
+7,FP-DEMO-ADH-CONTACTO-100-ML,ADH,Adhesivo de contacto · 100 ml,Ilustración,ilustrativa-adh.webp,Envase de adhesivo; composición y capacidad no acreditadas.
+8,FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS,ADH,Sellador acrílico blanco · caja de 10 cartuchos,Ilustración,ilustrativa-adh-sellador.webp,Caja y cartucho con boquilla; no acredita diez unidades ni composición.
+9,FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-AZUL,ALT,Arnés de cuerpo completo · talle 2XL/3XL azul,Ilustración,ilustrativa-alt.webp,"Símbolo de correas azules con hebilla; talle, arnés completo y certificaciones no acreditados."
+10,FP-DEMO-ALT-BOLSO-ARNES-10-L,ALT,Bolso para guardar arnés · 10 L,Ilustración,ilustrativa-alt-bolso.webp,Bolso con asas; capacidad no acreditada.
+11,FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES,ALT,Etiqueta de identificación para inventario de arneses · paquete de 100 unidades,Ilustración,ilustrativa-alt-etiqueta.webp,Etiqueta con ojal; no acredita el paquete de 100.
+12,FP-DEMO-ALT-PROTECTOR-CINTA-150-MM,ALT,Funda para cinta de arnés · 150 mm,Ilustración,ilustrativa-alt-protector.webp,Funda protectora; medida y material no acreditados.
+13,FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-100-UNIDADES,AUD,Tapón auditivo con aletas y cordón · paquete de 100 unidades,Fotografía,tapones-aletas-cordon.webp,Tapones con aletas y cordón. Muestra un par; no el paquete de 100.
+14,FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-100-UNIDADES,AUD,Tapón auditivo de espuma sin cordón · paquete de 100 unidades,Fotografía,tapones-espuma.webp,Tapones de espuma sin cordón. Muestra unidades; no el paquete de 100.
+15,FP-DEMO-AUD-OREJERA-AMARILLO,AUD,Orejera de copa con diadema · amarillo,Ilustración,ilustrativa-aud.webp,Copas amarillas y diadema; atenuación y modelo no acreditados.
+16,FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES,AUD,Tapón auditivo de espuma con cordón · paquete de 100 unidades,Ilustración,ilustrativa-aud-tapon.webp,Tapones unidos por cordón; no acredita espuma ni paquete de 100.
+17,FP-DEMO-CAB-CABLE-AZUL-0-5-MM2,CAB,"Cable unipolar azul en rollo de 25 m · 0,5 mm²",Ilustración,ilustrativa-cab.webp,Rollo azul; sección y longitud no acreditadas.
+18,FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2,CAB,"Cable bipolar negro en rollo de 10 m · 0,5 mm²",Ilustración,ilustrativa-cab-bipolar.webp,Rollo negro con dos extremos conductores; sección y longitud no acreditadas.
+19,FP-DEMO-CAB-CABLE-MARRON-0-5-MM2,CAB,"Cable unipolar marrón en rollo de 25 m · 0,5 mm²",Ilustración,ilustrativa-cab-marron.webp,Rollo marrón; sección y longitud no acreditadas.
+20,FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2,CAB,"Cable unipolar negro en rollo de 25 m · 0,5 mm²",Ilustración,ilustrativa-cab-negro.webp,Rollo negro; sección y longitud no acreditadas.
+21,FP-DEMO-CAL-BOTIN-38-AR,CAL,Botín de trabajo de cuero negro con puntera · 38 AR,Fotografía,botin-trabajo-negro.webp,Botín negro con puntera según la fuente; talla 38 no acreditada.
+22,FP-DEMO-CAL-ZAPATO-38-AR,CAL,Zapato de trabajo bajo con puntera · 38 AR,Fotografía,zapato-trabajo-bajo.webp,Zapato bajo con puntera según la fuente; talla 38 no acreditada.
+23,FP-DEMO-CAL-BORCEGUI-38-AR,CAL,Borceguí de trabajo marrón con puntera · 38 AR,Fotografía,borcegui-marron.webp,Borceguí marrón Caterpillar con puntera de acero según la fuente; talla 38 no acreditada.
+24,FP-DEMO-CAL-BOTA-PVC-38-AR,CAL,Bota de trabajo de PVC con puntera · 38 AR,Ilustración,ilustrativa-cal-bota-pvc.webp,"Bota de caña alta; PVC, puntera y talle no acreditados por el esquema."
+25,FP-DEMO-CAS-CASCO-BLANCO-BARBOQUEJO,CAS,Casco industrial blanco con barboquejo,Fotografía,casco-blanco-barboquejo.webp,Cascos blancos; correa visible en el casco invertido. Sin certificaciones acreditadas.
+26,FP-DEMO-CAS-CASCO-ALA-AMARILLO,CAS,Casco industrial de ala completa · amarillo,Ilustración,ilustrativa-cas-ala.webp,Esquema de casco amarillo con ala perimetral. Foto anterior retirada de este SKU por no acreditar ala completa.
+27,FP-DEMO-CAS-CASCO-CORTO-AMARILLO,CAS,Casco industrial de visera corta · amarillo,Fotografía,casco-visera-corta-amarillo.webp,Casco amarillo de visera corta; sin certificaciones acreditadas.
+28,FP-DEMO-CAS-CASCO-RANURAS-AMARILLO,CAS,Casco industrial con ranuras laterales · amarillo,Ilustración,ilustrativa-cas.webp,Casco amarillo con dos marcas laterales de ranuras; compatibilidad de accesorios no acreditada.
+29,FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL,CHA,Chaleco reflectivo amarillo con cierre · talle 2XL,Ilustración,ilustrativa-cha-cierre.webp,Chaleco amarillo con cierre central; talle no acreditado.
+30,FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL,CHA,Chaleco reflectivo amarillo con bolsillos · talle 2XL,Ilustración,ilustrativa-cha-bolsillos.webp,Chaleco amarillo con bolsillos; talle no acreditado.
+31,FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL,CHA,Chaleco reflectivo naranja de malla · talle 2XL,Ilustración,ilustrativa-cha-malla.webp,Chaleco naranja con trama de malla; talle y tejido real no acreditados.
+32,FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL,CHA,Chaleco reflectivo naranja con cierre · talle 2XL,Ilustración,ilustrativa-cha-naranja.webp,Chaleco naranja con cierre central; talle no acreditado.
+33,FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA,CIN,Cinta para delimitar sectores · amarilla,Ilustración,ilustrativa-cin-lisa.webp,Rollo amarillo liso; largo y material no acreditados.
+34,FP-DEMO-CIN-CINTA-PISO-AMARILLA,CIN,Cinta adhesiva para demarcación de pisos · amarilla,Ilustración,ilustrativa-cin-lisa.webp,Rollo amarillo liso; adhesivo y uso en piso no acreditados.
+35,FP-DEMO-CIN-CINTA-TEXTO-100-M,CIN,Cinta impresa de delimitación amarilla y negra · 100 m,Ilustración,ilustrativa-cin.webp,Rollo amarillo con trazos negros; longitud e impresión exacta no acreditadas.
+36,FP-DEMO-CIN-CINTA-VISUAL-12-MM,CIN,Cinta adhesiva reflectiva de señalización · 12 mm,Ilustración,ilustrativa-cin-lisa.webp,Rollo liso; reflectividad y ancho no acreditados.
+37,FP-DEMO-CON-CONO-NARANJA-18-CM,CON,Cono de señalización naranja · 18 cm,Ilustración,ilustrativa-con.webp,Cono naranja esquemático; no muestra una etiqueta de otra altura.
+38,FP-DEMO-CON-CONO-NARANJA-30-CM,CON,Cono de señalización naranja de 30 cm,Fotografía,cono-naranja-30-cm.webp,Cono naranja de 30 cm documentado por la fuente; sin escala en la copia.
+39,FP-DEMO-CON-BARRA-CONOS-0-6-M,CON,"Barra de enlace para conos · 0,6 m",Ilustración,ilustrativa-con-barra.webp,Barra de enlace con extremos; longitud no acreditada.
+40,FP-DEMO-CON-CADENA-100-M,CON,Cadena de balizamiento plástica · 100 m,Ilustración,ilustrativa-con-cadena.webp,Cadena plástica esquemática; longitud no acreditada.
+41,FP-DEMO-ELE-CALADORA-500-W,ELE,Sierra caladora con cable · 500 W,Fotografía,caladora-500w.webp,Caladora Ryobi RJS720; 500 W según la identificación de modelo de la auditoría previa.
+42,FP-DEMO-ELE-AMOLADORA-1000-W,ELE,Amoladora angular con cable · 1000 W,Ilustración,ilustrativa-ele-amoladora.webp,Amoladora con disco y cable; potencia no acreditada por el esquema.
+43,FP-DEMO-ELE-LIJADORA-150-W,ELE,Lijadora orbital con cable · 150 W,Ilustración,ilustrativa-ele-lijadora.webp,Lijadora de base plana; potencia y mecanismo orbital no acreditados por el esquema.
+44,FP-DEMO-ELE-TALADRO-500-W,ELE,Taladro percutor con cable · 500 W,Ilustración,ilustrativa-ele.webp,Taladro con cable; potencia y percusión no acreditadas por el esquema.
+45,FP-DEMO-FIJ-TARUGO-NYLON-10-MM,FIJ,Tarugo de nailon · 10 mm,Ilustración,ilustrativa-fij-tarugo.webp,Tarugo con cuerpo ranurado; foto de 8 mm retirada de este SKU de 10 mm.
+46,FP-DEMO-FIJ-ABRAZADERA-12-MM,FIJ,Abrazadera de montaje para caño · 12 mm,Ilustración,ilustrativa-fij-abrazadera.webp,Abrazadera curva para caño; diámetro no acreditado.
+47,FP-DEMO-FIJ-ANCLAJE-M10,FIJ,Anclaje metálico de expansión · M10,Ilustración,ilustrativa-fij-anclaje.webp,Anclaje con tuerca y camisa de expansión; rosca y capacidad no acreditadas.
+48,FP-DEMO-FIJ-VARILLA-M10,FIJ,Varilla roscada zincada de 1 m · M10,Ilustración,ilustrativa-fij-varilla.webp,"Varilla roscada sin cabeza; diámetro, largo y zincado no acreditados."
+49,FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL,GUA,Guante de algodón tejido · talle 2XL,Ilustración,ilustrativa-gua-algodon.webp,Guante claro con trama; algodón y talle no acreditados.
+50,FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL,GUA,Guante de cuero descarne de puño largo · talle 2XL,Ilustración,ilustrativa-gua-descarne.webp,Guante con puño extendido; cuero y talle no acreditados.

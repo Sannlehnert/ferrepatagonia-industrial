@@ -50,11 +50,13 @@ async function mount(t, page, handler = query => response(query.page)) {
       '@/components/ProductPrice.vue',
       '@/components/ProductThumbnail.vue',
       '@/components/CatalogCartButton.vue',
+      '@/components/IllustrativeImageNotice.vue',
     ].includes(name)) {
       return { default: {} }
     }
     if (name === '@/utils/catalogPagination') return require('../src/utils/catalogPagination.ts')
     if (name === '@/utils/catalogOrder') return require('../src/utils/catalogOrder.ts')
+    if (name === '@/utils/illustrativeDemoImage') return { isIllustrativeDemoImage: () => false }
     return require(name)
   }, module, module.exports)
   const component = module.exports.default
