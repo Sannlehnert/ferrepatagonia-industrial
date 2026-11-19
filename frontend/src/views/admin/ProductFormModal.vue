@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from 'vue';
+import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue';
 import axios from 'axios';
 import ProductThumbnail from '@/components/ProductThumbnail.vue';
 import {
@@ -31,10 +31,74 @@ const emit = defineEmits<{
     (e: 'reload'): void;
 }>();
 
-const isEditMode = computed(() => Boolean(props.product?.id_producto));
+const draftProduct = ref<AdminProduct | null>(null);
+const dialog = ref<HTMLDialogElement | null>(null);
+const isEditMode = computed(() => Boolean(draftProduct.value?.id_producto));
+
+let lastDialogFocus: HTMLElement | null = null;
+let nativeRestorePending = false;
+let suppressCancel = false;
+let unmounting = false;
+
+const containDialogFocus = (event: KeyboardEvent) => {
+    if (!dialog.value) return;
+
+    // Chromium puede completar el cierre del CloseWatcher aunque cancel esté
+    // prevenido. Interceptamos Escape para que el cierre siempre pase por la
+    // lógica de la aplicación y no desincronice el estado del padre.
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        suppressCancel = true;
+        globalThis.setTimeout(() => { suppressCancel = false; }, 0);
+        requestClose('implicit');
+        return;
+    }
+
+    if (event.key !== 'Tab') return;
+    const controls = [...dialog.value.querySelectorAll<HTMLElement>(
+        'button, input, select, textarea, a[href], [tabindex]'
+    )].filter(control => !control.matches(':disabled') && control.tabIndex >= 0
+        && control.getClientRects().length > 0);
+    const first = controls[0];
+    const last = controls.at(-1);
+    const current = dialog.value.ownerDocument.activeElement;
+    if (event.shiftKey && current === first) {
+        event.preventDefault();
+        last?.focus();
+    } else if (!event.shiftKey && current === last) {
+        event.preventDefault();
+        first?.focus();
+    }
+};
+
+const rememberDialogFocus = (event: FocusEvent) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && dialog.value?.contains(target)) {
+        lastDialogFocus = target;
+    }
+};
+
+const restoreNativeDialog = () => {
+    const element = dialog.value;
+    if (unmounting || !props.isOpen || !element || element.open) return;
+
+    try {
+        element.showModal();
+    } catch {
+        return;
+    }
+
+    const target = lastDialogFocus;
+    if (target?.isConnected && element.contains(target) && !target.matches(':disabled')) {
+        target.focus({ preventScroll: true });
+    } else {
+        element.querySelector<HTMLInputElement>('form input')?.focus({ preventScroll: true });
+    }
+};
 const isSubmitting = ref(false);
 const backendError = ref('');
 const uncertain = ref(false);
+const closeAttemptNotice = ref('');
 const formDisabled = computed(() => isSubmitting.value || uncertain.value || props.mutationBlocked);
 const fieldErrors = ref<Record<string, string>>({});
 const imageFile = ref<File>();
@@ -70,7 +134,11 @@ function rejectPreview() {
     imageError.value = 'No se pudo abrir la foto. Elegí otra imagen.';
 }
 
-onBeforeUnmount(clearImage);
+onBeforeUnmount(() => {
+    unmounting = true;
+    clearImage();
+    if (dialog.value?.open) dialog.value.close();
+});
 
 const form = ref({
     nombre: '',
@@ -82,6 +150,23 @@ const form = ref({
     imagen: '',
     activo: true
 });
+
+const formSnapshot = () => JSON.stringify(form.value);
+// Los cambios se comparan con el estado con el que se abrió el formulario.
+const initialSnapshot = ref('');
+const isDirty = computed(() => Boolean(imageFile.value)
+    || (initialSnapshot.value !== '' && formSnapshot() !== initialSnapshot.value));
+const hasPendingError = computed(() => Boolean(backendError.value) || uncertain.value
+    || Object.keys(fieldErrors.value).length > 0 || Boolean(imageError.value));
+
+watch([isDirty, hasPendingError], ([dirty, pending]) => {
+    if (!dirty && !pending) closeAttemptNotice.value = '';
+}, { flush: 'sync' });
+
+const validCategoryId = (value: unknown): number | '' => {
+    const id = Number(value);
+    return Number.isInteger(id) && id > 0 ? id : '';
+};
 
 const availableCategories = computed<CategoryOption[]>(() => {
     const list = props.categories ? [...props.categories] : [];
@@ -105,10 +190,20 @@ const availableCategories = computed<CategoryOption[]>(() => {
 watch(
     () => props.isOpen,
     (isOpen, wasOpen) => {
-        if (!isOpen) clearImage();
+        if (!isOpen) {
+            clearImage();
+            dialog.value?.close();
+        }
         if (!isOpen || wasOpen) return;
+        draftProduct.value = props.product ? { ...props.product } : null;
+        void nextTick(() => {
+            if (!props.isOpen || !dialog.value) return;
+            dialog.value.showModal();
+            dialog.value.querySelector<HTMLInputElement>('form input')?.focus({ preventScroll: true });
+        });
         backendError.value = '';
         uncertain.value = false;
+        closeAttemptNotice.value = '';
         fieldErrors.value = {};
 
         if (props.product) {
@@ -118,7 +213,7 @@ watch(
             form.value = {
                 nombre: props.product.nombre ?? '',
                 codigo: props.product.codigo ?? '',
-                id_categoria: Number(props.product.id_categoria) || 1,
+                id_categoria: validCategoryId(props.product.id_categoria),
                 // H05: Si no tiene precio dejamos ''; si tiene precio, Number() normaliza "150.00" a 150
                 precio: hasPrecio ? Number(rawPrecio) : '',
                 stock: Number(props.product.stock ?? 0),
@@ -130,7 +225,7 @@ watch(
             form.value = {
                 nombre: '',
                 codigo: '',
-                id_categoria: props.categories?.[0]?.id_categoria ?? 1,
+                id_categoria: '',
                 precio: '',
                 stock: '',
                 descripcion: '',
@@ -138,6 +233,7 @@ watch(
                 activo: true
             };
         }
+        initialSnapshot.value = formSnapshot();
     },
     { immediate: true }
 );
@@ -145,10 +241,15 @@ watch(
 watch(
     () => props.categories,
     (newCats) => {
-        const firstCategory = newCats?.[0];
-        if (props.isOpen && !isEditMode.value && !form.value.id_categoria && firstCategory) {
-            form.value.id_categoria = firstCategory.id_categoria;
-        }
+        // En alta, si las categorías llegan después de abrir el modal,
+        // seleccionamos la primera válida sin marcar el formulario como editado.
+        if (!props.isOpen || isEditMode.value || form.value.id_categoria !== '') return;
+        const firstCategory = newCats?.find(cat => validCategoryId(cat.id_categoria) !== '');
+        if (!firstCategory) return;
+
+        const untouched = formSnapshot() === initialSnapshot.value;
+        form.value.id_categoria = Number(firstCategory.id_categoria);
+        if (untouched && !imageFile.value) initialSnapshot.value = formSnapshot();
     }
 );
 
@@ -197,8 +298,13 @@ const validateForm = (): boolean => {
 };
 
 const handleSubmit = async () => {
-    if (formDisabled.value || imageError.value) return;
+    if (!props.isOpen || formDisabled.value || imageError.value) return;
+    if (props.product?.id_producto !== draftProduct.value?.id_producto) {
+        backendError.value = 'El producto seleccionado cambió. Cerrá el formulario y volvé a abrirlo.';
+        return;
+    }
     backendError.value = '';
+    closeAttemptNotice.value = '';
     if (!validateForm()) return;
 
     if (isEditMode.value && Boolean(props.product?.activo) && !form.value.activo &&
@@ -219,7 +325,7 @@ const handleSubmit = async () => {
             activo: Boolean(form.value.activo)
         };
 
-        const original = props.product;
+        const original = draftProduct.value;
         const priceUnchanged = original !== null && (
             isPriceEmpty
                 ? (original.precio === null || original.precio === undefined)
@@ -273,48 +379,112 @@ const handleSubmit = async () => {
     }
 };
 
-const requestClose = () => {
-    if (!isSubmitting.value && !props.isReloading) emit('close');
+const requestClose = (source: 'explicit' | 'implicit' = 'explicit') => {
+    if (isSubmitting.value || props.isReloading) {
+        if (source === 'implicit') {
+            closeAttemptNotice.value = isSubmitting.value
+                ? 'Esperá a que termine el guardado para cerrar el formulario.'
+                : 'Esperá a que termine la recarga para cerrar el formulario.';
+        }
+        return;
+    }
+    if (source === 'implicit' && (isDirty.value || hasPendingError.value)) {
+        closeAttemptNotice.value = 'Para cerrar el formulario usá «Cancelar» o el botón ×; así no se pierden los datos ni el detalle del error.';
+        return;
+    }
+    if (source === 'explicit' && isDirty.value
+        && !window.confirm('¿Descartar los cambios sin guardar del producto?')) return;
+    emit('close');
+};
+
+const handleCancel = (event: Event) => {
+    event.preventDefault();
+    if (suppressCancel) return;
+    requestClose('implicit');
+};
+
+const handleNativeClose = () => {
+    if (unmounting || !props.isOpen) return;
+
+    if (isSubmitting.value || props.isReloading) {
+        closeAttemptNotice.value = isSubmitting.value
+            ? 'Esperá a que termine el guardado para cerrar el formulario.'
+            : 'Esperá a que termine la recarga para cerrar el formulario.';
+    } else if (isDirty.value || hasPendingError.value) {
+        closeAttemptNotice.value = 'Para cerrar el formulario usá «Cancelar» o el botón ×; así no se pierden los datos ni el detalle del error.';
+    } else {
+        // El cierre nativo fue autorizado: sincronizamos el estado del padre.
+        emit('close');
+        return;
+    }
+
+    if (nativeRestorePending) return;
+    nativeRestorePending = true;
+    void nextTick(() => {
+        nativeRestorePending = false;
+        restoreNativeDialog();
+    });
 };
 </script>
 
 <template>
-    <div
+    <dialog
+        ref="dialog"
         v-if="isOpen"
-        class="fixed inset-0 bg-[#0B2438]/75 flex items-center justify-center z-50 p-2 sm:p-4"
-        @click.self="requestClose"
+        aria-labelledby="product-form-title"
+        class="fixed inset-0 m-auto h-full max-h-none w-full max-w-none box-border border-0 bg-[#0B2438]/75 p-2 sm:p-4 open:flex items-center justify-center"
+        @cancel="handleCancel"
+        @close="handleNativeClose"
+        @keydown="containDialogFocus"
+        @focusin="rememberDialogFocus"
+        @click.self="requestClose('implicit')"
     >
         <div class="bg-[#F8FAFC] w-full max-w-3xl rounded-lg shadow-xl border border-[#E2E8F0] flex flex-col max-h-[90dvh]">
             <!-- Encabezado fijo -->
             <div class="shrink-0 flex justify-between items-center p-4 sm:p-6 border-b border-[#E2E8F0] bg-white rounded-t-lg">
-                <h3 class="text-lg sm:text-xl font-bold text-[#0B2438]">
-                    {{ isEditMode ? `Editar Producto #${product?.id_producto}` : 'Crear Nuevo Producto' }}
+                <h3 id="product-form-title" class="text-lg sm:text-xl font-bold text-[#0B2438]">
+                    {{ isEditMode ? `Editar Producto #${draftProduct?.id_producto}` : 'Crear Nuevo Producto' }}
                 </h3>
                 <button
                     type="button"
-                    @click="requestClose"
+                    @click="requestClose()"
                     :disabled="isSubmitting || isReloading"
                     aria-label="Cerrar formulario"
-                    class="box-border min-h-11 min-w-11 flex items-center justify-center border-0 bg-transparent text-[#64748B] hover:text-[#0B2438] text-2xl"
+                    class="box-border min-h-11 min-w-11 flex items-center justify-center border-0 bg-transparent text-[#64748B] hover:text-[#0B2438] text-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                 >
                     ×
                 </button>
+            </div>
+
+            <!-- Aviso de cierre fijo, fuera del cuerpo desplazable -->
+            <div v-if="closeAttemptNotice" class="shrink-0 px-4 pt-4 sm:px-6 sm:pt-5">
+                <p
+                    role="alert"
+                    class="m-0 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 wrap-anywhere"
+                >
+                    {{ closeAttemptNotice }}
+                </p>
             </div>
 
             <!-- Formulario con cuerpo scrollable y botones fijos abajo -->
             <form @submit.prevent="handleSubmit" novalidate class="flex flex-col flex-1 min-h-0">
                 <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
                     <div v-if="uncertain || mutationBlocked" role="alert" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                        <p>{{ uncertainMutationMessage }}</p>
-                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 border-0 bg-transparent underline">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
+                        <p class="wrap-anywhere">{{ uncertainMutationMessage }}</p>
+                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 border-0 bg-transparent underline disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
                     </div>
                     <div
                         v-if="backendError && !uncertain"
                         role="alert"
-                        class="bg-red-50 border border-red-200 text-[#EF4444] text-sm px-4 py-3 rounded-md flex items-center justify-between"
+                        class="bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-md flex items-start gap-3"
                     >
-                        <span>{{ backendError }}</span>
-                        <button type="button" @click="backendError = ''" class="border-0 bg-transparent font-bold ml-4">✕</button>
+                        <span class="wrap-anywhere min-w-0 flex-1">{{ backendError }}</span>
+                        <button
+                            type="button"
+                            aria-label="Descartar error"
+                            class="box-border -my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center border-0 bg-transparent font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                            @click="backendError = ''"
+                        >✕</button>
                     </div>
 
                     <div>
@@ -326,7 +496,7 @@ const requestClose = () => {
                             class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                             :class="fieldErrors.nombre ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                         >
-                        <p v-if="fieldErrors.nombre" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.nombre }}</p>
+                        <p v-if="fieldErrors.nombre" class="text-xs text-red-700 mt-1">{{ fieldErrors.nombre }}</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -339,7 +509,7 @@ const requestClose = () => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
                                 :class="fieldErrors.codigo ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
-                            <p v-if="fieldErrors.codigo" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.codigo }}</p>
+                            <p v-if="fieldErrors.codigo" class="text-xs text-red-700 mt-1 wrap-anywhere">{{ fieldErrors.codigo }}</p>
                         </div>
 
                         <div>
@@ -348,8 +518,8 @@ const requestClose = () => {
                                 Cargando categorías...
                             </div>
                             <div v-if="categoriesError" role="alert" class="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-                                <p>{{ categoriesError }}</p>
-                                <button type="button" @click="emit('retry-categories')" class="mt-1 font-semibold underline">
+                                <p class="wrap-anywhere">{{ categoriesError }}</p>
+                                <button type="button" @click="emit('retry-categories')" class="mt-1 min-h-11 px-1 inline-flex items-center font-semibold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
                                     Reintentar
                                 </button>
                             </div>
@@ -365,7 +535,7 @@ const requestClose = () => {
                                     {{ cat.nombre }}
                                 </option>
                             </select>
-                            <p v-if="fieldErrors.id_categoria" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.id_categoria }}</p>
+                            <p v-if="fieldErrors.id_categoria" class="text-xs text-red-700 mt-1">{{ fieldErrors.id_categoria }}</p>
                         </div>
                     </div>
 
@@ -392,7 +562,7 @@ const requestClose = () => {
                                 Evidencia actual: {{ product?.estado_precio_base ? basePriceLabels[product.estado_precio_base] : 'No se pudo determinar el estado del precio base' }}
                             </p>
                             <p class="mt-1 text-xs text-[#64748B]">Guardar o cambiar el importe no verifica el precio e invalida la evidencia previa. Requiere nueva evidencia antes de ofrecerlo en el catálogo.</p>
-                            <p v-if="fieldErrors.precio" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.precio }}</p>
+                            <p v-if="fieldErrors.precio" class="text-xs text-red-700 mt-1">{{ fieldErrors.precio }}</p>
                         </div>
 
                         <div>
@@ -406,7 +576,7 @@ const requestClose = () => {
                                 class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
                                 :class="fieldErrors.stock ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
-                            <p v-if="fieldErrors.stock" class="text-xs text-[#EF4444] mt-1">{{ fieldErrors.stock }}</p>
+                            <p v-if="fieldErrors.stock" class="text-xs text-red-700 mt-1">{{ fieldErrors.stock }}</p>
                         </div>
                     </div>
 
@@ -429,7 +599,7 @@ const requestClose = () => {
                         <img v-if="previewUrl" :src="previewUrl" alt="Vista previa de la foto"
                             class="mt-2 h-28 max-w-full rounded-md object-contain" @error="rejectPreview">
                         <button v-if="imageFile || imageError" type="button" :disabled="formDisabled" @click="clearImage()"
-                            class="min-h-11 border-0 bg-transparent text-sm text-[#103A5C] underline">Quitar selección</button>
+                            class="min-h-11 border-0 bg-transparent text-sm text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">Quitar selección</button>
                         <ProductThumbnail v-if="product?.imagen" :image="product.imagen" alt="Foto actual del producto"
                             image-class="mt-2 block h-20 max-w-full rounded-md object-contain" />
                         <label for="producto-imagen-url" class="mt-2 block text-xs font-semibold uppercase text-[#64748B] mb-1">URL de Imagen (Opcional)</label>
@@ -471,21 +641,21 @@ const requestClose = () => {
                 <div class="shrink-0 p-4 sm:px-6 bg-white border-t border-[#E2E8F0] rounded-b-lg flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3">
                     <button
                         type="button"
-                        @click="requestClose"
+                        @click="requestClose()"
                         :disabled="isSubmitting || isReloading"
-                        class="box-border min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto"
+                        class="box-border min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         :disabled="formDisabled || Boolean(imageError)"
-                        class="box-border min-h-11 border-0 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
+                        class="box-border min-h-11 border-0 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
                         {{ isSubmitting ? (imageFile ? 'Subiendo foto...' : 'Guardando...') : (isEditMode ? 'Guardar Cambios' : 'Crear Producto') }}
                     </button>
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 </template>

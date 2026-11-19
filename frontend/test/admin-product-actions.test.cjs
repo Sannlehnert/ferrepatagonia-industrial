@@ -30,7 +30,7 @@ async function mount(t, modal=false, overrides={}, props={}) {
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
  app.mount({}); t.after(()=>app.unmount()); await settle();
- return {state:app._instance.setupState,calls,events,route};
+ return {state:app._instance.setupState,calls,events,route,props:app._instance.props};
 }
 test('status: cancel confirmation sends nothing; accept deactivates; reactivation needs no confirmation',async t=>{
  const {state,calls}=await mount(t); let confirmations=0;
@@ -161,4 +161,91 @@ describe('Product Form & Actions - Regression Tests (#240)', () => {
         assert.equal(payload.precio, undefined, 'El payload no debe incluir precio: 0');
         assert.notEqual(payload.precio, 0, 'El precio no debe coaccionarse a cero');
     });
+});
+test('modal refuses a submit when selection changes after draft initialization', async t => {
+ const {state,calls,props}=await mount(t,true);
+ props.product={...product,id_producto:8,nombre:'Otro'};
+ await settle();
+ await state.handleSubmit();
+ assert.equal(calls.length,0);
+ assert.match(state.backendError,/seleccionado cambió/);
+ assert.equal(state.draftProduct.id_producto,7);
+});
+test('an active edit cannot be replaced or switched to creation', async t => {
+ const {state}=await mount(t);
+ state.openEditModal(product);
+ state.openEditModal({...product,id_producto:8});
+ state.openCreateModal();
+ assert.equal(state.selectedProduct.id_producto,7);
+});
+
+test('un clic exterior no cierra un borrador con cambios y conserva los campos', async t => {
+ const {state,events}=await mount(t,true);
+ state.form.nombre='Borrador sin guardar';
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.nombre,'Borrador sin guardar');
+ assert.match(state.closeAttemptNotice,/Cancelar/);
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.nombre,'Borrador sin guardar');
+});
+
+test('una imagen elegida cuenta como cambio sin guardar', async t => {
+ const {state,events}=await mount(t,true);
+ state.imageFile={name:'foto.png',size:10,type:'image/png'};
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.ok(state.closeAttemptNotice);
+});
+
+test('un formulario sin cambios se cierra por clic exterior o Escape', async t => {
+ const {state,events}=await mount(t,true);
+ state.requestClose('implicit');
+ state.requestClose('implicit');
+ assert.deepEqual(events,[['close'],['close']]);
+ assert.equal(state.closeAttemptNotice,'');
+});
+
+test('Cancelar pide confirmación solo cuando hay cambios', async t => {
+ const {state,events}=await mount(t,true);
+ let asked=0;
+ global.window={confirm:()=>{asked++;return false;}};
+ state.form.nombre='Cambio pendiente';
+ state.requestClose();
+ assert.equal(asked,1);
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.nombre,'Cambio pendiente');
+ global.window.confirm=()=>{asked++;return true;};
+ state.requestClose();
+ assert.equal(asked,2);
+ assert.deepEqual(events,[['close']]);
+});
+
+test('un alta rechazada conserva los campos y el error ante un cierre accidental', async t => {
+ const {state,events}=await mount(t,true,{saveAdminProduct:async()=>{throw httpError(400);}},{product:null});
+ state.form.id_categoria=2;
+ state.form.nombre='Producto nuevo';
+ state.form.codigo='SKU-NUEVO';
+ state.form.precio=10;
+ state.form.stock=1;
+ await state.handleSubmit();
+ assert.equal(state.backendError,'rechazo');
+ assert.equal(state.form.nombre,'Producto nuevo');
+ assert.deepEqual(events,[]);
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.equal(state.form.codigo,'SKU-NUEVO');
+ assert.ok(state.closeAttemptNotice);
+});
+
+test('un error visible bloquea el cierre accidental aunque no haya cambios', async t => {
+ global.window={confirm:()=>true};
+ const {state,events}=await mount(t,true,{saveAdminProduct:async()=>{throw httpError(400);}});
+ await state.handleSubmit();
+ assert.equal(state.isDirty,false);
+ assert.ok(state.backendError);
+ state.requestClose('implicit');
+ assert.deepEqual(events,[]);
+ assert.ok(state.closeAttemptNotice);
 });

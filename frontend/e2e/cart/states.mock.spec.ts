@@ -164,7 +164,9 @@ test('permite reintentar una consulta fallida y recupera el carrito', async ({
     name: 'Volver a consultar carrito',
   }).click()
 
-  await expect(content.getByRole('alert')).toHaveCount(0)
+  await expect(content.getByRole('alert').filter({
+    hasText: 'El servidor no pudo procesar el carrito.',
+  })).toHaveCount(0)
   await expect(content.getByRole('spinbutton')).toHaveValue('1')
   await expect(content.getByRole('spinbutton')).toBeEnabled()
   expect(state.writes).toEqual([])

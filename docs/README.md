@@ -29,6 +29,9 @@
   procedimiento local autorizado, evidencia comercial, invalidación por cambio
   de precio, historial append-only y migración FER-17 de auditoría.
 
+- [Contrato de estados y transiciones de pedidos, comprobantes y pagos (T-S7-04.1)](s7-04/T-S7-04.1-contrato-estados-transiciones.md):
+  separación entre estado comercial del pedido, estado documental del comprobante y acreditación financiera, matrices de transición por rol, casos negativos y proyección coherente para cliente y administrador.
+
 - [Solicitud y habilitación de crédito (T-S7-09.1)](s7-09/T-S7-09.1-solicitud-habilitacion-credito.md):
   flujo de solicitud, aprobación/rechazo, habilitación/deshabilitación y
   modificación de límite, con auditoría append-only y separación entre

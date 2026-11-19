@@ -15,11 +15,24 @@ test('pagina el listado ADMIN y conserva búsqueda, historial y foco', async ({ 
   const pagination = page.getByRole('navigation', { name: 'Paginación de productos' });
   const previous = pagination.getByRole('button', { name: 'Anterior' });
   const next = pagination.getByRole('button', { name: 'Siguiente' });
+  const table = page.getByRole('table', { name: 'Productos del catálogo' });
   const search = page.getByRole('textbox', { name: 'Buscar productos por nombre o SKU' });
 
   await expect(pagination).toContainText('Página 1 de 2');
   await expect(previous).toBeDisabled();
-  await expect(page.getByRole('heading', { name: 'Producto inactivo E2E', exact: true })).toBeVisible();
+  await expect(table.getByRole('rowheader', { name: 'Producto inactivo E2E', exact: true })).toBeVisible();
+  const inactive = table.getByRole('row').filter({
+    has: page.getByRole('rowheader', { name: 'Producto inactivo E2E', exact: true }),
+  });
+  await expect(table.getByRole('columnheader')).toHaveText([
+    'Producto', 'SKU', 'Categoría', 'Stock', 'Precio base (USD)', 'Estado', 'Acciones',
+  ]);
+  await expect(table).toHaveAccessibleDescription(/no informa su verificación comercial/);
+  await expect(inactive.getByRole('cell', { name: 'Herramientas E2E' })).toBeVisible();
+  await expect(inactive.getByRole('cell', { name: '100.00', exact: true })).toBeVisible();
+  await expect(inactive.getByRole('cell', { name: 'Inactivo', exact: true })).toBeVisible();
+  await expect(inactive.getByRole('button', { name: 'Activar Producto inactivo E2E' })).toBeEnabled();
+  await expect(inactive.getByRole('button', { name: /^Desactivar/ })).toHaveCount(0);
   await next.focus();
   await page.keyboard.press('Enter');
   await expect(pagination).toContainText('Página 2 de 2');
@@ -34,36 +47,79 @@ test('pagina el listado ADMIN y conserva búsqueda, historial y foco', async ({ 
   await expect(pagination).toContainText('Página 1 de 2');
   await next.click();
   await expect(pagination).toContainText('Página 2 de 2');
-  await expect(page.getByRole('heading', { name: 'Producto E2E 02', exact: true })).toBeVisible();
+  await expect(table.getByRole('rowheader', { name: 'Producto E2E 02', exact: true })).toBeVisible();
   await page.reload();
   await expect(pagination).toContainText('Página 2 de 2');
 
   await search.fill('E2E-25');
   await expect(pagination).toContainText('Página 1 de 1');
-  await expect(page.getByRole('heading', { name: 'Producto E2E 25', exact: true })).toBeVisible();
+  await expect(table.getByRole('rowheader', { name: 'Producto E2E 25', exact: true })).toBeVisible();
   expect(new URL(page.url()).searchParams.get('page')).toBeNull();
   await page.reload();
   await expect(search).toHaveValue('E2E-25');
-  await expect(page.getByRole('heading', { name: 'Producto E2E 25', exact: true })).toBeVisible();
-  for (const width of [320, 360, 390, 768, 1280]) {
+  await expect(table.getByRole('rowheader', { name: 'Producto E2E 25', exact: true })).toBeVisible();
+  for (const width of [320, 360, 390, 768, 1024, 1280]) {
     await page.setViewportSize({ width, height: 800 });
     await expect(search).toBeVisible();
     await expect(pagination).toBeVisible();
+    await expect(table).toBeVisible();
+    await expect(table.getByRole('button', { name: 'Desactivar Producto E2E 25' })).toBeEnabled();
     expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true);
   }
+
+  await page.setViewportSize({ width: 320, height: 800 });
+  const region = page.getByRole('region', { name: 'Tabla desplazable de productos' });
+  await expect(region).toHaveAccessibleDescription(/usá las flechas/);
+  await region.focus();
+  await expect(region).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(() => region.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+  await page.keyboard.press('Tab');
+  const edit = table.getByRole('button', { name: 'Editar Producto E2E 25', exact: true });
+  await expect(edit).toBeFocused();
+  await expect(edit).toBeInViewport();
+  await expect(edit).toHaveAccessibleDescription('SKU: E2E-25');
+  await page.keyboard.press('Tab');
+  const deactivate = table.getByRole('button', { name: 'Desactivar Producto E2E 25', exact: true });
+  await expect(deactivate).toBeFocused();
+  await expect(deactivate).toBeInViewport();
+  await expect(table.getByRole('cell', { name: 'Activo', exact: true })).toBeVisible();
 
   await page.route(/\/api\/admin\/productos\?/, route =>
     route.fulfill({ status: 500, json: { message: 'Listado temporalmente inaccesible.' } }), { times: 1 });
   await search.fill('SKU-sin-coincidencias-340');
   await expect(page.getByRole('alert')).toContainText('Listado temporalmente inaccesible.');
   await page.getByRole('button', { name: 'Reintentar' }).click();
-  await expect(page.getByText('No se encontraron productos.')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'No se encontraron productos.' })).toBeVisible();
+  await expect(table).toHaveCount(0);
   await expect(page.getByText('Mostrando 0 de 0 productos')).toBeVisible();
   await expect(pagination).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Limpiar búsqueda' }).click();
   await expect(search).toHaveValue('');
   await expect(pagination).toContainText('Página 1 de 2');
+});
+
+test('anuncia la carga y no presenta un importe ausente como precio', async ({ page }) => {
+  await signIn(page);
+  const releaseList = Promise.withResolvers<void>();
+  await page.route(/\/api\/admin\/productos\?/, async route => {
+    await releaseList.promise;
+    const response = await route.fetch();
+    const result = await response.json();
+    result.data[0].precio = null;
+    await route.fulfill({ response, json: result });
+  });
+  try {
+    await page.goto('/admin/productos?busqueda=E2E-INACTIVO');
+    await expect(page.getByRole('status').filter({ hasText: 'Cargando catálogo' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Nuevo Producto' })).toBeDisabled();
+  } finally {
+    releaseList.resolve();
+  }
+  const table = page.getByRole('table', { name: 'Productos del catálogo' });
+  await expect(table.getByRole('cell', { name: 'Sin importe', exact: true })).toBeVisible();
+  await expect(table.getByRole('cell', { name: '0.00', exact: true })).toHaveCount(0);
 });
 
 test('canoniza la URL ADMIN sin repetir la consulta efectiva', async ({ page }) => {
