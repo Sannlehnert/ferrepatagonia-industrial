@@ -1,33 +1,32 @@
 <script setup lang="ts">
 import type { ClientCredit } from '@/composables/useAdminClientCredit'
 
-defineProps<{ credit: ClientCredit | null; company: boolean }>()
+defineProps<{ credit: ClientCredit | null; company: boolean; compact?: boolean }>()
 const emit = defineEmits<{ retry: [] }>()
+const badgeClass = "credit-badge box-border inline-flex w-44 min-h-7 items-center justify-center gap-[7px] whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold leading-5 before:size-1.5 before:shrink-0 before:rounded-full before:bg-current before:content-['']"
 </script>
 
 <template>
-  <div class="space-y-2 text-sm" aria-label="Estado de crédito">
+  <div class="grid justify-items-start gap-1.5 text-sm leading-normal" aria-label="Estado de crédito">
     <span v-if="!company" class="text-slate-600">No aplica a particulares</span>
     <span v-else-if="!credit" role="status">Consultando crédito…</span>
     <template v-else-if="credit.state === 'ERROR'">
       <p class="m-0 text-rose-800" role="alert">Crédito no disponible para consulta</p>
-      <button type="button" class="min-h-11 rounded border border-slate-400 px-3 underline"
+      <button type="button" class="box-border min-h-11 cursor-pointer rounded-lg border border-solid border-slate-300 bg-white px-3 py-2 [font-family:inherit] text-sm font-semibold leading-5 text-[#103a5c] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-[3px] focus-visible:outline-[#145a8d]"
         @click="emit('retry')">Reintentar crédito</button>
     </template>
     <template v-else-if="credit.account.estado === 'SIN_CUENTA'">
-      <span class="inline-block rounded bg-slate-100 px-2 py-1 text-slate-700">Sin cuenta corriente</span>
+      <span :class="[badgeClass, 'bg-[#f3f4f6] text-[#475569]']">Sin cuenta corriente</span>
     </template>
     <template v-else>
-      <span class="inline-block rounded px-2 py-1 font-semibold"
-        :class="credit.account.estado === 'HABILITADA' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-700'">
+      <span :class="[badgeClass, credit.account.estado === 'HABILITADA' ? 'bg-[#dcfce7] text-[#166534]' : 'bg-[#f3f4f6] text-[#475569]']">
         Cuenta {{ credit.account.estado === 'HABILITADA' ? 'habilitada' : 'inhabilitada' }}
       </span>
-      <p class="m-0" :class="credit.account.estadoCredito === 'DISPONIBLE' ? 'text-emerald-800' : 'text-amber-900'">
+      <p v-if="!compact || credit.account.estadoCredito !== 'DISPONIBLE'" class="m-0 text-[#475569]">
         {{ credit.account.estadoCredito === 'DISPONIBLE' ? 'Crédito disponible según la cuenta'
           : credit.account.estadoCredito === 'BLOQUEADO' ? 'Crédito bloqueado' : 'Crédito no determinable' }}
       </p>
-      <p v-if="credit.account.origen === 'DEMO'" class="m-0 font-semibold text-amber-900">Datos de demostración</p>
-      <p class="m-0 text-xs text-slate-600">La aprobación de empresa se verifica por separado.</p>
+      <p v-if="!compact && credit.account.origen === 'DEMO'" class="m-0 text-xs text-[#64748b]">Datos de demostración</p>
     </template>
   </div>
 </template>

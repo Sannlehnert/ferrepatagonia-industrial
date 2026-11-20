@@ -212,6 +212,43 @@ test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y ac
   assert.match(tableHtml, /Rechazada/);
   assert.match(tableHtml, /Aprobar cuenta empresa de Constructora Sur SRL/);
   assert.match(tableHtml, /Rechazar cuenta empresa de Constructora Sur SRL/);
+  assert.doesNotMatch(tableHtml, /Aprobar cuenta empresa de Metalúrgica Austral SA/);
+  assert.match(tableHtml, /Rechazar cuenta empresa de Metalúrgica Austral SA/);
+  assert.match(tableHtml, /Aprobar cuenta empresa de Obras Patagónicas SA/);
+  assert.doesNotMatch(tableHtml, /Rechazar cuenta empresa de Obras Patagónicas SA/);
+});
+
+test('crédito compacto conserva alertas y reserva disponibilidad y procedencia para el detalle', async t => {
+  const component = load('components/AdminClientCreditStatus.vue', {}, true).default;
+  const state = vue.reactive({ compact: true, credit: {
+    state: 'READY', account: { estado: 'HABILITADA', estadoCredito: 'DISPONIBLE', origen: 'DEMO' },
+  } });
+  const dom = createTestRenderer();
+  const rootEl = dom.createRoot();
+  const app = dom.renderer.createApp({ render: () => vue.h(component, {
+    company: true, compact: state.compact, credit: state.credit,
+  }) });
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  const html = () => dom.serialize(rootEl);
+  assert.match(html(), /Cuenta habilitada/);
+  assert.doesNotMatch(html(), /Crédito disponible|Datos de demostración/);
+  state.compact = false;
+  await settle();
+  assert.match(html(), /Crédito disponible según la cuenta/);
+  assert.match(html(), /Datos de demostración/);
+  state.compact = true;
+  for (const [status, label] of [['BLOQUEADO', 'Crédito bloqueado'], ['NO_DETERMINABLE', 'Crédito no determinable']]) {
+    state.credit.account.estadoCredito = status;
+    await settle();
+    assert.match(html(), new RegExp(label));
+    assert.doesNotMatch(html(), /Datos de demostración/);
+  }
+  state.credit = { state: 'ERROR' };
+  await settle();
+  assert.match(html(), /Crédito no disponible para consulta/);
+  assert.match(html(), /Reintentar crédito/);
+  assert.doesNotMatch(html(), /Sin cuenta corriente/);
 });
 
 function findNode(n, pred) {
