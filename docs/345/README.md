@@ -104,3 +104,17 @@ Las pruebas comprueban el crédito disponible en la fila tras aprobar y el bloqu
 Validación tras integrar develop (merge local e78b848): 289 pruebas frontend, build y TypeScript aprobados; cinco escenarios de Clientes aprobados con build de producción y 13 escenarios de Clientes/recorrido integrado aprobados en desarrollo. Limpieza de contenedores y datos tmpfs confirmada. El recorrido integrado utiliza crédito DEMO, que producción oculta deliberadamente; su expectativa de crédito visible corresponde al perfil de desarrollo y no se modificó esa protección. Se precisaron los selectores de confirmación para distinguirlos del aviso simultáneo de consulta de crédito.
 
 Pendientes commit/push, CI del nuevo HEAD, reauditoría técnica y validación UX/UI.
+
+## Corrección de revisión S7-345-02 · 20/11/2026
+
+Se reprodujo el defecto reteniendo la consulta de una empresa mientras otra devolvía 503: el error y su reintento quedaban ocultos hasta completar todo el lote. La lectura ahora publica cada resultado o error por cliente, manteniendo un máximo de dos consultas simultáneas. Una respuesta pendiente no oculta los resultados ya recibidos.
+
+Cada solicitud tiene un límite local de 15 segundos. Al vencer se cancela y muestra el error/reintento existente, liberando el lugar para la siguiente consulta. El reintento en tabla y detalle consulta solo a la empresa afectada, sin reiniciar las demás. No se modifica el timeout global de Axios, el diseño, las listas de precios, endpoints, permisos ni saldos/límites.
+
+Al cambiar de sesión, salir, desmontar o recargar el lote se cancelan solicitudes y se invalidan los resultados anteriores. Las respuestas tardías no reemplazan un reintento ni datos de otra sesión. Se mantiene la actualización del crédito al cambiar el registro empresarial.
+
+Se agregan tres regresiones unitarias (independencia/concurrencia y reintento individual, vencimiento con respuesta tardía, aislamiento de sesión) y un escenario real de navegador con una consulta retenida, otra fallida y otra exitosa. El caso también espera el vencimiento y verifica recuperación sin repetir las consultas de las otras empresas.
+
+Validación tras integrar develop (merge local 45f46ab): 294 pruebas frontend, builds backend/frontend y TypeScript aprobados. Pasaron los seis escenarios distintos de Clientes con build de producción (cinco existentes y el caso adversarial nuevo); el conjunto de Clientes y recorrido integrado pasó 14/14 en desarrollo. Las pruebas unitarias usan tiempo simulado; la prueba de navegador espera el vencimiento real de 15 segundos. Limpieza de contenedores y datos tmpfs confirmada.
+
+Pendientes commit/push, CI del nuevo HEAD y reauditoría técnica de S7-345-02; se mantiene pendiente la validación UX/UI.

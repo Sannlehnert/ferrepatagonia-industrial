@@ -252,6 +252,93 @@ test('crédito compacto distingue disponibilidad de cuenta y reserva la proceden
   assert.doesNotMatch(html(), /Sin cuenta corriente/);
 });
 
+function creditReader(t, read, ids = [1, 2, 3]) {
+  const auth = vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false });
+  const clients = vue.ref(ids.map(id => ({ id, tipoCliente: 'EMPRESA', estadoAprobacionEmpresa: 'APROBADA' })));
+  let dispose;
+  const { useAdminClientCredit } = load('composables/useAdminClientCredit.ts', {
+    vue: { ...vue, onBeforeUnmount: fn => { dispose = fn; } },
+    '@/stores/auth': { useAuthStore: () => auth },
+    '@/services/adminAccountService': { getAdminAccount: read },
+  });
+  const scope = vue.effectScope();
+  const credit = scope.run(() => useAdminClientCredit(() => clients.value));
+  t.after(() => { dispose(); scope.stop(); });
+  return { credit, auth, clients };
+}
+
+test('S7-345-02: publica errores y éxitos sin esperar a otra empresa y reintenta solo la afectada', async t => {
+  const calls = [];
+  let rejectSecond;
+  const { credit } = creditReader(t, (id, signal) => {
+    calls.push({ id, signal });
+    if (id === 1) return new Promise(() => {});
+    if (id === 2 && calls.filter(call => call.id === 2).length === 1)
+      return new Promise((_, reject) => { rejectSecond = reject; });
+    return Promise.resolve({ estado: 'HABILITADA', estadoCredito: 'DISPONIBLE' });
+  });
+  assert.deepEqual(calls.map(call => call.id), [1, 2]);
+  rejectSecond(Error('503'));
+  await settle();
+  assert.equal(credit.status(1), null);
+  assert.equal(credit.status(2).state, 'ERROR');
+  assert.equal(credit.status(3).state, 'READY');
+  credit.refresh(2);
+  credit.refresh(2);
+  await settle();
+  assert.equal(credit.status(2).state, 'READY');
+  assert.deepEqual(calls.map(call => call.id), [1, 2, 3, 2]);
+  assert.equal(calls[0].signal.aborted, false);
+});
+
+test('S7-345-02: vence la espera, permite reintentar y descarta una respuesta tardía', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let resolveOld, oldSignal, attempts = 0;
+  const { credit } = creditReader(t, (id, signal) => {
+    if (id === 1 && ++attempts === 1) {
+      oldSignal = signal;
+      return new Promise(resolve => { resolveOld = resolve; });
+    }
+    return Promise.resolve({ estado: 'HABILITADA', estadoCredito: 'DISPONIBLE' });
+  }, [1, 2]);
+  await settle();
+  const other = credit.status(2);
+  t.mock.timers.tick(15_000);
+  await settle();
+  assert.equal(oldSignal.aborted, true);
+  assert.equal(credit.status(1).state, 'ERROR');
+  credit.refresh(1);
+  await settle();
+  resolveOld({ estado: 'INHABILITADA', estadoCredito: 'BLOQUEADO' });
+  await settle();
+  assert.equal(credit.status(1).account.estadoCredito, 'DISPONIBLE');
+  assert.equal(credit.status(2), other);
+});
+
+test('S7-345-02: cambiar de sesión o salir cancela consultas y descarta resultados anteriores', async t => {
+  const calls = [];
+  const { credit, auth } = creditReader(t, (id, signal) => new Promise(resolve => {
+    calls.push({ id, signal, resolve });
+  }), [1, 2]);
+  auth.sessionVersion++;
+  assert.equal(calls.length, 4);
+  assert.ok(calls.slice(0, 2).every(call => call.signal.aborted));
+  calls[0].resolve({ estadoCredito: 'BLOQUEADO' });
+  calls[1].resolve({ estadoCredito: 'BLOQUEADO' });
+  await settle();
+  assert.equal(credit.status(1), null);
+  calls[2].resolve({ estadoCredito: 'DISPONIBLE' });
+  await settle();
+  assert.equal(credit.status(1).account.estadoCredito, 'DISPONIBLE');
+  auth.loggingOut = true;
+  assert.equal(calls[3].signal.aborted, true);
+  calls[3].resolve({ estadoCredito: 'DISPONIBLE' });
+  await settle();
+  assert.equal(credit.status(1), null);
+  assert.equal(credit.status(2), null);
+  assert.equal(calls.length, 4);
+});
+
 function findNode(n, pred) {
   if (pred(n)) return n;
   for (const c of n.children || []) {

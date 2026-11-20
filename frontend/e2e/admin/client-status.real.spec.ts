@@ -171,6 +171,47 @@ test('verifica una respuesta perdida y recupera una consulta de crédito fallida
   expect(mutations).toBe(1)
 })
 
+test('cada empresa publica su crédito y permite reintentar aunque otra consulta no responda', async ({ page }) => {
+  test.setTimeout(45_000)
+  await login(page)
+  const { clients } = await company(page)
+  const [slow, failed, healthy] = clients.filter((item: { tipoCliente: string }) => item.tipoCliente === 'EMPRESA')
+  expect(healthy).toBeTruthy()
+  const row = (client: { email: string }) => page.getByRole('row').filter({ hasText: client.email })
+  let release!: () => void
+  const held = new Promise<void>(resolve => { release = resolve })
+  let slowReads = 0, failedReads = 0, fail = true
+  await page.route(`**/api/admin/clientes/${slow.id}/cuenta-corriente`, async route => {
+    slowReads++
+    const response = await route.fetch()
+    if (slowReads === 1) await held
+    await route.fulfill({ response })
+  })
+  await page.route(`**/api/admin/clientes/${failed.id}/cuenta-corriente`, async route => {
+    failedReads++
+    if (fail) await route.fulfill({ status: 503, json: {} })
+    else await route.continue()
+  })
+  const accountLabel = /Cuenta\s+(?:habilitada|inhabilitada)|Sin cuenta corriente/
+  try {
+    await page.goto('/admin/clientes')
+    await expect(row(slow).getByText('Consultando crédito…', { exact: true })).toBeVisible()
+    await expect(row(failed).getByRole('button', { name: 'Reintentar crédito' })).toBeVisible()
+    await expect(row(healthy).getByText(accountLabel)).toBeVisible()
+    fail = false
+    await row(failed).getByRole('button', { name: 'Reintentar crédito' }).click()
+    await expect(row(failed).getByText(accountLabel)).toBeVisible()
+    expect(failedReads).toBe(2)
+    expect(slowReads).toBe(1)
+    await expect(row(slow).getByRole('button', { name: 'Reintentar crédito' })).toBeVisible({ timeout: 20_000 })
+    release()
+    await row(slow).getByRole('button', { name: 'Reintentar crédito' }).click()
+    await expect(row(slow).getByText(accountLabel)).toBeVisible()
+    expect(slowReads).toBe(2)
+    expect(failedReads).toBe(2)
+  } finally { release() }
+})
+
 test('un particular no puede consultar ni aprobar clientes desde ADMIN', async ({ page }) => {
   await page.goto('/login')
   await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')

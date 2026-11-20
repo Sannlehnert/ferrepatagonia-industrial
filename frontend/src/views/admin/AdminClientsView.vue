@@ -390,7 +390,7 @@ watch([identity, allowed], () => {
                             <span v-else class="text-slate-600">No aplica a particulares</span>
                         </td>
                         <td class="border-x-0 border-t-0 border-b border-solid border-[#e2e8f0] p-4 align-top text-sm leading-normal text-[#13293a] min-w-[210px]">
-                            <AdminClientCreditStatus compact :company="client.tipoCliente === 'EMPRESA'" :credit="credit.status(client.id)" @retry="credit.refresh()" />
+                            <AdminClientCreditStatus compact :company="client.tipoCliente === 'EMPRESA'" :credit="credit.status(client.id)" @retry="credit.refresh(client.id)" />
                         </td>
                         <td class="border-x-0 border-t-0 border-b border-solid border-[#e2e8f0] p-4 align-top text-sm leading-normal text-[#13293a] min-w-[120px]">
                             <button type="button" data-client-detail :class="clientButtonClass"
@@ -445,6 +445,6 @@ watch([identity, allowed], () => {
             :target="approvalTarget" :credit="credit.status(selectedClient.id)"
             :busy="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null"
             :uncertain="!!uncertainApprovalClientIds[selectedClient.id]" :feedback="approvalFeedback[selectedClient.id]"
-            @close="closeClient" @confirm="confirmApproval" @retry="reconcileCompanyApproval(selectedClient.id)" @refresh-credit="credit.refresh()" />
+            @close="closeClient" @confirm="confirmApproval" @retry="reconcileCompanyApproval(selectedClient.id)" @refresh-credit="credit.refresh(selectedClient.id)" />
     </section>
 </template>
