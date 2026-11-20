@@ -35,7 +35,15 @@ export async function updateAdminCategory(
   return data
 }
 
-export async function deactivateAdminCategory(id: number): Promise<AdminCategory> {
-  const { data } = await api.patch<AdminCategory>(`${categoriesPath}/${id}/desactivar`)
+async function patchCategoryStatus(id: number, action: 'activar' | 'desactivar'): Promise<AdminCategory> {
+  const { data } = await api.patch<AdminCategory>(`${categoriesPath}/${id}/${action}`)
   return data
+}
+
+export function deactivateAdminCategory(id: number): Promise<AdminCategory> {
+  return patchCategoryStatus(id, 'desactivar')
+}
+
+export function activateAdminCategory(id: number): Promise<AdminCategory> {
+  return patchCategoryStatus(id, 'activar')
 }

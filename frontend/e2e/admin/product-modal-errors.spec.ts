@@ -471,14 +471,24 @@ test('N-06: Escape repetido durante un guardado bloqueante no desincroniza el mo
     const saving = dialog.getByRole('button', { name: 'Guardando...', exact: true });
     await expect(saving).toBeDisabled();
 
-    await pressEscapeThrice(page);
+    // «Guardando...» se pinta antes de que el PUT llegue a page.route: sin esta
+    // sincronización, Escape puede ejecutarse antes de que exista la solicitud.
+    await expect.poll(
+        () => putRequests,
+        { message: 'PUT del producto interceptado' },
+    ).toBe(1);
 
-    await expect(dialog).toBeVisible();
-    await expect(name).toHaveValue('Producto guardado durante Escape');
-    expect(putRequests).toBe(1);
+    try {
+        await pressEscapeThrice(page);
 
-    expect(releaseRequest).toBeTruthy();
-    releaseRequest!();
+        await expect(dialog).toBeVisible();
+        await expect(name).toHaveValue('Producto guardado durante Escape');
+        expect(putRequests).toBe(1);
+    } finally {
+        // Librar la solicitud retenida aunque falle una aserción.
+        releaseRequest!();
+    }
+
     await expect(dialog).toHaveCount(0);
     await expect(page.getByText('Producto guardado durante Escape', { exact: false })).toBeVisible();
     expect(putRequests).toBe(1);
