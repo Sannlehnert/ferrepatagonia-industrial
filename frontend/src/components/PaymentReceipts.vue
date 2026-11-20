@@ -161,7 +161,7 @@ function operation(receipt: PaymentReceipt) {
         <button
           v-if="selectedFile"
           type="button"
-          class="bg-[#94A3B8] hover:bg-[#64748B] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition cursor-pointer"
+          class="box-border border-0 font-[inherit] bg-[#94A3B8] hover:bg-[#64748B] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition cursor-pointer focus-visible:outline-2 focus-visible:outline-[#145A8D]"
           :disabled="busy"
           @click="clearFile"
         >
@@ -169,7 +169,7 @@ function operation(receipt: PaymentReceipt) {
         </button>
         <button
           type="submit"
-          class="bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition shadow-sm disabled:opacity-50 cursor-pointer"
+          class="box-border border-0 font-[inherit] bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition shadow-sm disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#145A8D]"
           :disabled="!selectedFile || busy"
           :aria-label="busy ? 'Subiendo…' : 'Adjuntar comprobante'"
         >

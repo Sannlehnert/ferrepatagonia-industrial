@@ -61,6 +61,10 @@ async function submitLogin(page: Page, email: string, password: string) {
 
 async function confirmOrder(page: Page) {
   const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  if (await retry.isVisible()) {
+    await retry.click()
+  }
   await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
   await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
 }
@@ -169,6 +173,9 @@ test('compra real actualiza stock, historial y comprobante con un solo cargo', a
     const socket = observeSocket(page)
     await page.goto('/carrito')
     await expect(quantity(page, f.name)).toHaveValue('2')
+    await expect(
+      page.getByRole('region', { name: 'Resumen del carrito' }).getByRole('radio', { name: 'Cuenta corriente' }),
+    ).toBeVisible()
     await sibling.goto('/carrito')
     await expect(quantity(sibling, f.name)).toHaveValue('2')
     const historySocket = observeSocket(history)
