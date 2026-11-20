@@ -18,6 +18,7 @@ import { accountOrderPrivateResponses } from './middlewares/account-order-http.m
 import { accountOrderRouter, clientOrderRouter, transferOrderRouter } from './routes/accountOrder.routes';
 import { receiptRouter } from './routes/paymentReceipt.routes';
 import { productImageRouter } from './routes/productImage.routes';
+import { perfilRouter } from './routes/perfil.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
@@ -40,6 +41,7 @@ app.use('/api', receiptRouter);
 app.use('/api', productImageRouter);
 app.use(express.json());
 app.use('/api', healthRouter);
+app.use('/api/perfil', perfilRouter);
 app.use('/api', catalogRouter);
 app.use('/api', categoryRouter);
 app.use('/api', createPricingRouter(new PricingService(new MariaDbPricingSource())));
