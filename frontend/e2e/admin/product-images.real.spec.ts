@@ -35,7 +35,9 @@ test('alta y reemplazo con vista previa, estado de carga y catálogo a 360 px', 
   await page.setViewportSize({ width: 360, height: 780 })
   await signIn(page)
   await page.goto('/admin/productos')
-  const code = 'IMG-E2E-' + randomUUID().slice(0, 8)
+  // Evita que el SKU generado contenga por azar el término E2E-25 que
+  // otras pruebas ADMIN usan como búsqueda por subcadena.
+  const code = 'IMG-' + randomUUID().slice(0, 8)
   const name = 'Foto E2E ' + code
   await page.getByRole('button', { name: '+ Nuevo Producto' }).click()
   await field(page, 'Nombre del Producto').fill(name)
