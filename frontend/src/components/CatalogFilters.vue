@@ -20,6 +20,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
     apply: [filters: CatalogFiltersValue]
+    clear: []
     retryCategories: []
 }>()
 
@@ -60,36 +61,33 @@ function clearFilters() {
     categoryId.value = null
     validationError.value = null
 
-    emit('apply', {
-        search: '',
-        categoryId: null,
-    })
+    emit('clear')
 }
 </script>
 
 <template>
     <form
-        class="flex flex-wrap items-end gap-4"
+        class="flex w-full min-w-0 flex-wrap items-end gap-3"
         aria-label="Buscar y filtrar productos"
         @submit.prevent="applyFilters"
     >
-        <label class="flex min-w-0 flex-[1_1_220px] flex-col gap-1.5">
-            <span class="text-sm font-medium">Nombre o código</span>
+        <label class="flex min-w-[220px] flex-1 flex-col gap-1.5">
+            <span class="text-sm font-medium text-[var(--fp-navy)]">Nombre o código</span>
             <input
                 v-model="search"
                 type="search"
                 placeholder="Buscá un producto"
-                class="fp-input fp-focus"
+                class="fp-input fp-focus box-border min-h-11"
                 :aria-invalid="validationError ? 'true' : undefined"
                 :aria-describedby="validationError ? 'catalog-search-error' : undefined"
             />
         </label>
 
-        <label class="flex min-w-0 flex-[1_1_220px] flex-col gap-1.5">
-            <span class="text-sm font-medium">Categoría</span>
+        <label class="flex w-full min-[560px]:w-auto min-w-[210px] max-w-full flex-col gap-1.5">
+            <span class="text-sm font-medium text-[var(--fp-navy)]">Categoría</span>
             <select
                 v-model="categoryId"
-                class="fp-input fp-focus"
+                class="fp-input fp-focus box-border min-h-11"
                 :disabled="categoriesLoading || Boolean(categoriesError)"
             >
                 <option :value="null">Todas las categorías</option>
@@ -116,9 +114,11 @@ function clearFilters() {
             </select>
         </label>
 
-        <div class="flex flex-wrap gap-2">
-            <button class="fp-action fp-action--primary fp-focus" type="submit">Buscar</button>
-            <button class="fp-action fp-action--plain fp-focus" type="button" @click="clearFilters">
+        <slot name="order" />
+
+        <div class="flex flex-wrap items-center gap-2 w-full min-[801px]:w-auto min-[801px]:ml-auto">
+            <button class="fp-action fp-action--primary fp-focus box-border min-h-11" type="submit">Buscar</button>
+            <button class="fp-action fp-action--plain fp-focus box-border min-h-11" type="button" @click="clearFilters">
                 Limpiar filtros
             </button>
         </div>

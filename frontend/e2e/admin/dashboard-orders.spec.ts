@@ -26,6 +26,15 @@ function makeOrder(index: number) {
 async function setup(page: Page, count = 44) {
   const orders = Array.from({ length: count }, (_, index) => makeOrder(index))
   const reads: URL[] = []
+  await page.route(/\/api\/admin\/dashboard\/metricas(?:\?.*)?$/, route => route.fulfill({ json: { data: {
+    corte: '2026-11-20T12:00:00Z', origenDatos: 'REAL', umbralStockBajo: 5,
+    pedidosPorEstado: { CONFIRMADO: 1, EN_PREPARACION: 2, ENVIADO: 3, ENTREGADO: 4, totalOperativos: 10 },
+    indicadores: {
+      pedidosNuevos: 1, pedidosEnCurso: 5,
+      pedidosCuentaCorriente: orders.filter(order => order.modalidadPago === 'CUENTA_CORRIENTE').length,
+      comprobantesTotales: 2, comprobantesSinRevisar: 1, alertasStockBajo: 4, productosSinStock: 1, empresasFieles: 3,
+    },
+  } } }))
   await page.route(/\/api\/auth\/me(?:\?.*)?$/, route => route.fulfill({ json: { user: admin } }))
   await page.route(/\/api\/admin\/pedidos(?:\?.*)?$/, route => {
     const url = new URL(route.request().url())
@@ -62,8 +71,12 @@ for (const width of [360, 1280]) {
     const summary = page.getByRole('region', { name: 'Resumen', exact: true })
     await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toHaveText('1')
     await expect(summary.getByLabel('Pedidos con cuenta corriente', { exact: true })).toHaveText('21')
-    await expect(summary.getByLabel('Comprobantes recibidos', { exact: true })).toContainText('—')
-    await expect(summary.getByRole('definition')).toHaveCount(6)
+    await expect(summary.getByLabel('Comprobantes recibidos', { exact: true })).toHaveText('2')
+    await expect(summary.getByLabel('Comprobantes sin evaluar', { exact: true })).toHaveText('1')
+    await expect(summary.getByLabel('Alertas de stock', { exact: true })).toHaveText('4')
+    await expect(summary.getByLabel('Empresas fieles', { exact: true })).toHaveText('3')
+    await expect(summary.getByRole('region', { name: 'Pedidos por estado', exact: true })).toContainText('10 pedidos operativos')
+    await expect(summary.locator('dl[aria-label="Indicadores"]').getByRole('definition')).toHaveCount(6)
     await expect(summary.getByRole('columnheader')).toHaveCount(6)
     const receiptRow = summary.getByRole('row').filter({ has: page.getByRole('link', { name: 'Ver pedido #1001', exact: true }) })
     await expect(receiptRow).toContainText('2 comprobantes')
@@ -78,6 +91,7 @@ for (const width of [360, 1280]) {
     })
     expect(badgeSize).toEqual({ width: 136, height: 28 })
     expect(reads.some(url => url.searchParams.get('limit') === '5')).toBe(true)
+    expect(reads.some(url => url.searchParams.get('limit') === '1')).toBe(false)
     await expect(summary.getByRole('button', { name: 'Actualizar pedidos' })).toHaveCSS('cursor', 'pointer')
     await fits(page)
     await info.attach(`dashboard-${width}`, { body: await page.screenshot({ fullPage: true }), contentType: 'image/png' })
@@ -213,16 +227,23 @@ for (const width of [360, 1280]) {
   })
 }
 
-test('el resumen distingue cero pedidos de una consulta fallida y permite reintentar', async ({ page }) => {
+test('el resumen distingue cero métricas de una consulta fallida y permite reintentar', async ({ page }) => {
   await setup(page)
   let fail = true
   await page.route(/\/api\/admin\/pedidos(?:\?.*)?$/, route => route.fulfill(fail
     ? { status: 503, json: { message: 'No disponible' } }
     : { json: { data: { items: [], pagination: { page: 1, limit: 5, total: 0, totalPages: 0 } } } }),
   )
+  await page.route(/\/api\/admin\/dashboard\/metricas(?:\?.*)?$/, route => route.fulfill(fail
+    ? { status: 503, json: { message: 'No disponible' } }
+    : { json: { data: { corte: '2026-11-20T12:00:00Z', origenDatos: 'REAL', umbralStockBajo: 5,
+      pedidosPorEstado: { CONFIRMADO: 0, EN_PREPARACION: 0, ENVIADO: 0, ENTREGADO: 0, totalOperativos: 0 },
+      indicadores: { pedidosNuevos: 0, pedidosEnCurso: 0, pedidosCuentaCorriente: 0, comprobantesTotales: 0, comprobantesSinRevisar: 0, alertasStockBajo: 0, productosSinStock: 0, empresasFieles: 0 },
+    } } }),
+  )
   await page.goto('/admin/dashboard')
   const summary = page.getByRole('region', { name: 'Resumen', exact: true })
-  await expect(summary.getByRole('alert')).toContainText('No pudimos consultar')
+  await expect(summary.getByRole('alert')).toHaveCount(2)
   await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toContainText('—')
   fail = false
   await summary.getByRole('button', { name: 'Actualizar pedidos' }).click()
@@ -250,3 +271,24 @@ test('el listado no acredita pagos ni inventa moneda, identifica DEMO y permite 
   await page.getByRole('button', { name: 'Reintentar consulta' }).click()
   await expect(page.getByRole('button', { name: 'Ver detalle del pedido 1023', exact: true })).toBeVisible()
 })
+
+for (const failed of ['metrics', 'recent'] as const) {
+  test(`un error de ${failed} conserva la otra sección del dashboard`, async ({ page }) => {
+    await setup(page)
+    await page.route(failed === 'metrics' ? '**/api/admin/dashboard/metricas' : /\/api\/admin\/pedidos(?:\?.*)?$/, route => route.fulfill({ status: 503, json: {} }), { times: 1 })
+    await page.goto('/admin/dashboard')
+    const summary = page.getByRole('region', { name: 'Resumen', exact: true })
+    await expect(summary.getByRole('alert')).toHaveCount(1)
+    if (failed === 'metrics') {
+      await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toContainText('—')
+      await expect(summary.getByRole('link', { name: 'Ver pedido #1001', exact: true })).toBeVisible()
+      await summary.getByRole('button', { name: 'Reintentar indicadores', exact: true }).click()
+    } else {
+      await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toHaveText('1')
+      await summary.getByRole('button', { name: 'Actualizar pedidos', exact: true }).click()
+    }
+    await expect(summary.getByRole('alert')).toHaveCount(0)
+    await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toHaveText('1')
+    await expect(summary.getByRole('link', { name: 'Ver pedido #1001', exact: true })).toBeVisible()
+  })
+}

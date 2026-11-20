@@ -1,13 +1,13 @@
 # T-S7-16.2 — Dashboard y pedidos ADMIN
 
-Estado: **en progreso**. Revisión visual de Bruno, revisión técnica de Zahir y validación UX/UI de Lucci pendientes. Las métricas operativas de #347 se integran cuando su entrega esté corregida e incorporada a develop.
+Estado: **en progreso**. Revisión visual de Bruno, revisión técnica de Zahir y validación UX/UI de Lucci pendientes. Las métricas corregidas de #347 ya están integradas; resta la revisión UX/UI y técnica de la composición final.
 
 ## Alcance de este avance
 
 - Se conservan los seis conceptos de las cards originales: pedidos nuevos, pedidos con cuenta corriente, comprobantes, comprobantes sin evaluar, alertas de stock y empresas fieles. La card de comprobantes se titula «Comprobantes recibidos», porque el contrato de #347 expone un total, no un intervalo que defina «nuevos».
-- Mientras #347 no esté integrada, los dos indicadores de pedidos usan `pagination.total` de `GET /api/admin/pedidos`, filtrando por `estado=CONFIRMADO` y `modalidadPago=CUENTA_CORRIENTE`. Los otros cuatro muestran «—» con nombre accesible «No disponible», sin inventar cifras ni interpretar una API ausente como cero. `AdminDashboardMetrics` admite los indicadores de #347 como prop para la integración posterior; no llama a un endpoint inexistente.
-- Estos dos conteos provisionales tienen el alcance del listado actual, incluidos registros DEMO que coincidan con el filtro. No sustituyen la población REAL de los agregados de #347. Antes del cierre debe cotejarse ese alcance y conectarse el contrato completo. La UI no muestra explicaciones académicas.
-- Los cinco pedidos recientes se piden con `page=1&limit=5`, al entrar y al pulsar «Actualizar pedidos». El backend ordena por `fecha_utc DESC, id_pedido DESC`; no hay sondeo periódico ni almacenamiento simulado en el navegador. El botón actualiza tanto recientes como los indicadores disponibles.
+- Las seis cards consumen GET /api/admin/dashboard/metricas de #347 mediante AdminDashboardMetrics. Se eliminan las dos consultas provisionales con limit=1 al listado. Los seis valores provienen directamente de indicadores y los cuatro estados de pedidosPorEstado, sin recalcular totales en el navegador.
+- Las métricas respetan la población REAL definida por #347 (incluida la exclusión de cuentas DEMO); pedidos recientes conserva el alcance del listado administrativo. Por eso no se deducen los indicadores a partir de las cinco filas ni se espera que incluyan necesariamente todos los registros de muestra del listado. La API y su política de procedencia no se modifican.
+- Los cinco pedidos recientes se piden con `page=1&limit=5`, al entrar y al pulsar «Actualizar pedidos». El backend ordena por `fecha_utc DESC, id_pedido DESC`; no hay sondeo periódico ni almacenamiento simulado en el navegador. El botón actualiza tanto recientes como los indicadores; permanece deshabilitado mientras cualquiera de las dos lecturas esté pendiente. Los errores se presentan por separado: no se confunde una consulta fallida con un conteo cero.
 - Los accesos generales a Pedidos y Comprobantes permanecen en el sidebar; se retiraron los dos botones duplicados del dashboard a partir de la devolución UX. Los enlaces de pedidos recientes precargan una búsqueda por ID en el listado, no abren directamente el modal. La tabla de recientes presenta pedido, cliente, fecha, total, estado y resumen documental en columnas compactas, sin repetir la modalidad en cada fila.
 - Listado con filtros de búsqueda, estado operativo, modalidad y fecha comercial de Argentina. Los filtros se envían al servidor antes de paginar y se conservan al consultar otra página o actualizar un estado.
 - Estado operativo identificado por texto y color en dashboard, listado y detalle. Las etiquetas usan ancho/alto uniforme de 136 × 28 px, acordado para esta task; la guía visual de #269 no imponía una medida de badges. La modalidad TRANSFERENCIA se presenta como «Transferencia bancaria».
@@ -34,13 +34,13 @@ El contrato disponible de pedidos expone `estado` y `estadosPermitidos` para seg
 
 El repositorio calcula dos conteos por pedido con subconsultas sobre el índice `idx_comprobante_pedido`, verificando cliente y, cuando corresponda, propietario de la cuenta corriente. Aplica el mismo alcance que `paymentReceipt.repository.ts`; un registro con pedido/cliente incompatibles no se cuenta. No se descargan todos los comprobantes ni se hace una solicitud HTTP por fila. No se modifican tablas, filtros, orden, permisos ni transiciones.
 
-La pantalla mantiene etiquetas operativas claras y modalidad de pago en campos distintos; el panel de comprobantes sigue accesible desde el menú lateral. Se eliminaron los párrafos explicativos de estas reglas del encabezado y del modal, para conservar una interfaz orientada al trabajo del administrador. No se agregan acreditaciones, endpoints ni transiciones nuevas. Tampoco se anticipan las definiciones pendientes del contrato de #316.
+La pantalla mantiene etiquetas operativas claras y modalidad de pago en campos distintos; el panel de comprobantes sigue accesible desde el menú lateral. Se eliminaron los párrafos explicativos de estas reglas del encabezado y del modal, para conservar una interfaz orientada al trabajo del administrador. No se agregan acreditaciones, endpoints ni transiciones nuevas. Se respeta el contrato de #316 integrado en develop: no se agregan implementaciones financieras o transiciones nuevas.
 
 La sugerencia de aprobación/rechazo del pedido antes de prepararlo queda para validar con equipo/contrato. No se implementó ni se agregaron estados PENDIENTE/RECHAZADO al flujo de pedidos. El filtro por tipo Empresa/Particular también quedó detenido por indicación de Bruno; se conserva la búsqueda existente.
 
 Pendientes para completar #348:
 
-- Integrar y contrastar las métricas corregidas de #347. Este resumen usa exclusivamente el endpoint de pedidos actual; no sustituye sus agregados operativos.
+- Integración de métricas completada en este avance; contrastar la composición visual con el equipo antes del cierre.
 - Revisar visualmente con datos locales, tanto en móvil como en escritorio, y ajustar el diseño según la devolución.
 - Completar la revisión cruzada y el CI del futuro commit publicado.
 
@@ -57,7 +57,7 @@ git diff --check
 ```
 
 - Build backend y build frontend (incluido TypeScript): aprobados.
-- Frontend: en la ejecución anterior aprobaron 233 pruebas. En la última ejecución, después de duplicar la paginación, aprobaron **232 y falló 1 prueba preexistente**, `scripts/test-audit-scope.cjs`: espera que la auditoría completa termine con código 1 y reporte 10 vulnerabilidades altas, pero actualmente npm devuelve código 0. La consulta diagnóstica `npm audit --prefix frontend --json` informa 0 vulnerabilidades en el árbol completo (254 dependencias). No se cambiaron dependencias, lockfile, scripts ni excepciones de seguridad para ocultar este fallo. Requiere revisar esa expectativa con el responsable del script, fuera del ajuste visual de #348.
+- Frontend: en la ejecución anterior aprobaron 233 pruebas. En la última ejecución, después de duplicar la paginación, aprobaron **232 y falló 1 prueba preexistente**, `scripts/test-audit-scope.cjs`: espera que la auditoría completa termine con código 1 y reporte 10 vulnerabilidades altas, pero actualmente npm devuelve código 0. La consulta diagnóstica `npm audit --prefix frontend --json` informa 0 vulnerabilidades en el árbol completo (254 dependencias). No se cambiaron dependencias, lockfile, scripts ni excepciones de seguridad para ocultar este fallo. Registro histórico: develop retiró posteriormente la excepción y ese script mediante #144; la integración actual conserva esa eliminación, sin recrearlo.
 - Backend: 1.334 unitarias aprobadas, 3 omitidas; integración de Pedidos ADMIN: 4/4 aprobadas.
 - Regresión documental real: `npm run test:receipts:isolated --prefix backend`, 5/5 aprobadas con limpieza confirmada.
 - Playwright: **12/12 aprobados**. Incluye 6 escenarios de UI con respuestas controladas, 2 escenarios nuevos con HTTP/MariaDB reales y 4 regresiones existentes (1 de modal con respuestas controladas y 3 de reconciliación real). Limpieza confirmada: contenedor eliminado y datos en tmpfs. El caso de vista previa verifica los 24 pedidos/48 artículos, idempotencia del cargador, ausencia de pagos/cargos nuevos, rechazo de perfiles persistentes, contadores y paginación.
@@ -79,7 +79,7 @@ Con el entorno local ya configurado según las guías de instalación y usuarios
 
 1. Iniciar backend y frontend en sus terminales habituales (`npm run dev --prefix backend` y `npm run dev --prefix frontend`).
 2. Ingresar con un usuario ADMIN local y abrir `/admin/dashboard`.
-3. Revisar jerarquía de títulos, espacios, contraste y lectura de las seis cards; comparar los indicadores disponibles con el listado filtrado por Confirmado y Cuenta corriente, respectivamente. Revisar pedidos recientes y sus enlaces.
+3. Revisar jerarquía de títulos, espacios, contraste y lectura de las seis cards; comparar las seis cards y los cuatro estados con GET /api/admin/dashboard/metricas, respetando el alcance REAL de ese endpoint. Revisar pedidos recientes y sus enlaces.
 4. En `/admin/pedidos`, combinar búsqueda, estado, modalidad y fecha; cambiar de página con números y con «Ir a página», probar un valor inválido y limpiar. Verificar que el total corresponde al conjunto filtrado y que el cambio de página conserva los filtros.
 5. Abrir un detalle y recorrer sus artículos con desplazamiento vertical. Revisar el estado operativo y las acciones permitidas por la API.
 6. Usar Tab, Shift+Tab y Escape; comprobar foco visible y vuelta al botón de detalle. Cambiar un estado solo sobre un pedido de prueba si se quiere comprobar la acción real.
@@ -104,3 +104,13 @@ El cargador comprueba identidad del contenedor, etiqueta, credenciales del perfi
 La terminal muestra la URL y las credenciales ADMIN (`admin@e2e.test` / `E2eLocal-214!`). Mantenerla abierta; Enter finaliza el entorno y elimina sus datos. Una demo ya abierta necesita finalizar y volver a ejecutar el comando para recibir los pedidos nuevos. Recargar la página solo actualiza el frontend.
 
 Último ajuste del detalle: build frontend/TypeScript y git diff --check aprobados; 12/12 E2E aprobados (30,6 s), con limpieza del contenedor y datos temporales confirmada. Se verificaron las capturas del detalle móvil y escritorio. No se reejecutó la suite unitaria completa en este ajuste visual; permanece registrada su observación previa de auditoría.
+
+## Integración de develop y métricas #347
+
+Se resolvió el conflicto de AdminDashboardView conservando el contenedor visual de #348 y delegando la lectura de #347 a AdminDashboardMetrics. Se conservan las seis cards revisadas y, con autorización de Bruno, un desglose compacto adicional de Confirmados, En preparación, Enviados y Entregados antes de pedidos recientes. Confirmados repite el dato de Pedidos nuevos por decisión explícita de presentación.
+
+El componente mantiene usePrivateAccountRead, AbortSignal, reinicio por sesión y supresión del mensaje transitorio 403. Durante carga/error se muestra indisponibilidad, sin inventar ceros; cero se muestra únicamente cuando lo devuelve la API. Se expone la última actualización en horario de Argentina. No se cambia backend, origenDatos, fórmulas ni autorización.
+
+Los tests de #347 se adaptan a la división en componentes; conservan la comprobación de lectura privada, estados y texto sin insinuar acreditaciones. La cobertura E2E compara seis valores y cuatro estados con HTTP real e incorpora recuperación tras logout/login con una respuesta anterior retenida. No se versionan reportes generados.
+
+Validación de esta integración: builds backend/frontend y TypeScript aprobados; 274/274 pruebas frontend aprobadas. Pasaron 15 escenarios E2E distintos: 13 del conjunto dashboard/listado/detalle/reconciliación y dos adicionales de fallo independiente entre métricas y recientes. Se confirmó limpieza de ambos entornos descartables. Se comprobó el diseño de escritorio en la captura y ausencia de desborde a 360/1280 px mediante Playwright. La observación histórica del script de auditoría ya no falla en la suite actual tras integrar su eliminación desde develop.

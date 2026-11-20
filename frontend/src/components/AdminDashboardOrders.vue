@@ -28,10 +28,10 @@ onMounted(() => { if (allowed()) void loadRecent() })
 </script>
 
 <template>
-  <section v-if="allowed()" aria-labelledby="dashboard-orders-title" :aria-busy="orders.loading.value" class="min-w-0">
+  <section v-if="allowed()" aria-labelledby="dashboard-orders-title" :aria-busy="orders.loading.value || metricsPanel?.loading" class="min-w-0">
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
       <h2 id="dashboard-orders-title" class="m-0 text-xl font-semibold text-[#0b2438]">Resumen</h2>
-      <button type="button" class="min-h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-[#103a5c] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" :disabled="orders.loading.value" @click="reload">
+      <button type="button" class="min-h-11 cursor-pointer rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-[#103a5c] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]" :disabled="orders.loading.value || metricsPanel?.loading" @click="reload">
         {{ orders.loading.value ? 'Consultando…' : 'Actualizar pedidos' }}
       </button>
     </div>

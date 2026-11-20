@@ -33,6 +33,23 @@ const realTest = test.extend<{ db: Connection; receiptDir: string }>({
   },
 })
 
+async function checkDashboardMetrics(page: import('@playwright/test').Page) {
+  const response = await page.request.get('/api/admin/dashboard/metricas')
+  expect(response.ok()).toBe(true)
+  const data = (await response.json()).data
+  for (const [label, key] of [
+    ['Pedidos nuevos', 'pedidosNuevos'], ['Pedidos con cuenta corriente', 'pedidosCuentaCorriente'],
+    ['Comprobantes recibidos', 'comprobantesTotales'], ['Comprobantes sin evaluar', 'comprobantesSinRevisar'],
+    ['Alertas de stock', 'alertasStockBajo'], ['Empresas fieles', 'empresasFieles'],
+  ]) await expect(page.getByLabel(label!, { exact: true })).toHaveText(String(data.indicadores[key!]))
+  const distribution = page.getByRole('region', { name: 'Pedidos por estado', exact: true })
+  await expect(distribution.getByRole('definition')).toHaveCount(4)
+  for (const [index, key] of ['CONFIRMADO', 'EN_PREPARACION', 'ENVIADO', 'ENTREGADO'].entries()) {
+    await expect(distribution.getByRole('definition').nth(index)).toHaveText(String(data.pedidosPorEstado[key]))
+  }
+  await expect(distribution).toContainText(data.pedidosPorEstado.totalOperativos + ' pedidos operativos')
+}
+
 realTest('vista previa ADMIN: 24 pedidos con artículos, cards y paginación, exclusivamente en base descartable', async ({ page, db, receiptDir, baseURL }) => {
   const profile = JSON.parse(process.env.CCE2E_TEST_PROFILE!)
   await expect(seedAdminPreviewOrders({ ...profile, database: 'ferrepatagonia_dev' })).rejects.toThrow()
@@ -64,6 +81,7 @@ realTest('vista previa ADMIN: 24 pedidos con artículos, cards y paginación, ex
   const allGroups = await db.query<{ estado: string; total: number }[]>('SELECT estado, COUNT(*) AS total FROM PEDIDO GROUP BY estado')
   const confirmed = allGroups.find(group => group.estado === 'CONFIRMADO')?.total ?? 0
   await expect(page.getByLabel('Pedidos nuevos', { exact: true })).toHaveText(String(confirmed))
+  await checkDashboardMetrics(page)
   const confirmedColor = await page.getByText('Confirmado', { exact: true }).first().evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor)
   const sentColor = await page.getByText('Enviado', { exact: true }).first().evaluate(element => element.ownerDocument.defaultView!.getComputedStyle(element).backgroundColor)
   expect(confirmedColor).not.toBe(sentColor)
@@ -127,6 +145,7 @@ realTest('dashboard y filtros corresponden a los registros reales de la API y Ma
   const body = await response.json()
   expect(body.data.pagination.total).toBe(Number(count!.total))
   await expect(page.getByLabel('Pedidos nuevos', { exact: true })).toBeVisible()
+  await checkDashboardMetrics(page)
   for (const item of body.data.items) {
     await expect(page.getByRole('link', { name: `Ver pedido #${item.idPedido}`, exact: true })).toBeVisible()
   }
@@ -152,4 +171,35 @@ realTest('dashboard y filtros corresponden a los registros reales de la API y Ma
   await page.getByRole('button', { name: `Ver detalle del pedido ${id}`, exact: true }).click()
   await expect(page.getByRole('dialog')).toContainText(company)
   await expect(page.getByRole('dialog')).toContainText('USD 13.37')
+})
+
+realTest('una respuesta de métricas de la sesión anterior no reaparece al volver a ingresar', async ({ page }) => {
+  const login = async () => {
+    await page.goto('/login')
+    await page.getByLabel('Email', { exact: true }).fill('admin@e2e.test')
+    await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
+    await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
+    await expect(page.getByLabel('Pedidos nuevos', { exact: true })).not.toContainText('—')
+  }
+  await login()
+  let started!: () => void, release!: () => void
+  const pending = new Promise<void>(resolve => { started = resolve })
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route('**/api/admin/dashboard/metricas', async route => {
+    const response = await route.fetch()
+    const body = await response.json()
+    body.data.indicadores.pedidosNuevos = 987654
+    started()
+    await held
+    await route.fulfill({ json: body }).catch(() => {})
+  }, { times: 1 })
+  try {
+    await page.getByRole('button', { name: 'Actualizar pedidos', exact: true }).click()
+    await pending
+    await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
+    await expect(page).toHaveURL(/\/login$/)
+  } finally { release() }
+  await login()
+  await expect(page.getByText('987654', { exact: true })).toHaveCount(0)
+  await checkDashboardMetrics(page)
 })
