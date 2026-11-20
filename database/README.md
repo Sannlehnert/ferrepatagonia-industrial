@@ -13,6 +13,7 @@ database/
 ├── migrate-fer-17-price-verification.sql
 ├── migrate-s7-09-1-credit-workflow.sql
 ├── migrate-s7-06-1-transfer-order-confirmation.sql
+├── migrate-s7-10-2-payment-accreditation.sql
 ├── seed.sql
 ├── verify-seed.sql
 ├── migrate-uq-producto-codigo.sql
@@ -77,6 +78,18 @@ Migración aditiva e idempotente de T-S7-09.1. Crea `SOLICITUD_CREDITO` y `EVENT
 
 Migración aditiva e idempotente de T-S7-06.1 (#322). Crea `CONFIRMACION_PEDIDO_TRANSFERENCIA` para persistir los intentos, rechazos y confirmaciones idempotentes de pedidos por `TRANSFERENCIA` sin instalar triggers ni modificar `CUENTA_CORRIENTE`, `MOVIMIENTO_CUENTA_CORRIENTE` ni `PAGO`. En una instalación nueva `schema.sql` ya incluye la tabla (`CREATE TABLE IF NOT EXISTS` no altera la tabla existente); en bases existentes previas a #322 debe aplicarse para incorporar la tabla antes de operar el checkout por transferencia. Es segura de repetir.
 
+### `migrate-s7-10-2-payment-accreditation.sql`
+
+Migración aditiva e idempotente de T-S7-10.2 (#333). Extiende `PAGO` para la
+declaración de pagos con comprobante, la revisión administrativa y la
+acreditación financiera autorizada: `monto_usd`, cotización histórica,
+idempotencia de declaración y acreditación, vínculo lógico al comprobante y
+actores/instantes de revisión y acreditación. No crea tablas, triggers ni
+movimientos, no convierte datos y no agrega FKs nuevas a `PAGO`. Depende de
+`migrate-275-payment-receipts.sql` para que exista `COMPROBANTE_PAGO`. En una
+base nueva, `schema.sql` ya incluye las columnas; la migración es segura de
+repetir y debe aplicarse después de FER-20 y de #275.
+
 ### `seed.sql`
 
 Carga datos ficticios para desarrollo y pruebas.
@@ -129,11 +142,12 @@ Sobre una base de datos nueva y vacía:
 3. migrate-fer-17-price-verification.sql
 4. migrate-s7-09-1-credit-workflow.sql
 5. migrate-s7-06-1-transfer-order-confirmation.sql
-6. seed.sql (solo entorno de desarrollo/pruebas)
-7. verify-seed.sql (solo después de seed.sql)
+6. migrate-s7-10-2-payment-accreditation.sql
+7. seed.sql (solo entorno de desarrollo/pruebas)
+8. verify-seed.sql (solo después de seed.sql)
 ```
 
-`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. `migrate-fer-17-price-verification.sql` instala la auditoría y los cuatro triggers de precio. Las migraciones aditivas `migrate-s7-09-1-credit-workflow.sql` y `migrate-s7-06-1-transfer-order-confirmation.sql` también se incluyen en la secuencia de instalación y en la actualización de bases existentes. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1–5 más la verificación SQL de tablas y triggers.
+`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. `migrate-fer-17-price-verification.sql` instala la auditoría y los cuatro triggers de precio. Las migraciones aditivas `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql` y `migrate-s7-10-2-payment-accreditation.sql` también se incluyen en la secuencia de instalación y en la actualización de bases existentes. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1–6 más la verificación SQL de tablas y triggers.
 
 `verify-seed.sql` debe ejecutarse antes de modificar manualmente los datos cargados por el seed.
 
@@ -232,6 +246,12 @@ Aplicar la migración aditiva de T-S7-06.1 para confirmación de pedidos por tra
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-06-1-transfer-order-confirmation.sql'
 ```
 
+Aplicar la migración aditiva de T-S7-10.2 para declaración, revisión y acreditación de pagos (idempotente, no instala triggers ni modifica saldos; requiere #275 y FER-20):
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-10-2-payment-accreditation.sql'
+```
+
 Cargar los datos ficticios de desarrollo:
 
 ```bash
@@ -325,7 +345,7 @@ Para reconstruir:
 docker compose up -d --wait --wait-timeout 180
 ```
 
-Después ejecutar nuevamente los comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `migrate-fer-17-price-verification.sql`, `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
+Después ejecutar nuevamente los comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `migrate-fer-17-price-verification.sql`, `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql`, `migrate-s7-10-2-payment-accreditation.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
 
 ---
 

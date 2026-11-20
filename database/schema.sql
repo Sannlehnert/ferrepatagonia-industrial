@@ -191,9 +191,27 @@ CREATE TABLE PAGO (
     moneda VARCHAR(3) NULL,
     fecha_acreditacion_utc DATETIME(3) NULL,
     evidencia_acreditacion VARCHAR(1000) NULL,
+    monto_usd DECIMAL(12,2) NULL,
+    id_cotizacion INT NULL,
+    tasa_historica DECIMAL(20,8) NULL,
+    id_usuario_declarante INT NULL,
+    clave_idempotencia CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    huella_declaracion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    id_comprobante CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    estado_documental VARCHAR(20) COLLATE utf8mb4_bin NOT NULL DEFAULT 'PENDIENTE',
+    id_admin_revision INT NULL,
+    revision_utc DATETIME(3) NULL,
+    motivo_revision VARCHAR(1000) NULL,
+    id_admin_acreditacion INT NULL,
+    clave_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    huella_acreditacion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
     PRIMARY KEY (id_pago),
+    UNIQUE KEY uq_pago_idempotencia (id_cuenta_corriente, clave_idempotencia),
+    UNIQUE KEY uq_pago_acreditacion (id_cuenta_corriente, clave_acreditacion),
+    UNIQUE KEY uq_pago_comprobante (id_comprobante),
     KEY idx_pago_pedido (id_pedido),
     KEY idx_pago_cuenta (id_cuenta_corriente),
+    KEY idx_pago_cuenta_estado (id_cuenta_corriente, estado, fecha),
     CONSTRAINT fk_pago_pedido FOREIGN KEY (id_pedido)
         REFERENCES PEDIDO (id_pedido) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_pago_cuenta FOREIGN KEY (id_cuenta_corriente)
@@ -204,7 +222,38 @@ CREATE TABLE PAGO (
         OR (id_pedido IS NULL AND id_cuenta_corriente IS NOT NULL)
     ),
     CONSTRAINT chk_pago_monto CHECK (monto >= 0),
-    CONSTRAINT chk_pago_moneda CHECK (moneda IS NULL OR moneda IN ('USD', 'ARS'))
+    CONSTRAINT chk_pago_moneda CHECK (moneda IS NULL OR moneda IN ('USD', 'ARS')),
+    CONSTRAINT chk_pago_monto_usd CHECK (monto_usd IS NULL OR monto_usd > 0),
+    CONSTRAINT chk_pago_conversion CHECK (
+        monto_usd IS NULL OR (
+            (moneda = 'USD' AND monto_usd = monto AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+            OR (
+                moneda = 'ARS' AND id_cotizacion IS NOT NULL
+                AND tasa_historica IS NOT NULL AND tasa_historica > 0
+            )
+        )
+    ),
+    CONSTRAINT chk_pago_documental CHECK (estado_documental IN ('PENDIENTE', 'APROBADO', 'RECHAZADO')),
+    CONSTRAINT chk_pago_revision CHECK (
+        (estado_documental = 'PENDIENTE'
+            AND id_admin_revision IS NULL AND revision_utc IS NULL AND motivo_revision IS NULL)
+        OR (estado_documental = 'APROBADO'
+            AND id_admin_revision IS NOT NULL AND revision_utc IS NOT NULL)
+        OR (estado_documental = 'RECHAZADO'
+            AND id_admin_revision IS NOT NULL AND revision_utc IS NOT NULL
+            AND motivo_revision IS NOT NULL)
+    ),
+    CONSTRAINT chk_pago_declaracion CHECK (
+        (id_usuario_declarante IS NULL AND clave_idempotencia IS NULL
+            AND huella_declaracion IS NULL AND id_comprobante IS NULL)
+        OR (id_usuario_declarante IS NOT NULL AND clave_idempotencia IS NOT NULL
+            AND huella_declaracion IS NOT NULL AND id_comprobante IS NOT NULL)
+    ),
+    CONSTRAINT chk_pago_acreditacion CHECK (
+        (id_admin_acreditacion IS NULL AND clave_acreditacion IS NULL AND huella_acreditacion IS NULL)
+        OR (id_admin_acreditacion IS NOT NULL AND clave_acreditacion IS NOT NULL
+            AND huella_acreditacion IS NOT NULL)
+    )
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE MOVIMIENTO_CUENTA_CORRIENTE (

@@ -31,6 +31,17 @@ import {
     enableCreditAccountPolicy,
     rejectCreditRequestPolicy,
 } from '../dtos/credit/credit-workflow.dto';
+import {
+    accreditPaymentPolicy,
+    paymentIdPolicy,
+    reviewPaymentPolicy,
+} from '../dtos/payments/payment.dto';
+import {
+    getAdminPayment,
+    getAdminPayments,
+    patchReviewPayment,
+    postAccreditPayment,
+} from '../controllers/payment.controller';
 
 export const adminRouter = Router();
 
@@ -87,6 +98,27 @@ adminRouter.put(
     validateDto('params', creditClientIdPolicy),
     validateDto('body', changeCreditLimitPolicy),
     putCreditLimit,
+);
+
+// Declaraciones de pago: revisión documental y acreditación financiera son
+// operaciones distintas. Ninguna de las dos se dispara desde comprobantes.
+adminRouter.get('/pagos', getAdminPayments);
+adminRouter.get(
+    '/pagos/:id',
+    validateDto('params', paymentIdPolicy),
+    getAdminPayment,
+);
+adminRouter.patch(
+    '/pagos/:id/revision',
+    validateDto('params', paymentIdPolicy),
+    validateDto('body', reviewPaymentPolicy),
+    patchReviewPayment,
+);
+adminRouter.post(
+    '/pagos/:id/acreditar',
+    validateDto('params', paymentIdPolicy),
+    validateDto('body', accreditPaymentPolicy),
+    postAccreditPayment,
 );
 
 adminRouter.get('/clientes', getClientes);
