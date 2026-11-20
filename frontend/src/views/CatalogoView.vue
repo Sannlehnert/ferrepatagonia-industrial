@@ -96,6 +96,17 @@ function aplicarFiltros(filters: CatalogFiltersValue) {
   return router.push({ name: 'catalogo', query })
 }
 
+function limpiarFiltros() {
+  const query = { ...route.query }
+
+  delete query.page
+  delete query.busqueda
+  delete query.categoria
+  delete query.orden
+
+  return router.push({ name: 'catalogo', query })
+}
+
 const listaCategorias = ref<CatalogCategory[]>([])
 const cargandoCategorias = ref(true)
 const errorCategorias = ref<string | null>(null)
@@ -244,62 +255,78 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="fp-shell py-6 sm:py-9">
-    <p class="m-0 mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
-      Inicio /
+    <nav aria-label="Ruta de navegación" class="mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
       <RouterLink
-        v-if="categoriaId"
-        class="fp-focus box-border inline-flex min-h-11 items-center px-1 text-[var(--fp-blue)]"
-        :to="{ name: 'catalogo', query: { ...route.query, categoria: undefined, page: undefined } }"
-      >Catálogo</RouterLink>
-      <template v-else>Catálogo</template>
-      <template v-if="categoriaId"> / {{ nombreCategoria }}</template>
-    </p>
+        :to="{ name: 'home' }"
+        class="box-border inline-flex min-h-11 items-center px-1 fp-focus text-[var(--fp-blue)]"
+      >Inicio</RouterLink>
+      <span aria-hidden="true">/</span>
+      <template v-if="categoriaId">
+        <RouterLink
+          custom
+          :to="{ name: 'catalogo', query: { ...route.query, categoria: undefined, page: undefined } }"
+          v-slot="{ href, navigate }"
+        >
+          <a
+            :href="href"
+            class="box-border inline-flex min-h-11 items-center px-1 fp-focus text-[var(--fp-blue)]"
+            @click="navigate"
+          >Catálogo</a>
+        </RouterLink>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" class="text-slate-700 [overflow-wrap:anywhere]">{{ nombreCategoria }}</span>
+      </template>
+      <span v-else aria-current="page" class="text-slate-700">Catálogo</span>
+    </nav>
 
-    <header class="mb-5 flex flex-col items-start justify-between gap-4 min-[801px]:flex-row">
-      <div>
-        <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
-        <p class="fp-section-copy">{{ total }} productos</p>
-      </div>
-      <div class="w-full min-[801px]:w-auto">
-        <label for="catalog-order" class="mb-1 block text-sm font-medium text-[var(--fp-navy)]">
-          Ordenar por
-        </label>
-        <select
-          id="catalog-order"
-          :value="orden"
-          class="fp-focus box-border min-h-11 w-full rounded-md border border-[var(--fp-control-line)] bg-white px-3 py-2 text-base text-[var(--fp-navy)] sm:text-sm"
-          :aria-describedby="orden.startsWith('precio_') ? 'catalog-order-help' : undefined"
-          @change="cambiarOrden"
-        >
-          <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
-            {{ option.label }}
-          </option>
-        </select>
-        <p
-          v-if="orden.startsWith('precio_')"
-          id="catalog-order-help"
-          class="m-0 mt-1 max-w-xs text-xs text-slate-500"
-        >
-          El orden usa el precio público del catálogo; tu precio personalizado no modifica la posición.
-        </p>
-      </div>
+    <header class="mb-5">
+      <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
+      <p class="fp-section-copy">{{ total }} productos</p>
     </header>
 
-    <div class="grid grid-cols-1 items-start gap-5 min-[801px]:grid-cols-[190px_minmax(0,1fr)]">
-      <aside class="min-h-0 rounded-[var(--fp-radius-panel)] border border-[var(--fp-line)] bg-white p-4 min-[801px]:min-h-[260px]" aria-label="Filtros">
-        <h2 class="m-0 text-base">Filtros</h2>
+    <section
+      aria-label="Filtros y orden del catálogo"
+      class="mb-6 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4"
+    >
+      <CatalogFilters
+        :model-value="filtrosAplicados"
+        :categories="listaCategorias"
+        :categories-loading="cargandoCategorias"
+        :categories-error="errorCategorias"
+        @apply="aplicarFiltros"
+        @clear="limpiarFiltros"
+        @retry-categories="cargarCategorias"
+      >
+        <template #order>
+          <div class="w-full shrink-0 min-[801px]:w-72">
+            <label for="catalog-order" class="mb-1.5 block text-sm font-medium text-[var(--fp-navy)]">
+              Ordenar por
+            </label>
+            <select
+              id="catalog-order"
+              :value="orden"
+              class="fp-focus box-border min-h-11 w-full rounded-md border border-[var(--fp-control-line)] bg-white px-3 py-2 text-base text-[var(--fp-navy)] sm:text-sm"
+              :aria-describedby="orden.startsWith('precio_') ? 'catalog-order-help' : undefined"
+              @change="cambiarOrden"
+            >
+              <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+        </template>
+      </CatalogFilters>
 
-        <CatalogFilters
-          :model-value="filtrosAplicados"
-          :categories="listaCategorias"
-          :categories-loading="cargandoCategorias"
-          :categories-error="errorCategorias"
-          @apply="aplicarFiltros"
-          @retry-categories="cargarCategorias"
-        />
-      </aside>
+      <p
+        v-if="orden.startsWith('precio_')"
+        id="catalog-order-help"
+        class="m-0 mt-2 w-full text-xs text-slate-500"
+      >
+        El orden usa el precio público del catálogo; tu precio personalizado no modifica la posición.
+      </p>
+    </section>
 
-      <section>
+    <section>
         <ProductPrices :products="productos" :catalog-loading="cargando" v-slot="pricing">
         <p v-if="cargando" class="fp-state" role="status">Cargando productos...</p>
 
@@ -321,7 +348,7 @@ onBeforeUnmount(() => {
             v-if="busqueda || categoriaId"
             type="button"
             class="fp-action fp-action--primary fp-focus mt-2"
-            @click="aplicarFiltros({ search: '', categoryId: null })"
+            @click="limpiarFiltros"
           >
             Limpiar filtros
           </button>
@@ -395,7 +422,6 @@ onBeforeUnmount(() => {
           </button>
         </nav>
         </ProductPrices>
-      </section>
-    </div>
+    </section>
   </main>
 </template>
