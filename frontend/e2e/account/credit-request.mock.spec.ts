@@ -20,6 +20,123 @@ async function fillRequest(page: Page, amount = '1000') {
   await page.getByLabel('Observaciones (opcional)').fill('Prueba')
 }
 
+for (const width of [360, 768, 1280]) {
+  test(`controles de crédito son visibles y conservan foco a ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await setup(page)
+    await page.route('**/api/cuenta-corriente/solicitudes**', route =>
+      route.fulfill({ json: { data: { items: [], siguienteAntesDeId: null } } }))
+    await page.goto('/mi-cuenta/cuenta-corriente')
+    const amount = page.getByLabel('Monto solicitado (USD)')
+    const term = page.getByLabel('Plazo solicitado')
+    const notes = page.getByLabel('Observaciones (opcional)')
+    const submit = page.getByRole('button', { name: 'Solicitar crédito', exact: true })
+    const refresh = page.getByRole('button', { name: 'Actualizar', exact: true })
+    await expect(amount).toBeVisible()
+
+    const font = await page.locator('body').evaluate(element =>
+      element.ownerDocument.defaultView!.getComputedStyle(element).fontFamily)
+    for (const control of [amount, term, notes]) {
+      await expect(control).toHaveCSS('box-sizing', 'border-box')
+      await expect(control).toHaveCSS('font-family', font)
+      await expect(control).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+      const fits = await control.evaluate(element => {
+        const bounds = element.getBoundingClientRect()
+        const parent = element.parentElement!.getBoundingClientRect()
+        return bounds.left >= parent.left && bounds.right <= parent.right + 0.5
+      })
+      expect(fits).toBe(true)
+    }
+    if (width >= 768) {
+      const amountBounds = (await amount.boundingBox())!
+      const termBounds = (await term.boundingBox())!
+      expect(termBounds.x - (amountBounds.x + amountBounds.width)).toBeGreaterThanOrEqual(15)
+    }
+    await expect(term).toHaveCSS('cursor', 'pointer')
+    for (const button of [submit, refresh]) {
+      await expect(button).toHaveCSS('box-sizing', 'border-box')
+      await expect(button).toHaveCSS('font-family', font)
+      await expect(button).toHaveCSS('cursor', 'pointer')
+    }
+    await expect(submit).toHaveCSS('border-top-width', '0px')
+    await expect(refresh).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await page.keyboard.press('Tab')
+    for (const control of [amount, term, notes, submit, refresh]) {
+      await control.focus()
+      expect(await control.evaluate(element => element.matches(':focus-visible'))).toBe(true)
+      await expect(control).toHaveCSS('outline-width', '2px')
+      await expect(control).toHaveCSS('outline-offset', '2px')
+      await expect(control).toHaveCSS('outline-color', 'rgb(20, 90, 141)')
+    }
+    await amount.focus()
+    for (const control of [term, notes, submit]) {
+      await page.keyboard.press('Tab')
+      await expect(control).toBeFocused()
+    }
+    expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+  })
+}
+
+test('controles deshabilitados y reintento de consulta mantienen estilos explícitos', async ({ page }) => {
+  await setup(page)
+  let release = () => {}
+  const gate = new Promise<void>(resolve => { release = resolve })
+  let releaseAccount = () => {}
+  const accountGate = new Promise<void>(resolve => { releaseAccount = resolve })
+  let failRead = true
+  await page.route('**/api/cuenta-corriente/solicitudes**', async route => {
+    if (route.request().method() === 'GET') {
+      return failRead
+        ? route.fulfill({ status: 503, json: { message: 'No disponible' } })
+        : route.fulfill({ json: { data: { items: [], siguienteAntesDeId: null } } })
+    }
+    await gate
+    return route.fulfill({ status: 201, json: { data: { solicitud: request(808) } } })
+  })
+  try {
+    await page.goto('/mi-cuenta/cuenta-corriente')
+    const retry = page.getByRole('button', { name: 'Reintentar consulta', exact: true })
+    await expect(retry).toHaveCSS('background-color', 'rgb(255, 255, 255)')
+    await expect(retry).toHaveCSS('cursor', 'pointer')
+    await page.keyboard.press('Tab')
+    await retry.focus()
+    await expect(retry).toHaveCSS('outline-width', '2px')
+    await expect(retry).toHaveCSS('outline-offset', '2px')
+    await expect(retry).toHaveCSS('outline-color', 'rgb(20, 90, 141)')
+    failRead = false
+    await retry.click()
+    const refresh = page.getByRole('button', { name: 'Actualizar', exact: true })
+    await expect(refresh).toBeEnabled()
+    await page.route('**/api/cuenta-corriente', async route => {
+      await accountGate
+      await route.continue()
+    }, { times: 1 })
+    await refresh.click()
+    const updating = page.getByRole('button', { name: 'Actualizando…', exact: true })
+    await expect(updating).toBeDisabled()
+    await expect(updating).toHaveCSS('cursor', 'not-allowed')
+    await expect(updating).toHaveCSS('opacity', '0.6')
+    releaseAccount()
+    await expect(refresh).toBeEnabled()
+    await fillRequest(page)
+    await page.getByRole('button', { name: 'Solicitar crédito', exact: true }).click()
+    for (const control of [
+      page.getByLabel('Monto solicitado (USD)'),
+      page.getByLabel('Plazo solicitado'),
+      page.getByLabel('Observaciones (opcional)'),
+      page.getByRole('button', { name: 'Enviando…', exact: true }),
+    ]) {
+      await expect(control).toBeDisabled()
+      await expect(control).toHaveCSS('cursor', 'not-allowed')
+    }
+    release()
+    await expect(page.getByText('Solicitud #808 · Pendiente')).toBeVisible()
+  } finally {
+    release()
+    releaseAccount()
+  }
+})
+
 for (const outcome of ['success', 'failure'] as const) {
   test(`descarta respuesta tardía ${outcome} al cambiar de sesión`, async ({ page }) => {
     await setup(page)

@@ -176,7 +176,7 @@ async function submitRequest() {
             <p v-if="loading" role="status" class="mb-4">Consultando tus solicitudes de crédito…</p>
             <div v-else-if="loadError" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3">
                 <p role="alert" class="m-0 mb-2">{{ loadError }}</p>
-                <button type="button" class="min-h-11 rounded-md border border-red-300 px-3 py-2"
+                <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="loadRequests">Reintentar consulta</button>
             </div>
             <template v-else>
@@ -210,31 +210,31 @@ async function submitRequest() {
                     <p v-if="retrySubmission" role="status" class="m-0 text-sm text-slate-700 sm:col-span-2">
                         El resultado del envío no está confirmado. Reintentá con los mismos datos para evitar solicitudes duplicadas.
                     </p>
-                    <label class="grid gap-1 text-sm font-medium" for="credit-amount">
+                    <label class="grid min-w-0 gap-1 text-sm font-medium" for="credit-amount">
                         Monto solicitado (USD)
                         <input id="credit-amount" v-model="montoSolicitado" required
                             inputmode="decimal" pattern="(?:0|[1-9][0-9]{0,9})(?:\.[0-9]{1,2})?"
                             :disabled="submitting || retrySubmission !== null"
-                            class="min-h-11 rounded-md border border-slate-300 px-3 py-2 font-normal"
+                            class="box-border min-h-11 w-full min-w-0 rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             aria-describedby="credit-amount-help">
                         <span id="credit-amount-help" class="font-normal text-slate-600">
                             Ingresá un importe mayor a cero, con hasta dos decimales.
                         </span>
                     </label>
-                    <label class="grid content-start gap-1 text-sm font-medium" for="credit-term">
+                    <label class="grid min-w-0 content-start gap-1 text-sm font-medium" for="credit-term">
                         Plazo solicitado
                         <select id="credit-term" v-model.number="plazoDias"
                             :disabled="submitting || retrySubmission !== null"
-                            class="min-h-11 rounded-md border border-slate-300 px-3 py-2 font-normal">
+                            class="box-border min-h-11 w-full min-w-0 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
                             <option :value="30">30 días</option>
                             <option :value="60">60 días</option>
                         </select>
                     </label>
-                    <label class="grid gap-1 text-sm font-medium sm:col-span-2" for="credit-notes">
+                    <label class="grid min-w-0 gap-1 text-sm font-medium sm:col-span-2" for="credit-notes">
                         Observaciones (opcional)
                         <textarea id="credit-notes" v-model="observaciones" maxlength="1000" rows="3"
                             :disabled="submitting || retrySubmission !== null"
-                            class="rounded-md border border-slate-300 px-3 py-2 font-normal"></textarea>
+                            class="box-border w-full min-w-0 rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"></textarea>
                     </label>
                     <p v-if="successMessage" role="status"
                         class="m-0 rounded-md border border-green-200 bg-green-50 p-3 text-green-800 sm:col-span-2">
@@ -242,7 +242,7 @@ async function submitRequest() {
                     </p>
                     <div class="flex flex-wrap items-center gap-3 sm:col-span-2">
                         <button type="submit"
-                            class="min-h-11 rounded-md bg-[#103A5C] px-4 py-2 font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60"
+                            class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#103A5C] px-4 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             :disabled="submitting">
                             {{ submitting ? 'Enviando…' : retrySubmission ? 'Reintentar envío' : 'Solicitar crédito' }}
                         </button>

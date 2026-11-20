@@ -105,7 +105,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                 <h1 id="current-account-title" class="m-0 mb-2 text-[28px] font-semibold">Cuenta corriente</h1>
                 <p class="m-0 leading-6 text-slate-600">Saldo, límite de crédito y movimientos de tu cuenta.</p>
             </div>
-            <button type="button" class="min-h-11 rounded-md border border-slate-300 px-4 py-2 hover:bg-slate-50"
+            <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                 :disabled="cuenta.consultaCargando" @click="refreshAccount()">
                 {{ cuenta.consultaCargando ? 'Actualizando…' : 'Actualizar' }}
             </button>
