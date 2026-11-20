@@ -68,6 +68,7 @@ function createRuntime(t, transport, saved = null) {
       transferOrderErrorMessage: () => 'Transfer failed',
     },
     '@/services/sessionGeneration': { currentSessionGeneration: () => 1 },
+    '@/services/confirmationReset': { registerConfirmationReset: () => () => {} },
     '@/services/realtime': { onRealtime() {} },
     '@/stores/auth': { useAuthStore: () => auth },
     '@/stores/cart': {
@@ -177,4 +178,36 @@ test('recovers a saved transfer attempt and reconciles the cart only when regist
   assert.deepEqual(runtime.store.confirmation, confirmed)
   assert.equal(runtime.values.has(7), false)
   assert.equal(runtime.reconciled, 1)
+})
+
+test('clearConfirmation clears confirmed state without touching pending attempts', async t => {
+  const runtime = createRuntime(t, {
+    getEligibility: async () => eligibleOrder,
+    confirm: async () => ({ estado: 'CONFIRMADO', result: confirmed }),
+    recover: async () => ({ estado: 'PENDIENTE', result: pending }),
+  })
+  await tick()
+  await runtime.store.loadEligibility()
+  assert.equal(await runtime.store.confirm(), true)
+  assert.equal(runtime.store.attemptState, 'confirmed')
+  assert.deepEqual(runtime.store.confirmation, confirmed)
+
+  runtime.store.clearConfirmation()
+  assert.equal(runtime.store.attemptState, 'idle')
+  assert.equal(runtime.store.confirmation, null)
+
+  const pendingRuntime = createRuntime(t, {
+    getEligibility: async () => eligibleOrder,
+    confirm: async () => ({ estado: 'PENDIENTE', result: pending }),
+    recover: async () => ({ estado: 'PENDIENTE', result: pending }),
+  })
+  await tick()
+  await pendingRuntime.store.loadEligibility()
+  assert.equal(await pendingRuntime.store.confirm(), false)
+  assert.equal(pendingRuntime.store.attemptState, 'pending')
+
+  pendingRuntime.store.clearConfirmation()
+  assert.equal(pendingRuntime.store.attemptState, 'pending')
+  assert.equal(pendingRuntime.store.pendingKey, key)
+  assert.equal(pendingRuntime.values.has(7), true)
 })

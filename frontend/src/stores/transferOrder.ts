@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import axios from 'axios'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
+import { registerConfirmationReset } from '@/services/confirmationReset'
 import { onRealtime } from '@/services/realtime'
 import { transferOrderErrorMessage, transferOrderService } from '@/services/transferOrderService'
 import { useAuthStore } from '@/stores/auth'
@@ -290,6 +291,13 @@ export function createTransferOrderStore(
       attemptError.value = ''
     }
 
+    function clearConfirmation() {
+      if (attemptState.value !== 'confirmed' && confirmation.value === null) return
+      attemptState.value = 'idle'
+      attemptError.value = ''
+      confirmation.value = null
+    }
+
     function finishRequest(controller: AbortController) {
       if (activeAttempt !== controller) return
       activeAttempt = undefined
@@ -317,8 +325,11 @@ export function createTransferOrderStore(
       }
     }, { immediate: true, flush: 'sync' })
 
+    const unregisterConfirmationReset = registerConfirmationReset(clearConfirmation)
+
     onScopeDispose(() => {
       disposed = true
+      unregisterConfirmationReset()
       clearState(null)
     })
 
@@ -326,6 +337,7 @@ export function createTransferOrderStore(
       eligibility, eligibilityLoading, eligibilityError, canUseTransfer, attemptState,
       attemptError, confirmation, pendingKey, pendingQuoteToken, storageError,
       loadEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
+      clearConfirmation,
     }
   })
 }
