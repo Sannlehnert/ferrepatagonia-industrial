@@ -3,6 +3,7 @@ import { computed, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import axios from 'axios'
 import { accountOrderErrorMessage, accountOrderService } from '@/services/accountOrderService'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
+import { registerConfirmationReset } from '@/services/confirmationReset'
 import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import { useCartStore } from '@/stores/cart'
@@ -322,6 +323,13 @@ export function createAccountOrderStore(
       attemptError.value = ''
     }
 
+    function clearConfirmation() {
+      if (attemptState.value !== 'confirmed' && confirmation.value === null) return
+      attemptState.value = 'idle'
+      attemptError.value = ''
+      confirmation.value = null
+    }
+
     function finishRequest(controller: AbortController) {
       if (activeAttempt !== controller) return
       activeAttempt = undefined
@@ -350,8 +358,11 @@ export function createAccountOrderStore(
       }
     }, { immediate: true, flush: 'sync' })
 
+    const unregisterConfirmationReset = registerConfirmationReset(clearConfirmation)
+
     onScopeDispose(() => {
       disposed = true
+      unregisterConfirmationReset()
       clearState(null)
     })
 
@@ -360,6 +371,7 @@ export function createAccountOrderStore(
       attemptError, confirmation, receipts, pendingKey, storageError,
       pendingQuoteToken,
       loadEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
+      clearConfirmation,
     }
   })
 }
