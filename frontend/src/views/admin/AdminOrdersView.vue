@@ -114,7 +114,15 @@ function resolveErrorMessage(
 function loadList(page = activeFilters.page ?? 1, keepData = false) {
   const filters = { ...activeFilters, page }
   activeFilters = filters
-  return list.load(signal => getAdminOrders(filters, signal), { keepData })
+  return list.load(async signal => {
+    let result = await getAdminOrders(filters, signal)
+    while (filters.page > Math.max(1, result.pagination.totalPages)) {
+      signal.throwIfAborted()
+      filters.page = Math.max(1, result.pagination.totalPages)
+      result = await getAdminOrders(filters, signal)
+    }
+    return result
+  }, { keepData })
 }
 
 function isCurrentSession(session: string) {

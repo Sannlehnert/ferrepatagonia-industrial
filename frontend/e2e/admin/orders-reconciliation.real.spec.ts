@@ -70,6 +70,44 @@ const openOrder = (page: Page, id: number) => page.getByRole('button', { name: `
 const listQuery = (request: { method(): string; url(): string }) =>
   request.method() === 'GET' && new URL(request.url()).pathname === ordersPath
 
+for (const lostResponse of [false, true]) {
+  ordersTest(`última página filtrada vuelve a una página válida con respuesta ${lostResponse ? 'perdida' : 'confirmada'}`, async ({ page, db }) => {
+    const { company, a } = await fixture(db, 19)
+    await openPanel(page, company)
+    await page.getByLabel('Filtrar por estado del pedido').selectOption('CONFIRMADO')
+    await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+    await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+    const pagination = page.getByRole('navigation', { name: 'Paginación de pedidos', exact: true })
+    await expect(pagination).toContainText('1–20 de 21 pedidos')
+    await pagination.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(pagination).toContainText('21–21 de 21 pedidos')
+    const reads: string[] = []
+    let patches = 0
+    const patchPath = `${ordersPath}/${a}/estado`
+    page.on('request', request => {
+      if (listQuery(request)) reads.push(request.url())
+      if (request.method() === 'PATCH' && new URL(request.url()).pathname === patchPath) patches++
+    })
+    if (lostResponse) await page.route(`**${patchPath}`, async route => {
+      expect((await route.fetch()).ok()).toBe(true)
+      await route.abort('failed')
+    }, { times: 1 })
+    await openOrder(page, a)
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Guardar Estado' }).click()
+    await expect(pagination).toContainText('1–20 de 20 pedidos')
+    expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+    expect(patches).toBe(1)
+    expect(reads.map(url => Object.fromEntries(new URL(url).searchParams))).toEqual([2, 1].map(page => ({
+      page: String(page), limit: '20', estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', fecha: '2026-11-10', q: company,
+    })))
+    await dialog.getByRole('button', { name: 'Cerrar modal' }).click()
+    await expect(rowFor(page, a)).toHaveCount(0)
+    await expect(page.getByLabel('Filtrar por estado del pedido')).toHaveValue('CONFIRMADO')
+    await expect(pagination.getByRole('button', { name: 'Siguiente', exact: true })).toHaveCount(0)
+  })
+}
+
 function gate() {
   let release!: () => void
   const ready = new Promise<void>(resolve => { release = resolve })

@@ -114,3 +114,15 @@ El componente mantiene usePrivateAccountRead, AbortSignal, reinicio por sesión 
 Los tests de #347 se adaptan a la división en componentes; conservan la comprobación de lectura privada, estados y texto sin insinuar acreditaciones. La cobertura E2E compara seis valores y cuatro estados con HTTP real e incorpora recuperación tras logout/login con una respuesta anterior retenida. No se versionan reportes generados.
 
 Validación de esta integración: builds backend/frontend y TypeScript aprobados; 274/274 pruebas frontend aprobadas. Pasaron 15 escenarios E2E distintos: 13 del conjunto dashboard/listado/detalle/reconciliación y dos adicionales de fallo independiente entre métricas y recientes. Se confirmó limpieza de ambos entornos descartables. Se comprobó el diseño de escritorio en la captura y ausencia de desborde a 360/1280 px mediante Playwright. La observación histórica del script de auditoría ya no falla en la suite actual tras integrar su eliminación desde develop.
+
+## Corrección de revisión: última página filtrada · 20/11/2026
+
+Se reprodujo en Chromium y MariaDB descartable el caso señalado en PR #146: con 21 pedidos filtrados, cambiar el único pedido de la página 2 a otro estado dejaba el listado vacío aunque quedaban 20 coincidencias.
+
+La lectura del listado ahora consulta la última página válida indicada por la API si la página solicitada dejó de existir. Conserva todos los filtros y usa la misma operación cancelable, evitando publicar el resultado vacío intermedio o aceptar una respuesta de otra sesión. No cambia backend, estados permitidos, métricas, estilos ni controles de paginación.
+
+Se agregan dos regresiones reales: respuesta confirmada y respuesta perdida después del commit. Ambas comprueban vuelta de página 2 a 1, conservación de búsqueda/estado/modalidad/fecha, estado persistido y un solo PATCH. Se mantienen los escenarios de respuesta tardía, cierre de sesión y recuperación existentes.
+
+Validación tras integrar develop (merge local 396a667): 288 pruebas frontend, builds backend/frontend y TypeScript aprobados; 16 E2E de Dashboard, Pedidos y reconciliación aprobados con build de producción sobre MariaDB descartable. Limpieza de contenedor y datos tmpfs confirmada. Se estabilizó la simulación de error de métricas/recientes para mantener el fallo hasta el reintento explícito, en lugar de depender del orden de las consultas iniciales.
+
+Pendientes commit/push, CI del nuevo HEAD, reauditoría técnica y validación UX/UI.

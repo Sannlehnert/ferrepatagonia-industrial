@@ -275,16 +275,20 @@ test('el listado no acredita pagos ni inventa moneda, identifica DEMO y permite 
 for (const failed of ['metrics', 'recent'] as const) {
   test(`un error de ${failed} conserva la otra sección del dashboard`, async ({ page }) => {
     await setup(page)
-    await page.route(failed === 'metrics' ? '**/api/admin/dashboard/metricas' : /\/api\/admin\/pedidos(?:\?.*)?$/, route => route.fulfill({ status: 503, json: {} }), { times: 1 })
+    let fail = true
+    await page.route(failed === 'metrics' ? '**/api/admin/dashboard/metricas' : /\/api\/admin\/pedidos(?:\?.*)?$/,
+      route => fail ? route.fulfill({ status: 503, json: {} }) : route.fallback())
     await page.goto('/admin/dashboard')
     const summary = page.getByRole('region', { name: 'Resumen', exact: true })
     await expect(summary.getByRole('alert')).toHaveCount(1)
     if (failed === 'metrics') {
       await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toContainText('—')
       await expect(summary.getByRole('link', { name: 'Ver pedido #1001', exact: true })).toBeVisible()
+      fail = false
       await summary.getByRole('button', { name: 'Reintentar indicadores', exact: true }).click()
     } else {
       await expect(summary.getByLabel('Pedidos nuevos', { exact: true })).toHaveText('1')
+      fail = false
       await summary.getByRole('button', { name: 'Actualizar pedidos', exact: true }).click()
     }
     await expect(summary.getByRole('alert')).toHaveCount(0)
