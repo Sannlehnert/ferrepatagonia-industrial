@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { clearRegisteredConfirmations } from '@/services/confirmationReset'
 import { useAuthStore } from '@/stores/auth'
 import type { Rol } from '@/types/auth'
 import { rutaPorRol } from '@/utils/rutas'
@@ -223,6 +224,11 @@ router.beforeEach(async (to) => {
   ) {
     return rutaPorRol(auth.rol)
   }
+})
+
+router.afterEach((to, from) => {
+  if (to.path === from.path) return
+  clearRegisteredConfirmations()
 })
 
 export default router
