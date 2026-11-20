@@ -69,6 +69,7 @@ function createRuntime(t, transport, savedKey = null) {
             currentSessionGeneration: () => generation,
         },
         '@/stores/auth': { useAuthStore: () => auth },
+        '@/services/confirmationReset': { registerConfirmationReset: () => () => {} },
         '@/services/realtime': { onRealtime() {} },
         '@/stores/cart': { useCartStore: () => ({ reconciliarPedidoConfirmado() {} }) },
     })
