@@ -55,6 +55,7 @@ async function mount(t, page, handler = query => response(query.page)) {
       return { default: {} }
     }
     if (name === '@/utils/catalogPagination') return require('../src/utils/catalogPagination.ts')
+    if (name === '@/utils/catalogOrder') return require('../src/utils/catalogOrder.ts')
     if (name === '@/utils/illustrativeDemoImage') return { isIllustrativeDemoImage: () => false }
     return require(name)
   }, module, module.exports)
@@ -142,6 +143,36 @@ test('normalization replaces history; page buttons push; back/forward and filter
   await settle()
   assert.equal(router.currentRoute.value.query.categoria, undefined)
   assert.equal(router.currentRoute.value.query.busqueda, undefined)
+  assert.equal(router.currentRoute.value.query.extra, 'conservar')
+})
+
+test('aplicarFiltros preserves orden while limpiarFiltros resets orden and preserves extra params', async t => {
+  const { router, requests, state } = await mount(t, '2')
+  await router.push({ query: { ...router.currentRoute.value.query, orden: 'precio_asc' } })
+  await settle()
+  assert.equal(state.orden, 'precio_asc')
+
+  await state.aplicarFiltros({ search: 'tuerca', categoryId: 6 })
+  await settle()
+  assert.equal(router.currentRoute.value.query.orden, 'precio_asc')
+  assert.equal(router.currentRoute.value.query.extra, 'conservar')
+  assert.deepEqual(requests.at(-1), {
+    page: 1, limit: 12, categoria: 6, busqueda: 'tuerca', orden: 'precio_asc',
+  })
+
+  await state.aplicarFiltros({ search: '', categoryId: null })
+  await settle()
+  assert.equal(router.currentRoute.value.query.busqueda, undefined)
+  assert.equal(router.currentRoute.value.query.categoria, undefined)
+  assert.equal(router.currentRoute.value.query.orden, 'precio_asc')
+
+  await state.limpiarFiltros()
+  await settle()
+  assert.equal(state.orden, 'predeterminado')
+  assert.equal(router.currentRoute.value.query.busqueda, undefined)
+  assert.equal(router.currentRoute.value.query.categoria, undefined)
+  assert.equal(router.currentRoute.value.query.page, undefined)
+  assert.equal(router.currentRoute.value.query.orden, undefined)
   assert.equal(router.currentRoute.value.query.extra, 'conservar')
 })
 
