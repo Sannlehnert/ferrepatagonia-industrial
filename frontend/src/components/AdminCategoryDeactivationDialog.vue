@@ -206,7 +206,7 @@ function reload() {
         <div class="box-border min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 text-sm sm:p-6">
           <p id="category-deactivation-description" class="m-0 wrap-anywhere">
             ¿Desactivar <strong>{{ category.nombre }}</strong>?
-            La categoría dejará de aparecer en el catálogo público.
+            La categoría dejará de aparecer en el catálogo público, sin eliminar sus productos asociados.
           </p>
 
           <div
