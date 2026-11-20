@@ -96,14 +96,67 @@ test('ordena por precio público y conserva el criterio al cambiar y quitar la c
   await expect(sort).toHaveValue('precio_asc')
   await expect(names.first()).toHaveText('Producto E2E 24')
 
-  await page.locator('#contenido-principal').getByRole('link', {
+  const nav = page.getByRole('navigation', { name: 'Ruta de navegación' })
+  await expect(nav.getByRole('link', { name: 'Inicio', exact: true })).toHaveAttribute('href', '/')
+  await expect(nav.locator('[aria-current="page"]')).toHaveText('Fijaciones E2E')
+
+  await nav.getByRole('link', {
     name: 'Catálogo',
     exact: true,
   }).click()
   await expect(page).not.toHaveURL(/categoria=/)
   await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(nav.locator('[aria-current="page"]')).toHaveText('Catálogo')
   await expect(sort).toHaveValue('precio_asc')
   await expect(names.first()).toHaveText('Producto E2E 24')
+})
+
+test('limpiar filtros restablece el orden a predeterminado y quita ?orden= de la URL, mientras Buscar y Enter lo conservan', async ({
+  page,
+}) => {
+  await page.goto('/catalogo?extra=1')
+
+  const filters = page.getByRole('form', { name: 'Buscar y filtrar productos' })
+  const search = filters.getByRole('searchbox', { name: 'Nombre o código' })
+  const category = filters.getByRole('combobox', { name: 'Categoría', exact: true })
+  const sort = page.getByRole('combobox', { name: 'Ordenar por' })
+
+  await expect(category).toBeEnabled()
+  await sort.selectOption('precio_asc')
+  await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(page.locator('#catalog-order-help')).toBeVisible()
+
+  await search.fill('Producto E2E')
+  await search.press('Enter')
+  await expect(page).toHaveURL(/busqueda=Producto\+E2E|busqueda=Producto%20E2E/)
+  await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(page).toHaveURL(/extra=1/)
+  await expect(sort).toHaveValue('precio_asc')
+
+  await category.selectOption({ label: 'Herramientas E2E' })
+  await filters.getByRole('button', { name: 'Buscar', exact: true }).click()
+  await expect(page).toHaveURL(/categoria=1/)
+  await expect(page).toHaveURL(/orden=precio_asc/)
+
+  // Aplicar filtros vacíos con Buscar sigue conservando el criterio de orden.
+  await search.fill('')
+  await category.selectOption({ label: 'Todas las categorías' })
+  await filters.getByRole('button', { name: 'Buscar', exact: true }).click()
+  await expect(page).not.toHaveURL(/busqueda=/)
+  await expect(page).not.toHaveURL(/categoria=/)
+  await expect(page).toHaveURL(/orden=precio_asc/)
+  await expect(page).toHaveURL(/extra=1/)
+  await expect(sort).toHaveValue('precio_asc')
+
+  // Limpiar filtros restablece también el orden a predeterminado y quita ?orden=.
+  await filters.getByRole('button', { name: 'Limpiar filtros', exact: true }).click()
+  await expect(sort).toHaveValue('predeterminado')
+  await expect(page).not.toHaveURL(/orden=/)
+  await expect(page).not.toHaveURL(/busqueda=/)
+  await expect(page).not.toHaveURL(/categoria=/)
+  await expect(page).not.toHaveURL(/page=/)
+  await expect(page).toHaveURL(/extra=1/)
+  await expect(page.locator('#catalog-order-help')).toHaveCount(0)
 })
 
 for (const width of [360, 768, 1280]) {
@@ -112,7 +165,14 @@ for (const width of [360, 768, 1280]) {
     await page.goto('/catalogo?categoria=1')
 
     const sort = page.getByRole('combobox', { name: 'Ordenar por' })
-    const breadcrumb = page.locator('#contenido-principal').getByRole('link', { name: 'Catálogo', exact: true })
+    const nav = page.getByRole('navigation', { name: 'Ruta de navegación' })
+    const homeBreadcrumb = nav.getByRole('link', { name: 'Inicio', exact: true })
+    const breadcrumb = nav.getByRole('link', { name: 'Catálogo', exact: true })
+    const filters = page.getByRole('form', { name: 'Buscar y filtrar productos' })
+    const searchInput = filters.getByRole('searchbox', { name: 'Nombre o código' })
+    const categorySelect = filters.getByRole('combobox', { name: 'Categoría', exact: true })
+    const searchButton = filters.getByRole('button', { name: 'Buscar', exact: true })
+    const clearButton = filters.getByRole('button', { name: 'Limpiar filtros', exact: true })
     const pagination = page.getByRole('navigation', { name: 'Paginación del catálogo' })
     const previous = pagination.getByRole('button', { name: 'Anterior', exact: true })
     const next = pagination.getByRole('button', { name: 'Siguiente', exact: true })
@@ -120,10 +180,33 @@ for (const width of [360, 768, 1280]) {
     await expect(sort.locator('option:checked')).toHaveText('Predeterminado')
     await expect(sort).toHaveCSS('font-size', width < 640 ? '16px' : '14px')
     await expect(next).toBeEnabled()
-    expect((await sort.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    await expect(nav.locator('[aria-current="page"]')).toHaveText('Herramientas E2E')
+
+    const initialSearchInputBox = (await searchInput.boundingBox())!
+    const initialCategoryBox = (await categorySelect.boundingBox())!
+    const initialSortBox = (await sort.boundingBox())!
+    const initialSearchBtnBox = (await searchButton.boundingBox())!
+    const initialClearBtnBox = (await clearButton.boundingBox())!
+
+    expect(initialSortBox.height).toBeGreaterThanOrEqual(44)
+    expect((await homeBreadcrumb.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect((await breadcrumb.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+    expect(initialSearchInputBox.height).toBeGreaterThanOrEqual(44)
+    expect(initialCategoryBox.height).toBeGreaterThanOrEqual(44)
+    expect(initialSearchBtnBox.height).toBeGreaterThanOrEqual(44)
+    expect(initialClearBtnBox.height).toBeGreaterThanOrEqual(44)
     expect((await previous.boundingBox())!.height).toBeGreaterThanOrEqual(44)
     expect((await next.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+
+    if (width === 1280) {
+      expect(initialSortBox.width).toBe(288)
+      expect(initialSearchInputBox.x).toBeLessThan(initialCategoryBox.x)
+      expect(initialCategoryBox.x).toBeLessThan(initialSortBox.x)
+      expect(initialSortBox.x).toBeLessThan(initialSearchBtnBox.x)
+      expect(initialSearchBtnBox.x).toBeLessThan(initialClearBtnBox.x)
+      expect(Math.abs((initialSortBox.y + initialSortBox.height) - (initialSearchBtnBox.y + initialSearchBtnBox.height))).toBeLessThanOrEqual(2)
+      expect(Math.abs((initialSortBox.y + initialSortBox.height) - (initialClearBtnBox.y + initialClearBtnBox.height))).toBeLessThanOrEqual(2)
+    }
 
     const contrast = await sort.evaluate(element => {
       const style = element.ownerDocument.defaultView!.getComputedStyle(element)
@@ -151,9 +234,18 @@ for (const width of [360, 768, 1280]) {
     await sort.selectOption('precio_asc')
     const help = page.locator('#catalog-order-help')
     await expect(help).toBeVisible()
-    expect(Math.abs((await sort.boundingBox())!.x - (await help.boundingBox())!.x)).toBeLessThan(1)
+    const sortBoxWithHelp = (await sort.boundingBox())!
+    const searchBtnWithHelp = (await searchButton.boundingBox())!
+    const clearBtnWithHelp = (await clearButton.boundingBox())!
+    const helpBox = (await help.boundingBox())!
+    expect(Math.abs(sortBoxWithHelp.width - initialSortBox.width)).toBeLessThan(1)
+    expect(Math.abs(sortBoxWithHelp.y - initialSortBox.y)).toBeLessThan(1)
+    expect(Math.abs(searchBtnWithHelp.y - initialSearchBtnBox.y)).toBeLessThan(1)
+    expect(Math.abs(clearBtnWithHelp.y - initialClearBtnBox.y)).toBeLessThan(1)
+    expect(helpBox.y).toBeGreaterThanOrEqual(sortBoxWithHelp.y + sortBoxWithHelp.height)
+    expect(helpBox.y).toBeGreaterThanOrEqual(clearBtnWithHelp.y + clearBtnWithHelp.height)
     expect(await sort.evaluate(element =>
-      element.ownerDocument.documentElement.scrollWidth <= element.ownerDocument.defaultView!.innerWidth,
+      element.ownerDocument.documentElement.scrollWidth <= element.ownerDocument.documentElement.clientWidth,
     )).toBe(true)
   })
 }
