@@ -1,5 +1,5 @@
 import type { CreateCategory, UpdateCategory } from '../dtos/categories/category.dto';
-import { deactivateCategory, findActiveCategories, insertCategory, updateCategory } from '../repositories/category.repository';
+import { activateCategory, deactivateCategory, findActiveCategories, insertCategory, updateCategory } from '../repositories/category.repository';
 
 export async function listActiveCategories() {
   const rows = await findActiveCategories();
@@ -16,4 +16,8 @@ export function updateAdminCategory(id: number, input: UpdateCategory) {
 
 export function deactivateAdminCategory(id: number) {
   return deactivateCategory(id);
+}
+
+export function activateAdminCategory(id: number) {
+  return activateCategory(id);
 }

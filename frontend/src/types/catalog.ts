@@ -1,3 +1,5 @@
+import type { CatalogOrder } from '../utils/catalogOrder'
+
 export interface CatalogCategory {
     id: number
     nombre: string
@@ -43,6 +45,7 @@ export interface CatalogQuery {
     limit?: number
     categoria?: number
     busqueda?: string
+    orden?: CatalogOrder
 }
 
 export interface CatalogFiltersValue {

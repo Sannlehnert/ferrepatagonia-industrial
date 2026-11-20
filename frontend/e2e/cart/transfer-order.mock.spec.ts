@@ -44,3 +44,27 @@ test('mantiene el intento de transferencia pendiente sin declararlo pago aprobad
   await expect(page.getByRole('region', { name: 'Comprobantes de pago' })).toHaveCount(0)
   expect(state.transferRequests).toHaveLength(1)
 })
+
+test('limpia la confirmación de transferencia al cambiar de ruta sin afectar intentos pendientes', async ({ page }) => {
+  const state = await mockCart(page)
+  await page.route('**/api/productos*', route => route.fulfill({
+    json: { items: [], total: 0, page: 1, limit: 20 },
+  }))
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await summary.getByRole('button', { name: 'Confirmar pedido por transferencia' }).click()
+  await expect(page.getByRole('status').filter({
+    hasText: 'El pago por transferencia está pendiente de acreditación',
+  })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Explorar catálogo' }).click()
+  await expect(page).toHaveURL(/\/catalogo$/)
+  await page.getByRole('button', { name: 'Carrito', exact: true }).click()
+
+  const drawer = page.getByRole('dialog', { name: 'Tu carrito' })
+  await expect(drawer.getByText('Tu carrito está vacío.', { exact: true })).toBeVisible()
+  await expect(drawer.getByRole('region', { name: 'Comprobantes de pago' })).toHaveCount(0)
+  await expect(drawer.getByText('El pago por transferencia está pendiente de acreditación')).toHaveCount(0)
+  expect(state.transferRequests).toHaveLength(1)
+})

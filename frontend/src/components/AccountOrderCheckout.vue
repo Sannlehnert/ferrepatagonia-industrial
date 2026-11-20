@@ -160,7 +160,7 @@ async function retryTransferAfterRejection() {
     </p>
     <div v-if="showTotal && !hasLockedAttempt && order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
       <p role="alert" class="mb-2 mt-0 text-sm">{{ order.eligibilityError }}</p>
-      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.loadEligibility()">
+      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.loadEligibility()">
         Volver a consultar elegibilidad
       </button>
     </div>
@@ -169,7 +169,7 @@ async function retryTransferAfterRejection() {
     </p>
     <div v-if="selected === 'TRANSFERENCIA' && transfer.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
       <p role="alert" class="mb-2 mt-0 text-sm">{{ transfer.eligibilityError }}</p>
-      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.loadEligibility()">
+      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.loadEligibility()">
         Volver a consultar el total
       </button>
     </div>
@@ -182,26 +182,26 @@ async function retryTransferAfterRejection() {
     </p>
     <p v-if="order.attemptState === 'pending'" role="status" class="mb-3 text-sm">
       La confirmación todavía no tiene un resultado definitivo. Conservamos el mismo identificador para evitar duplicados.
-      <button type="button" class="ml-1 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.consultResult()">
+      <button type="button" class="ml-1 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.consultResult()">
         Consultar resultado
       </button>
-      <button v-if="order.pendingQuoteToken" type="button" class="ml-3 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.retryPendingConfirmation()">
+      <button v-if="order.pendingQuoteToken" type="button" class="ml-3 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.retryPendingConfirmation()">
         Reintentar con el mismo identificador
       </button>
     </p>
     <p v-if="transfer.attemptState === 'pending'" role="status" class="mb-3 text-sm">
       Todavía no pudimos verificar si el pedido quedó registrado. Conservamos el mismo identificador para evitar duplicados.
-      <button type="button" class="ml-1 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.consultResult()">
+      <button type="button" class="ml-1 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.consultResult()">
         Consultar resultado
       </button>
-      <button v-if="transfer.pendingQuoteToken" type="button" class="ml-3 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.retryPendingConfirmation()">
+      <button v-if="transfer.pendingQuoteToken" type="button" class="ml-3 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.retryPendingConfirmation()">
         Reintentar con el mismo identificador
       </button>
     </p>
     <button
       v-if="order.attemptState === 'rejected' && showTotal"
       type="button"
-      class="mb-3 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]"
+      class="mb-3 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]"
       @click="retryAfterRejection()"
     >
       Actualizar carrito y crédito para reintentar
@@ -209,7 +209,7 @@ async function retryTransferAfterRejection() {
     <button
       v-if="transfer.attemptState === 'rejected' && showTotal"
       type="button"
-      class="mb-3 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]"
+      class="mb-3 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]"
       @click="retryTransferAfterRejection()"
     >
       Actualizar carrito y total para reintentar
@@ -298,11 +298,11 @@ async function retryTransferAfterRejection() {
       <section aria-label="Instrucciones de transferencia de demostración" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
         <h3 class="mb-2 mt-0 font-semibold">Datos de demostración — no realizar transferencias</h3>
         <dl class="m-0 grid grid-cols-1 gap-1">
-          <div><dt class="inline font-medium">Banco:</dt> <dd class="inline">Banco de demostración (ficticio)</dd></div>
-          <div><dt class="inline font-medium">Titular:</dt> <dd class="inline">Ferretería Patagonia (ficticio)</dd></div>
-          <div><dt class="inline font-medium">CUIT:</dt> <dd class="inline">00-00000000-0 (ficticio)</dd></div>
-          <div><dt class="inline font-medium">CBU/CVU:</dt> <dd class="inline">No configurado</dd></div>
-          <div><dt class="inline font-medium">Alias:</dt> <dd class="inline">NO-TRANSFERIR-DEMO</dd></div>
+          <div><dt class="inline font-medium">Banco:</dt> <dd class="m-0 inline">Banco de demostración (ficticio)</dd></div>
+          <div><dt class="inline font-medium">Titular:</dt> <dd class="m-0 inline">Ferretería Patagonia (ficticio)</dd></div>
+          <div><dt class="inline font-medium">CUIT:</dt> <dd class="m-0 inline">00-00000000-0 (ficticio)</dd></div>
+          <div><dt class="inline font-medium">CBU/CVU:</dt> <dd class="m-0 inline">No configurado</dd></div>
+          <div><dt class="inline font-medium">Alias:</dt> <dd class="m-0 inline">NO-TRANSFERIR-DEMO</dd></div>
         </dl>
         <p class="mb-0 mt-2">
           Estos datos no corresponden a una cuenta real. El pedido quedará pendiente hasta revisar el comprobante; no se confirma ni acredita el pago automáticamente.
@@ -368,7 +368,7 @@ async function retryTransferAfterRejection() {
         v-if="selected === 'CUENTA_CORRIENTE' && order.eligibility && !order.eligibility.elegible && showTotal"
         type="button"
         :disabled="busy"
-        class="mt-2 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+        class="mt-2 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
         @click="order.loadEligibility()"
       >
         Volver a consultar elegibilidad
@@ -377,7 +377,7 @@ async function retryTransferAfterRejection() {
         v-if="selected === 'TRANSFERENCIA' && transfer.eligibility && !transfer.eligibility.elegible && showTotal"
         type="button"
         :disabled="busy"
-        class="mt-2 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+        class="mt-2 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
         @click="transfer.loadEligibility()"
       >
         Volver a consultar el total

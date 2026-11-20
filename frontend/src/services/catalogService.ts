@@ -32,6 +32,10 @@ export async function getCatalog(
         params.busqueda = query.busqueda
     }
 
+    if (query.orden !== undefined && query.orden !== 'predeterminado') {
+        params.orden = query.orden
+    }
+
     const response = await api.get<CatalogResponse>('/catalogo', {
         params,
         signal,

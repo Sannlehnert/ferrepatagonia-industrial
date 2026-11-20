@@ -4,7 +4,7 @@ import ProductPrice from '@/components/ProductPrice.vue'
 import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
 import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import axios from 'axios'
 import CatalogFilters from '@/components/CatalogFilters.vue'
 import { getCatalog, getCatalogCategories } from '@/services/catalogService'
@@ -13,6 +13,11 @@ import {
   MAX_PAGINA_CATALOGO,
   normalizarQueryPagina,
 } from '@/utils/catalogPagination'
+import {
+  CATALOG_ORDER_OPTIONS,
+  normalizarQueryOrden,
+  type CatalogOrder,
+} from '@/utils/catalogOrder'
 import type {
   CatalogProduct,
   CatalogPagination,
@@ -56,6 +61,15 @@ function entero(v: unknown): number | undefined {
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
 const pagina = computed(() => normalizarQueryPagina(route.query).pagina)
+const orden = computed(() => normalizarQueryOrden(route.query).orden)
+
+// Cambiar el orden reinicia la paginación y conserva búsqueda y categoría.
+function cambiarOrden(event: Event) {
+  const value = (event.target as HTMLSelectElement).value as CatalogOrder
+  const query: LocationQueryRaw = { ...route.query, orden: value }
+  delete query.page
+  return router.push({ name: 'catalogo', query: normalizarQueryOrden(query).query })
+}
 
 const busqueda = computed(() => {
   const value = route.query.busqueda
@@ -78,6 +92,17 @@ function aplicarFiltros(filters: CatalogFiltersValue) {
   if (filters.categoryId !== null) {
     query.categoria = String(filters.categoryId)
   }
+
+  return router.push({ name: 'catalogo', query })
+}
+
+function limpiarFiltros() {
+  const query = { ...route.query }
+
+  delete query.page
+  delete query.busqueda
+  delete query.categoria
+  delete query.orden
 
   return router.push({ name: 'catalogo', query })
 }
@@ -155,10 +180,11 @@ async function cargar() {
   error.value = null
 
   const paginaNormalizada = normalizarQueryPagina(route.query)
-  if (!paginaNormalizada.esCanonica) {
+  const ordenNormalizado = normalizarQueryOrden(paginaNormalizada.query)
+  if (!paginaNormalizada.esCanonica || !ordenNormalizado.esCanonica) {
     await router.replace({
       name: 'catalogo',
-      query: paginaNormalizada.query,
+      query: ordenNormalizado.query,
     })
     return
   }
@@ -175,6 +201,7 @@ async function cargar() {
         limit: LIMITE,
         categoria: categoriaId.value,
         busqueda: busqueda.value,
+        ...(orden.value !== 'predeterminado' ? { orden: orden.value } : {}),
       },
       actual.signal,
     )
@@ -213,7 +240,7 @@ async function cargar() {
 }
 
 // Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
-watch([categoriaId, () => route.query.page, busqueda], cargar)
+watch([categoriaId, () => route.query.page, busqueda, () => route.query.orden], cargar)
 refreshOnStock(ids => cargando.value || productos.value.some(product => ids.has(product.id)), () => void cargar())
 onMounted(() => {
   void cargar()
@@ -228,39 +255,78 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="fp-shell py-6 sm:py-9">
-    <p class="m-0 mb-2 text-xs text-slate-500">
-      Inicio /
-      <RouterLink v-if="categoriaId" class="fp-focus text-[var(--fp-blue)]" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
-      <template v-else>Catálogo</template>
-      <template v-if="categoriaId"> / {{ nombreCategoria }}</template>
-    </p>
+    <nav aria-label="Ruta de navegación" class="mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+      <RouterLink
+        :to="{ name: 'home' }"
+        class="box-border inline-flex min-h-11 items-center px-1 fp-focus text-[var(--fp-blue)]"
+      >Inicio</RouterLink>
+      <span aria-hidden="true">/</span>
+      <template v-if="categoriaId">
+        <RouterLink
+          custom
+          :to="{ name: 'catalogo', query: { ...route.query, categoria: undefined, page: undefined } }"
+          v-slot="{ href, navigate }"
+        >
+          <a
+            :href="href"
+            class="box-border inline-flex min-h-11 items-center px-1 fp-focus text-[var(--fp-blue)]"
+            @click="navigate"
+          >Catálogo</a>
+        </RouterLink>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" class="text-slate-700 [overflow-wrap:anywhere]">{{ nombreCategoria }}</span>
+      </template>
+      <span v-else aria-current="page" class="text-slate-700">Catálogo</span>
+    </nav>
 
-    <header class="mb-5 flex flex-col items-start justify-between gap-4 min-[801px]:flex-row">
-      <div>
-        <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
-        <p class="fp-section-copy">{{ total }} productos</p>
-      </div>
-      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
-      <select class="box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" disabled aria-label="Ordenar productos">
-        <option>Ordenar: Relevancia</option>
-      </select>
+    <header class="mb-5">
+      <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
+      <p class="fp-section-copy">{{ total }} productos</p>
     </header>
 
-    <div class="grid grid-cols-1 items-start gap-5 min-[801px]:grid-cols-[190px_minmax(0,1fr)]">
-      <aside class="min-h-0 rounded-[var(--fp-radius-panel)] border border-[var(--fp-line)] bg-white p-4 min-[801px]:min-h-[260px]" aria-label="Filtros">
-        <h2 class="m-0 text-base">Filtros</h2>
+    <section
+      aria-label="Filtros y orden del catálogo"
+      class="mb-6 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4"
+    >
+      <CatalogFilters
+        :model-value="filtrosAplicados"
+        :categories="listaCategorias"
+        :categories-loading="cargandoCategorias"
+        :categories-error="errorCategorias"
+        @apply="aplicarFiltros"
+        @clear="limpiarFiltros"
+        @retry-categories="cargarCategorias"
+      >
+        <template #order>
+          <div class="w-full shrink-0 min-[801px]:w-72">
+            <label for="catalog-order" class="mb-1.5 block text-sm font-medium text-[var(--fp-navy)]">
+              Ordenar por
+            </label>
+            <select
+              id="catalog-order"
+              :value="orden"
+              class="fp-focus box-border min-h-11 w-full rounded-md border border-[var(--fp-control-line)] bg-white px-3 py-2 text-base text-[var(--fp-navy)] sm:text-sm"
+              :aria-describedby="orden.startsWith('precio_') ? 'catalog-order-help' : undefined"
+              @change="cambiarOrden"
+            >
+              <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+        </template>
+      </CatalogFilters>
 
-        <CatalogFilters
-          :model-value="filtrosAplicados"
-          :categories="listaCategorias"
-          :categories-loading="cargandoCategorias"
-          :categories-error="errorCategorias"
-          @apply="aplicarFiltros"
-          @retry-categories="cargarCategorias"
-        />
-      </aside>
+      <p
+        v-if="orden.startsWith('precio_')"
+        id="catalog-order-help"
+        class="m-0 mt-2 w-full text-xs text-slate-500"
+      >
+        El orden usa el precio público del catálogo; tu precio personalizado no modifica la posición.
+      </p>
+    </section>
 
-      <section>
+    <section>
         <ProductPrices :products="productos" :catalog-loading="cargando" v-slot="pricing">
         <p v-if="cargando" class="fp-state" role="status">Cargando productos...</p>
 
@@ -282,7 +348,7 @@ onBeforeUnmount(() => {
             v-if="busqueda || categoriaId"
             type="button"
             class="fp-action fp-action--primary fp-focus mt-2"
-            @click="aplicarFiltros({ search: '', categoryId: null })"
+            @click="limpiarFiltros"
           >
             Limpiar filtros
           </button>
@@ -339,7 +405,7 @@ onBeforeUnmount(() => {
         >
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
+            class="fp-focus box-border min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasPrevious"
             @click="cambiarPagina(pagina - 1)"
           >
@@ -348,7 +414,7 @@ onBeforeUnmount(() => {
           <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
+            class="fp-focus box-border min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasNext"
             @click="cambiarPagina(pagina + 1)"
           >
@@ -356,7 +422,6 @@ onBeforeUnmount(() => {
           </button>
         </nav>
         </ProductPrices>
-      </section>
-    </div>
+    </section>
   </main>
 </template>
