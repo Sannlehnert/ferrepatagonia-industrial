@@ -1,12 +1,15 @@
 # T-S7-10.2 / #333 — Declaración, revisión y acreditación de pagos
 
 - **Rama:** `task/333-payment-accreditation`, creada desde `origin/develop`.
-- **Base verificada de `develop`:** `5cf464c` (`Merge pull request #139`).
+- **Base inicial:** `5cf464c` (`Merge pull request #139`).
+- **Commit de implementación:** `1cb4d4c`.
+- **Merge final de `origin/develop`:** `ddac706` (integra #328 vía PR #148), merge local `416087b`.
 - **Responsable:** Santiago Agustín Lehnert.
 - **Revisor técnico:** Lucci.
 - **Validación UX/UI:** no requerida.
-- **Alcance:** cuentas corrientes de empresas. No se modificó frontend, checkout,
-  comprobantes existentes ni el contrato financiero FER-20.
+- **Alcance:** cuentas corrientes de empresas. La implementación de #333 no
+  modificó frontend, checkout, comprobantes existentes ni el contrato financiero
+  FER-20. El merge local incorpora cambios de `develop` ya integrados allí.
 
 ## 1. Diagnóstico inicial
 
@@ -29,8 +32,8 @@ contrato versionado [T-S7-04.1](../s7-04/T-S7-04.1-contrato-estados-transiciones
 
 | Dependencia | Estado en `develop` | Uso en #333 |
 | --- | --- | --- |
-| **#275 / #328 — comprobantes** | #275 integrado. La rama `feature/s7-08-2-receipt-endpoints-permissions` (#328) **no está integrada** en `develop`. | Se reutiliza `COMPROBANTE_PAGO` y sus endpoints actuales. No se copiaron ni modificaron los cambios de #328. |
-| **#332 — lecturas legítimas** | La rama `task/332-legitimate-account-reads` **no está integrada** en `develop`. | No se mezclaron sus cambios. La acreditación respeta la política de libro mixto (`libro_mixto`) y cobertura completa. |
+| **#275 / #328 — comprobantes** | #275 integrado. #328 integrada en `develop` mediante PR #148 (`ddac706`); el código backend de comprobantes no cambió, se ampliaron pruebas y frontend. | Se reutiliza `COMPROBANTE_PAGO` y sus endpoints actuales. Las pruebas #328 de comprobantes pasan sobre el merge: **9/9**. |
+| **#332 — lecturas legítimas** | La rama `task/332-legitimate-account-reads` (`47b3787`) **no está integrada** en `develop`. | No se incorporaron sus cambios. `git merge-tree HEAD origin/task/332-legitimate-account-reads` no reporta conflictos; la acreditación ya respeta libro mixto y cobertura completa. |
 | **#323 / #324 — checkout y transferencia** | Integrados en `develop`/ramas de checkout. | No se modificó checkout. Las regresiones de pedidos, transferencia y sockets pasan. |
 | **#260 / FER-20** | Integrado. | Se reutiliza `registrarAbonoPorPago` y el contrato de saldo/FIFO. |
 | **S7-04.1 / #316** | Contrato documentado, implementación parcial. | Se alinean estados, locks, idempotencia y conversión ARS. |
@@ -230,11 +233,12 @@ auto-remove) y datos aislados.
 | `npm run test:account:contract` | **32/32** |
 | `npm run test:account:client` | **38/38** |
 | `npm run test:account-admin:isolated` | **57/57** |
-| `npm run test:receipts:isolated` | **5/5** |
+| `npm run test:receipts:isolated` | **9/9** (incluye la ampliación #328) |
 | `npm run test:orders:isolated` | **91/91** |
 | `npm run test:credit-workflow:isolated` | **23/23** |
 | `npm run test:company-approval:audit` | **22/22** |
-| `npm run test:integration` | **OK** (incluye todas las suites anteriores del script) |
+| `npm run test:integration` | **EXIT 0** (incluye todas las suites anteriores del script) |
+| Migración sobre base pre-#333 con datos, aplicada dos veces | **OK**: filas `PAGO` preservadas, columnas/índices/checks creados, `verify-seed` OK. |
 
 Evidencia de migración:
 
@@ -342,11 +346,14 @@ saldo 100.00 -> 99.00
 
 ## 11. Commit y PR recomendados
 
-- **Base:** `origin/develop` en `5cf464c`.
+- **Base inicial:** `origin/develop` en `5cf464c`.
+- **Merge de `origin/develop`:** `ddac706` integrado localmente en `416087b`.
 - **Rama:** `task/333-payment-accreditation`.
-- **Commit propuesto:**
+- **Commit de implementación:** `1cb4d4c`
   `feat(payments): add client declaration, documentary review and authorized accreditation (#333)`
+- **HEAD actual:** `416087b` (merge local; sin push).
 - **PR recomendado:** contra `develop`, con CI completa y revisión cruzada de
   Lucci. Incluir en la descripción el diagnóstico, la matriz de invariantes y
   los comandos de prueba de este documento.
-- **No se hizo push, merge ni modificación de Taiga.**
+- **No se hizo push ni merge remoto.** Solo se realizó el merge local de
+  `origin/develop` solicitado. No se modificó Taiga.
