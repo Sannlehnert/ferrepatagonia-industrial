@@ -57,8 +57,8 @@ for (const width of [1280, 360]) {
       await expect(quantity).toBeEnabled()
 
       await expect(content.getByRole('button', {
-        name: 'Finalizar compra',
-      })).toBeDisabled()
+        name: 'Confirmar pedido por transferencia',
+      })).toBeEnabled()
 
       await content.getByRole('button', {
         name: 'Eliminar Producto de prueba del carrito',
