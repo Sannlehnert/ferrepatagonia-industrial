@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import type { AdminCategory } from '@/services/adminCategoryService'
 
 const props = defineProps<{
@@ -21,6 +21,7 @@ type CategoryFieldErrors = {
 }
 
 const dialog = ref<HTMLDialogElement | null>(null)
+const scrollArea = ref<HTMLDivElement | null>(null)
 const nameInput = ref<HTMLInputElement | null>(null)
 const descriptionInput = ref<HTMLTextAreaElement | null>(null)
 const name = ref(props.category?.nombre ?? '')
@@ -84,6 +85,16 @@ onBeforeUnmount(() => {
   if (dialog.value?.open) dialog.value.close()
   unlockPageScroll()
 })
+
+watch(
+  () => [props.error, props.uncertain] as const,
+  async ([error, uncertain]) => {
+    if (!error && !uncertain) return
+
+    await nextTick()
+    if (scrollArea.value) scrollArea.value.scrollTop = 0
+  },
+)
 
 function restoreNativeDialog() {
   const element = dialog.value
@@ -252,7 +263,7 @@ function submit() {
           </h2>
           <button
             type="button"
-            class="box-border flex min-h-11 min-w-11 items-center justify-center rounded-md border-0 bg-transparent text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+            class="box-border flex min-h-11 min-w-11 items-center justify-center rounded-md border-0 bg-transparent font-[inherit] text-2xl leading-none text-slate-500 hover:bg-slate-100 hover:text-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
             aria-label="Cerrar formulario"
             :disabled="busy || uncertain"
             @click="requestClose"
@@ -262,36 +273,36 @@ function submit() {
         </header>
 
         <form class="box-border flex min-h-0 flex-1 flex-col" novalidate @submit.prevent="submit">
-          <!-- Zona fija entre el encabezado y el cuerpo desplazable -->
+          <!-- Alertas y campos comparten el scroll para no desplazar el footer. -->
           <div
-            v-if="uncertain || error"
-            class="box-border shrink-0 space-y-2 px-4 pt-4 sm:px-6 sm:pt-5"
+            ref="scrollArea"
+            class="box-border min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 sm:p-6"
           >
-            <div
-              v-if="uncertain"
-              role="alert"
-              class="box-border rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
-            >
-              <p class="m-0 wrap-anywhere">{{ error || 'No se pudo confirmar el resultado. Recargá el listado antes de continuar.' }}</p>
-              <button
-                type="button"
-                class="mt-2 min-h-11 border-0 bg-transparent font-semibold text-red-900 underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-                :disabled="busy"
-                @click="reload"
+            <div v-if="uncertain || error" class="box-border space-y-2">
+              <div
+                v-if="uncertain"
+                role="alert"
+                class="box-border rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800"
               >
-                {{ busy ? 'Recargando…' : 'Recargar listado' }}
-              </button>
+                <p class="m-0 wrap-anywhere">{{ error || 'No se pudo confirmar el resultado. Recargá el listado antes de continuar.' }}</p>
+                <button
+                  type="button"
+                  class="mt-2 min-h-11 border-0 bg-transparent font-[inherit] font-semibold text-red-900 underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                  :disabled="busy"
+                  @click="reload"
+                >
+                  {{ busy ? 'Recargando…' : 'Recargar listado' }}
+                </button>
+              </div>
+              <p
+                v-else
+                role="alert"
+                class="m-0 box-border rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 wrap-anywhere"
+              >
+                {{ error }}
+              </p>
             </div>
-            <p
-              v-else
-              role="alert"
-              class="m-0 box-border rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 wrap-anywhere"
-            >
-              {{ error }}
-            </p>
-          </div>
 
-          <div class="box-border min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
             <div>
               <label for="category-name" class="block text-sm font-medium">
                 Nombre
@@ -354,7 +365,7 @@ function submit() {
           <footer class="box-border flex shrink-0 flex-col-reverse gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:gap-3 sm:px-6 sm:py-4">
             <button
               type="button"
-              class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              class="box-border min-h-11 w-full rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               :disabled="busy || uncertain"
               @click="requestClose"
             >
@@ -362,7 +373,7 @@ function submit() {
             </button>
             <button
               type="submit"
-              class="box-border min-h-11 w-full rounded-md border-0 bg-[#103a5c] px-5 text-sm font-semibold text-white hover:bg-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+              class="box-border min-h-11 w-full rounded-md border-0 bg-[#103a5c] px-5 font-[inherit] text-sm font-semibold text-white hover:bg-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
               :disabled="busy || uncertain"
             >
               {{ busy ? 'Guardando…' : 'Guardar categoría' }}

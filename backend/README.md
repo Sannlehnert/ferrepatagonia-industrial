@@ -412,6 +412,17 @@ cuenta). Ambos son null para particulares y administradores. Se consultan en cad
 restauración y no conceden por sí solos crédito: el estado de crédito se consulta
 en `GET /api/cuenta-corriente`, y cada compra requiere validar su elegibilidad.
 
+### Perfil propio y edición — #336
+
+`GET /api/perfil` y `PATCH /api/perfil` permiten al cliente autenticado
+consultar sus datos y actualizar únicamente `telefono` y `direccion`. La
+identidad se toma de `req.auth.id`; no existe `:id` ni se aceptan IDs en body o
+query. `email`, `password`, `cuit`, `docCliente`, `nombreRazonSocial`, rol,
+aprobación empresarial, habilitación y límites de crédito son de solo lectura.
+El contrato completo, los errores y las decisiones de seguridad están en
+[docs/s7-11/T-S7-11.1-api-perfil.md](../docs/s7-11/T-S7-11.1-api-perfil.md).
+`GET /api/auth/me` no cambia.
+
 ### Hash de contraseña — #165
 
 `hashPassword(password)` en `src/services/password.service.ts` usa `bcryptjs`

@@ -467,3 +467,77 @@ test('un error de consulta no se presenta como ausencia de comprobantes', async 
   await expect(page.getByRole('listitem').getByText('Revisado', { exact: true })).toBeVisible()
   await expect(page.getByText('Estado no disponible', { exact: true })).toHaveCount(0)
 })
+
+for (const client of [
+  { email: 'cliente@e2e.test', other: 'empresa-cuenta@e2e.test', company: false },
+  { email: 'empresa-cuenta@e2e.test', other: 'cliente@e2e.test', company: true },
+]) {
+  test(`transferencia y comprobante privado en historial: ${client.email}`, async ({ page, browser }) => {
+    test.setTimeout(60_000)
+    await page.route('**/socket.io/**', route => route.abort())
+    await signIn(page, client.email)
+    const before = client.company ? (await (await page.request.get('/api/cuenta-corriente')).json()).data : null
+    await page.goto('/catalogo?busqueda=E2E-24')
+    const card = page.locator('li').filter({
+      has: page.getByRole('heading', { name: 'Producto E2E 24', exact: true }),
+    })
+    const added = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/carrito/items' && response.request().method() === 'POST')
+    await card.getByRole('button', { name: 'Agregar', exact: true }).click()
+    expect((await added).status()).toBe(204)
+    await page.goto('/carrito')
+
+    const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+    await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+    if (client.company) {
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
+    } else {
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+    }
+    const submitted = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/pedidos/transferencia' &&
+      response.request().method() === 'POST')
+    await summary.getByRole('button', { name: 'Confirmar pedido por transferencia' }).click()
+    const response = await submitted
+    expect(response.status()).toBe(201)
+    const orderId: number = (await response.json()).data.pedidoId
+    await expect(page.getByRole('status').filter({
+      hasText: 'El pago por transferencia está pendiente de acreditación',
+    })).toContainText('no significa que el pago haya sido aprobado')
+    await expect(page.getByRole('region', { name: 'Comprobantes de pago' })).toBeVisible()
+
+    await page.goto('/mi-cuenta/pedidos')
+    const history = (await (await page.request.get('/api/pedidos')).json()).data.items
+    const savedOrder = history.find((order: { pedidoId: number }) => order.pedidoId === orderId)
+    expect(savedOrder).toBeDefined()
+    const orderNumber: string = savedOrder.numero
+    const row = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: orderNumber, exact: true }),
+    })
+    await expect(row.getByText('No adjunto', { exact: true })).toBeVisible()
+    await row.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
+    const detailReceipts = row.getByRole('region', { name: 'Comprobantes de pago' })
+    await expect(detailReceipts).toBeVisible()
+    await upload(detailReceipts)
+    await expect(row.getByRole('row').first().getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+
+    await row.getByRole('button', { name: `Ver comprobantes de ${orderNumber}` }).click()
+    const dialog = page.getByRole('dialog', { name: `Comprobantes · ${orderNumber}` })
+    await expect(detailReceipts).toHaveCount(0)
+    await expect(dialog.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(detailReceipts).toBeVisible()
+
+    const other = await browser.newPage()
+    try {
+      await signIn(other, client.other)
+      expect((await other.request.get(`/api/pedidos/${orderId}/comprobantes`)).status()).toBe(404)
+    } finally {
+      await other.close()
+    }
+    if (before) {
+      const after = (await (await page.request.get('/api/cuenta-corriente')).json()).data
+      expect({ saldo: after.saldo, revision: after.revision }).toEqual({ saldo: before.saldo, revision: before.revision })
+    }
+  })
+}
