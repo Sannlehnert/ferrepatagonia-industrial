@@ -131,6 +131,57 @@ test('oculta la modalidad y muestra el rechazo de elegibilidad del backend', asy
   expect(state.orderRequests).toEqual([])
 })
 
+test('reconsulta elegibilidad con feedback de carga, error y resultado', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = eligibleOrder
+  state.eligibilityFails = true
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  const credit = summary.getByRole('radio', { name: 'Cuenta corriente' })
+  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
+  await expect(credit).toHaveCount(0)
+  const requestsBeforeRetry = state.eligibilityRequests
+  expect(requestsBeforeRetry).toBeGreaterThan(0)
+
+  const failedRetry = page.waitForResponse(response =>
+    response.url().endsWith('/pedidos/cuenta-corriente/eligibilidad') &&
+    response.status() === 500)
+  await retry.click()
+  await failedRetry
+  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
+  await expect(credit).toHaveCount(0)
+  expect(state.eligibilityRequests).toBe(requestsBeforeRetry + 1)
+
+  let release = () => {}
+  state.eligibilityFails = false
+  state.eligibilityGate = new Promise<void>(resolve => { release = resolve })
+  const successfulRetry = page.waitForResponse(response =>
+    response.url().endsWith('/pedidos/cuenta-corriente/eligibilidad') &&
+    response.status() === 200)
+  try {
+    await retry.click()
+    await expect(summary.getByRole('status').filter({
+      hasText: 'Verificando si este pedido puede confirmarse a crédito',
+    })).toBeVisible()
+    await expect(credit).toHaveCount(0)
+    expect(state.orderRequests).toEqual([])
+
+    release()
+    await successfulRetry
+    await expect(summary.getByRole('status').filter({
+      hasText: 'Elegibilidad actualizada.',
+    })).toBeVisible()
+    await expect(credit).toBeVisible()
+    await expect(summary).toContainText('USD 500.00')
+    expect(state.eligibilityRequests).toBe(requestsBeforeRetry + 2)
+    expect(state.orderRequests).toEqual([])
+  } finally {
+    release()
+  }
+})
+
 test('recupera un resultado pendiente con la misma clave idempotente', async ({
   page,
 }) => {

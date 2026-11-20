@@ -13,6 +13,7 @@ const props = defineProps<{
 const order = useAccountOrderStore()
 const cart = useCartStore()
 const selected = ref(false)
+const eligibilityFeedback = ref('')
 const eligibilityKey = computed(() => props.snapshot && JSON.stringify({
   id: props.snapshot.id_carrito,
   total: props.snapshot.totalUSD,
@@ -68,10 +69,23 @@ watch(
   eligibilityKey,
   () => {
     selected.value = false
+    eligibilityFeedback.value = ''
     if (showTotal.value) void order.loadEligibility()
   },
   { immediate: true },
 )
+
+watch(
+  () => order.eligibilityLoading,
+  loading => {
+    if (loading) eligibilityFeedback.value = ''
+  },
+)
+
+async function retryEligibility() {
+  eligibilityFeedback.value = ''
+  if (await order.loadEligibility()) eligibilityFeedback.value = 'Elegibilidad actualizada.'
+}
 
 async function confirmOrder() {
   await order.confirm()
@@ -91,10 +105,13 @@ async function retryAfterRejection() {
     </p>
     <div v-else-if="order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
       <p role="alert" class="mb-2 mt-0 text-sm">{{ order.eligibilityError }}</p>
-      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.loadEligibility()">
+      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="retryEligibility()">
         Volver a consultar elegibilidad
       </button>
     </div>
+    <p v-if="eligibilityFeedback" role="status" class="mb-3 text-sm text-green-800">
+      {{ eligibilityFeedback }}
+    </p>
 
     <p v-if="order.attemptError" role="alert" class="mb-3 rounded-md border border-red-200 bg-red-50 p-3 text-sm">
       {{ order.attemptError }}
@@ -197,7 +214,7 @@ async function retryAfterRejection() {
         type="button"
         :disabled="busy"
         class="mt-2 inline-flex min-h-[44px] min-w-[44px] items-center text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
-        @click="order.loadEligibility()"
+        @click="retryEligibility()"
       >
         Volver a consultar elegibilidad
       </button>

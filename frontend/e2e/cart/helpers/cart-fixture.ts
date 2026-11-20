@@ -10,6 +10,9 @@ export async function mockCart(page: Page) {
     failCartReadOnRecovery: false,
     readGate: null as Promise<void> | null,
     confirmGate: null as Promise<void> | null,
+    eligibilityGate: null as Promise<void> | null,
+    eligibilityFails: false,
+    eligibilityRequests: 0,
     transform: null as ((value: CartSnapshot) => CartSnapshot) | null,
     writes: [] as Array<{ method: string; quantity?: number }>,
     eligibility: {
@@ -114,6 +117,11 @@ export async function mockCart(page: Page) {
     }
 
     if (path === '/api/pedidos/cuenta-corriente/eligibilidad' && method === 'GET') {
+      state.eligibilityRequests++
+      if (state.eligibilityGate) await state.eligibilityGate
+      if (state.eligibilityFails) {
+        return route.fulfill({ status: 500, json: { message: 'No se pudo consultar el crédito.' } })
+      }
       return route.fulfill({ json: { data: state.eligibility } })
     }
 
