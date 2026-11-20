@@ -1,31 +1,55 @@
-# #311 — Imágenes del catálogo académico
+# #311 — Imágenes de los SKU 51–100
 
-Ferrepatagonia Industrial es un proyecto académico sin fines comerciales. Los productos, precios y pedidos de esta demostración forman parte de una simulación. No se realizan ventas ni cobros reales. Las imágenes ilustran los productos de la demo y no acreditan especificaciones técnicas, certificaciones ni vínculos con fabricantes o comercios.
+## Entrega preparada
 
-## Registro de imágenes
+Los 50 SKU del segundo lote tienen un recurso local asociado: **17 fotografías y 33 ilustraciones**. Se reutilizan 11 fotografías existentes y se incorporan seis fotografías y 30 ilustraciones nuevas; los cuatro carteles comparten una ilustración cuya leyenda coincide. Los primeros 50 SKU conservan sus asociaciones y archivos byte a byte. El maestro de #309 queda con **100/100 SKU con fuente de imagen**.
 
-El [CSV de imágenes](imagenes-51-100.csv) cubre los SKU 51 a 100. Para cada imagen se registra el resultado de la revisión visual, su procedencia y el estado del permiso.
+Las ilustraciones siguen el criterio de #310 acordado para los casos sin fotografía adecuada. Son esquemas propios por tipo de producto, con el aviso visible «IMAGEN ILUSTRATIVA / No es la variante exacta». No acreditan dimensiones, materiales, talles, certificaciones ni homologación. No se incorporaron fotos candidatas con permiso pendiente. La mascarilla del SKU 81 se reemplazó por una ilustración propia para no depender de la declaración de dominio público limitada a Estados Unidos de la candidata anterior.
 
-- `url_candidata` contiene la URL directa de una foto en revisión. `fuente_candidata` guarda la ficha de origen, cuando está disponible.
-- `url_imagen` contiene la URL directa elegida para el catálogo. `fuente`, `autor`, `licencia` y `url_licencia` documentan su procedencia y las condiciones de uso.
-- `archivo_candidato` conserva referencias a archivos que ya existen en el proyecto. La entrega de la #311 registra enlaces y atribuciones. La carga del catálogo usará las URLs aprobadas o podrá copiar las fotos al almacenamiento persistente del proyecto si el permiso lo permite.
+## Correspondencia y procedencia
 
-## Estado de la revisión
+La [matriz de los 50 SKU](imagenes-51-100.csv) identifica número, SKU, nombre canónico, tipo, recurso local, autor, fuente, licencia, límites visuales y SHA-256. `url_imagen` apunta al recurso público local; `archivo_candidato` conserva el nombre del archivo elegido. `url_candidata` y `fuente_candidata` conservan trazabilidad del relevamiento y **no son instrucciones de publicación**. El [relevamiento anterior](evidence/relevamiento-anterior.csv) es un antecedente, no el estado vigente de cobertura.
 
-- La prueba registrada cubre los 50 SKU del 51 al 100. Los 50 enlaces devolvieron imágenes que Chrome pudo mostrar. Se comprobó que la evidencia corresponde a las URLs actuales del CSV.
-- 14 imágenes elegidas tienen autor, ficha de origen y licencia o declaración de dominio público documentada. Para publicarlas, asociar los créditos al catálogo según las condiciones de cada fuente e indicar las adaptaciones que corresponda, como recortes.
-- El SKU 81 está aprobado visualmente y su fuente indica dominio público en Estados Unidos. Queda pendiente confirmar su alcance para un despliegue público desde Argentina o elegir otra foto con permiso explícito para ese uso. La imagen muestra marcas de un modelo real y se documenta como ilustrativa. [Ficha de la imagen](https://commons.wikimedia.org/wiki/File:Фильтрующая_полумаска_3М_8210.jpg) · [Alcance de la marca de dominio público](https://creativecommons.org/publicdomain/mark/1.0/)
-- El relevamiento de los 50 SKU está completo. Las 36 referencias con permiso pendiente quedan en `url_candidata` y fuera de la demo publicada. Cada fila documenta el resultado de la revisión en `observaciones`. Se propone una tarea vinculada para obtener las autorizaciones o conseguir reemplazos.
+El registro operativo está en [image-sources.csv](../../data/demo-catalog/image-sources.csv), con créditos por archivo en [creditos.txt](../../frontend/public/demo-catalog/creditos.txt). Las seis fotografías añadidas proceden de Wikimedia Commons: E27 y mecha de mampostería bajo CC BY-SA; llave combinada bajo CC BY; mecha de madera y arandela Grower con declaración de dominio público de su autor; mameluco bajo CC BY-SA. Las fichas, versiones de licencia, autores y adaptaciones se consignan individualmente. Se conserva la atribución y se documenta la conversión a WebP, sin recortar ni ampliar por encima del tamaño descargado.
 
-## Incorporación de fotos
+[Fuentes verificadas](evidence/fuentes-verificadas.json) registra la obtención y huellas de las seis fotos. Cuatro descargas originales respondieron HTTP 429 el 20/11/2026: se usaron copias locales del relevamiento previo y se volvieron a consultar las fichas de licencia. Las otras dos descargas respondieron HTTP 200. No se presenta esa limitación como una descarga actual exitosa; el catálogo sirve los WebP locales.
 
-1. Elegir una foto donde se reconozca el producto. Comprobar que el enlace directo abre y que la foto corresponde al SKU.
-2. Buscar una licencia aplicable a esa foto en su página de origen. Si el permiso no está publicado, consultar a quien pueda autorizar el uso. Se pueden agrupar varias fotos de un mismo titular en un solo pedido, indicando cada enlace.
-3. Registrar en el CSV la fuente, el crédito requerido y la licencia o, en `observaciones`, la fecha, la referencia y el alcance de la autorización escrita. Confirmar si cubre presentación en clase, publicación en línea y almacenamiento de una copia, según corresponda.
-4. Pasar el enlace a `url_imagen` cuando estén confirmados la correspondencia del producto y el permiso para el uso previsto. Mientras falte esa confirmación, usar `url_candidata` como referencia interna.
+Las observaciones explicitan cuando una unidad representa un pack o no se puede acreditar tamaño, potencia, talla o marca. La llave combinada permite reconocer el marcado de 10 mm. Las ilustraciones distinguen caja de embutir/superficie, mascarilla copa/plana, prefiltro/retenedor y camisa/campera. No se alteran datos comerciales para ajustarlos a una imagen.
 
-## Mensaje para solicitar permiso
+## Evidencia visual
 
-> Hola, somos estudiantes y estamos preparando una demostración de Ferrepatagonia Industrial, una aplicación académica sin fines comerciales. ¿Nos autorizan a mostrar estas fotos en el catálogo simulado de la presentación en clase? Les dejamos los enlaces a las imágenes para que puedan identificarlas.
->
-> Si más adelante publicamos una demo accesible por internet o guardamos una copia de las fotos para servirlas desde nuestra aplicación, ¿la autorización cubriría también esos usos? ¿Cómo prefieren que indiquemos el crédito?
+- [SKU 51–60](evidence/lamina-51-60.webp)
+- [SKU 61–70](evidence/lamina-61-70.webp)
+- [SKU 71–80](evidence/lamina-71-80.webp)
+- [SKU 81–90](evidence/lamina-81-90.webp)
+- [SKU 91–100](evidence/lamina-91-100.webp)
+
+Las láminas muestran los 50 recursos junto a su nombre canónico y tipo. [Recursos locales](evidence/recursos-locales.json) registra decodificación completa, dimensiones, tamaño y huella. [Primeros 50 preservados](evidence/primeros-50-preservados.json) contiene las huellas de #310 tomadas sobre `14abaa4`; la regresión comprueba que no cambian.
+
+El generador vectorial nuevo es [ilustraciones-311.cjs](../../data/demo-catalog/ilustraciones-311.cjs), integrado al generador compartido. El [manifiesto](../../frontend/public/demo-catalog/ilustraciones-manifest.json) verifica cada WebP contra el SVG y la leyenda obligatoria. La clasificación en frontend incluye los nuevos SKU para conservar el aviso accesible cuando ADMIN guarda la imagen con nombre UUID.
+
+## Verificación reproducible
+
+Desde la raíz del proyecto:
+
+```sh
+node --test data/demo-catalog/generar.test.cjs
+node data/demo-catalog/cobertura-visual.cjs
+```
+
+Prueba completa con build de producción en PowerShell:
+
+```powershell
+$env:E2E_PRODUCTION_BUILD = '1'
+node backend/test/helpers/run-e2e.cjs --demo-catalog
+```
+
+El helper utiliza MariaDB descartable y limpia su contenedor al terminar. Primero importa el maestro de 100 SKU y sube las imágenes mediante ADMIN. Luego verifica el fixture de 904 SKU: las 221 asociaciones disponibles, bytes publicados por HTTP, catálogo y detalle en Chromium a 360 px, avisos ilustrativos, respuesta sin imagen, conservación al repetir la asociación y escenarios comerciales existentes. Los informes se generan en `frontend/test-results/demo-catalog/`; las capturas `detalle-311-*.png` muestran ejemplos del lote nuevo.
+
+Resultado del 20/11/2026: **17/17 pruebas del catálogo, 274/274 pruebas frontend, builds backend/frontend y type-check aprobados**. La prueba completa de producción pasó en 3,9 minutos y confirmó la limpieza del contenedor. [Validación](evidence/validacion.json) · [50 SKU por HTTP](evidence/catalogo-51-100-http.json) · [100 asociaciones ADMIN](evidence/catalogo-maestro-100.json). El [informe general](../../data/demo-catalog/catalog-validation.json) contiene la evidencia HTTP real de esta ejecución, sin registros provisionales. No se ejecutan migraciones ni cargas sobre la base de desarrollo personal.
+
+## Alcance y revisión pendiente
+
+La cobertura completa corresponde al **maestro de 100 SKU**. El fixture ampliado de 904 contiene 221 asociaciones y mantiene 683 SKU sin imagen; esos SKU adicionales no forman parte de #311. Los informes históricos de #310 corresponden a su versión anterior y no se reescriben como si hubieran verificado este lote.
+
+La entrega queda preparada para comprobación visual manual, revisión técnica de Zahir y validación UX/UI de Lucci. El cierre requiere las revisiones y el CI del commit publicado. No sustituye la auditoría integral de catálogo/persistencia de #313 ni acredita un despliegue compartido. No se modifican pedidos, pagos, crédito ni controles ADMIN.
