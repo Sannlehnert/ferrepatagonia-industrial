@@ -1,10 +1,12 @@
 const assert = require('node:assert/strict');
-const { randomUUID } = require('node:crypto');
+const { createHash, randomBytes, randomUUID } = require('node:crypto');
 const { once } = require('node:events');
 const { readFile, readdir, rename } = require('node:fs/promises');
+const http = require('node:http');
 const { join } = require('node:path');
 const { after, before, test } = require('node:test');
-const { PDFDocument } = require('pdf-lib');
+const jwt = require('jsonwebtoken');
+const { PDFDocument, PDFName, PDFRawStream } = require('pdf-lib');
 const sharp = require('sharp');
 const { childProfile, connectOwned } = require('./helpers/cc260-disposable.cjs');
 const { fetchFromBrowser } = require('./helpers/browser-request.cjs');
@@ -95,7 +97,44 @@ function upload(path, auth, bytes = pdf, mime = 'application/pdf', headers = {})
 async function body(response, status) {
   assert.equal(response.status, status, status !== response.status ? await response.text() : '');
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const vary = response.headers.get('vary') ?? '';
+  assert.ok(vary.split(',').some(value => value.trim().toLowerCase() === 'cookie'), 'Debe variar según Cookie');
   return response.json();
+}
+
+function assertDownloadHeaders(response, mime, expectedBytes, extension) {
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), mime);
+  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+  assert.equal(response.headers.get('content-security-policy'), "default-src 'none'; sandbox");
+  assert.equal(response.headers.get('cross-origin-resource-policy'), 'same-origin');
+  assert.equal(response.headers.get('cache-control'), 'private, no-store');
+  const vary = response.headers.get('vary') ?? '';
+  assert.ok(vary.split(',').some(value => value.trim().toLowerCase() === 'cookie'), 'Descarga debe variar según Cookie');
+  assert.match(
+    response.headers.get('content-disposition'),
+    new RegExp(`^attachment; filename="comprobante-[a-f0-9-]+\\.${extension}"$`),
+  );
+  assert.equal(Number(response.headers.get('content-length')), expectedBytes);
+}
+
+async function createExactSizePdf(targetBytes) {
+  const buildWithPad = async padLength => {
+    const doc = await PDFDocument.create();
+    doc.addPage().drawText('Comprobante frontera 5 MiB');
+    const padBytes = Buffer.alloc(padLength, 0x20);
+    const stream = PDFRawStream.of(doc.context.obj({ Length: padLength }), padBytes);
+    doc.context.register(stream);
+    return Buffer.from(await doc.save({ useObjectStreams: false }));
+  };
+  let pad = targetBytes - 2000;
+  let candidate = await buildWithPad(pad);
+  for (let i = 0; i < 4 && candidate.length !== targetBytes; i++) {
+    pad += targetBytes - candidate.length;
+    candidate = await buildWithPad(pad);
+  }
+  assert.equal(candidate.length, targetBytes);
+  return candidate;
 }
 
 async function financialState() {
@@ -126,14 +165,10 @@ test('particular: carga, lista, descarga privada y revisión documental, sin cam
   const own = (await body(await request(path, particular.auth), 200)).data.items;
   assert.deepEqual(own, [saved]);
   const response = await request(path + '/' + saved.id, particular.auth);
-  assert.equal(response.status, 200);
-  assert.equal(response.headers.get('content-type'), 'application/pdf');
-  assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
-  assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  assert.match(response.headers.get('content-disposition'), /^attachment; filename="comprobante-[a-f0-9-]+\.pdf"$/);
+  assertDownloadHeaders(response, 'application/pdf', pdf.length, 'pdf');
   assert.deepEqual(Buffer.from(await response.arrayBuffer()), pdf);
   const head = await request(path + '/' + saved.id, particular.auth, { method: 'HEAD' });
-  assert.equal(Number(head.headers.get('content-length')), pdf.length);
+  assertDownloadHeaders(head, 'application/pdf', pdf.length, 'pdf');
   assert.equal((await head.arrayBuffer()).byteLength, 0);
 
   await body(await request(path + '/' + saved.id, null), 401);
@@ -261,4 +296,384 @@ test('el almacenamiento dentro del checkout se rechaza sin escribir archivos', a
     assert.ok(!JSON.stringify(response).includes(__dirname));
   } finally { process.env.RECEIPT_STORAGE_DIR = storage; }
   assert.deepEqual(await readdir(storage), prior);
+});
+
+async function createCustomClient({
+  type = 'EMPRESA',
+  approval = type === 'EMPRESA' ? 'APROBADA' : null,
+  clientActive = 1,
+  userActive = 1,
+  withAccount = false,
+  accountEnabled = 1,
+  orderModality = type === 'EMPRESA' ? 'TRANSFERENCIA' : 'TRANSFERENCIA',
+} = {}) {
+  const clientId = await insert(`
+    INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, estado_aprobacion_empresa, es_fiel, activo)
+    VALUES (?, ?, ?, 0, ?)
+  `, [type, `Cliente ${type} ${approval ?? ''}`.trim(), approval, clientActive]);
+  const userId = await insert(`
+    INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo)
+    VALUES (?, ?, 'test-only', 'CLIENTE', ?)
+  `, [clientId, randomUUID() + '@example.test', userActive]);
+  const account = withAccount ? await insert(`
+    INSERT INTO CUENTA_CORRIENTE (id_cliente, limite_credito, habilitada, cobertura, moneda_limite)
+    VALUES (?, 1000, ?, 'COMPLETA', 'USD')
+  `, [clientId, accountEnabled]) : null;
+  const order = orderModality ? await insert(`
+    INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
+    VALUES (?, 'CONFIRMADO', ?, 100, 0, 100)
+  `, [clientId, orderModality]) : null;
+  return { clientId, userId, account, order, auth: { id: userId, rol: 'CLIENTE' } };
+}
+
+test('#328 modalidades, separación TRANSFERENCIA vs CUENTA_CORRIENTE, anti-IDOR cruzado y permisos por rol', async () => {
+  // 1. Empresa APROBADA sin cuenta corriente con pedido TRANSFERENCIA
+  const approvedNoCc = await createCustomClient({
+    type: 'EMPRESA', approval: 'APROBADA', withAccount: false, orderModality: 'TRANSFERENCIA',
+  });
+  // 2. Empresa APROBADA con cuenta corriente HABILITADA, con pedido TRANSFERENCIA y pedido CUENTA_CORRIENTE
+  const approvedWithCc = await createCustomClient({
+    type: 'EMPRESA', approval: 'APROBADA', withAccount: true, accountEnabled: 1, orderModality: 'TRANSFERENCIA',
+  });
+  const ccOrderId = await insert(`
+    INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total)
+    VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', 200, 0, 200)
+  `, [approvedWithCc.clientId]);
+  // 3. Empresas PENDIENTE y RECHAZADA con pedido TRANSFERENCIA
+  const pendingCompany = await createCustomClient({
+    type: 'EMPRESA', approval: 'PENDIENTE', withAccount: false, orderModality: 'TRANSFERENCIA',
+  });
+  const rejectedCompany = await createCustomClient({
+    type: 'EMPRESA', approval: 'RECHAZADA', withAccount: false, orderModality: 'TRANSFERENCIA',
+  });
+  // 4. Particular con pedido modalidad incompatible CUENTA_CORRIENTE
+  const particularIncompatible = await createCustomClient({
+    type: 'PARTICULAR', approval: null, withAccount: false, orderModality: 'CUENTA_CORRIENTE',
+  });
+
+  const before = await financialState();
+
+  // Empresa aprobada sin CC opera TRANSFERENCIA en /api/pedidos/:id/comprobantes pero 404 en /api/cuenta-corriente/comprobantes
+  const transferOnly = (await body(await upload(orderPath(approvedNoCc), approvedNoCc.auth, pdf, 'application/pdf'), 201)).data;
+  assert.equal(transferOnly.pedidoId, approvedNoCc.order);
+  assert.equal(transferOnly.cuentaCorrienteId, null);
+  assert.equal(transferOnly.estadoRevision, 'PENDIENTE');
+  assert.equal(transferOnly.clienteId, undefined);
+  assert.equal(transferOnly.cliente, undefined);
+  const transferOnlyList = (await body(await request(orderPath(approvedNoCc), approvedNoCc.auth), 200)).data.items;
+  assert.deepEqual(transferOnlyList, [transferOnly]);
+  const transferOnlyGet = await request(orderPath(approvedNoCc) + '/' + transferOnly.id, approvedNoCc.auth);
+  assertDownloadHeaders(transferOnlyGet, 'application/pdf', pdf.length, 'pdf');
+  assert.deepEqual(Buffer.from(await transferOnlyGet.arrayBuffer()), pdf);
+  await body(await request(accountPath, approvedNoCc.auth), 404);
+  await body(await upload(accountPath, approvedNoCc.auth), 404);
+
+  // Empresa aprobada CON CC: pedido TRANSFERENCIA conserva cuentaCorrienteId = null y no se mezcla con CC
+  const companyTransfer = (await body(await upload(orderPath(approvedWithCc), approvedWithCc.auth, png, 'image/png'), 201)).data;
+  assert.equal(companyTransfer.pedidoId, approvedWithCc.order);
+  assert.equal(companyTransfer.cuentaCorrienteId, null);
+  const companyCcOrderPath = '/pedidos/' + ccOrderId + '/comprobantes';
+  const companyCc = (await body(await upload(companyCcOrderPath, approvedWithCc.auth, jpg, 'image/jpeg'), 201)).data;
+  assert.equal(companyCc.pedidoId, ccOrderId);
+  assert.equal(companyCc.cuentaCorrienteId, approvedWithCc.account);
+
+  // Listado de cuenta corriente incluye solo los de CC, nunca el de TRANSFERENCIA
+  const ccListed = (await body(await request(accountPath, approvedWithCc.auth), 200)).data.items;
+  assert.deepEqual(ccListed.map(row => row.id), [companyCc.id]);
+  // Descarga de comprobante TRANSFERENCIA desde /api/cuenta-corriente/comprobantes/:id -> 404
+  await body(await request(accountPath + '/' + companyTransfer.id, approvedWithCc.auth), 404);
+  // Subida a /api/cuenta-corriente/comprobantes?pedidoId=<pedido TRANSFERENCIA propio> -> 404
+  await body(await upload(accountPath + '?pedidoId=' + approvedWithCc.order, approvedWithCc.auth), 404);
+  // Mismo cliente, pedidoId cruzado entre sus dos pedidos -> 404 en ambos sentidos
+  await body(await request(companyCcOrderPath + '/' + companyTransfer.id, approvedWithCc.auth), 404);
+  await body(await request(orderPath(approvedWithCc) + '/' + companyCc.id, approvedWithCc.auth), 404);
+  // Descarga de comprobante CC desde /api/cuenta-corriente/comprobantes/:id + HEAD con todas las cabeceras
+  const ccGet = await request(accountPath + '/' + companyCc.id, approvedWithCc.auth);
+  assertDownloadHeaders(ccGet, 'image/jpeg', jpg.length, 'jpg');
+  assert.deepEqual(Buffer.from(await ccGet.arrayBuffer()), jpg);
+  const ccHead = await request(accountPath + '/' + companyCc.id, approvedWithCc.auth, { method: 'HEAD' });
+  assertDownloadHeaders(ccHead, 'image/jpeg', jpg.length, 'jpg');
+  assert.equal((await ccHead.arrayBuffer()).byteLength, 0);
+
+  // Empresas no aprobadas (PENDIENTE / RECHAZADA) en TRANSFERENCIA -> 404
+  for (const blocked of [pendingCompany, rejectedCompany]) {
+    await body(await upload(orderPath(blocked), blocked.auth), 404);
+    await body(await request(orderPath(blocked), blocked.auth), 404);
+  }
+  // Particular con pedido modalidad CUENTA_CORRIENTE -> 404
+  await body(await upload(orderPath(particularIncompatible), particularIncompatible.auth), 404);
+  await body(await request(orderPath(particularIncompatible), particularIncompatible.auth), 404);
+
+  // Anti-IDOR cruzado: Empresa A vs Empresa B y Particular vs Empresa
+  const missingCompanyOrder = await body(await request(companyCcOrderPath, company.auth), 404);
+  assert.equal(missingCompanyOrder.code, 'OPERACION_NO_ENCONTRADA');
+  await body(await upload(companyCcOrderPath, company.auth), 404);
+  const missingCompanyReceipt = await body(await request(companyCcOrderPath + '/' + companyCc.id, company.auth), 404);
+  assert.equal(missingCompanyReceipt.code, 'COMPROBANTE_NO_ENCONTRADO');
+  await body(await request(accountPath + '/' + companyCc.id, company.auth), 404);
+  await body(await upload(accountPath + '?pedidoId=' + ccOrderId, company.auth), 404);
+  await body(await request(companyCcOrderPath, particular.auth), 404);
+  await body(await upload(companyCcOrderPath, particular.auth), 404);
+  await body(await request(companyCcOrderPath + '/' + companyCc.id, particular.auth), 404);
+
+  // Autorización estricta por rol (403) en todas las rutas cruzadas
+  await body(await request(adminPath + '/' + companyCc.id, approvedWithCc.auth), 403);
+  await body(await request(companyCcOrderPath, admin), 403);
+  await body(await request(companyCcOrderPath + '/' + companyCc.id, admin), 403);
+  await body(await request(accountPath, admin), 403);
+  await body(await upload(accountPath, admin), 403);
+  await body(await request(accountPath + '/' + companyCc.id, admin), 403);
+
+  // HEAD en descarga ADMIN
+  const adminHead = await request(adminPath + '/' + companyTransfer.id, admin, { method: 'HEAD' });
+  assertDownloadHeaders(adminHead, 'image/png', png.length, 'png');
+  assert.equal((await adminHead.arrayBuffer()).byteLength, 0);
+
+  assert.deepEqual(await financialState(), before);
+});
+
+test('#328 seguridad de sesión (401), cliente inactivo (404) y protección CSRF/Same-Origin (403)', async () => {
+  const target = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const targetPath = orderPath(target);
+  const created = (await body(await upload(targetPath, target.auth, png, 'image/png'), 201)).data;
+  const reviewPath = adminPath + '/' + created.id + '/revision';
+  const priorFiles = await readdir(storage);
+
+  // 1. Sesiones inválidas / ausentes / expiradas / algoritmo inválido / sin exp / firma errónea -> 401
+  const secret = process.env.JWT_SECRET;
+  const invalidTokens = [
+    undefined,
+    'not-a-jwt',
+    jwt.sign({ id: target.userId, rol: 'CLIENTE' }, secret, { expiresIn: -10 }),
+    jwt.sign({ id: target.userId, rol: 'CLIENTE' }, secret),
+    jwt.sign({ id: target.userId, rol: 'CLIENTE' }, secret, { algorithm: 'HS384', expiresIn: 120 }),
+    jwt.sign({ id: target.userId, rol: 'CLIENTE' }, randomBytes(32), { expiresIn: 120 }),
+  ];
+  for (const token of invalidTokens) {
+    const headers = token ? { Cookie: 'jwt_token=' + token } : {};
+    await body(await fetchFromBrowser(base + targetPath, { headers }), 401);
+    await body(await fetchFromBrowser(base + targetPath + '/' + created.id, { headers }), 401);
+    await body(await fetchFromBrowser(base + targetPath, {
+      method: 'POST', headers: { ...headers, 'Content-Type': 'application/pdf' }, body: pdf,
+    }), 401);
+    await body(await fetchFromBrowser(base + reviewPath, { method: 'PATCH', headers }), 401);
+  }
+
+  // 2. Usuario inactivo y rol alterado en BD -> 401
+  const deactivatedUser = await createCustomClient({ type: 'PARTICULAR', approval: null, userActive: 0, orderModality: 'TRANSFERENCIA' });
+  await body(await request(orderPath(deactivatedUser), deactivatedUser.auth), 401);
+  await body(await upload(orderPath(deactivatedUser), deactivatedUser.auth), 401);
+
+  const roleChanged = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const oldClientToken = signToken(roleChanged.auth);
+  await db.query("UPDATE USUARIO SET rol = 'ADMIN', id_cliente = NULL WHERE id_usuario = ?", [roleChanged.userId]);
+  await body(await fetchFromBrowser(base + orderPath(roleChanged), {
+    headers: { Cookie: 'jwt_token=' + oldClientToken },
+  }), 401);
+  await body(await fetchFromBrowser(base + adminPath, {
+    headers: { Cookie: 'jwt_token=' + oldClientToken },
+  }), 401);
+
+  // 3. Cliente inactivo (USUARIO activo, CLIENTE inactivo) -> 404 sin filtrar ni escribir archivos
+  const inactiveClient = await createCustomClient({ type: 'PARTICULAR', approval: null, clientActive: 0, orderModality: 'TRANSFERENCIA' });
+  await body(await request(orderPath(inactiveClient), inactiveClient.auth), 404);
+  await body(await upload(orderPath(inactiveClient), inactiveClient.auth), 404);
+
+  // 4. CSRF / Same-Origin en mutaciones POST y PATCH (usando fetch nativo para controlar Origin/Referer/Sec-Fetch-Site)
+  const validOrigin = process.env.APP_PUBLIC_ORIGIN;
+  const csrfCases = [
+    {},
+    { Origin: 'https://attacker.example' },
+    { Origin: 'null' },
+    { Origin: validOrigin, 'Sec-Fetch-Site': 'cross-site' },
+    { Origin: validOrigin, 'Sec-Fetch-Site': 'same-site' },
+    { Referer: 'https://attacker.example/csrf' },
+  ];
+  for (const csrfHeaders of csrfCases) {
+    const postOrderRes = await fetch(base + targetPath, {
+      method: 'POST',
+      headers: { Cookie: 'jwt_token=' + signToken(target.auth), 'Content-Type': 'application/pdf', ...csrfHeaders },
+      body: pdf,
+    });
+    assert.equal(postOrderRes.status, 403);
+    assert.equal(postOrderRes.headers.get('cache-control'), 'private, no-store');
+
+    const postAccountRes = await fetch(base + accountPath, {
+      method: 'POST',
+      headers: { Cookie: 'jwt_token=' + signToken(company.auth), 'Content-Type': 'application/pdf', ...csrfHeaders },
+      body: pdf,
+    });
+    assert.equal(postAccountRes.status, 403);
+    assert.equal(postAccountRes.headers.get('cache-control'), 'private, no-store');
+
+    const patchReviewRes = await fetch(base + reviewPath, {
+      method: 'PATCH',
+      headers: { Cookie: 'jwt_token=' + signToken(admin), ...csrfHeaders },
+    });
+    assert.equal(patchReviewRes.status, 403);
+    assert.equal(patchReviewRes.headers.get('cache-control'), 'private, no-store');
+  }
+
+  // Verificar que ninguna solicitud rechazada escribió archivos ni cambió estadoRevision
+  assert.deepEqual(await readdir(storage), priorFiles);
+  const current = (await body(await request(targetPath, target.auth), 200)).data.items;
+  assert.equal(current.length, 1);
+  assert.equal(current[0].estadoRevision, 'PENDIENTE');
+});
+
+test('#328 revisión ADMIN: rechaza body/query, 404 en inexistente e idempotencia entre dos ADMIN', async () => {
+  const ownerClient = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const saved = (await body(await upload(orderPath(ownerClient), ownerClient.auth, jpg, 'image/jpeg'), 201)).data;
+  const reviewPath = adminPath + '/' + saved.id + '/revision';
+  const secondAdmin = {
+    id: await insert(
+      "INSERT INTO USUARIO (email, password_hash, rol, activo) VALUES (?, 'test-only', 'ADMIN', 1)",
+      [randomUUID() + '@receipt-admin.test'],
+    ),
+    rol: 'ADMIN',
+  };
+  const before = await financialState();
+
+  // Body presente o query extra -> 400 SOLICITUD_INVALIDA
+  const withBody = await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estadoRevision: 'REVISADO' }),
+  }), 400);
+  assert.equal(withBody.code, 'SOLICITUD_INVALIDA');
+
+  const withQuery = await body(await request(reviewPath + '?forzar=1', admin, { method: 'PATCH' }), 400);
+  assert.equal(withQuery.code, 'SOLICITUD_INVALIDA');
+
+  // UUID inexistente -> 404
+  const missing = await body(await request(adminPath + '/' + randomUUID() + '/revision', admin, { method: 'PATCH' }), 404);
+  assert.equal(missing.code, 'COMPROBANTE_NO_ENCONTRADO');
+
+  // Primera revisión por admin 1 y reintento por admin 2 conserva id_admin_revision y revision_utc del primero
+  const first = (await body(await request(reviewPath, admin, { method: 'PATCH' }), 200)).data;
+  assert.equal(first.estadoRevision, 'REVISADO');
+  assert.ok(first.revisadoEn.endsWith('Z'));
+
+  const second = (await body(await request(reviewPath, secondAdmin, { method: 'PATCH' }), 200)).data;
+  assert.deepEqual(second, first);
+  const [row] = await db.query(
+    'SELECT id_admin_revision, CAST(revision_utc AS CHAR) AS rev FROM COMPROBANTE_PAGO WHERE id_comprobante = ?',
+    [saved.id],
+  );
+  assert.equal(Number(row.id_admin_revision), admin.id);
+  assert.equal(new Date(row.rev.replace(' ', 'T') + 'Z').toISOString(), first.revisadoEn);
+  assert.deepEqual(await financialState(), before);
+});
+
+test('#328 frontera 5 MiB, MIME estricto, PDF >100 págs, paginación (50/pág) y concurrencia (503 Retry-After: 1)', async () => {
+  const client = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const path = orderPath(client);
+
+  // 1. Frontera exacta 5 MiB (5.242.880 bytes) -> 201 y descarga íntegra
+  const exact5MiB = await createExactSizePdf(5 * 1024 * 1024);
+  const boundary = (await body(await upload(path, client.auth, exact5MiB, 'application/pdf'), 201)).data;
+  assert.equal(boundary.bytes, 5 * 1024 * 1024);
+  const boundaryDownload = await request(path + '/' + boundary.id, client.auth);
+  assertDownloadHeaders(boundaryDownload, 'application/pdf', 5 * 1024 * 1024, 'pdf');
+  assert.equal((await boundaryDownload.arrayBuffer()).byteLength, 5 * 1024 * 1024);
+
+  // 2. Content-Type con parámetros -> 415; PDF >100 páginas y PDF con OpenAction/URI -> 422
+  await body(await upload(path, client.auth, pdf, 'application/pdf; charset=utf-8'), 415);
+
+  const manyPagesDoc = await PDFDocument.create();
+  for (let i = 0; i < 101; i++) manyPagesDoc.addPage();
+  await body(await upload(path, client.auth, Buffer.from(await manyPagesDoc.save()), 'application/pdf'), 422);
+
+  const uriDoc = await PDFDocument.create();
+  uriDoc.addPage();
+  uriDoc.catalog.set(PDFName.of('OpenAction'), uriDoc.context.obj({
+    S: PDFName.of('URI'),
+    URI: 'https://example.test',
+  }));
+  await body(await upload(path, client.auth, Buffer.from(await uriDoc.save()), 'application/pdf'), 422);
+
+  // 3. Queries inválidas -> 400
+  await body(await upload(path + '?pedidoId=' + client.order, client.auth, pdf, 'application/pdf'), 400);
+  await body(await upload(accountPath + '?extra=1', company.auth, pdf, 'application/pdf'), 400);
+  await body(await request(path + '?pagina=0', client.auth), 400);
+  await body(await request(path + '?pagina=abc', client.auth), 400);
+  await body(await request(adminPath + '?pagina=0', admin), 400);
+
+  // 4. Paginación determinista (pageSize = 50, orden fecha_utc DESC, id_comprobante DESC)
+  const paginatedClient = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const seededIds = [];
+  for (let i = 0; i < 52; i++) {
+    const id = randomUUID();
+    const sec = String(Math.floor(i / 2)).padStart(2, '0');
+    const hash = createHash('sha256').update(`page-${i}-${id}`).digest();
+    await db.query(`
+      INSERT INTO COMPROBANTE_PAGO (
+        id_comprobante, id_cliente, id_usuario_carga, id_pedido, id_cuenta_corriente,
+        tipo_mime, bytes, sha256, fecha_utc
+      ) VALUES (?, ?, ?, ?, NULL, 'application/pdf', 100, ?, ?)
+    `, [id, paginatedClient.clientId, paginatedClient.userId, paginatedClient.order, hash, `2026-11-01 10:00:${sec}.000`]);
+    seededIds.push({ id, ts: `2026-11-01T10:00:${sec}.000Z` });
+  }
+  seededIds.sort((a, b) => b.ts.localeCompare(a.ts) || b.id.localeCompare(a.id));
+
+  const page1 = (await body(await request(orderPath(paginatedClient) + '?pagina=1', paginatedClient.auth), 200)).data;
+  assert.equal(page1.items.length, 50);
+  assert.equal(page1.paginaSiguiente, 2);
+  const page2 = (await body(await request(orderPath(paginatedClient) + '?pagina=2', paginatedClient.auth), 200)).data;
+  assert.equal(page2.items.length, 2);
+  assert.equal(page2.paginaSiguiente, null);
+  assert.deepEqual([...page1.items, ...page2.items].map(item => item.id), seededIds.map(item => item.id));
+
+  // 5. Saturación de concurrencia (activeUploads >= 2 -> 503 con Retry-After: 1) y recuperación
+  const c1 = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const c2 = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
+  const openSlowUpload = (targetClient, bytes, mime) => {
+    const url = new URL(base + orderPath(targetClient));
+    const req = http.request({
+      hostname: url.hostname,
+      port: url.port,
+      path: url.pathname,
+      method: 'POST',
+      headers: {
+        Origin: process.env.APP_PUBLIC_ORIGIN,
+        Cookie: 'jwt_token=' + signToken(targetClient.auth),
+        'Content-Type': mime,
+        'Content-Length': String(bytes.length),
+      },
+    });
+    const response = new Promise((resolve, reject) => {
+      req.on('response', res => {
+        const chunks = [];
+        res.on('data', chunk => chunks.push(chunk));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      });
+      req.on('error', reject);
+    });
+    req.write(bytes.subarray(0, 1));
+    return {
+      finish: () => { req.end(bytes.subarray(1)); return response; },
+      abort: () => req.destroy(),
+    };
+  };
+
+  const slot1 = openSlowUpload(c1, png, 'image/png');
+  const slot2 = openSlowUpload(c2, jpg, 'image/jpeg');
+  try {
+    await new Promise(resolve => setTimeout(resolve, 250));
+    const saturated = await upload(path, client.auth, png, 'image/png');
+    assert.equal(saturated.headers.get('retry-after'), '1');
+    const saturatedBody = await body(saturated, 503);
+    assert.equal(saturatedBody.code, 'COMPROBANTES_NO_DISPONIBLES');
+    const [res1, res2] = await Promise.all([slot1.finish(), slot2.finish()]);
+    assert.equal(res1.status, 201);
+    assert.equal(res2.status, 201);
+  } catch (error) {
+    slot1.abort();
+    slot2.abort();
+    throw error;
+  }
+
+  // Después de liberar los slots, las cargas vuelven a responder 201
+  const recovered = (await body(await upload(path, client.auth, png, 'image/png'), 201)).data;
+  assert.equal(recovered.tipoMime, 'image/png');
 });
