@@ -20,7 +20,8 @@ export interface ReceiptPage {
 
 export const accountReceiptsPath = '/cuenta-corriente/comprobantes'
 export const adminReceiptsPath = '/admin/comprobantes'
-export const orderReceiptsPath = (orderId: number) => '/pedidos/' + orderId + '/comprobantes'
+export const orderReceiptsPath = (orderId: number) =>
+  '/pedidos/' + orderId + '/comprobantes'
 
 export function supportsOrderReceipts(
   clientType: string | null | undefined,
@@ -28,23 +29,52 @@ export function supportsOrderReceipts(
   companyApproval?: string | null,
   companyAccountEnabled?: boolean | null,
 ) {
-  return (paymentMethod === 'TRANSFERENCIA'
-      && (clientType === 'PARTICULAR'
-        || (clientType === 'EMPRESA' && companyApproval === 'APROBADA')))
-    || (clientType === 'EMPRESA'
-      && paymentMethod === 'CUENTA_CORRIENTE'
-      && companyAccountEnabled !== null)
+  return (
+    paymentMethod === 'TRANSFERENCIA'
+    && (
+      clientType === 'PARTICULAR'
+      || (
+        clientType === 'EMPRESA'
+        && companyApproval === 'APROBADA'
+      )
+    )
+  ) || (
+    clientType === 'EMPRESA'
+    && paymentMethod === 'CUENTA_CORRIENTE'
+    && companyAccountEnabled !== null
+  )
 }
 
-export async function listPaymentReceipts(path: string, pagina: number, signal: AbortSignal) {
-  return (await api.get<{ data: ReceiptPage }>(path, { params: { pagina }, signal })).data.data
+export async function listPaymentReceipts(
+  path: string,
+  pagina: number,
+  signal: AbortSignal,
+) {
+  return (
+    await api.get<{ data: ReceiptPage }>(path, {
+      params: { pagina },
+      signal,
+    })
+  ).data.data
 }
 
-export async function uploadPaymentReceipt(path: string, file: File, signal: AbortSignal) {
-  const response = await api.post(path, file, { headers: { 'Content-Type': file.type }, signal })
+export async function uploadPaymentReceipt(
+  path: string,
+  file: File,
+  signal: AbortSignal,
+) {
+  const response = await api.post(path, file, {
+    headers: { 'Content-Type': file.type },
+    signal,
+  })
+
   return response.status === 201
 }
 
-export async function markPaymentReceiptReviewed(path: string, id: string, signal: AbortSignal) {
+export async function markPaymentReceiptReviewed(
+  path: string,
+  id: string,
+  signal: AbortSignal,
+) {
   await api.patch(path + '/' + id + '/revision', undefined, { signal })
 }

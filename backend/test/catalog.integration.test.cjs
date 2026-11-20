@@ -412,7 +412,8 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
         'BASE_NO_VERIFICADA', 'DEFINIDO', 'BASE_CERO', ...Array(5).fill('BASE_NO_VERIFICADA')]);
       assert.equal(quoted.find(line => line.productoId === synthetic).evidenciaBaseUSD.synthetic, true);
       const personal = await quote('precios/mios', [promotion, regular]);
-      assert.deepEqual(personal.map(line => line.precioUnitarioUSD), ['36.00', '24.00']);
+      assert.deepEqual(personal.map(line => [line.productoId, line.precioUnitarioUSD]),
+        [[promotion, '36.00'], [regular, '24.00']]);
 
       const limit = 3;
       for (const [orden, ranked] of [
@@ -440,7 +441,11 @@ test('catálogo público real en MariaDB', { skip: !process.env.CATALOG_TEST_DAT
           const withSession = await fetch(pageUrl, { headers: { Cookie: headers.Cookie } });
           assert.equal(withSession.status, 200);
           assert.equal(withSession.headers.get('set-cookie'), null);
-          assert.deepEqual(await withSession.json(), body);
+          const personalizedCatalog = await withSession.json();
+          assert.deepEqual(personalizedCatalog.data.productos.map(product => product.id),
+            expected.slice((page - 1) * limit, page * limit),
+            'el precio personalizado no altera el orden público ni la paginación');
+          assert.deepEqual(personalizedCatalog, body);
         }
       }
 
