@@ -40,10 +40,19 @@ export function updateCategory(id_categoria: number, { nombre, descripcion }: Pa
   });
 }
 
-export function deactivateCategory(id_categoria: number): Promise<Categoria | null> {
+function setCategoryActive(id_categoria: number, activo: 0 | 1): Promise<Categoria | null> {
+  const previous = activo === 1 ? 0 : 1;
   return inTransaction(async manager => {
     const categories = manager.getRepository(CategoriaSchema);
-    await categories.update({ id_categoria, activo: 1 }, { activo: 0 });
-    return categories.findOneBy({ id_categoria, activo: 0 });
+    await categories.update({ id_categoria, activo: previous }, { activo });
+    return categories.findOneBy({ id_categoria, activo });
   });
+}
+
+export function deactivateCategory(id_categoria: number): Promise<Categoria | null> {
+  return setCategoryActive(id_categoria, 0);
+}
+
+export function activateCategory(id_categoria: number): Promise<Categoria | null> {
+  return setCategoryActive(id_categoria, 1);
 }
