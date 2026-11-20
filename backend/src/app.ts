@@ -18,6 +18,7 @@ import { accountOrderPrivateResponses } from './middlewares/account-order-http.m
 import { accountOrderRouter, clientOrderRouter, transferOrderRouter } from './routes/accountOrder.routes';
 import { receiptRouter } from './routes/paymentReceipt.routes';
 import { productImageRouter } from './routes/productImage.routes';
+import { perfilRouter } from './routes/perfil.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
@@ -34,8 +35,9 @@ app.use('/api', httpSecurity(env.httpSecurity));
 app.use(cookieParser());
 app.use(authPassport.initialize());
 
-// Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
+// Auth y perfil procesan su JSON para conservar { message } sin cambiar otras rutas.
 app.use('/api/auth', authRouter);
+app.use('/api/perfil', perfilRouter);
 app.use('/api', receiptRouter);
 app.use('/api', productImageRouter);
 app.use(express.json());
