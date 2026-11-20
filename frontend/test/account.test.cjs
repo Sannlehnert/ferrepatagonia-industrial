@@ -60,3 +60,16 @@ test('HistorialPedidos does not render metric cards and keeps filter bar above a
  assert.ok(filterBarIndex < tableIndex, 'Filter bar must be above table');
 });
 
+test('receipt availability includes EMPRESA transfers and preserves other payment rules', () => {
+ const filename=resolve(__dirname,'../src/services/paymentReceiptService.ts');
+ const source=readFileSync(filename,'utf8');
+ const m={exports:{}};
+ new Function('require','module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(()=>({}),m,m.exports);
+ const { supportsOrderReceipts }=m.exports;
+ assert.equal(supportsOrderReceipts('EMPRESA','TRANSFERENCIA'),true);
+ assert.equal(supportsOrderReceipts('PARTICULAR','TRANSFERENCIA'),true);
+ assert.equal(supportsOrderReceipts('EMPRESA','CUENTA_CORRIENTE'),true);
+ assert.equal(supportsOrderReceipts('PARTICULAR','CUENTA_CORRIENTE'),false);
+ assert.equal(supportsOrderReceipts(undefined,'TRANSFERENCIA'),false);
+});
+

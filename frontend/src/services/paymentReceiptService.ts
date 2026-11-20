@@ -23,7 +23,7 @@ export const adminReceiptsPath = '/admin/comprobantes'
 export const orderReceiptsPath = (orderId: number) => '/pedidos/' + orderId + '/comprobantes'
 
 export function supportsOrderReceipts(clientType: string | null | undefined, paymentMethod: string) {
-  return (clientType === 'PARTICULAR' && paymentMethod === 'TRANSFERENCIA')
+  return ((clientType === 'PARTICULAR' || clientType === 'EMPRESA') && paymentMethod === 'TRANSFERENCIA')
     || (clientType === 'EMPRESA' && paymentMethod === 'CUENTA_CORRIENTE')
 }
 

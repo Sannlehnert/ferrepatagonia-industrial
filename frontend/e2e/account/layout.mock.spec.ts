@@ -240,6 +240,51 @@ for (const width of [320, 360, 390, 768, 1280]) {
   }
 }
 
+test('EMPRESA: transferencia sin comprobante aparece en resumen, historial y permite adjuntarlo', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await mockApi(page, 'EMPRESA')
+  const order = {
+    pedidoId: 1, numero: 'PED-000001', fecha: '2026-11-16T12:00:00.000Z',
+    estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', moneda: 'USD',
+    subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+    cantidadLineas: 1, cantidadUnidades: 2,
+  }
+  let uploads = 0
+  await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: [order] } } })
+    if (path === '/api/pedidos/1/comprobantes') {
+      if (route.request().method() === 'POST') {
+        uploads++
+        return route.fulfill({ status: 201, json: {} })
+      }
+      return route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
+    }
+    return route.continue()
+  })
+
+  await page.goto('/mi-cuenta')
+  const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+  const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+  await expect(missing).toContainText('1')
+  await missing.click()
+  await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+  await expect(page.getByRole('heading', { name: 'PED-000001' })).toBeVisible()
+  await expect(page.getByText('No adjunto', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Ver comprobantes de PED-000001' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Todavía no hay comprobantes.')).toBeVisible()
+  await dialog.getByLabel('Archivo (PDF, JPG o PNG, hasta 5 MB)').setInputFiles({
+    name: 'transferencia.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4'),
+  })
+  await dialog.getByRole('button', { name: 'Adjuntar comprobante' }).click()
+  await expect(dialog.getByText('Comprobante recibido. La acreditación del pago se gestiona por separado.')).toBeVisible()
+  expect(uploads).toBe(1)
+})
+
 test('el resumen no muestra cifras parciales de comprobantes y permite reintentar', async ({ page }) => {
   await mockApi(page, 'PARTICULAR')
   let fails = true
