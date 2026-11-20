@@ -41,8 +41,9 @@ const account = computed(() => {
 })
 
 async function finishNavigation() {
-  if (!expanded.value) return
-  close()
+  const businessTarget = route.name === 'home' && route.hash === '#empresas'
+  if (!expanded.value && !businessTarget) return
+  if (expanded.value) close()
   await nextTick()
   emit('navigate')
 }

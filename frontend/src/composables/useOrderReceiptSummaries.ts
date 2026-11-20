@@ -34,7 +34,12 @@ export function useOrderReceiptSummaries(orders: () => ClientOrderSummary[] | nu
   const query = usePrivateAccountRead<Record<number, OrderReceiptStatus>>(identity, allowed)
 
   function available(order: ClientOrderSummary) {
-    return supportsOrderReceipts(auth.user?.tipo_cliente, order.modalidadPago)
+    return supportsOrderReceipts(
+      auth.user?.tipo_cliente,
+      order.modalidadPago,
+      auth.user?.estadoAprobacionEmpresa,
+      auth.user?.cuentaCorrienteHabilitada,
+    )
   }
 
   function refresh() {
