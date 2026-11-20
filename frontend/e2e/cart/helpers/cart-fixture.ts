@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test'
 import type { CartSnapshot } from '../../../src/types/cart'
 import type { AccountOrderEligibility } from '../../../src/types/accountOrder'
+import type { TransferOrderEligibility } from '../../../src/types/transferOrder'
 
 export async function mockCart(page: Page) {
   const state = {
@@ -10,9 +11,8 @@ export async function mockCart(page: Page) {
     failCartReadOnRecovery: false,
     readGate: null as Promise<void> | null,
     confirmGate: null as Promise<void> | null,
-    eligibilityGate: null as Promise<void> | null,
-    eligibilityFails: false,
-    eligibilityRequests: 0,
+    creditEligibilityFails: false,
+    creditEligibilityGate: null as Promise<void> | null,
     transform: null as ((value: CartSnapshot) => CartSnapshot) | null,
     writes: [] as Array<{ method: string; quantity?: number }>,
     eligibility: {
@@ -24,10 +24,23 @@ export async function mockCart(page: Page) {
       mensaje: 'El cliente no tiene una cuenta corriente habilitada.',
       cotizacion: null,
     } as AccountOrderEligibility,
+    transferEligibility: {
+      elegible: true,
+      modalidadPago: 'TRANSFERENCIA',
+      moneda: 'USD',
+      totalUSD: '80.00',
+      codigo: null,
+      mensaje: null,
+      cotizacion: 'mock-transfer-quote-token-for-e2e',
+    } as TransferOrderEligibility,
     confirmationStatus: 201,
     recoveryStatus: 202,
+    transferConfirmationStatus: 201,
+    transferRecoveryStatus: 202,
     recoveryRequests: [] as string[],
+    transferRecoveryRequests: [] as string[],
     orderRequests: [] as Array<{ method: string; key?: string; body?: unknown }>,
+    transferRequests: [] as Array<{ method: string; key?: string; body?: unknown }>,
   }
 
   const amounts: Record<number, string> = {
@@ -117,12 +130,110 @@ export async function mockCart(page: Page) {
     }
 
     if (path === '/api/pedidos/cuenta-corriente/eligibilidad' && method === 'GET') {
-      state.eligibilityRequests++
-      if (state.eligibilityGate) await state.eligibilityGate
-      if (state.eligibilityFails) {
+      if (state.creditEligibilityGate) await state.creditEligibilityGate
+      if (state.creditEligibilityFails) {
         return route.fulfill({ status: 500, json: { message: 'No se pudo consultar el crédito.' } })
       }
       return route.fulfill({ json: { data: state.eligibility } })
+    }
+
+    if (path === '/api/pedidos/transferencia/eligibilidad' && method === 'GET') {
+      return route.fulfill({
+        json: {
+          data: {
+            ...state.transferEligibility,
+            ...(state.transferEligibility.elegible ? { totalUSD: amounts[state.quantity] } : {}),
+          },
+        },
+      })
+    }
+
+    if (path === '/api/pedidos/transferencia' && method === 'POST') {
+      state.transferRequests.push({
+        method,
+        key: request.headers()['idempotency-key'],
+        body: request.postDataJSON(),
+      })
+      if (state.confirmGate) await state.confirmGate
+      if (state.transferConfirmationStatus === 409) {
+        return route.fulfill({
+          status: 409,
+          json: {
+            estado: 'RECHAZADO',
+            code: 'COTIZACION_VENCIDA',
+            message: 'El carrito o sus precios cambiaron.',
+          },
+        })
+      }
+
+      if (state.transferConfirmationStatus === 202) {
+        return route.fulfill({
+          status: 202,
+          json: {
+            data: {
+              estado: 'PENDIENTE',
+              code: 'CONFIRMACION_PENDIENTE',
+              message: 'Todavía no hay un resultado definitivo.',
+            },
+          },
+        })
+      }
+
+      state.removed = true
+      return route.fulfill({
+        status: state.transferConfirmationStatus,
+        json: {
+          data: {
+            pedidoId: 789,
+            estado: 'CONFIRMADO',
+            modalidadPago: 'TRANSFERENCIA',
+            moneda: 'USD',
+            totalUSD: amounts[state.quantity],
+          },
+        },
+      })
+    }
+
+    const transferRecoveryKey = path.match(/^\/api\/pedidos\/transferencia\/([^/]+)$/)?.[1]
+    if (transferRecoveryKey && method === 'GET') {
+      state.transferRecoveryRequests.push(decodeURIComponent(transferRecoveryKey))
+      if (state.transferRecoveryStatus === 202) {
+        return route.fulfill({
+          status: 202,
+          json: {
+            data: {
+              estado: 'PENDIENTE',
+              code: 'CONFIRMACION_PENDIENTE',
+              message: 'Todavía no hay un resultado definitivo.',
+            },
+          },
+        })
+      }
+
+      if (state.transferRecoveryStatus === 404) {
+        return route.fulfill({
+          status: 404,
+          json: { code: 'INTENTO_NO_ENCONTRADO', message: 'No se encontró el intento.' },
+        })
+      }
+
+      state.removed = true
+      return route.fulfill({
+        status: 200,
+        json: {
+          data: {
+            pedidoId: 789,
+            estado: 'CONFIRMADO',
+            modalidadPago: 'TRANSFERENCIA',
+            moneda: 'USD',
+            totalUSD: amounts[state.quantity],
+          },
+        },
+      })
+    }
+
+    if (/^\/api\/pedidos\/\d+\/comprobantes$/.test(path) && method === 'GET') {
+      return route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
     }
 
     if (path === '/api/pedidos/cuenta-corriente' && method === 'POST') {
@@ -133,6 +244,13 @@ export async function mockCart(page: Page) {
       })
       if (state.confirmGate) await state.confirmGate
       if (state.confirmationStatus === 409) {
+        state.eligibility = {
+          ...state.eligibility,
+          elegible: false,
+          codigo: 'CREDITO_INSUFICIENTE',
+          mensaje: 'El crédito disponible no alcanza para confirmar este pedido.',
+          cotizacion: null,
+        }
         return route.fulfill({
           status: 409,
           json: {

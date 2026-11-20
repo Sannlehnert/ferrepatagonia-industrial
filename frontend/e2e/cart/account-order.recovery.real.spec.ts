@@ -208,6 +208,7 @@ for (const width of [360, 1280]) {
       const summary = page.getByRole('region', { name: 'Resumen del carrito' })
       const eligibility = await addFromCatalog()
       expect(eligibility).toMatchObject({ elegible: true, totalUSD: '10.00', creditoDisponibleUSD: '15.00' })
+      await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
       await expect(summary).toContainText('USD 10.00')
       await expect(summary).toContainText('USD 15.00')
 
@@ -258,9 +259,9 @@ for (const width of [360, 1280]) {
       expect(denied).toMatchObject({
         elegible: false, codigo: 'CREDITO_INSUFICIENTE', totalUSD: '10.00', creditoDisponibleUSD: '5.00',
       })
-      await expect(summary.getByRole('alert')).toContainText('El crédito disponible no alcanza')
-      await expect(summary).toContainText('USD 5.00')
-      await expect(summary.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+      await expect(summary.getByRole('button', { name: 'Confirmar pedido por transferencia' })).toBeEnabled()
       const before = await sql(database, f)
       expect(before).toEqual({ ...committed, items: [{ cantidad: 1 }] })
       const rejectedKey = randomUUID()
