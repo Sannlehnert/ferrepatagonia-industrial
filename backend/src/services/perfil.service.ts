@@ -3,6 +3,7 @@ import {
   findPerfilByUsuarioId,
   updatePerfilByUsuarioId,
   type PerfilRow,
+  type PerfilUpdateResult,
 } from '../repositories/perfil.repository';
 
 export interface Perfil {
@@ -26,6 +27,12 @@ export class PerfilNoEncontradoError extends Error {
   }
 }
 
+export class PerfilAccesoError extends Error {
+  constructor(readonly status: 401 | 403, message: string) {
+    super(message);
+  }
+}
+
 function toPerfil(row: PerfilRow): Perfil {
   return {
     id: Number(row.id_usuario),
@@ -46,6 +53,19 @@ function toPerfil(row: PerfilRow): Perfil {
   };
 }
 
+function rejected(result: Extract<PerfilUpdateResult, { ok: false }>): never {
+  switch (result.reason) {
+    case 'USUARIO_INACTIVO':
+      throw new PerfilAccesoError(401, 'No autenticado.');
+    case 'CLIENTE_INACTIVO':
+      throw new PerfilAccesoError(403, 'La cuenta de cliente no está habilitada.');
+    case 'NO_AUTORIZADO':
+      throw new PerfilAccesoError(403, 'El rol autenticado no tiene permiso.');
+    default:
+      throw new PerfilNoEncontradoError();
+  }
+}
+
 export async function getPerfil(usuarioId: number): Promise<Perfil> {
   const row = await findPerfilByUsuarioId(usuarioId);
   if (!row) throw new PerfilNoEncontradoError();
@@ -57,7 +77,7 @@ export async function updatePerfil(usuarioId: number, input: UpdatePerfil): Prom
     ...(input.telefono !== undefined ? { telefono: input.telefono } : {}),
     ...(input.direccion !== undefined ? { direccion: input.direccion } : {}),
   };
-  const row = await updatePerfilByUsuarioId(usuarioId, changes);
-  if (!row) throw new PerfilNoEncontradoError();
-  return toPerfil(row);
+  const result = await updatePerfilByUsuarioId(usuarioId, changes);
+  if (!result.ok) rejected(result);
+  return toPerfil(result.perfil);
 }

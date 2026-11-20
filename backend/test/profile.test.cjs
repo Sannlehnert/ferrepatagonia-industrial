@@ -52,6 +52,15 @@ const request = (method, token, body, url = base) => fetch(url, {
   ...(body === undefined ? {} : { body: JSON.stringify(body) }),
 });
 
+const rawRequest = (token, body, url = base) => fetch(url, {
+  method: 'PATCH',
+  headers: {
+    ...(token ? { Cookie: `jwt_token=${token}` } : {}),
+    'Content-Type': 'application/json',
+  },
+  body,
+});
+
 const perfilParticular = {
   id: 12,
   tipoCliente: 'PARTICULAR',
@@ -200,11 +209,14 @@ for (const field of protectedFields) {
 test('PATCH rechaza bodies no objetos y vacíos sin actualizar', async t => {
   mockSessions(t);
   t.mock.method(service, 'updatePerfil', () => assert.fail('No debe ejecutar una actualización'));
-  for (const body of [null, 'texto']) {
+  for (const body of [null, 'texto', 123]) {
     const response = await request('PATCH', signToken({ id: 12, rol: 'CLIENTE' }), body);
     assert.equal(response.status, 400);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    assert.match(response.headers.get('vary'), /Cookie/i);
     const json = await response.json();
-    assert.equal(typeof Object.values(json)[0], 'string');
+    assert.equal(typeof json.message, 'string');
+    assert.deepEqual(Object.keys(json), ['message']);
   }
   for (const [body, message] of [
     [[], 'El cuerpo de la solicitud es requerido y debe ser un objeto válido.'],
@@ -213,8 +225,30 @@ test('PATCH rechaza bodies no objetos y vacíos sin actualizar', async t => {
   ]) {
     const response = await request('PATCH', signToken({ id: 12, rol: 'CLIENTE' }), body);
     assert.equal(response.status, 400);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
     assert.deepEqual(await response.json(), { message });
   }
+});
+
+test('PATCH: JSON malformado o excesivo conserva { message } y cabeceras privadas', async () => {
+  for (const raw of ['{"telefono":', 'null', '"texto"', '123']) {
+    const response = await rawRequest(signToken({ id: 12, rol: 'CLIENTE' }), raw);
+    assert.equal(response.status, 400, raw);
+    assert.equal(response.headers.get('cache-control'), 'private, no-store', raw);
+    assert.match(response.headers.get('vary'), /Cookie/i, raw);
+    const json = await response.json();
+    assert.equal(typeof json.message, 'string', raw);
+    assert.deepEqual(Object.keys(json), ['message'], raw);
+  }
+
+  const oversized = await rawRequest(signToken({ id: 12, rol: 'CLIENTE' }),
+    JSON.stringify({ telefono: 'x'.repeat(110 * 1024) }));
+  assert.equal(oversized.status, 413);
+  assert.equal(oversized.headers.get('cache-control'), 'private, no-store');
+  assert.match(oversized.headers.get('vary'), /Cookie/i);
+  const body = await oversized.json();
+  assert.equal(typeof body.message, 'string');
+  assert.deepEqual(Object.keys(body), ['message']);
 });
 
 for (const [label, body] of [
@@ -227,6 +261,11 @@ for (const [label, body] of [
   ['dirección no textual', { direccion: 123 }],
   ['dirección vacía', { direccion: '' }],
   ['dirección demasiado larga', { direccion: 'x'.repeat(501) }],
+  ['teléfono con NUL', { telefono: '294\u0000400' }],
+  ['teléfono con control C0', { telefono: '294\u0001400' }],
+  ['dirección con control C0', { direccion: 'Calle\u0001123' }],
+  ['dirección con DEL', { direccion: 'Calle\u007f123' }],
+  ['dirección con control C1', { direccion: 'Calle\u0085123' }],
 ]) {
   test(`PATCH rechaza ${label} sin actualizar`, async t => {
     mockSessions(t);
@@ -238,6 +277,19 @@ for (const [label, body] of [
     assert.ok(!text.includes('x'.repeat(51)));
   });
 }
+
+test('PATCH conserva direcciones legítimas con acentos, símbolos y multilínea', async t => {
+  mockSessions(t);
+  const direccion = 'Av. San Martín 123, Piso 4° B — Unidad 2/3\nRuta Provincial 40';
+  t.mock.method(service, 'updatePerfil', async (_id, dto) => {
+    assert.equal(dto.direccion, direccion);
+    return { ...perfilParticular, direccion };
+  });
+  const response = await request('PATCH', signToken({ id: 12, rol: 'CLIENTE' }),
+    { direccion: `  ${direccion}  ` });
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.perfil.direccion, direccion);
+});
 
 test('PATCH PARTICULAR: recorta, actualiza solo campos enviados y devuelve el perfil', async t => {
   mockSessions(t);

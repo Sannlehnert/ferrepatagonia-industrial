@@ -3,6 +3,7 @@ import { DatabaseOutcomeUnknownError } from '../config/database-policy';
 import type { UpdatePerfil } from '../dtos/profile/profile.dto';
 import {
   getPerfil,
+  PerfilAccesoError,
   PerfilNoEncontradoError,
   updatePerfil,
 } from '../services/perfil.service';
@@ -14,6 +15,10 @@ function setPrivacyHeaders(res: Response): void {
 
 function fail(res: Response, error: unknown, context: string): void {
   setPrivacyHeaders(res);
+  if (error instanceof PerfilAccesoError) {
+    res.status(error.status).json({ message: error.message });
+    return;
+  }
   if (error instanceof PerfilNoEncontradoError) {
     res.status(404).json({ message: error.message });
     return;

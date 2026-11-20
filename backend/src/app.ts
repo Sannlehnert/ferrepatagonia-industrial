@@ -35,13 +35,13 @@ app.use('/api', httpSecurity(env.httpSecurity));
 app.use(cookieParser());
 app.use(authPassport.initialize());
 
-// Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
+// Auth y perfil procesan su JSON para conservar { message } sin cambiar otras rutas.
 app.use('/api/auth', authRouter);
+app.use('/api/perfil', perfilRouter);
 app.use('/api', receiptRouter);
 app.use('/api', productImageRouter);
 app.use(express.json());
 app.use('/api', healthRouter);
-app.use('/api/perfil', perfilRouter);
 app.use('/api', catalogRouter);
 app.use('/api', categoryRouter);
 app.use('/api', createPricingRouter(new PricingService(new MariaDbPricingSource())));

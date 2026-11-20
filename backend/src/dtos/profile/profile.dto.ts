@@ -1,9 +1,14 @@
 import { Rule } from '../rules';
 import type { DtoPolicy } from '../validation';
 
+// Se conservan tabulación, LF y CR para direcciones multilínea legítimas.
+// NUL, los demás controles C0, DEL y los controles C1 no aportan datos válidos.
+const forbiddenControls = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/;
+
 const optionalText = (field: string, max: number) => Rule((value: unknown) => {
   if (value === undefined || value === null) return null;
   if (typeof value !== 'string') return `${field} debe ser texto o null.`;
+  if (forbiddenControls.test(value)) return `${field} contiene caracteres de control no permitidos.`;
   const trimmed = value.trim();
   if (!trimmed) return `${field} debe ser un texto no vacío o null.`;
   if ([...trimmed].length > max) return `${field} admite hasta ${max} caracteres.`;

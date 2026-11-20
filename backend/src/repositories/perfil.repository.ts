@@ -20,6 +20,16 @@ export interface PerfilUpdate {
   direccion?: string | null;
 }
 
+export type PerfilUpdateRejection =
+  | 'USUARIO_INACTIVO'
+  | 'CLIENTE_INACTIVO'
+  | 'NO_AUTORIZADO'
+  | 'NO_ENCONTRADO';
+
+export type PerfilUpdateResult =
+  | { ok: true; perfil: PerfilRow }
+  | { ok: false; reason: PerfilUpdateRejection };
+
 function perfilQuery(manager?: EntityManager) {
   return (manager ?? dataSource).getRepository(UsuarioSchema).createQueryBuilder('u')
     .innerJoin('u.cliente', 'c')
@@ -36,31 +46,49 @@ function perfilQuery(manager?: EntityManager) {
     .addSelect('cc.habilitada', 'cuenta_corriente_habilitada');
 }
 
+const perfilActivo = (query: ReturnType<typeof perfilQuery>, idUsuario: number) => query
+  .where('u.id_usuario = :idUsuario', { idUsuario })
+  .andWhere('u.activo = 1')
+  .andWhere('u.rol = :rol', { rol: 'CLIENTE' })
+  .andWhere('u.id_cliente IS NOT NULL')
+  .andWhere('c.activo = 1');
+
 export async function findPerfilByUsuarioId(idUsuario: number): Promise<PerfilRow | null> {
-  return (await perfilQuery().where('u.id_usuario = :idUsuario', { idUsuario })
-    .getRawOne<PerfilRow>()) ?? null;
+  return (await perfilActivo(perfilQuery(), idUsuario).getRawOne<PerfilRow>()) ?? null;
 }
 
-// La transacción bloquea la identidad antes de escribir y vuelve a leer dentro
-// del mismo contexto: si la lectura falla, no se confirma una actualización parcial.
+// Orden global de locks del proyecto: CLIENTE -> USUARIO. El primer SELECT solo
+// localiza el vínculo sin bloquear; la identidad se revalida bajo los dos locks.
 export async function updatePerfilByUsuarioId(
   idUsuario: number,
   changes: PerfilUpdate,
-): Promise<PerfilRow | null> {
+): Promise<PerfilUpdateResult> {
   return inTransaction(async manager => {
+    const identity = await manager.getRepository(UsuarioSchema).findOne({
+      select: { id_cliente: true },
+      where: { id_usuario: idUsuario },
+    });
+    if (!identity || identity.id_cliente == null) return { ok: false, reason: 'NO_ENCONTRADO' };
+    const idCliente = identity.id_cliente;
+
+    const cliente = await manager.getRepository(ClienteSchema).findOne({
+      select: { id_cliente: true, activo: true },
+      where: { id_cliente: idCliente },
+      lock: { mode: 'pessimistic_write' },
+    });
+    if (!cliente) return { ok: false, reason: 'NO_ENCONTRADO' };
+    if (cliente.activo !== 1) return { ok: false, reason: 'CLIENTE_INACTIVO' };
+
     const usuario = await manager.getRepository(UsuarioSchema).findOne({
-      select: { id_usuario: true, id_cliente: true, rol: true },
+      select: { id_usuario: true, id_cliente: true, rol: true, activo: true },
       where: { id_usuario: idUsuario },
       lock: { mode: 'pessimistic_write' },
     });
-    if (!usuario || usuario.rol !== 'CLIENTE' || usuario.id_cliente == null) return null;
-
-    const cliente = await manager.getRepository(ClienteSchema).findOne({
-      select: { id_cliente: true },
-      where: { id_cliente: usuario.id_cliente },
-      lock: { mode: 'pessimistic_write' },
-    });
-    if (!cliente) return null;
+    if (!usuario) return { ok: false, reason: 'NO_ENCONTRADO' };
+    if (usuario.activo !== 1) return { ok: false, reason: 'USUARIO_INACTIVO' };
+    if (usuario.rol !== 'CLIENTE' || usuario.id_cliente !== idCliente) {
+      return { ok: false, reason: 'NO_AUTORIZADO' };
+    }
 
     if (Object.keys(changes).length > 0) {
       const defined = Object.fromEntries(
@@ -68,13 +96,16 @@ export async function updatePerfilByUsuarioId(
       );
       if (Object.keys(defined).length > 0) {
         await manager.getRepository(ClienteSchema).update(
-          { id_cliente: usuario.id_cliente },
+          { id_cliente: idCliente },
           defined,
         );
       }
     }
 
-    return (await perfilQuery(manager).where('u.id_usuario = :idUsuario', { idUsuario })
-      .getRawOne<PerfilRow>()) ?? null;
+    const perfil = await perfilActivo(perfilQuery(manager), idUsuario).getRawOne<PerfilRow>();
+    // Una relectura vacía después de escribir es una inconsistencia, no un
+    // rechazo autorizado: debe revertir la transacción, no confirmarla.
+    if (!perfil) throw new Error('No se pudo releer el perfil actualizado.');
+    return { ok: true, perfil };
   });
 }
