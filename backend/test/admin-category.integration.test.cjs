@@ -55,6 +55,7 @@ test('API ADMIN de categorías con HTTP y MariaDB', {
   assert.ok(Number.isInteger(id) && id > 0);
   const suffix = `/${id}`;
   const deactivate = suffix + '/desactivar';
+  const activate = suffix + '/activar';
   await t.test('C01–C02: alta activa con ID generado, lectura SQL y publicación', async () => {
     assert.deepEqual(created, { id_categoria: id, nombre, descripcion, activo: 1 });
     assert.deepEqual(await getPersisted(id), created);
@@ -78,9 +79,11 @@ test('API ADMIN de categorías con HTTP y MariaDB', {
     const missing = '/2147483647';
     assert.deepEqual(await mutate('PUT', missing, 404, { nombre }), { message: 'Categoría no encontrada.' });
     assert.deepEqual(await mutate('PATCH', missing + '/desactivar', 404), { message: 'Categoría no encontrada.' });
+    assert.deepEqual(await mutate('PATCH', missing + '/activar', 404), { message: 'Categoría no encontrada.' });
     for (const invalid of ['0', '-1', '01', '1.1', '1e0', 'abc', '2147483648']) {
       await mutate('PUT', '/' + invalid, 400, { nombre });
-      await mutate('PATCH', '/' + invalid + '/desactivar', 400);
+      assert.deepEqual(await mutate('PATCH', '/' + invalid + '/desactivar', 400), { message: 'ID inválido' });
+      assert.deepEqual(await mutate('PATCH', '/' + invalid + '/activar', 400), { message: 'ID inválido' });
     }
     const invalidBodies = [undefined, null, [], {}, { nombre: '  ' }, { nombre: 'a'.repeat(151) },
       { nombre: 12 }, { nombre, descripcion: 1 }, { nombre, descripcion: 'é'.repeat(32768) },
@@ -94,6 +97,12 @@ test('API ADMIN de categorías con HTTP y MariaDB', {
     await mutate('POST', '', 400, { nombre }, { contentType: 'text/plain' });
     await mutate('PATCH', deactivate, 400, { activo: 1 });
     await mutate('PATCH', deactivate, 400, { id_categoria: id }, { contentType: 'text/plain' });
+    assert.deepEqual(await mutate('PATCH', activate, 400, { activo: 1 }),
+      { message: 'La activación no admite un cuerpo de solicitud.' });
+    assert.deepEqual(await mutate('PATCH', activate, 400, {}),
+      { message: 'La activación no admite un cuerpo de solicitud.' });
+    assert.deepEqual(await mutate('PATCH', activate, 400, { id_categoria: id }, { contentType: 'text/plain' }),
+      { message: 'La activación no admite un cuerpo de solicitud.' });
     assert.deepEqual(await getPersisted(id), before);
     const boundary = { nombre: '🛠'.repeat(150), descripcion: 'é'.repeat(32767) + 'a' };
     const first = await mutate('POST', '', 201, boundary);
@@ -107,7 +116,12 @@ test('API ADMIN de categorías con HTTP y MariaDB', {
     const expired = 'jwt_token=' + jwt.sign({ id: admin.id, rol: 'ADMIN' }, process.env.JWT_SECRET, { expiresIn: -1 });
     const before = await getPersisted(id);
     const publicBefore = await getPublic();
-    for (const [method, path, body] of [['POST', '', { nombre }], ['PUT', suffix, { nombre }], ['PATCH', deactivate]]) {
+    for (const [method, path, body] of [
+      ['POST', '', { nombre }],
+      ['PUT', suffix, { nombre }],
+      ['PATCH', deactivate],
+      ['PATCH', activate],
+    ]) {
       await mutate(method, path, 403, body, { cookie: client.cookie });
       for (const cookie of ['', 'jwt_token=invalido', expired, inactive.cookie]) {
         await mutate(method, path, 401, body, { cookie });
@@ -177,5 +191,28 @@ test('API ADMIN de categorías con HTTP y MariaDB', {
     assert.deepEqual(data.categorias.find(category => category.id_categoria === id), await getPersisted(id));
     assert.deepEqual(data.categorias.find(category => category.id_categoria === active.id_categoria), active);
     assert.ok(!(await getPublic()).some(category => category.id === id));
+  });
+
+  await t.test('reactivación idempotente vuelve a publicar la categoría sin mutar productos', async () => {
+    const current = await getPersisted(id);
+    assert.equal(current.activo, 0);
+    assert.equal((await getPublic()).some(category => category.id === id), false);
+    const productsBefore = await pool.query('SELECT * FROM PRODUCTO WHERE id_categoria = ?', [id]);
+    assert.ok(productsBefore.length > 0);
+    const expected = { ...current, activo: 1 };
+
+    const results = await Promise.all([
+      mutate('PATCH', activate, 200),
+      mutate('PATCH', activate, 200),
+    ]);
+    assert.deepEqual(results, [expected, expected]);
+    assert.deepEqual(await mutate('PATCH', activate, 200), expected);
+    assert.deepEqual(await request(adminPath + activate, 200, {
+      method: 'PATCH',
+      headers: { Cookie: admin.cookie, 'Content-Type': 'application/json', 'Content-Length': '0' },
+    }), expected);
+    assert.deepEqual(await getPersisted(id), expected);
+    assert.deepEqual((await getPublic()).find(category => category.id === id), { id, nombre: expected.nombre });
+    assert.deepEqual(await pool.query('SELECT * FROM PRODUCTO WHERE id_categoria = ?', [id]), productsBefore);
   });
 });

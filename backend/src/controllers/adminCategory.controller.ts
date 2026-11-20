@@ -2,7 +2,7 @@ import type { RequestHandler, Response } from 'express';
 import { mutationErrorMessage } from '../config/database-policy';
 import type { Categoria } from '../entities/active.schemas';
 import { findAdminCategories } from '../repositories/category.repository';
-import { createAdminCategory, deactivateAdminCategory, updateAdminCategory } from '../services/category.service';
+import { activateAdminCategory, createAdminCategory, deactivateAdminCategory, updateAdminCategory } from '../services/category.service';
 
 function mutation(status: number, write: (res: Response) => Promise<Categoria | null>): RequestHandler {
   return async (_req, res) => {
@@ -22,6 +22,7 @@ function mutation(status: number, write: (res: Response) => Promise<Categoria | 
 export const createCategory = mutation(201, res => createAdminCategory(res.locals.dto.body));
 export const updateCategory = mutation(200, res => updateAdminCategory(res.locals.dto.params.id, res.locals.dto.body));
 export const deactivateCategory = mutation(200, res => deactivateAdminCategory(res.locals.dto.params.id));
+export const activateCategory = mutation(200, res => activateAdminCategory(res.locals.dto.params.id));
 
 export const getAdminCategories: RequestHandler = async (_req, res) => {
   try {

@@ -149,6 +149,72 @@ test.describe('diálogo de desactivación de categorías', () => {
     expect(await page.evaluate('window.scrollY')).toBe(scrollBefore)
   })
 
+  test('desactiva, autocierra aviso a los 4s, oculta de /catalogo y reactiva en 1 clic conservando scroll y foco', async ({ page }) => {
+    test.setTimeout(90_000)
+    await login(page)
+
+    const suffix = randomUUID().slice(0, 8)
+    const prefix = `Categoría ciclo ${suffix}`
+    const names = Array.from(
+      { length: 10 },
+      (_, index) => `${prefix} ${String(index).padStart(2, '0')}`,
+    )
+    for (const nombre of names) await createCategory(page, nombre)
+
+    await page.goto('/admin/categorias')
+    const target = names[8]
+    const row = categoryRow(page, target)
+    await expect(row).toBeVisible()
+    await row.scrollIntoViewIfNeeded()
+    const scrollBefore = await page.evaluate('window.scrollY') as number
+    expect(scrollBefore).toBeGreaterThan(0)
+
+    await row.getByRole('button', { name: `Desactivar ${target}`, exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Confirmar desactivación' }).click()
+    await expect(dialog).toHaveCount(0)
+
+    const deactivatedToast = page.getByRole('status').filter({ hasText: 'Categoría desactivada.' })
+    await expect(deactivatedToast).toBeVisible()
+    await expect(row.getByText('Inactiva', { exact: true })).toBeVisible()
+    await expect(deactivatedToast).toBeHidden({ timeout: 6500 })
+
+    // Verifica que desaparece del selector público de /catalogo.
+    await page.goto('/catalogo')
+    const catalogCategory = page.getByRole('combobox', { name: 'Categoría', exact: true })
+    await expect(catalogCategory).toBeEnabled()
+    expect(await catalogCategory.locator('option').allTextContents()).not.toContain(target)
+
+    // Vuelve a /admin/categorias y reactiva en 1 clic.
+    await page.goto('/admin/categorias')
+    const rowBack = categoryRow(page, target)
+    await expect(rowBack).toBeVisible()
+    await rowBack.scrollIntoViewIfNeeded()
+    const scrollBeforeActivate = await page.evaluate('window.scrollY') as number
+    expect(scrollBeforeActivate).toBeGreaterThan(0)
+
+    const activateButton = rowBack.getByRole('button', { name: `Activar ${target}`, exact: true })
+    await expect(activateButton).toBeVisible()
+    await activateButton.click()
+
+    const activatedToast = page.getByRole('status').filter({ hasText: 'Categoría activada.' })
+    await expect(activatedToast).toBeVisible()
+    await expect(rowBack.getByText('Activa', { exact: true })).toBeVisible()
+    const deactivateButton = rowBack.getByRole('button', { name: `Desactivar ${target}`, exact: true })
+    await expect(deactivateButton).toBeVisible()
+    await expect(deactivateButton).toBeFocused()
+    const scrollAfterActivate = await page.evaluate('window.scrollY') as number
+    expect(Math.abs(scrollAfterActivate - scrollBeforeActivate)).toBeLessThanOrEqual(1)
+    await expect(activatedToast).toBeHidden({ timeout: 6500 })
+
+    // Reaparece en el catálogo público.
+    await page.goto('/catalogo')
+    const catalogCategoryAfter = page.getByRole('combobox', { name: 'Categoría', exact: true })
+    await expect(catalogCategoryAfter).toBeEnabled()
+    expect(await catalogCategoryAfter.locator('option').allTextContents()).toContain(target)
+  })
+
   test('el cierre nativo sincroniza el estado Vue y restaura foco y scroll', async ({ page }) => {
     test.setTimeout(60_000)
     await login(page)

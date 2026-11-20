@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import AdminCategoryDeactivationDialog from '@/components/AdminCategoryDeactivationDialog.vue'
 import AdminCategoryForm from '@/components/AdminCategoryForm.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
+  activateAdminCategory,
   createAdminCategory,
   deactivateAdminCategory,
   listAdminCategories,
@@ -13,6 +14,8 @@ import {
 } from '@/services/adminCategoryService'
 import { isMutationResultUncertain } from '@/services/adminMutationError'
 import { useAuthStore } from '@/stores/auth'
+
+const NOTICE_DURATION_MS = 4000
 
 const auth = useAuthStore()
 const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}`
@@ -30,17 +33,23 @@ const formUncertain = ref(false)
 const pendingDeactivation = ref<AdminCategory | null>(null)
 const deactivationError = ref('')
 const deactivationUncertain = ref(false)
+const activationError = ref('')
+const activationUncertain = ref(false)
 const busy = ref(false)
 const notice = ref('')
 const titleHeading = ref<HTMLHeadingElement | null>(null)
 const newButton = ref<HTMLButtonElement | null>(null)
+const activationReloadButton = ref<HTMLButtonElement | null>(null)
 const formTrigger = ref<HTMLElement | null>(null)
 const deactivationTrigger = ref<HTMLElement | null>(null)
 let formScrollY = 0
 let deactivationScrollY = 0
+let noticeTimer: ReturnType<typeof setTimeout> | null = null
+let unmounted = false
 
 const categoryUncertainMessage = 'No se pudo confirmar el resultado. El formulario quedó bloqueado para evitar duplicados; recargá el listado antes de reintentar.'
 const categoryDeactivationUncertainMessage = 'No se pudo confirmar la desactivación. El diálogo quedó bloqueado para evitar duplicados; recargá el listado antes de reintentar.'
+const categoryActivationUncertainMessage = 'No se pudo confirmar la activación. Las acciones quedaron bloqueadas para evitar conflictos; recargá el listado antes de reintentar.'
 
 const collator = new Intl.Collator('es', { sensitivity: 'base' })
 
@@ -49,6 +58,31 @@ const visibleCategories = computed(() =>
     filter.value === 'all' || category.activo === (filter.value === 'active' ? 1 : 0),
   ),
 )
+
+const actionsBlocked = computed(() =>
+  busy.value || formOpen.value || Boolean(pendingDeactivation.value) || activationUncertain.value,
+)
+
+function clearNoticeTimer() {
+  if (noticeTimer !== null) {
+    clearTimeout(noticeTimer)
+    noticeTimer = null
+  }
+}
+
+function clearNotice() {
+  clearNoticeTimer()
+  notice.value = ''
+}
+
+function showNotice(message: string) {
+  clearNoticeTimer()
+  notice.value = message
+  noticeTimer = setTimeout(() => {
+    notice.value = ''
+    noticeTimer = null
+  }, NOTICE_DURATION_MS)
+}
 
 function refreshCategories() {
   return load(listAdminCategories)
@@ -80,12 +114,20 @@ function categoryMutationErrorMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : 'No se pudo guardar la categoría.'
 }
 
-function rememberFormOrigin(event?: Event) {
-  if (typeof HTMLElement !== 'undefined' && event?.currentTarget instanceof HTMLElement) {
-    formTrigger.value = event.currentTarget
-  } else if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-    formTrigger.value = document.activeElement
+function resolveTriggerElement(event?: Event): HTMLElement | null {
+  if (typeof HTMLElement === 'undefined') return null
+  if (event?.currentTarget instanceof HTMLElement) {
+    return event.currentTarget
   }
+  if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+    return document.activeElement
+  }
+  return null
+}
+
+function rememberFormOrigin(event?: Event) {
+  const trigger = resolveTriggerElement(event)
+  if (trigger) formTrigger.value = trigger
 
   if (typeof window !== 'undefined') {
     formScrollY = window.scrollY
@@ -93,11 +135,8 @@ function rememberFormOrigin(event?: Event) {
 }
 
 function rememberDeactivationOrigin(event?: Event) {
-  if (typeof HTMLElement !== 'undefined' && event?.currentTarget instanceof HTMLElement) {
-    deactivationTrigger.value = event.currentTarget
-  } else if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
-    deactivationTrigger.value = document.activeElement
-  }
+  const trigger = resolveTriggerElement(event)
+  if (trigger) deactivationTrigger.value = trigger
 
   if (typeof window !== 'undefined') {
     deactivationScrollY = window.scrollY
@@ -109,11 +148,13 @@ function clearFeedback() {
   formUncertain.value = false
   deactivationError.value = ''
   deactivationUncertain.value = false
-  notice.value = ''
+  activationError.value = ''
+  activationUncertain.value = false
+  clearNotice()
 }
 
 function openCreate(event?: Event) {
-  if (busy.value || loading.value || pendingDeactivation.value || formOpen.value) return
+  if (busy.value || loading.value || pendingDeactivation.value || formOpen.value || activationUncertain.value) return
 
   clearFeedback()
   editingCategory.value = null
@@ -122,7 +163,7 @@ function openCreate(event?: Event) {
 }
 
 function openEdit(category: AdminCategory, event?: Event) {
-  if (busy.value || loading.value || pendingDeactivation.value || formOpen.value) return
+  if (busy.value || loading.value || pendingDeactivation.value || formOpen.value || activationUncertain.value) return
 
   clearFeedback()
   editingCategory.value = category
@@ -131,7 +172,7 @@ function openEdit(category: AdminCategory, event?: Event) {
 }
 
 function openDeactivation(category: AdminCategory, event?: Event) {
-  if (busy.value || loading.value || formOpen.value || pendingDeactivation.value) return
+  if (busy.value || loading.value || formOpen.value || pendingDeactivation.value || activationUncertain.value) return
 
   clearFeedback()
   rememberDeactivationOrigin(event)
@@ -204,10 +245,17 @@ watch(identity, () => {
   deactivationError.value = ''
   deactivationUncertain.value = false
   deactivationTrigger.value = null
-  notice.value = ''
+  activationError.value = ''
+  activationUncertain.value = false
+  clearNotice()
   busy.value = false
   void refreshCategories()
 }, { immediate: true, flush: 'sync' })
+
+onBeforeUnmount(() => {
+  unmounted = true
+  clearNoticeTimer()
+})
 
 async function save(fields: { nombre: string; descripcion: string | null }) {
   if (busy.value || !allowed() || !formOpen.value) return
@@ -217,7 +265,8 @@ async function save(fields: { nombre: string; descripcion: string | null }) {
   busy.value = true
   formError.value = ''
   formUncertain.value = false
-  notice.value = ''
+  activationError.value = ''
+  clearNotice()
 
   try {
     const saved = selected
@@ -226,7 +275,7 @@ async function save(fields: { nombre: string; descripcion: string | null }) {
     if (session !== identity()) return
 
     upsertCategory(saved)
-    notice.value = selected ? 'Categoría actualizada.' : 'Categoría creada.'
+    showNotice(selected ? 'Categoría actualizada.' : 'Categoría creada.')
     busy.value = false
     await dismissForm()
   } catch (cause) {
@@ -260,7 +309,7 @@ async function reloadAfterUncertain() {
     }
 
     formUncertain.value = false
-    notice.value = 'Listado actualizado.'
+    showNotice('Listado actualizado.')
     busy.value = false
     await dismissForm()
   } finally {
@@ -275,14 +324,15 @@ async function confirmDeactivation() {
   const session = identity()
   busy.value = true
   deactivationError.value = ''
-  notice.value = ''
+  activationError.value = ''
+  clearNotice()
 
   try {
     const updated = await deactivateAdminCategory(selected.id_categoria)
     if (session !== identity()) return
 
     upsertCategory(updated)
-    notice.value = 'Categoría desactivada.'
+    showNotice('Categoría desactivada.')
     busy.value = false
     await dismissDeactivation()
   } catch (cause) {
@@ -316,9 +366,108 @@ async function reloadAfterDeactivationUncertain() {
     }
 
     deactivationUncertain.value = false
-    notice.value = 'Listado actualizado.'
+    showNotice('Listado actualizado.')
     busy.value = false
     await dismissDeactivation()
+  } finally {
+    if (session === identity()) busy.value = false
+  }
+}
+
+async function activateCategory(category: AdminCategory, event?: Event) {
+  if (
+    busy.value
+    || loading.value
+    || formOpen.value
+    || pendingDeactivation.value
+    || activationUncertain.value
+    || !allowed()
+  ) return
+
+  const session = identity()
+  const trigger = resolveTriggerElement(event)
+  const scrollY = typeof window !== 'undefined' ? window.scrollY : 0
+
+  busy.value = true
+  activationError.value = ''
+  activationUncertain.value = false
+  clearNotice()
+
+  try {
+    const updated = await activateAdminCategory(category.id_categoria)
+    if (session !== identity()) return
+
+    upsertCategory(updated)
+    showNotice('Categoría activada.')
+    busy.value = false
+    await nextTick()
+    if (session !== identity() || unmounted) return
+
+    let target: HTMLElement | null = null
+    if (typeof document !== 'undefined') {
+      target = document.querySelector<HTMLElement>(
+        `[data-category-status-id="${category.id_categoria}"]`,
+      )
+    }
+    if (!target && trigger?.isConnected) {
+      target = trigger
+    }
+    target ??= titleHeading.value ?? newButton.value
+    target?.focus({ preventScroll: true })
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, scrollY)
+    }
+  } catch (cause) {
+    if (session !== identity()) return
+
+    if (isMutationResultUncertain(cause)) {
+      activationUncertain.value = true
+      activationError.value = categoryActivationUncertainMessage
+      busy.value = false
+      await nextTick()
+      if (session !== identity() || unmounted) return
+      activationReloadButton.value?.focus({ preventScroll: true })
+    } else {
+      activationError.value = categoryMutationErrorMessage(cause)
+      busy.value = false
+      await nextTick()
+      if (session !== identity() || unmounted) return
+      if (trigger?.isConnected) {
+        trigger.focus({ preventScroll: true })
+      }
+    }
+
+    if (typeof window !== 'undefined') {
+      window.scrollTo(0, scrollY)
+    }
+  } finally {
+    if (session === identity()) busy.value = false
+  }
+}
+
+async function reloadAfterActivationUncertain() {
+  if (busy.value || !activationUncertain.value) return
+
+  const session = identity()
+  busy.value = true
+  activationError.value = ''
+
+  try {
+    await refreshCategories()
+    if (session !== identity()) return
+
+    if (error.value) {
+      activationError.value = 'No se pudo recargar el listado. Reintentá antes de continuar.'
+      return
+    }
+
+    activationUncertain.value = false
+    showNotice('Listado actualizado.')
+    busy.value = false
+    await nextTick()
+    if (session !== identity() || unmounted) return
+    ;(titleHeading.value ?? newButton.value)?.focus({ preventScroll: true })
   } finally {
     if (session === identity()) busy.value = false
   }
@@ -340,7 +489,7 @@ async function reloadAfterDeactivationUncertain() {
         ref="newButton"
         type="button"
         class="box-border min-h-11 rounded-md bg-[#103a5c] px-4 font-[inherit] text-white disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-        :disabled="busy || loading || formOpen || !!pendingDeactivation"
+        :disabled="loading || actionsBlocked"
         @click="openCreate($event)"
       >
         Nueva categoría
@@ -356,6 +505,26 @@ async function reloadAfterDeactivationUncertain() {
     >
       {{ notice }}
     </p>
+
+    <div
+      v-if="activationError || activationUncertain"
+      role="alert"
+      class="box-border rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800 wrap-anywhere"
+    >
+      <p class="m-0 wrap-anywhere">
+        {{ activationError || categoryActivationUncertainMessage }}
+      </p>
+      <button
+        v-if="activationUncertain"
+        ref="activationReloadButton"
+        type="button"
+        class="mt-2 box-border min-h-11 border-0 bg-transparent p-0 font-[inherit] font-semibold text-red-900 underline disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        :disabled="busy"
+        @click="reloadAfterActivationUncertain"
+      >
+        {{ busy ? 'Recargando…' : 'Recargar listado' }}
+      </button>
+    </div>
 
     <AdminCategoryForm
       v-if="formOpen"
@@ -382,7 +551,7 @@ async function reloadAfterDeactivationUncertain() {
     />
 
     <p v-if="loading" role="status">Cargando categorías…</p>
-    <div v-else-if="error" class="space-y-2">
+    <div v-else-if="error && !activationUncertain" class="space-y-2">
       <p role="alert" class="text-red-800 wrap-anywhere">No se pudieron cargar las categorías.</p>
       <button
         type="button"
@@ -432,7 +601,7 @@ async function reloadAfterDeactivationUncertain() {
               class="box-border min-h-11 rounded-md border border-slate-300 px-4 font-[inherit] disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :aria-label="`Editar ${category.nombre}`"
               :data-category-edit-id="category.id_categoria"
-              :disabled="busy || formOpen || !!pendingDeactivation"
+              :disabled="actionsBlocked"
               @click="openEdit(category, $event)"
             >
               Editar
@@ -442,10 +611,22 @@ async function reloadAfterDeactivationUncertain() {
               type="button"
               class="box-border min-h-11 rounded-md border border-red-300 px-4 font-[inherit] text-red-800 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
               :aria-label="`Desactivar ${category.nombre}`"
-              :disabled="busy || formOpen || !!pendingDeactivation"
+              :data-category-status-id="category.id_categoria"
+              :disabled="actionsBlocked"
               @click="openDeactivation(category, $event)"
             >
               Desactivar
+            </button>
+            <button
+              v-else
+              type="button"
+              class="box-border min-h-11 rounded-md border border-emerald-700 bg-white px-4 font-[inherit] font-medium text-emerald-800 enabled:hover:bg-emerald-50 disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+              :aria-label="`Activar ${category.nombre}`"
+              :data-category-status-id="category.id_categoria"
+              :disabled="actionsBlocked"
+              @click="activateCategory(category, $event)"
+            >
+              Activar
             </button>
           </div>
         </li>
