@@ -34,7 +34,7 @@ function snapshot(quantity) {
 }
 
 // Ambos stores son los de producción. Solo se sustituyen transporte, almacenamiento y avisos externos.
-function runtime(t, backend, saved = new Map()) {
+function runtime(t, backend, saved = new Map(), Controller = AbortController) {
   const pinia = createPinia()
   t.after(() => disposePinia(pinia))
   const cache = new Map()
@@ -45,11 +45,11 @@ function runtime(t, backend, saved = new Map()) {
       compilerOptions: { module: ts.ModuleKind.CommonJS, esModuleInterop: true },
     })
     const module = { exports: {} }
-    new Function('require', 'module', 'exports', outputText)(name => {
+    new Function('require', 'module', 'exports', 'AbortController', outputText)(name => {
       if (name === '@/services/api') return { __esModule: true, default: {} }
       if (name === '@/services/realtime') return { onRealtime() {} }
       return name.startsWith('@/') ? load(name.slice(2)) : require(name)
-    }, module, module.exports)
+    }, module, module.exports, Controller)
     cache.set(file, module.exports)
     return module.exports
   }
@@ -57,12 +57,17 @@ function runtime(t, backend, saved = new Map()) {
   auth.$patch({ user: { id: 325, rol: 'CLIENTE' }, sessionChecked: true })
   const cartModule = load('stores/cart')
   const reads = []
+  const writes = []
   cartModule.useCartStore = cartModule.createCartStore({
     get: signal => {
       reads.push(signal)
       return backend.read ? backend.read(signal) : Promise.resolve(snapshot(backend.quantity))
     },
-    mutate: async () => assert.fail('La reconciliación no debe escribir en el carrito'),
+    mutate: async (command, signal) => {
+      writes.push({ command, signal })
+      if (!backend.mutate) assert.fail('La reconciliación no debe escribir en el carrito')
+      return backend.mutate(command, signal)
+    },
   })
   const cart = cartModule.useCartStore(pinia)
   const order = load('stores/accountOrder').createAccountOrderStore({
@@ -82,7 +87,7 @@ function runtime(t, backend, saved = new Map()) {
     set: (id, key, quoteToken) => saved.set(id, JSON.stringify({ key, quoteToken })),
     remove: id => saved.delete(id),
   }, randomUUID)(pinia)
-  return { auth, cart, order, saved, reads }
+  return { auth, cart, order, saved, reads, writes }
 }
 const server = () => ({ quantity: 2, posts: [], recoveries: [] })
 
@@ -149,9 +154,16 @@ test('#325: doble envío y respuesta perdida conservan la clave; recarga recuper
   assert.equal(reloaded.saved.size, 0)
 })
 
-test('#325: lectura anterior a la confirmación no repone ítems aunque ignore la cancelación', async t => {
+for (const cancellationWorks of [true, false]) {
+test(`#325: lectura anterior no repone ítems con cancelación ${cancellationWorks ? 'efectiva' : 'sin efecto'}`, async t => {
   const backend = server()
-  const { cart, order, reads } = runtime(t, backend)
+  let cancellationAttempts = 0
+  // Solo este runtime recibe el controlador simulado; no se altera el global.
+  class UncancellableController extends AbortController {
+    abort() { cancellationAttempts++ }
+  }
+  const { cart, order, reads } = runtime(t, backend, new Map(),
+    cancellationWorks ? AbortController : UncancellableController)
   await tick()
   let releaseOld
   const old = new Promise(done => { releaseOld = done })
@@ -163,13 +175,70 @@ test('#325: lectura anterior a la confirmación no repone ítems aunque ignore l
   const previousSignal = reads.at(-1)
   assert.equal(await order.confirm(), true)
   await tick()
-  assert.equal(previousSignal.aborted, true)
+  assert.equal(previousSignal.aborted, cancellationWorks)
+  if (!cancellationWorks) assert.ok(cancellationAttempts > 0)
   assert.deepEqual(cart.cart, snapshot(0))
   releaseOld(snapshot(2))
-  await previousRead
+  assert.equal(await previousRead, false)
   assert.deepEqual(cart.cart, snapshot(0))
   assert.equal(cart.needsSync, false)
+  assert.equal(cart.loading, false)
+  assert.equal(order.attemptState, 'confirmed')
+  assert.equal(backend.posts.length, 1)
 })
+}
+
+for (const responseLost of [false, true]) {
+  test(`#325: escritura pendiente al confirmar conserva ítems posteriores con respuesta ${responseLost ? 'perdida' : 'recibida'}`, async t => {
+    const backend = server()
+    let releaseWrite
+    const pendingWrite = new Promise(done => { releaseWrite = done })
+    backend.mutate = async command => {
+      await pendingWrite
+      // El servidor aplica esta adición después del COMMIT de la compra.
+      backend.quantity += command.cantidad
+      if (responseLost) throw failure(500, {})
+    }
+    const { cart, order, reads, writes, saved } = runtime(t, backend)
+    await tick()
+    const readsBefore = reads.length
+    const writing = cart.agregarProducto(325, 1)
+    try {
+      assert.equal(writes.length, 1)
+      assert.equal(cart.operation, 'add')
+      assert.equal(await order.confirm(), true)
+      await tick()
+      assert.equal(backend.quantity, 0)
+      assert.equal(cart.cart, null)
+      assert.equal(cart.needsSync, true)
+      assert.equal(cart.operation, 'add')
+      assert.equal(writes[0].signal.aborted, false)
+      assert.equal(reads.length, readsBefore, 'La confirmación debe esperar la escritura sin iniciar otro GET')
+      assert.equal(writes.length, 1, 'La reconciliación no debe agregar ni vaciar ítems')
+      assert.equal(order.attemptState, 'confirmed')
+      assert.equal(order.confirmation.pedidoId, result.pedidoId)
+    } finally {
+      releaseWrite()
+      await writing
+    }
+    assert.equal(await writing, !responseLost)
+    assert.deepEqual(cart.cart, snapshot(1), 'Conserva la adición posterior sin reponer las dos unidades compradas')
+    assert.equal(backend.quantity, 1)
+    assert.equal(reads.length, readsBefore + 1)
+    assert.equal(writes.length, 1)
+    assert.deepEqual(writes[0].command, { type: 'add', productoId: 325, cantidad: 1 })
+    assert.equal(cart.operation, null)
+    assert.equal(cart.loading, false)
+    assert.equal(cart.needsSync, false)
+    assert.equal(cart.loadError, '')
+    assert.equal(Boolean(cart.operationError), responseLost)
+    assert.equal(order.attemptState, 'confirmed')
+    assert.equal(order.receipts.length, 1)
+    assert.equal(saved.size, 0)
+    assert.equal(backend.posts.length, 1)
+    assert.deepEqual(backend.recoveries, [])
+  })
+}
 
 test('#325: fallo de recarga conserva confirmación y reintenta solo la consulta del carrito', async t => {
   const backend = server()
