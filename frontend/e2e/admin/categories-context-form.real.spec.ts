@@ -300,14 +300,24 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
     const saving = dialog.getByRole('button', { name: 'Guardando…' })
     await expect(saving).toBeDisabled()
 
-    await pressEscapeThrice(page)
+    // «Guardando…» se pinta antes de que el PUT llegue a page.route: sin esta
+    // sincronización, Escape puede ejecutarse antes de que exista la solicitud.
+    await expect.poll(
+      () => putRequests,
+      { message: 'PUT de la categoría interceptado' },
+    ).toBe(1)
 
-    await expect(dialog).toBeVisible()
-    await expect(nameInput).toHaveValue(edited)
-    expect(putRequests).toBe(1)
+    try {
+      await pressEscapeThrice(page)
 
-    expect(releaseRequest).toBeTruthy()
-    releaseRequest!()
+      await expect(dialog).toBeVisible()
+      await expect(nameInput).toHaveValue(edited)
+      expect(putRequests).toBe(1)
+    } finally {
+      // Librar la solicitud retenida aunque falle una aserción.
+      releaseRequest!()
+    }
+
     await expect(dialog).toHaveCount(0)
     await expect(page.getByRole('heading', { name: edited, exact: true })).toBeVisible()
     expect(putRequests).toBe(1)
