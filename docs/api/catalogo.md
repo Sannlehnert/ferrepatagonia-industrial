@@ -108,6 +108,11 @@ se conservan page y limit. Un producto que coincide en ambos campos aparece una 
 | `precio_asc` | `precio_publico_usd IS NULL, precio_publico_usd ASC, p.id_producto ASC` | Menor a mayor, precios no disponibles al final |
 | `precio_desc` | `precio_publico_usd IS NULL, precio_publico_usd DESC, p.id_producto ASC` | Mayor a menor, precios no disponibles al final |
 
+El orden por precio usa el precio público calculado para el catálogo; no usa
+el precio personalizado que una cuenta CLIENTE puede ver al consultar sus
+precios. Las listas de precios personalizadas no alteran el orden ni la
+paginación del catálogo.
+
 La comparación alfabética usa la collation de `PRODUCTO.nombre`
 (`utf8mb4_unicode_ci`), la misma que la búsqueda: no distingue mayúsculas ni
 acentos. Ante nombres equivalentes, **ambos** órdenes alfabéticos desempatan por
