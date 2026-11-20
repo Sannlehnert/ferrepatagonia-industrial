@@ -152,7 +152,7 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
     {
       const decision = page.getByRole('dialog', { name: 'Rechazar empresa', exact: true })
       await decision.getByRole('button', { name: 'Confirmar rechazo', exact: true }).click()
-      await expect(decision.getByRole('status')).toHaveText('Empresa rechazada.')
+      await expect(decision.getByRole('status').filter({ hasText: 'Empresa rechazada.' })).toHaveText('Empresa rechazada.')
       await decision.getByRole('button', { name: 'Cerrar detalle del cliente', exact: true }).click()
       await expect(decision).toHaveCount(0)
     }
@@ -169,7 +169,7 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
     {
       const decision = page.getByRole('dialog', { name: 'Aprobar empresa', exact: true })
       await decision.getByRole('button', { name: 'Confirmar aprobación', exact: true }).click()
-      await expect(decision.getByRole('status')).toHaveText('Empresa aprobada.')
+      await expect(decision.getByRole('status').filter({ hasText: 'Empresa aprobada.' })).toHaveText('Empresa aprobada.')
       await decision.getByRole('button', { name: 'Cerrar detalle del cliente', exact: true }).click()
       await expect(decision).toHaveCount(0)
     }

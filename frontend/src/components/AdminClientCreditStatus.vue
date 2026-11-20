@@ -22,8 +22,8 @@ const badgeClass = "credit-badge box-border inline-flex w-44 min-h-7 items-cente
       <span :class="[badgeClass, credit.account.estado === 'HABILITADA' ? 'bg-[#dcfce7] text-[#166534]' : 'bg-[#f3f4f6] text-[#475569]']">
         Cuenta {{ credit.account.estado === 'HABILITADA' ? 'habilitada' : 'inhabilitada' }}
       </span>
-      <p v-if="!compact || credit.account.estadoCredito !== 'DISPONIBLE'" class="m-0 text-[#475569]">
-        {{ credit.account.estadoCredito === 'DISPONIBLE' ? 'Crédito disponible según la cuenta'
+      <p class="m-0 text-[#475569]">
+        {{ credit.account.estadoCredito === 'DISPONIBLE' ? (compact ? 'Crédito disponible' : 'Crédito disponible según la cuenta')
           : credit.account.estadoCredito === 'BLOQUEADO' ? 'Crédito bloqueado' : 'Crédito no determinable' }}
       </p>
       <p v-if="!compact && credit.account.origen === 'DEMO'" class="m-0 text-xs text-[#64748b]">Datos de demostración</p>

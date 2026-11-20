@@ -41,6 +41,7 @@ export function useAdminClientCredit(clients: () => AdminClient[]) {
     return query.data.value?.[id] ?? (query.error.value ? { state: 'ERROR' } : null)
   }
 
-  watch([identity, allowed, clients], () => { void refresh() }, { immediate: true, flush: 'sync' })
+  watch([identity, allowed, clients, () => clients().map(client => client.estadoAprobacionEmpresa).join('|')],
+    () => { void refresh() }, { immediate: true, flush: 'sync' })
   return { status, refresh }
 }

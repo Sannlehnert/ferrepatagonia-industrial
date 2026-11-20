@@ -218,7 +218,7 @@ test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y ac
   assert.doesNotMatch(tableHtml, /Rechazar cuenta empresa de Obras Patagónicas SA/);
 });
 
-test('crédito compacto conserva alertas y reserva disponibilidad y procedencia para el detalle', async t => {
+test('crédito compacto distingue disponibilidad de cuenta y reserva la procedencia para el detalle', async t => {
   const component = load('components/AdminClientCreditStatus.vue', {}, true).default;
   const state = vue.reactive({ compact: true, credit: {
     state: 'READY', account: { estado: 'HABILITADA', estadoCredito: 'DISPONIBLE', origen: 'DEMO' },
@@ -232,7 +232,8 @@ test('crédito compacto conserva alertas y reserva disponibilidad y procedencia 
   t.after(() => app.unmount());
   const html = () => dom.serialize(rootEl);
   assert.match(html(), /Cuenta habilitada/);
-  assert.doesNotMatch(html(), /Crédito disponible|Datos de demostración/);
+  assert.match(html(), /Crédito disponible<\/p>/);
+  assert.doesNotMatch(html(), /según la cuenta|Datos de demostración/);
   state.compact = false;
   await settle();
   assert.match(html(), /Crédito disponible según la cuenta/);

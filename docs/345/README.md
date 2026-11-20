@@ -92,3 +92,15 @@ A pedido de Bruno, se reemplazaron los bloques scoped de AdminClientsView.vue y 
 Se mantienen indicadores de 176 × 28 px, acciones de 88 × 44 px, colores de confirmación, detalle en dos/una columnas, desplazamiento del diálogo, fondo modal, foco visible y retorno de foco. Se conserva la presentación compacta de la tabla y las acciones según estado de la tercera pasada. El ajuste de interlineado mantiene explícitamente la separación de etiquetas y valores al reemplazar CSS por utilidades.
 
 Validación de la conversión: 277 pruebas del frontend, build con TypeScript y 13 E2E aprobados sobre MariaDB descartable. Los recorridos incluyen aprobación/rechazo en 1280/768/360 px, errores y respuesta perdida, permisos, conservación de cuenta/saldo/límite y el efecto de la decisión empresarial en la elegibilidad de compra. Se añadieron comprobaciones del color de las confirmaciones. Limpieza de contenedor y datos tmpfs confirmada. Tras el ajuste final de interlineado, build y los cinco E2E de Clientes volvieron a pasar, con limpieza confirmada. La revisión visual manual de Bruno sigue pendiente.
+
+## Corrección de revisión S7-345-01 · 20/11/2026
+
+La tabla vuelve a mostrar explícitamente «Crédito disponible» cuando la API informa DISPONIBLE, separado del indicador de cuenta. Se conserva el diseño compacto, los avisos de crédito bloqueado/no determinable y los errores con reintento. La procedencia DEMO sigue reservada al detalle; no cambian las listas de precios ni los estilos.
+
+La regresión en navegador también detectó que aprobar una empresa dejaba el crédito anterior en pantalla aunque la API ya informaba disponibilidad. La consulta de crédito ahora observa los cambios del registro empresarial, incluyendo los recuperados tras una respuesta perdida, y vuelve a leer el estado de la API. No se modifica la habilitación de la cuenta ni su saldo o límite.
+
+Las pruebas comprueban el crédito disponible en la fila tras aprobar y el bloqueado tras rechazar, además de los recorridos existentes de detalle, teclado, errores y permisos en escritorio, tablet y móvil.
+
+Validación tras integrar develop (merge local e78b848): 289 pruebas frontend, build y TypeScript aprobados; cinco escenarios de Clientes aprobados con build de producción y 13 escenarios de Clientes/recorrido integrado aprobados en desarrollo. Limpieza de contenedores y datos tmpfs confirmada. El recorrido integrado utiliza crédito DEMO, que producción oculta deliberadamente; su expectativa de crédito visible corresponde al perfil de desarrollo y no se modificó esa protección. Se precisaron los selectores de confirmación para distinguirlos del aviso simultáneo de consulta de crédito.
+
+Pendientes commit/push, CI del nuevo HEAD, reauditoría técnica y validación UX/UI.
