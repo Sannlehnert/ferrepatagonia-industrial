@@ -11,6 +11,7 @@ import { priceListPolicy } from '../dtos/clients/price-list.dto';
 import { companyApprovalPolicy } from '../dtos/clients/company-approval.dto';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 import { adminAccountHandler } from '../controllers/adminAccount.controller';
+import { getAdminDashboardMetrics } from '../controllers/adminDashboard.controller';
 import {
     getAdminCreditEvents,
     getAdminCreditRequestById,
@@ -33,12 +34,20 @@ import {
 
 export const adminRouter = Router();
 
+adminRouter.use('/dashboard/metricas', (_req, res, next) => {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Pragma', 'no-cache');
+  res.vary('Cookie');
+  next();
+});
+
 adminRouter.use(authenticate, authorizeRoles('ADMIN'));
 
 adminRouter.get('/cuentas-corrientes', adminAccountHandler('listado'));
 adminRouter.get('/clientes/:clienteId/cuenta-corriente', adminAccountHandler('resumen'));
 adminRouter.get('/clientes/:clienteId/cuenta-corriente/movimientos', adminAccountHandler('movimientos'));
 adminRouter.get('/clientes/:clienteId/cuenta-corriente/vencimientos', adminAccountHandler('vencimientos'));
+adminRouter.get('/dashboard/metricas', getAdminDashboardMetrics);
 
 // Resolución de solicitudes y gestión comercial de la cuenta. La identidad ADMIN
 // se revalida dentro de cada transacción; el body nunca aporta actor ni estados.
