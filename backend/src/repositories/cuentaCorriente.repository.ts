@@ -50,8 +50,8 @@ export interface RegistrarCargoPedidoDTO {
     dias_vencimiento?: number; origen?: string; observaciones?: string | null; autorizado_por?: string | null;
 }
 export interface RegistrarAbonoDTO {
-    id_cuenta_corriente: number; id_pago: number; monto: number | string;
-    origen?: string; observaciones?: string | null;
+    id_cuenta_corriente: number; id_pago: number; monto?: number | string;
+    origen?: string; observaciones?: string | null; autorizado_por?: string | null;
 }
 export interface AnularMovimientoDTO {
     id_cuenta_corriente: number; id_movimiento_cuenta: number; evento: string; actor: string; motivo: string;
@@ -208,13 +208,18 @@ export const registrarCargoPorPedido = async (dto: RegistrarCargoPedidoDTO, exte
 };
 
 export const registrarAbonoPorPago = async (dto: RegistrarAbonoDTO, externalManager?: EntityManager): Promise<number> => {
-    const cents = parseMontoCents(dto.monto);
-    const hash = digest(['ABONO', dto.id_cuenta_corriente, dto.id_pago, fromCents(cents), dto.origen ?? 'PAGO', dto.observaciones ?? null]);
+    const declared = dto.monto === undefined ? null : parseMontoCents(dto.monto);
+    const hashFor = (usd: bigint) => digest(['ABONO', dto.id_cuenta_corriente, dto.id_pago, fromCents(usd),
+        dto.origen ?? 'PAGO', dto.observaciones ?? null]);
     return write(externalManager, async manager => {
         const c = await account(manager, dto.id_cuenta_corriente, true);
         if (!c) throw Error('Cuenta corriente no encontrada.');
-        const prev = await previous(manager, 'id_pago', dto.id_pago, hash);
-        if (prev !== null) return prev;
+        // Compatibilidad con llamadas históricas: si el importe USD se declara,
+        // el replay se resuelve antes de exigir cotización o estado del pago.
+        if (declared !== null) {
+            const prev = await previous(manager, 'id_pago', dto.id_pago, hashFor(declared));
+            if (prev !== null) return prev;
+        }
         const [p] = await manager.query(`SELECT *, DATE_FORMAT(fecha_acreditacion_utc,'%Y-%m-%dT%H:%i:%s.%fZ') AS acreditado_utc
             FROM PAGO WHERE id_pago=? FOR UPDATE`, [dto.id_pago]);
         if (!p || p.id_cuenta_corriente !== c.id_cuenta_corriente || p.id_pedido !== null) throw Error('Pago inexistente o ajeno a la cuenta.');
@@ -228,16 +233,34 @@ export const registrarAbonoPorPago = async (dto: RegistrarAbonoDTO, externalMana
             const rate = BigInt(quote.valor.replace('.', ''));
             usd = (usd * 100000000n + rate / 2n) / rate;
         }
-        if (usd <= 0n || usd > MAX_CENTS || usd !== cents) throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        if (usd <= 0n || usd > MAX_CENTS || (declared !== null && usd !== declared)) throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        // El pago ya fue persistido atómicamente por el servicio de acreditación
+        // (#333) o por el servicio administrativo (#158). El repositorio sólo
+        // revalida; no vuelve a escribir PAGO bajo triggers de inmutabilidad.
+        if (p.monto_usd !== null && p.monto_usd !== undefined && toCents(p.monto_usd) !== usd) {
+            throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        }
+        if (p.moneda === 'ARS' && p.id_cotizacion !== null && p.id_cotizacion !== undefined
+            && quote && Number(p.id_cotizacion) !== Number(quote.id)) {
+            throw Error('Cotización histórica del pago inconsistente con FER17-v1.');
+        }
+        const hash = hashFor(usd);
+        // La acreditación declarada por #333 no aporta importe: el replay se resuelve
+        // con el importe ya persistido y el bloqueo previo del pago.
+        if (declared === null) {
+            const prev = await previous(manager, 'id_pago', dto.id_pago, hash);
+            if (prev !== null) return prev;
+        }
         const rows = await movements(manager, c.id_cuenta_corriente, true);
         if (!complete(c, rows)) throw Error('No se puede acreditar: cobertura histórica no acreditada.');
         const result = await manager.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
             (id_cuenta_corriente,tipo_movimiento,origen,id_pago,monto,moneda,fecha_efectiva,huella_registro,
-             evidencia_origen,monto_original,moneda_original,id_cotizacion,tasa_historica,observaciones,fecha_incorporacion)
-            VALUES(?,'ABONO',?,?,?,'USD',?,?,?,?,?,?,?,?,?)`,
+             evidencia_origen,monto_original,moneda_original,id_cotizacion,tasa_historica,observaciones,autorizado_por,fecha_incorporacion)
+            VALUES(?,'ABONO',?,?,?,'USD',?,?,?,?,?,?,?,?,?,?)`,
             [c.id_cuenta_corriente, dto.origen ?? 'PAGO', dto.id_pago, fromCents(usd), utc(at), hash,
                 JSON.stringify({ pago: dto.id_pago, acreditado: p.acreditado_utc, referencia: p.evidencia_acreditacion, cotizacion: quote }),
-                p.monto, p.moneda, quote?.id ?? null, quote?.valor ?? null, dto.observaciones ?? null, utc(new Date())]);
+                p.monto, p.moneda, quote?.id ?? null, quote?.valor ?? null, dto.observaciones ?? null,
+                dto.autorizado_por ?? null, utc(new Date())]);
         await project(manager, c, `PAGO:${dto.id_pago}`, new Date());
         return Number(result.insertId);
     });

@@ -42,6 +42,11 @@
   modificación de límite, con auditoría append-only y separación entre
   aprobación empresarial, crédito, habilitación y elegibilidad de compra.
 
+- [Declaración, revisión y acreditación de pagos (T-S7-10.2 / #333)](333/README.md):
+  declaración de cliente con comprobante e idempotencia, revisión documental
+  separada y acreditación financiera transaccional sobre cuentas corrientes,
+  con pruebas de concurrencia, rollback, permisos y conversión ARS.
+
 - [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
   matriz P0/P1/P2, cobertura existente frente a brechas, catálogo maestro de
   100 SKU separado de la demo sintética de 904, checkout de cuenta corriente
