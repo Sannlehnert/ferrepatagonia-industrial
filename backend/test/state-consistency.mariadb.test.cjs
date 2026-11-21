@@ -1042,3 +1042,336 @@ test('7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actuali
   assert.equal(sParticular.events.payment.length, 0, 'Usuario revocado no debe recibir pago.acreditado.v1');
   assert.equal(sAdmin.events.payment.length, 2);
 });
+
+test('8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO', async () => {
+  const client = await createClient({ type: 'PARTICULAR' });
+  const companyA = await createClient({ type: 'EMPRESA', withAccount: true, habilitada: 1, cobertura: 'COMPLETA' });
+  const companyB = await createClient({ type: 'EMPRESA', withAccount: true, habilitada: 1, cobertura: 'COMPLETA' });
+  const orderA = await createOrder(client.clientId, { modalidad: 'TRANSFERENCIA', total: '200.00' });
+  const orderB = await createOrder(client.clientId, { modalidad: 'TRANSFERENCIA', total: '200.00' });
+
+  // --- P2-01: validación SQL en s704_pago_before_insert y s704_pago_before_update ---
+  // 1) Cotización sin registro en FER17_COTIZACION_VERIFICACION -> rechazada con SQLSTATE 45000
+  const unverifiedQuoteId = await insert(`
+    INSERT INTO COTIZACION (tasa, fecha_referencia, fecha_carga, actor, valida)
+    VALUES (950.00000000, '2026-07-01', '2026-07-01 09:00:00', 'BNA Sin Verif', 1)
+  `);
+  await assert.rejects(
+    q(`INSERT INTO PAGO (
+         id_pedido, monto, moneda, monto_usd, id_cotizacion, tasa_historica,
+         metodo_pago, estado, fecha_acreditacion_utc, evidencia_acreditacion
+       ) VALUES (?, 950.00, 'ARS', 1.00, ?, 950.00000000, 'TRANSFERENCIA', 'ACREDITADO', '2026-07-01 12:00:00.000', 'SQL-NO-VERIF')`,
+    [orderA, unverifiedQuoteId]),
+    err => err.sqlState === '45000' && /S704_PAGO_COTIZACION_NO_VERIFICADA/.test(err.message),
+  );
+
+  // 2) Cotización con valida = 0 en COTIZACION o en FER17_COTIZACION_VERIFICACION -> rechazada con SQLSTATE 45000
+  const invalidQuoteId = await insert(`
+    INSERT INTO COTIZACION (tasa, fecha_referencia, fecha_carga, actor, valida)
+    VALUES (980.00000000, '2026-07-02', '2026-07-02 09:00:00', 'BNA Invalida', 1)
+  `);
+  await q(`
+    INSERT INTO FER17_COTIZACION_VERIFICACION (
+      id_cotizacion, tasa_verificada, referencia_verificada, cargada_utc,
+      actor_carga_verificado, banco, tipo, evidencia, id_admin, verificado_utc, valida, sintetica
+    ) VALUES (
+      ?, 980.00000000, '2026-07-02', '2026-07-02 10:00:00.000',
+      'BNA Invalida', 'BNA', 'VENDEDOR', 'Verif invalida', ?, '2026-07-02 11:00:00.000', 0, 0
+    )
+  `, [invalidQuoteId, admin1.id]);
+  await assert.rejects(
+    q(`INSERT INTO PAGO (
+         id_pedido, monto, moneda, monto_usd, id_cotizacion, tasa_historica,
+         metodo_pago, estado, fecha_acreditacion_utc, evidencia_acreditacion
+       ) VALUES (?, 980.00, 'ARS', 1.00, ?, 980.00000000, 'TRANSFERENCIA', 'ACREDITADO', '2026-07-02 12:00:00.000', 'SQL-VERIF-0')`,
+    [orderA, invalidQuoteId]),
+    err => err.sqlState === '45000' && /S704_PAGO_COTIZACION_NO_VERIFICADA/.test(err.message),
+  );
+
+  // 3) tasa_historica distinta de COTIZACION.tasa -> rechazada con SQLSTATE 45000
+  await assert.rejects(
+    q(`INSERT INTO PAGO (
+         id_pedido, monto, moneda, monto_usd, id_cotizacion, tasa_historica,
+         metodo_pago, estado, fecha_acreditacion_utc, evidencia_acreditacion
+       ) VALUES (?, 1000.00, 'ARS', 1.00, ?, 1000.00000001, 'TRANSFERENCIA', 'ACREDITADO', '2026-10-02 15:00:00.000', 'SQL-RATE-MISMATCH')`,
+    [orderA, verifiedQuoteId]),
+    err => err.sqlState === '45000' && /S704_PAGO_COTIZACION_NO_VERIFICADA/.test(err.message),
+  );
+
+  // 4) monto_usd incongruente con ROUND(monto / tasa_historica, 2) en INSERT -> rechazada con SQLSTATE 45000
+  await assert.rejects(
+    q(`INSERT INTO PAGO (
+         id_pedido, monto, moneda, monto_usd, id_cotizacion, tasa_historica,
+         metodo_pago, estado, fecha_acreditacion_utc, evidencia_acreditacion
+       ) VALUES (?, 1005.00, 'ARS', 1.00, ?, 1000.00000000, 'TRANSFERENCIA', 'ACREDITADO', '2026-10-02 15:00:00.000', 'SQL-BAD-MATH-INS')`,
+    [orderA, verifiedQuoteId]),
+    err => err.sqlState === '45000' && /S704_PAGO_CONVERSION_INVALIDA/.test(err.message),
+  );
+
+  // 5) UPDATE directo de PENDIENTE ARS a ACREDITADO con monto_usd incongruente o cotización no verificada -> SQLSTATE 45000
+  const sqlPendId = await insert(`
+    INSERT INTO PAGO (id_pedido, monto, moneda, metodo_pago, estado)
+    VALUES (?, 1005.00, 'ARS', 'TRANSFERENCIA', 'PENDIENTE')
+  `, [orderA]);
+  await assert.rejects(
+    q(`UPDATE PAGO
+       SET estado = 'ACREDITADO',
+           monto_usd = 1.00,
+           id_cotizacion = ?,
+           tasa_historica = 1000.00000000,
+           fecha_acreditacion_utc = '2026-10-02 15:00:00.000',
+           evidencia_acreditacion = 'SQL-BAD-MATH-UPD'
+       WHERE id_pago = ?`, [verifiedQuoteId, sqlPendId]),
+    err => err.sqlState === '45000' && /S704_PAGO_CONVERSION_INVALIDA/.test(err.message),
+  );
+  await assert.rejects(
+    q(`UPDATE PAGO
+       SET estado = 'ACREDITADO',
+           monto_usd = 1.01,
+           id_cotizacion = ?,
+           tasa_historica = 950.00000000,
+           fecha_acreditacion_utc = '2026-10-02 15:00:00.000',
+           evidencia_acreditacion = 'SQL-NO-VERIF-UPD'
+       WHERE id_pago = ?`, [unverifiedQuoteId, sqlPendId]),
+    err => err.sqlState === '45000' && /S704_PAGO_COTIZACION_NO_VERIFICADA/.test(err.message),
+  );
+  // UPDATE válido con ROUND(1005.00 / 1000.00000000, 2) = 1.01 -> permitido y rechazado luego si se intenta anular sin motivo o cambiar campos
+  await q(`
+    UPDATE PAGO
+    SET estado = 'ACREDITADO',
+        monto_usd = 1.01,
+        id_cotizacion = ?,
+        tasa_historica = 1000.00000000,
+        fecha_acreditacion_utc = '2026-10-02 15:00:00.000',
+        evidencia_acreditacion = 'SQL-OK-ARS'
+    WHERE id_pago = ?
+  `, [verifiedQuoteId, sqlPendId]);
+  await q(`UPDATE PAGO SET estado = 'ANULADO', motivo_cierre = 'Limpieza SQL prueba P2-01' WHERE id_pago = ?`, [sqlPendId]);
+
+  // --- P2-02: comparación exacta de observaciones en replay ---
+  const kCreateObs = randomUUID();
+  const pendObs = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: kCreateObs,
+    body: {
+      pedidoId: orderA,
+      monto: '25.00',
+      moneda: 'USD',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+      observaciones: 'Obs inicial alta',
+    },
+  });
+  assert.equal(pendObs.status, 201);
+
+  for (const obsVariant of [{}, { observaciones: null }, { observaciones: 'Obs distinta' }]) {
+    const bodyPayload = {
+      pedidoId: orderA,
+      monto: '25.00',
+      moneda: 'USD',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+      ...obsVariant,
+    };
+    const badReplay = await api('/admin/pagos', { method: 'POST', auth: admin1, key: kCreateObs, body: bodyPayload });
+    assert.equal(badReplay.status, 409);
+    assert.equal(badReplay.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  }
+
+  const kAccObs = randomUUID();
+  const accWithObs = await api(`/admin/pagos/${pendObs.body.data.idPago}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: kAccObs,
+    body: {
+      evidenciaAcreditacion: 'EXT-OBS-01',
+      fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      observaciones: 'Obs acreditacion exacta',
+    },
+  });
+  assert.equal(accWithObs.status, 200);
+  assert.equal(accWithObs.body.data.observaciones, 'Obs acreditacion exacta');
+
+  // Replay de acreditación omitiendo observaciones o enviando null -> 409 CLAVE_IDEMPOTENCIA_REUTILIZADA
+  for (const badAccBody of [
+    { evidenciaAcreditacion: 'EXT-OBS-01', fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+    { evidenciaAcreditacion: 'EXT-OBS-01', fechaAcreditacionUtc: '2026-10-02T15:00:00Z', observaciones: null },
+    { evidenciaAcreditacion: 'EXT-OBS-01', fechaAcreditacionUtc: '2026-10-02T15:00:00Z', observaciones: 'Otra' },
+  ]) {
+    const res = await api(`/admin/pagos/${pendObs.body.data.idPago}/acreditar`, {
+      method: 'POST', auth: admin1, key: kAccObs, body: badAccBody,
+    });
+    assert.equal(res.status, 409);
+    assert.equal(res.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  }
+
+  // Replay de acreditación con observaciones idénticas -> 200 meta.replay=true
+  const accReplayOk = await api(`/admin/pagos/${pendObs.body.data.idPago}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: kAccObs,
+    body: {
+      evidenciaAcreditacion: 'EXT-OBS-01',
+      fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      observaciones: 'Obs acreditacion exacta',
+    },
+  });
+  assert.equal(accReplayOk.status, 200);
+  assert.equal(accReplayOk.body.meta.replay, true);
+
+  // Replay de creación con payload original (incluso después de que acreditar sobrescribiera PAGO.observaciones) -> 200 replay
+  const createReplayOk = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: kCreateObs,
+    body: {
+      pedidoId: orderA,
+      monto: '25.00',
+      moneda: 'USD',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+      observaciones: 'Obs inicial alta',
+    },
+  });
+  assert.equal(createReplayOk.status, 200);
+  assert.equal(createReplayOk.body.meta.replay, true);
+
+  // Caso inverso: acreditar omitiendo observaciones y luego reintentar enviando observaciones -> 409
+  const pendNoObs = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: {
+      pedidoId: orderA, monto: '10.00', moneda: 'USD', metodoPago: 'TRANSFERENCIA', estado: 'PENDIENTE',
+      observaciones: 'Obs previa que no debe habilitar replay',
+    },
+  });
+  assert.equal(pendNoObs.status, 201);
+  const kAccNoObs = randomUUID();
+  assert.equal((await api(`/admin/pagos/${pendNoObs.body.data.idPago}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: kAccNoObs,
+    body: { evidenciaAcreditacion: 'EXT-NO-OBS', fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+  })).status, 200);
+  const badReplayAddingObs = await api(`/admin/pagos/${pendNoObs.body.data.idPago}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: kAccNoObs,
+    body: {
+      evidenciaAcreditacion: 'EXT-NO-OBS',
+      fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      observaciones: 'Obs previa que no debe habilitar replay',
+    },
+  });
+  assert.equal(badReplayAddingObs.status, 409);
+  assert.equal(badReplayAddingObs.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
+  // Reutilización secuencial cross-operación de la misma clave -> 409 CLAVE_IDEMPOTENCIA_REUTILIZADA
+  const reuseCreateKeyOnAccredit = await api(`/admin/pagos/${pendObs.body.data.idPago}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: kCreateObs,
+    body: { evidenciaAcreditacion: 'EXT-OBS-01', fechaAcreditacionUtc: '2026-10-02T15:00:00Z', observaciones: 'Obs inicial alta' },
+  });
+  assert.equal(reuseCreateKeyOnAccredit.status, 409);
+  assert.equal(reuseCreateKeyOnAccredit.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
+  const reuseAccKeyOnAnnul = await api(`/admin/pagos/${pendObs.body.data.idPago}/anular`, {
+    method: 'POST', auth: admin1, key: kAccObs, body: { motivo: 'Reuso de clave' },
+  });
+  assert.equal(reuseAccKeyOnAnnul.status, 409);
+  assert.equal(reuseAccKeyOnAnnul.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
+  // --- P2-02: carrera concurrente con misma Idempotency-Key entre POST /api/admin/pagos y POST /api/admin/pagos/:id/acreditar ---
+  const racePendingOrder = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: { pedidoId: orderB, monto: '30.00', moneda: 'USD', metodoPago: 'TRANSFERENCIA', estado: 'PENDIENTE' },
+  });
+  assert.equal(racePendingOrder.status, 201);
+
+  const raceOrderKey = randomUUID();
+  const [raceCreateOrder, raceAccreditOrder] = await Promise.all([
+    api('/admin/pagos', {
+      method: 'POST',
+      auth: admin1,
+      key: raceOrderKey,
+      body: {
+        pedidoId: orderA,
+        monto: '30.00',
+        moneda: 'USD',
+        metodoPago: 'TRANSFERENCIA',
+        estado: 'ACREDITADO',
+        evidenciaAcreditacion: 'RACE-ORDER-CREATE',
+        fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      },
+    }),
+    api(`/admin/pagos/${racePendingOrder.body.data.idPago}/acreditar`, {
+      method: 'POST',
+      auth: admin2,
+      key: raceOrderKey,
+      body: {
+        evidenciaAcreditacion: 'RACE-ORDER-ACCREDIT',
+        fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      },
+    }),
+  ]);
+  const orderPair = [raceCreateOrder, raceAccreditOrder];
+  const orderWinners = orderPair.filter(r => r.status === 200 || r.status === 201);
+  const orderLosers = orderPair.filter(r => r.status === 409);
+  assert.equal(orderWinners.length, 1, `Esperado 1 ganador: ${JSON.stringify(orderPair.map(r => [r.status, r.body]))}`);
+  assert.equal(orderLosers.length, 1, `Esperado 1 rechazo 409: ${JSON.stringify(orderPair.map(r => [r.status, r.body]))}`);
+  assert.equal(orderLosers[0].body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  const [raceKeyRows] = await q('SELECT COUNT(*) AS n FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?', [raceOrderKey]);
+  assert.equal(Number(raceKeyRows.n), 1);
+
+  // Carrera concurrente equivalente sobre dos CUENTA_CORRIENTE distintas (crea ABONO vs acredita pendiente)
+  const racePendingCc = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: { cuentaCorrienteId: companyB.accountId, monto: '45.00', moneda: 'USD', metodoPago: 'TRANSFERENCIA', estado: 'PENDIENTE' },
+  });
+  assert.equal(racePendingCc.status, 201);
+
+  const raceCcKey = randomUUID();
+  const [raceCreateCc, raceAccreditCc] = await Promise.all([
+    api('/admin/pagos', {
+      method: 'POST',
+      auth: admin1,
+      key: raceCcKey,
+      body: {
+        cuentaCorrienteId: companyA.accountId,
+        monto: '45.00',
+        moneda: 'USD',
+        metodoPago: 'TRANSFERENCIA',
+        estado: 'ACREDITADO',
+        evidenciaAcreditacion: 'RACE-CC-CREATE',
+        fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      },
+    }),
+    api(`/admin/pagos/${racePendingCc.body.data.idPago}/acreditar`, {
+      method: 'POST',
+      auth: admin2,
+      key: raceCcKey,
+      body: {
+        evidenciaAcreditacion: 'RACE-CC-ACCREDIT',
+        fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+      },
+    }),
+  ]);
+  const ccPair = [raceCreateCc, raceAccreditCc];
+  const ccWinners = ccPair.filter(r => r.status === 200 || r.status === 201);
+  const ccLosers = ccPair.filter(r => r.status === 409);
+  assert.equal(ccWinners.length, 1);
+  assert.equal(ccLosers.length, 1);
+  assert.equal(ccLosers[0].body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  const [ccMovCount] = await q(
+    'SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_cuenta_corriente IN (?, ?)',
+    [companyA.accountId, companyB.accountId],
+  );
+  assert.equal(Number(ccMovCount.n), 1, 'El perdedor concurrente no debe crear ABONO en cuenta corriente');
+});
