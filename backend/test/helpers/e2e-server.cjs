@@ -77,7 +77,7 @@ async function main() {
     } else if (process.env.E2E_DEMO_CATALOG === '1') {
       const { issueAcademicCheckout } = require('../../dist/services/orders/academic-checkout');
       academicCheckout = await issueAcademicCheckout(session.profile);
-    } else if (process.env.E2E_RECEIPTS !== "1") {
+    } else if (process.env.E2E_RECEIPTS !== "1" && process.env.E2E_PAYMENTS !== "1") {
       fixture = await seedAdminAccounts(session, { browser: true });
     }
   } finally {

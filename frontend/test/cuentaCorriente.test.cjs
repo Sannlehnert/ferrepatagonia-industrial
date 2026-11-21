@@ -135,8 +135,11 @@ function loadAccountView(account) {
         '@/components/CompanyStatus.vue': { default: {} },
         '@/components/CreditRequestPanel.vue': { default: {} },
         '@/components/PaymentReceipts.vue': { default: {} },
+        '@/components/PaymentDeclarationForm.vue': { default: {} },
+        '@/components/PaymentHistory.vue': { default: {} },
         '@/services/paymentReceiptService': { accountReceiptsPath: '/cuenta-corriente/comprobantes' },
         '@/utils/companyStatus': loadTypeScript('utils/companyStatus.ts'),
+        '@/utils/payment': loadTypeScript('utils/payment.ts'),
         '@/utils/cuentaCorriente': {
             coverageMessage: () => '',
             formatCivilDate,
@@ -405,6 +408,36 @@ test('muestra cargos y abonos sin signos redundantes', async () => {
     assert.match(html, /Cargo/)
     assert.match(html, /Abono/)
     assert.doesNotMatch(html, /[+−-]\s*US\$/)
-    assert.equal((html.match(/US\$\s*20,00/g) || []).length, 1)
-    assert.equal((html.match(/US\$\s*5,00/g) || []).length, 1)
+    // El movimiento y el total agregado muestran el mismo importe sin signos redundantes.
+    assert.equal((html.match(/US\$\s*20,00/g) || []).length, 2)
+    assert.equal((html.match(/US\$\s*5,00/g) || []).length, 2)
+})
+
+test('muestra totales de cargos y abonos sólo cuando la página cubre toda la cuenta', async () => {
+    const account = {
+        consulta: summary(),
+        movimientos: page('r1', [
+            movement('1', 'CARGO', '20.00'),
+            movement('2', 'ABONO', '5.00'),
+        ]),
+        vencimientos: page('r1'),
+        consultaCargando: false,
+        movimientosCargando: false,
+        vencimientosCargando: false,
+        movimientosMasCargando: false,
+        vencimientosMasCargando: false,
+        consultaError: '',
+        movimientosError: '',
+        vencimientosError: '',
+    }
+
+    const html = await renderToString(createSSRApp(loadAccountView(account)))
+    assert.match(html, /Total de cargos \(USD\)<\/h3>\s*<p[^>]*>US\$\s*20,00/)
+    assert.match(html, /Total de abonos \(USD\)<\/h3>\s*<p[^>]*>US\$\s*5,00/)
+    assert.doesNotMatch(html, /Los totales no se muestran/)
+
+    account.movimientos = { ...page('r1', [movement('1', 'CARGO', '20.00')]), siguienteCursor: 'next' }
+    const partial = await renderToString(createSSRApp(loadAccountView(account)))
+    assert.match(partial, /Total de cargos \(USD\)<\/h3>\s*<p[^>]*>No determinable/)
+    assert.match(partial, /Los totales no se muestran/)
 })
