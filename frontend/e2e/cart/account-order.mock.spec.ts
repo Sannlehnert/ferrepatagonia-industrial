@@ -31,14 +31,13 @@ for (const width of [1280, 360]) {
         name: 'Confirmar pedido a cuenta corriente',
       })
 
-      await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
+      await expect(option).toBeVisible()
+      await expect(confirm).toHaveCount(0)
+      await option.check()
+
       await expect(summary).toContainText('Total del pedido')
       await expect(summary).toContainText('USD 80.00')
       await expect(summary).toContainText('USD 500.00')
-      await expect(option).toBeVisible()
-      await expect(confirm).toBeDisabled()
-
-      await option.check()
       await expect(confirm).toBeEnabled()
       const postObserved = page.waitForRequest(request =>
         request.method() === 'POST' && request.url().includes('/pedidos/cuenta-corriente'))
@@ -173,15 +172,17 @@ test('no anuncia elegibilidad actualizada para una respuesta del carrito anterio
   }
   await page.goto('/carrito')
 
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const retry = page.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  await expect(retry).toBeVisible()
+
   let release = () => {}
   state.eligibilityGate = new Promise<void>(resolve => { release = resolve })
-  const retry = page.getByRole('button', { name: 'Volver a consultar elegibilidad' })
   const retryRequest = page.waitForRequest(request =>
     request.method() === 'GET' && request.url().includes('/pedidos/cuenta-corriente/eligibilidad'))
   await retry.click()
   await retryRequest
 
-  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
   const quantity = page.getByRole('spinbutton', { name: 'Cantidad de Producto de prueba' })
   await quantity.fill('2')
   await quantity.press('Tab')
