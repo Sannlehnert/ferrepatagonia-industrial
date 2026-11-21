@@ -1,21 +1,26 @@
 import { Router } from 'express';
 import {
-  getAdminPayment,
+  getAdminPaymentById,
   getAdminPayments,
-  patchReviewPayment,
-  postAccreditPayment,
-} from '../controllers/payment.controller';
+  postAccreditAdminPayment,
+  postAdminPayment,
+  postAnnulAdminPayment,
+  postRejectAdminPayment,
+} from '../controllers/adminPayment.controller';
+import { patchReviewPayment } from '../controllers/payment.controller';
 import {
-  accreditPaymentPolicy,
+  accreditAdminPaymentPolicy,
+  adminPaymentIdPolicy,
+  closeAdminPaymentPolicy,
+  createAdminPaymentPolicy,
+} from '../dtos/payments/admin-payment.dto';
+import {
   paymentIdPolicy,
   reviewPaymentPolicy,
 } from '../dtos/payments/payment.dto';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 
-// Router único para /api/admin/pagos. #158 publica create/rechazar/anular en
-// este mismo punto de montaje; #333 agrega revisión documental y acreditación
-// de declaraciones. Cualquier integración debe fusionar ambos contratos en este
-// archivo, nunca montar dos routers sobre la misma ruta.
+// Router único para /api/admin/pagos (#317 / #158 + #333).
 export const adminPaymentRouter = Router();
 
 adminPaymentRouter.use((_req, res, next) => {
@@ -27,9 +32,14 @@ adminPaymentRouter.use((_req, res, next) => {
 
 adminPaymentRouter.get('/', getAdminPayments);
 adminPaymentRouter.get(
-  '/:id',
-  validateDto('params', paymentIdPolicy),
-  getAdminPayment,
+  '/:pagoId',
+  validateDto('params', adminPaymentIdPolicy),
+  getAdminPaymentById,
+);
+adminPaymentRouter.post(
+  '/',
+  validateDto('body', createAdminPaymentPolicy),
+  postAdminPayment,
 );
 adminPaymentRouter.patch(
   '/:id/revision',
@@ -38,8 +48,20 @@ adminPaymentRouter.patch(
   patchReviewPayment,
 );
 adminPaymentRouter.post(
-  '/:id/acreditar',
-  validateDto('params', paymentIdPolicy),
-  validateDto('body', accreditPaymentPolicy),
-  postAccreditPayment,
+  '/:pagoId/acreditar',
+  validateDto('params', adminPaymentIdPolicy),
+  validateDto('body', accreditAdminPaymentPolicy),
+  postAccreditAdminPayment,
+);
+adminPaymentRouter.post(
+  '/:pagoId/rechazar',
+  validateDto('params', adminPaymentIdPolicy),
+  validateDto('body', closeAdminPaymentPolicy),
+  postRejectAdminPayment,
+);
+adminPaymentRouter.post(
+  '/:pagoId/anular',
+  validateDto('params', adminPaymentIdPolicy),
+  validateDto('body', closeAdminPaymentPolicy),
+  postAnnulAdminPayment,
 );

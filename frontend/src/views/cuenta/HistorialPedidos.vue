@@ -172,7 +172,8 @@ function getOrderStatusBadgeClasses(status: string) {
             <option value="">Estado del Comprobante (Todos)</option>
             <option value="PENDIENTE">Pendiente de revisión</option>
             <option value="NO_ADJUNTO">No adjunto</option>
-            <option value="REVISADO">Revisado</option>
+            <option value="APROBADO">Aprobado</option>
+            <option value="RECHAZADO">Rechazado</option>
           </select>
         </div>
 
