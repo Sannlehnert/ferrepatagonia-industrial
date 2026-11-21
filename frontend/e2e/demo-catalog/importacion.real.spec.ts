@@ -254,16 +254,16 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
         }).then(r => respuesta(r)),
       }
       const asociaciones = await asociarFotos(apiMaestro, { aplicar: true, fuentes: seleccion.fuentes })
-      expect(asociaciones).toHaveLength(61)
-      expect(seleccion.pendientes).toHaveLength(39)
+      expect(asociaciones).toHaveLength(100)
+      expect(seleccion.pendientes).toHaveLength(0)
       for (const asociacion of asociaciones) {
         const recurso = await publico.get(asociacion.imagen)
         expect(recurso.status()).toBe(200)
         expect(createHash('sha256').update(await recurso.body()).digest('hex')).toBe(
           require('../../../data/demo-catalog/catalog-validation.json').imagenes.find((i: { sku: string }) => i.sku === asociacion.sku).sha256Publicado)
       }
-      expect(Number((await db.query('SELECT COUNT(*) AS total FROM PRODUCTO WHERE imagen IS NULL'))[0].total)).toBe(39)
-      await reporte('catalogo-maestro-100.json', { total: 100, conFuente: 61, pendientes: seleccion.pendientes, asociaciones })
+      expect(Number((await db.query('SELECT COUNT(*) AS total FROM PRODUCTO WHERE imagen IS NULL'))[0].total)).toBe(0)
+      await reporte('catalogo-maestro-100.json', { total: 100, conFuente: 100, pendientes: seleccion.pendientes, asociaciones })
       expect((await db.query(`DELETE FROM PRODUCTO WHERE codigo IN (${maestro.map(() => '?').join(',')})`,
         maestro.map((m: { sku: string }) => m.sku))).affectedRows).toBe(100)
     }
@@ -447,6 +447,10 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
       await verificarAviso(page, esIlustrativa)
       expect(await page.locator('html').evaluate(element =>
         (element as unknown as { scrollWidth: number }).scrollWidth)).toBeLessThanOrEqual(360)
+      if (['FP-DEMO-OBR-PERFIL-10-10-MM',
+        'FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-100-UNIDADES', 'FP-DEMO-ROP-CAMISA-TALLE-2XL'].includes(producto.codigo)) {
+        await page.screenshot({ path: testInfo.outputPath(`detalle-311-${producto.codigo}.png`), fullPage: true })
+      }
     }
     for (const width of [320, 360]) {
       await page.setViewportSize({ width, height: 800 })
@@ -472,9 +476,9 @@ test('FER-16 carga el catálogo académico y FER-17 conserva sus límites comerc
     await expect(page.getByText('Sin imagen disponible', { exact: true })).toBeVisible()
     await expect(page.getByRole('note')).toHaveCount(0)
     await page.unroute(urlImagenIlustrativa)
-    expect(imagenes).toHaveLength(182)
+    expect(imagenes).toHaveLength(221)
     const sinImagen = dbFilas.filter(p => !p.imagen)
-    expect(sinImagen).toHaveLength(722)
+    expect(sinImagen).toHaveLength(683)
     const muestra = sinImagen[0]!
     const listado = `/catalogo?busqueda=${encodeURIComponent(muestra.codigo)}&categoria=${muestra.id_categoria}`
     await page.goto(listado)
