@@ -5,6 +5,7 @@ import { adminProductRouter } from './adminProduct.routes';
 import { adminCategoryRouter } from './adminCategory.routes';
 import { productImportRouter } from './productImport.routes';
 import { adminOrderRouter } from './adminOrder.routes';
+import { adminPaymentRouter } from './adminPayment.routes';
 import { getAdminPriceLists, getClientPriceLists, putClientPriceList, saveAdminPriceList } from '../controllers/clientPriceList.controller';
 import { clientIdPolicy, priceListAssignmentPolicy, priceListIdPolicy } from '../dtos/clients/price-list-assignment.dto';
 import { priceListPolicy } from '../dtos/clients/price-list.dto';
@@ -110,6 +111,7 @@ adminRouter.get('/clientes/listas-precio', getClientPriceLists);
 adminRouter.put('/clientes/:id/lista-precio',
     validateDto('params', clientIdPolicy), validateDto('body', priceListAssignmentPolicy), putClientPriceList);
 adminRouter.use('/pedidos', adminOrderRouter);
+adminRouter.use('/pagos', adminPaymentRouter);
 adminRouter.use('/productos/importar', productImportRouter);
 adminRouter.use('/productos', adminProductRouter);
 adminRouter.use('/categorias', adminCategoryRouter);

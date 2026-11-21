@@ -229,6 +229,12 @@ export const registrarAbonoPorPago = async (dto: RegistrarAbonoDTO, externalMana
             usd = (usd * 100000000n + rate / 2n) / rate;
         }
         if (usd <= 0n || usd > MAX_CENTS || usd !== cents) throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        if (p.monto_usd !== null && p.monto_usd !== undefined && toCents(p.monto_usd) !== usd) {
+            throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        }
+        if (p.moneda === 'ARS' && p.id_cotizacion !== null && p.id_cotizacion !== undefined && quote && Number(p.id_cotizacion) !== Number(quote.id)) {
+            throw Error('Cotización histórica del pago inconsistente con FER17-v1.');
+        }
         const rows = await movements(manager, c.id_cuenta_corriente, true);
         if (!complete(c, rows)) throw Error('No se puede acreditar: cobertura histórica no acreditada.');
         const result = await manager.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
