@@ -9,6 +9,7 @@ import {
 } from '@/services/profileService'
 import { useAuthStore } from '@/stores/auth'
 
+const props = defineProps<{ summaryOnly?: boolean }>()
 const auth = useAuthStore()
 const profile = ref<AccountProfile | null>(null)
 const telefono = ref('')
@@ -127,7 +128,13 @@ async function save() {
   }
 }
 
-watch(sessionKey, () => { void loadProfile() }, { immediate: true, flush: 'sync' })
+watch(
+  () => props.summaryOnly ? null : sessionKey(),
+  () => {
+    if (!props.summaryOnly) void loadProfile()
+  },
+  { immediate: true, flush: 'sync' },
+)
 onScopeDispose(() => {
   requestSequence++
   activeRequest?.abort()
@@ -136,92 +143,106 @@ onScopeDispose(() => {
 
 <template>
   <div class="w-full max-w-full min-w-0 box-border rounded-[10px] border border-[#E2E8F0] bg-white p-4 sm:p-6 shadow-sm">
-    <h1 class="m-0 mb-2 text-xl font-bold text-[#0B2438] sm:text-2xl">Mis datos</h1>
-    <p class="mb-5 mt-0 text-sm text-slate-600">
-      Consultá tus datos registrados. Podés actualizar tu teléfono y dirección.
-    </p>
-
-    <p v-if="loading" role="status" class="text-sm text-slate-600">Cargando tus datos…</p>
-    <div v-else-if="loadError" class="space-y-3">
-      <p role="alert" class="m-0 text-sm text-red-800">{{ loadError }}</p>
-      <button
-        type="button"
-        class="min-h-[44px] rounded-md border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-        @click="loadProfile"
+    <template v-if="summaryOnly">
+      <h3 class="m-0 mb-4 sm:mb-6 text-xl font-bold text-[#0B2438]">Mis datos</h3>
+      <dl
+        v-if="auth.user"
+        class="grid grid-cols-1 w-full max-w-full min-w-0 gap-y-3 text-base box-border sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-x-4 sm:text-sm"
       >
-        Reintentar carga
-      </button>
-    </div>
-    <template v-else-if="profile">
-      <dl class="mb-6 grid min-w-0 grid-cols-1 gap-y-2 text-sm sm:grid-cols-[minmax(9rem,12rem)_minmax(0,1fr)] sm:gap-x-4">
-        <dt class="font-semibold text-slate-700">Tipo de cuenta</dt>
-        <dd class="m-0 break-words text-[#0B2438]">{{ profile.tipoCliente === 'EMPRESA' ? 'Empresa' : 'Particular' }}</dd>
-        <dt class="font-semibold text-slate-700">{{ profile.tipoCliente === 'EMPRESA' ? 'Razón social' : 'Nombre' }}</dt>
-        <dd class="m-0 break-words text-[#0B2438]">{{ profile.nombreRazonSocial }}</dd>
-        <dt class="font-semibold text-slate-700">Email</dt>
-        <dd class="m-0 break-words text-[#0B2438]">{{ profile.email }}</dd>
-        <dt v-if="profile.tipoCliente === 'PARTICULAR'" class="font-semibold text-slate-700">Documento</dt>
-        <dd v-if="profile.tipoCliente === 'PARTICULAR'" class="m-0 break-words text-[#0B2438]">{{ profile.docCliente || 'No informado' }}</dd>
-        <dt v-if="profile.tipoCliente === 'EMPRESA'" class="font-semibold text-slate-700">CUIT</dt>
-        <dd v-if="profile.tipoCliente === 'EMPRESA'" class="m-0 break-words text-[#0B2438]">{{ profile.cuit || 'No informado' }}</dd>
-        <template v-if="profile.tipoCliente === 'EMPRESA'">
-          <dt class="font-semibold text-slate-700">Aprobación de empresa</dt>
-          <dd class="m-0 break-words text-[#0B2438]">{{ profile.estadoAprobacionEmpresa || 'No determinable' }}</dd>
-          <dt class="font-semibold text-slate-700">Cuenta corriente</dt>
-          <dd class="m-0 break-words text-[#0B2438]">
-            {{ profile.cuentaCorrienteHabilitada === null
-              ? 'Sin cuenta asociada'
-              : profile.cuentaCorrienteHabilitada ? 'Habilitada' : 'Inhabilitada' }}
-          </dd>
-        </template>
+        <dt class="w-full max-w-full min-w-0 box-border font-semibold text-slate-700">Nombre</dt>
+        <dd class="m-0 w-full max-w-full min-w-0 box-border break-words font-medium text-[#0B2438]">{{ auth.user.nombre }}</dd>
+        <dt class="w-full max-w-full min-w-0 box-border font-semibold text-slate-700">Email</dt>
+        <dd class="m-0 w-full max-w-full min-w-0 box-border break-words font-medium text-[#0B2438]">{{ auth.user.email }}</dd>
       </dl>
+    </template>
+    <template v-else>
+      <h1 class="m-0 mb-2 text-xl font-bold text-[#0B2438] sm:text-2xl">Mis datos</h1>
+      <p class="mb-5 mt-0 text-sm text-slate-600">
+        Consultá tus datos registrados. Podés actualizar tu teléfono y dirección.
+      </p>
 
-      <form class="space-y-4 border-t border-slate-200 pt-5" novalidate @submit.prevent="save">
-        <div>
-          <label for="profile-phone" class="mb-1 block text-sm font-semibold text-slate-700">Teléfono</label>
-          <input
-            id="profile-phone"
-            v-model="telefono"
-            type="tel"
-            autocomplete="tel"
-            :disabled="!editable"
-            :aria-invalid="!!validation.telefono"
-            :aria-describedby="validation.telefono ? 'profile-phone-error' : undefined"
-            class="box-border min-h-[44px] w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-          />
-          <p v-if="validation.telefono" id="profile-phone-error" role="alert" class="mb-0 mt-1 text-sm text-red-800">
-            {{ validation.telefono }}
-          </p>
-        </div>
-        <div>
-          <label for="profile-address" class="mb-1 block text-sm font-semibold text-slate-700">Dirección</label>
-          <textarea
-            id="profile-address"
-            v-model="direccion"
-            rows="3"
-            :disabled="!editable"
-            :aria-invalid="!!validation.direccion"
-            :aria-describedby="validation.direccion ? 'profile-address-error' : undefined"
-            class="box-border min-h-24 w-full min-w-0 resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-          />
-          <p v-if="validation.direccion" id="profile-address-error" role="alert" class="mb-0 mt-1 text-sm text-red-800">
-            {{ validation.direccion }}
-          </p>
-        </div>
-
-        <p v-if="feedback" role="status" aria-live="polite" class="m-0 text-sm font-semibold text-emerald-800">
-          {{ feedback }}
-        </p>
-        <p v-if="saveError" role="alert" class="m-0 text-sm text-red-800">{{ saveError }}</p>
-
+      <p v-if="loading" role="status" class="text-sm text-slate-600">Cargando tus datos…</p>
+      <div v-else-if="loadError" class="space-y-3">
+        <p role="alert" class="m-0 text-sm text-red-800">{{ loadError }}</p>
         <button
-          type="submit"
-          :disabled="!editable || !dirty"
-          class="min-h-[44px] rounded-md border-0 bg-[#103A5C] px-5 text-sm font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+          type="button"
+          class="min-h-[44px] rounded-md border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+          @click="loadProfile"
         >
-          {{ saving ? 'Guardando…' : 'Guardar cambios' }}
+          Reintentar carga
         </button>
-      </form>
+      </div>
+      <template v-else-if="profile">
+        <dl class="mb-6 grid min-w-0 grid-cols-1 gap-y-2 text-sm sm:grid-cols-[minmax(9rem,12rem)_minmax(0,1fr)] sm:gap-x-4">
+          <dt class="font-semibold text-slate-700">Tipo de cuenta</dt>
+          <dd class="m-0 break-words text-[#0B2438]">{{ profile.tipoCliente === 'EMPRESA' ? 'Empresa' : 'Particular' }}</dd>
+          <dt class="font-semibold text-slate-700">{{ profile.tipoCliente === 'EMPRESA' ? 'Razón social' : 'Nombre' }}</dt>
+          <dd class="m-0 break-words text-[#0B2438]">{{ profile.nombreRazonSocial }}</dd>
+          <dt class="font-semibold text-slate-700">Email</dt>
+          <dd class="m-0 break-words text-[#0B2438]">{{ profile.email }}</dd>
+          <dt v-if="profile.tipoCliente === 'PARTICULAR'" class="font-semibold text-slate-700">Documento</dt>
+          <dd v-if="profile.tipoCliente === 'PARTICULAR'" class="m-0 break-words text-[#0B2438]">{{ profile.docCliente || 'No informado' }}</dd>
+          <dt v-if="profile.tipoCliente === 'EMPRESA'" class="font-semibold text-slate-700">CUIT</dt>
+          <dd v-if="profile.tipoCliente === 'EMPRESA'" class="m-0 break-words text-[#0B2438]">{{ profile.cuit || 'No informado' }}</dd>
+          <template v-if="profile.tipoCliente === 'EMPRESA'">
+            <dt class="font-semibold text-slate-700">Aprobación de empresa</dt>
+            <dd class="m-0 break-words text-[#0B2438]">{{ profile.estadoAprobacionEmpresa || 'No determinable' }}</dd>
+            <dt class="font-semibold text-slate-700">Cuenta corriente</dt>
+            <dd class="m-0 break-words text-[#0B2438]">
+              {{ profile.cuentaCorrienteHabilitada === null
+                ? 'Sin cuenta asociada'
+                : profile.cuentaCorrienteHabilitada ? 'Habilitada' : 'Inhabilitada' }}
+            </dd>
+          </template>
+        </dl>
+
+        <form class="space-y-4 border-t border-slate-200 pt-5" novalidate @submit.prevent="save">
+          <div>
+            <label for="profile-phone" class="mb-1 block text-sm font-semibold text-slate-700">Teléfono</label>
+            <input
+              id="profile-phone"
+              v-model="telefono"
+              type="tel"
+              autocomplete="tel"
+              :disabled="!editable"
+              :aria-invalid="!!validation.telefono"
+              :aria-describedby="validation.telefono ? 'profile-phone-error' : undefined"
+              class="box-border min-h-[44px] w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+            />
+            <p v-if="validation.telefono" id="profile-phone-error" role="alert" class="mb-0 mt-1 text-sm text-red-800">
+              {{ validation.telefono }}
+            </p>
+          </div>
+          <div>
+            <label for="profile-address" class="mb-1 block text-sm font-semibold text-slate-700">Dirección</label>
+            <textarea
+              id="profile-address"
+              v-model="direccion"
+              rows="3"
+              :disabled="!editable"
+              :aria-invalid="!!validation.direccion"
+              :aria-describedby="validation.direccion ? 'profile-address-error' : undefined"
+              class="box-border min-h-24 w-full min-w-0 resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+            />
+            <p v-if="validation.direccion" id="profile-address-error" role="alert" class="mb-0 mt-1 text-sm text-red-800">
+              {{ validation.direccion }}
+            </p>
+          </div>
+
+          <p v-if="feedback" role="status" aria-live="polite" class="m-0 text-sm font-semibold text-emerald-800">
+            {{ feedback }}
+          </p>
+          <p v-if="saveError" role="alert" class="m-0 text-sm text-red-800">{{ saveError }}</p>
+
+          <button
+            type="submit"
+            :disabled="!editable || !dirty"
+            class="min-h-[44px] rounded-md border-0 bg-[#103A5C] px-5 text-sm font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+          >
+            {{ saving ? 'Guardando…' : 'Guardar cambios' }}
+          </button>
+        </form>
+      </template>
     </template>
   </div>
 </template>

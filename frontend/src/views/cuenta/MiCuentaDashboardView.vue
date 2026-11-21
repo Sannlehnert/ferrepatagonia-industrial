@@ -155,6 +155,6 @@ const isParticular = computed(() => {
       Cargando métricas…
     </p>
 
-    <DatosClientes />
+    <DatosClientes summary-only />
   </div>
 </template>
