@@ -177,6 +177,13 @@ test('adminClientService usa PATCH /admin/clientes/:id/estado-empresa y retorna 
     ['patch', '/admin/clientes/20/estado-empresa', { estado: 'APROBADA' }],
     ['patch', '/admin/clientes/20/estado-empresa', { estado: 'RECHAZADA' }],
   ]);
+  const controller = new AbortController();
+  await service.getAdminClients(controller.signal);
+  await service.updateAdminCompanyApproval(20, 'APROBADA', controller.signal);
+  assert.deepEqual(calls.slice(-2), [
+    ['get', '/admin/clientes', { signal: controller.signal }],
+    ['patch', '/admin/clientes/20/estado-empresa', { estado: 'APROBADA' }, { signal: controller.signal }],
+  ]);
 });
 
 test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y acciones Aprobar/Rechazar', async t => {
@@ -347,6 +354,141 @@ function findNode(n, pred) {
   }
   return null;
 }
+
+async function approvalView(t, service, auth) {
+  const component = load('views/admin/AdminClientsView.vue', {
+    ...(auth ? { '@/stores/auth': { useAuthStore: () => auth } } : {}),
+    '@/services/adminClientService': {
+      getAdminClients: (...args) => service.getAdminClients ? service.getAdminClients(...args) : Promise.resolve(sampleClients()),
+      getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+      updateAdminCompanyApproval: (...args) => service.updateAdminCompanyApproval(...args),
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  }).default;
+  component.render = () => null;
+  const dom = createTestRenderer();
+  const app = dom.renderer.createApp(component);
+  app.mount(dom.createRoot());
+  t.after(() => app.unmount());
+  await settle();
+  return app._instance.setupState;
+}
+
+test('S7-345-03: PATCH pendiente vence, permite cerrar y conserva incertidumbre ante lectura anterior', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let release, signal, mutations = 0;
+  const service = {
+    updateAdminCompanyApproval: (_id, _status, requestSignal) => {
+      mutations++; signal = requestSignal;
+      return new Promise(resolve => { release = resolve; });
+    },
+  };
+  const state = await approvalView(t, service);
+  const client = state.clients.find(c => c.id === 20);
+  state.openClient(client, 'APROBADA');
+  const request = state.confirmApproval();
+  await settle();
+  assert.equal(state.updatingApprovalClientId, 20);
+  state.confirmApproval();
+  assert.equal(mutations, 1);
+  t.mock.timers.tick(15_000);
+  await settle();
+  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  assert.equal(signal.aborted, true);
+  state.closeClient();
+  assert.equal(state.selectedClient, null);
+  // El GET puede leer el estado anterior mientras el servidor aún procesa el PATCH.
+  await state.reconcileCompanyApproval(20);
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  release({ ...sampleClients()[1], estadoAprobacionEmpresa: 'APROBADA' });
+  await request;
+  await settle();
+  assert.equal(client.estadoAprobacionEmpresa, 'PENDIENTE');
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  // Solo una verificación posterior que observe el destino confirma el cambio.
+  service.getAdminClients = async () => sampleClients().map(c => c.id === 20 ? { ...c, estadoAprobacionEmpresa: 'APROBADA' } : c);
+  await state.reconcileCompanyApproval(20);
+  assert.equal(client.estadoAprobacionEmpresa, 'APROBADA');
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
+  assert.equal(mutations, 1);
+});
+
+test('S7-345-03: verificación pendiente también vence y descarta su respuesta tardía', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const service = { updateAdminCompanyApproval: async () => { throw Error('respuesta perdida'); } };
+  const state = await approvalView(t, service);
+  let release, signal;
+  service.getAdminClients = requestSignal => new Promise(resolve => { release = resolve; signal = requestSignal; });
+  const request = state.setCompanyApproval(state.clients[1], 'APROBADA');
+  await settle();
+  assert.equal(state.reconcilingApprovalClientId, 20);
+  t.mock.timers.tick(15_000);
+  await request;
+  assert.equal(signal.aborted, true);
+  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.reconcilingApprovalClientId, null);
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  release(sampleClients().map(c => ({ ...c, estadoAprobacionEmpresa: 'APROBADA' })));
+  await settle();
+  assert.equal(state.clients[1].estadoAprobacionEmpresa, 'PENDIENTE');
+});
+
+test('S7-345-03: salir de sesión cancela la modificación sin contaminar la siguiente sesión', async t => {
+  const auth = vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false });
+  let release, signal;
+  const state = await approvalView(t, {
+    updateAdminCompanyApproval: (_id, _status, requestSignal) => new Promise(resolve => { release = resolve; signal = requestSignal; }),
+  }, auth);
+  const request = state.setCompanyApproval(state.clients[1], 'APROBADA');
+  auth.sessionVersion++;
+  await settle();
+  assert.equal(signal.aborted, true);
+  release({ ...sampleClients()[1], estadoAprobacionEmpresa: 'APROBADA' });
+  await request;
+  assert.equal(state.clients[1].estadoAprobacionEmpresa, 'PENDIENTE');
+  assert.equal(state.updatingApprovalClientId, null);
+});
+
+test('S7-345-04: cambiar aprobación refresca solo esa empresa y conserva resultados ajenos', async t => {
+  const calls = [];
+  let release;
+  const { credit, clients } = creditReader(t, (id, signal) => {
+    calls.push({ id, signal });
+    if (calls.length > 3) return new Promise(resolve => { release = resolve; });
+    return Promise.resolve({ estadoCredito: 'DISPONIBLE' });
+  });
+  await settle();
+  const first = credit.status(1), last = credit.status(3);
+  clients.value[1].estadoAprobacionEmpresa = 'RECHAZADA';
+  await settle();
+  assert.deepEqual(calls.map(c => c.id), [1, 2, 3, 2]);
+  assert.equal(credit.status(1), first);
+  assert.equal(credit.status(3), last);
+  release({ estadoCredito: 'BLOQUEADO' });
+  await settle();
+  assert.equal(credit.status(2).account.estadoCredito, 'BLOQUEADO');
+});
+
+test('S7-345-04: aprobación durante una lectura pendiente descarta el crédito anterior y vuelve a consultar esa fila', async t => {
+  const calls = [];
+  let release;
+  const { credit, clients } = creditReader(t, (id, signal) => {
+    calls.push({ id, signal });
+    if (id === 1 && calls.length === 1) return new Promise(resolve => { release = resolve; });
+    return Promise.resolve({ estadoCredito: id === 1 ? 'BLOQUEADO' : 'DISPONIBLE' });
+  }, [1, 2]);
+  await settle();
+  const other = credit.status(2);
+  clients.value[0].estadoAprobacionEmpresa = 'RECHAZADA';
+  await settle();
+  assert.equal(calls[0].signal.aborted, false);
+  release({ estadoCredito: 'DISPONIBLE' });
+  await settle();
+  assert.deepEqual(calls.map(c => c.id), [1, 2, 1]);
+  assert.equal(credit.status(1).account.estadoCredito, 'BLOQUEADO');
+  assert.equal(credit.status(2), other);
+});
 
 test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea acciones ante resultado incierto', async t => {
   const service = {

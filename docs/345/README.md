@@ -118,3 +118,26 @@ Se agregan tres regresiones unitarias (independencia/concurrencia y reintento in
 Validación tras integrar develop (merge local 45f46ab): 294 pruebas frontend, builds backend/frontend y TypeScript aprobados. Pasaron los seis escenarios distintos de Clientes con build de producción (cinco existentes y el caso adversarial nuevo); el conjunto de Clientes y recorrido integrado pasó 14/14 en desarrollo. Las pruebas unitarias usan tiempo simulado; la prueba de navegador espera el vencimiento real de 15 segundos. Limpieza de contenedores y datos tmpfs confirmada.
 
 Pendientes commit/push, CI del nuevo HEAD y reauditoría técnica de S7-345-02; se mantiene pendiente la validación UX/UI.
+
+## Correcciones de revisión S7-345-03 y S7-345-04 · 21/11/2026
+
+Se reprodujeron los dos P2 observados sobre `077ec45`: un PATCH retenido dejaba el diálogo bloqueado y un cambio de aprobación reiniciaba las consultas y borraba resultados de crédito de las demás empresas.
+
+**S7-345-03.** La modificación y la consulta de verificación tienen un límite local de 15 segundos por solicitud. Al vencer se deja de esperar, se libera el estado ocupado del diálogo y se conserva el resultado incierto, con Cerrar/Escape y verificación posterior disponibles. Se propaga AbortSignal sin modificar el timeout global de Axios. Al cambiar de sesión o desmontar la vista se cancelan estas esperas y se descartan respuestas tardías.
+
+Cancelar la solicitud del navegador no demuestra que el servidor haya cancelado el cambio. Tras un PATCH vencido no se reenvía automáticamente la modificación. Un GET que todavía informa el estado anterior tampoco elimina la incertidumbre: se mantiene «Por verificar» hasta que una consulta posterior observe el estado solicitado. Las respuestas tardías del PATCH o de una verificación vencida no actualizan el estado local. Ante otros errores de red/5xx se conserva la verificación automática existente, ahora también acotada a 15 segundos.
+
+**S7-345-04.** Los cambios de registro empresarial refrescan únicamente el crédito de la empresa afectada, incluyendo los estados recuperados mediante verificación. Las otras filas conservan sus resultados o errores y no reinician sus solicitudes. Si el registro cambia mientras su consulta de crédito está pendiente, ese resultado se descarta y se programa una nueva lectura de la misma fila. Se mantiene el máximo de dos consultas simultáneas y el aislamiento por sesión; el reinicio completo queda para cambios de sesión o de las empresas incluidas en el listado.
+
+No se modifica el diseño, Tailwind/CSS, la lógica de listas de precios, endpoints, permisos del servidor, saldos o límites de crédito.
+
+Validación local:
+
+- 302 pruebas frontend aprobadas; las 15 focalizadas de aprobación/crédito también pasan tras la comprobación final de propagación de AbortSignal.
+- Builds de backend/frontend y TypeScript del frontend aprobados.
+- Cinco regresiones unitarias nuevas: PATCH sin respuesta, verificación sin respuesta, aislamiento de la modificación al cambiar de sesión, conservación de crédito de otras filas y cambio de aprobación durante una consulta de crédito pendiente.
+- Nueve E2E de Clientes aprobados con build de producción y MariaDB descartable (seis existentes y tres nuevos). Los casos nuevos retienen el PATCH antes de enviarlo al servidor y permiten su procesamiento tardío tras vencer la espera; retienen la consulta de verificación; y retienen consultas de crédito después de aprobar una fila para comprobar que las demás no pierden sus resultados. No se repite la modificación para recuperar una respuesta perdida.
+- Los recorridos existentes conservan la verificación de cuenta/saldo/límite, permisos, errores, foco, acciones por estado y presentación a 1280/768/360 px.
+- Limpieza E2E de contenedor y datos tmpfs confirmada. Se utilizó un navegador de prueba aislado.
+
+Pendientes commit/push, CI del nuevo HEAD y reauditoría técnica de S7-345-03/04; la aprobación final y validación UX/UI corresponden a sus revisores.

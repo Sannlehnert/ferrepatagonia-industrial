@@ -27,10 +27,36 @@ const companyBadgeClass = "box-border inline-flex w-44 min-h-7 items-center just
 const auth = useAuthStore()
 const allowed = () => auth.rol === 'ADMIN' && !auth.loggingIn && !auth.loggingOut
 const identity = () => [auth.user?.id, auth.rol, auth.sessionVersion].join(':')
+const APPROVAL_TIMEOUT_MS = 15_000
+class ApprovalTimeoutError extends Error {}
+const approvalRequests = new Set<AbortController>()
+function cancelApprovalRequests() {
+    for (const request of approvalRequests) request.abort()
+    approvalRequests.clear()
+}
+async function withApprovalDeadline<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+    const request = new AbortController()
+    approvalRequests.add(request)
+    let rejectWait!: (reason: Error) => void
+    const interrupted = new Promise<never>((_, reject) => { rejectWait = reject })
+    const cancel = () => rejectWait(new Error('Consulta cancelada.'))
+    request.signal.addEventListener('abort', cancel, { once: true })
+    const timer = setTimeout(() => {
+        rejectWait(new ApprovalTimeoutError('El servidor no respondió a tiempo.'))
+        request.abort()
+    }, APPROVAL_TIMEOUT_MS)
+    try {
+        return await Promise.race([work(request.signal), interrupted])
+    } finally {
+        clearTimeout(timer)
+        request.signal.removeEventListener('abort', cancel)
+        approvalRequests.delete(request)
+    }
+}
 let generation = 0
 let active = true
 const isCurrent = (token: number) => active && generation === token && allowed()
-onBeforeUnmount(() => { active = false; generation++ })
+onBeforeUnmount(() => { active = false; generation++; cancelApprovalRequests() })
 const clients = ref<AdminClient[]>([])
 const credit = useAdminClientCredit(() => clients.value)
 const selectedClientId = ref<number | null>(null)
@@ -60,6 +86,7 @@ const feedback = ref<Record<number, { text: string; error: boolean }>>({})
 const approvalFeedback = ref<Record<number, { text: string; error: boolean }>>({})
 const updatingApprovalClientId = ref<number | null>(null)
 const uncertainApprovalClientIds = ref<Record<number, boolean>>({})
+const uncertainApprovalTargets = ref<Record<number, CompanyApprovalStatus>>({})
 const reconcilingApprovalClientId = ref<number | null>(null)
 const priceListsLoading = ref(true)
 const priceListsError = ref<string | null>(null)
@@ -143,11 +170,22 @@ async function reconcileCompanyApproval(clientId: number): Promise<void> {
     const token = generation
     reconcilingApprovalClientId.value = clientId
     try {
-        const freshClients = await getAdminClients()
+        const freshClients = await withApprovalDeadline(signal => getAdminClients(signal))
         if (!isCurrent(token)) return
         const fresh = freshClients.find(c => c.id === clientId)
         const current = clients.value.find(c => c.id === clientId)
         if (!fresh || !current || fresh.tipoCliente !== 'EMPRESA' || !['APROBADA', 'RECHAZADA', 'PENDIENTE'].includes(fresh.estadoAprobacionEmpresa ?? '')) throw new Error('El cliente ya no está disponible en el listado.')
+        // Un GET puede adelantar al PATCH que sigue procesándose en el servidor.
+        // Observar el estado anterior no demuestra que la modificación se canceló.
+        const expected = uncertainApprovalTargets.value[clientId]
+        if (expected && fresh.estadoAprobacionEmpresa !== expected) {
+            uncertainApprovalClientIds.value[clientId] = true
+            approvalFeedback.value[clientId] = {
+                text: 'El servidor aún no confirma el cambio solicitado. El resultado es incierto; volvé a verificar antes de modificarlo.',
+                error: true,
+            }
+            return
+        }
         if (fresh && current) {
             current.estadoAprobacionEmpresa = fresh.estadoAprobacionEmpresa
             current.nombreRazonSocial = fresh.nombreRazonSocial
@@ -158,6 +196,7 @@ async function reconcileCompanyApproval(clientId: number): Promise<void> {
             current.fechaRegistro = fresh.fechaRegistro
         }
         delete uncertainApprovalClientIds.value[clientId]
+        delete uncertainApprovalTargets.value[clientId]
         approvalFeedback.value[clientId] = {
             text: 'Estado verificado con el servidor.',
             error: false,
@@ -188,11 +227,12 @@ async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprova
     delete approvalFeedback.value[client.id]
     delete feedback.value[client.id]
     try {
-        const updated = await updateAdminCompanyApproval(client.id, newStatus)
+        const updated = await withApprovalDeadline(signal => updateAdminCompanyApproval(client.id, newStatus, signal))
         if (!isCurrent(token)) return
         if (updated.estadoAprobacionEmpresa !== newStatus || updated.id !== client.id) throw new Error('Respuesta de aprobación incompleta.')
         client.estadoAprobacionEmpresa = updated.estadoAprobacionEmpresa
         delete uncertainApprovalClientIds.value[client.id]
+        delete uncertainApprovalTargets.value[client.id]
         approvalFeedback.value[client.id] = {
             text: newStatus === 'APROBADA' ? 'Empresa aprobada.' : 'Empresa rechazada.',
             error: false,
@@ -202,13 +242,17 @@ async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprova
         const response = axios.isAxiosError<{ message?: string }>(error) ? error.response : undefined
         if (!response || response.status >= 500) {
             uncertainApprovalClientIds.value[client.id] = true
+            uncertainApprovalTargets.value[client.id] = newStatus
             approvalFeedback.value[client.id] = {
-                text: 'No pudimos confirmar el cambio en el servidor. Verificando estado actual…',
+                text: error instanceof ApprovalTimeoutError
+                    ? 'El servidor no respondió a tiempo. El resultado es incierto: podés cerrar y verificar el estado antes de volver a modificarlo.'
+                    : 'No pudimos confirmar el cambio en el servidor. Verificando estado actual…',
                 error: true,
             }
-            await reconcileCompanyApproval(client.id)
+            if (!(error instanceof ApprovalTimeoutError)) await reconcileCompanyApproval(client.id)
         } else {
             delete uncertainApprovalClientIds.value[client.id]
+            delete uncertainApprovalTargets.value[client.id]
             approvalFeedback.value[client.id] = {
                 text: response.data?.message ?? 'No se pudo actualizar el estado de la empresa.',
                 error: true,
@@ -230,6 +274,7 @@ async function loadClients(): Promise<void> {
         if (!isCurrent(token)) return
         clients.value = fresh
         uncertainApprovalClientIds.value = {}
+        uncertainApprovalTargets.value = {}
     } catch (error: unknown) {
         if (!isCurrent(token)) return
         const status = axios.isAxiosError(error)
@@ -247,6 +292,7 @@ async function loadClients(): Promise<void> {
 
 watch([identity, allowed], () => {
     generation++
+    cancelApprovalRequests()
     clients.value = []
     priceLists.value = []
     assignments.value = {}
@@ -254,6 +300,7 @@ watch([identity, allowed], () => {
     feedback.value = {}
     approvalFeedback.value = {}
     uncertainApprovalClientIds.value = {}
+    uncertainApprovalTargets.value = {}
     updatingApprovalClientId.value = null
     reconcilingApprovalClientId.value = null
     savingClientId.value = null

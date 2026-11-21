@@ -14,6 +14,7 @@ export function useAdminClientCredit(clients: () => AdminClient[]) {
   const allowed = () => auth.rol === 'ADMIN' && !auth.loggingIn && !auth.loggingOut
   const results = shallowRef<Record<number, ClientCredit>>({})
   const pending = new Set<number>()
+  const reread = new Set<number>()
   let queue: number[] = []
   let controller = new AbortController()
   let generation = 0
@@ -28,6 +29,7 @@ export function useAdminClientCredit(clients: () => AdminClient[]) {
     controller = new AbortController()
     queue = []
     pending.clear()
+    reread.clear()
     running = 0
     results.value = {}
   }
@@ -59,13 +61,17 @@ export function useAdminClientCredit(clients: () => AdminClient[]) {
       const id = queue.shift()!
       running++
       void readClient(id, signal).then(account => {
-        if (valid(token, session)) results.value = { ...results.value, [id]: { state: 'READY', account } }
+        if (valid(token, session) && !reread.has(id)) results.value = { ...results.value, [id]: { state: 'READY', account } }
       }, () => {
-        if (valid(token, session)) results.value = { ...results.value, [id]: { state: 'ERROR' } }
+        if (valid(token, session) && !reread.has(id)) results.value = { ...results.value, [id]: { state: 'ERROR' } }
       }).finally(() => {
         if (generation !== token) return
         pending.delete(id)
         running--
+        if (reread.delete(id)) {
+          pending.add(id)
+          queue.unshift(id)
+        }
         pump()
       })
     }
@@ -93,8 +99,17 @@ export function useAdminClientCredit(clients: () => AdminClient[]) {
     return !disposed && allowed() ? results.value[id] ?? null : null
   }
 
-  watch([identity, allowed, clients, () => clients().map(client => client.estadoAprobacionEmpresa).join('|')],
+  watch([identity, allowed, () => clients().filter(client => client.tipoCliente === 'EMPRESA').map(client => client.id).join('|')],
     () => { refresh() }, { immediate: true, flush: 'sync' })
+  watch(() => clients().map(client => ({ id: client.id, approval: client.estadoAprobacionEmpresa })),
+    (current, previous) => {
+      const old = new Map(previous.map(client => [client.id, client.approval]))
+      for (const client of current) {
+        if (!old.has(client.id) || old.get(client.id) === client.approval) continue
+        if (pending.has(client.id)) reread.add(client.id)
+        else refresh(client.id)
+      }
+    }, { flush: 'sync' })
   onBeforeUnmount(() => { disposed = true; reset() })
   return { status, refresh }
 }
