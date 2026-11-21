@@ -191,21 +191,69 @@ CREATE TABLE PAGO (
     moneda VARCHAR(3) NULL,
     fecha_acreditacion_utc DATETIME(3) NULL,
     evidencia_acreditacion VARCHAR(1000) NULL,
+    monto_usd DECIMAL(12,2) NULL,
+    id_cotizacion INT NULL,
+    tasa_historica DECIMAL(20,8) NULL,
+    clave_idempotencia CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    clave_idempotencia_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    clave_idempotencia_cierre CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    motivo_cierre VARCHAR(1000) NULL,
+    id_admin_actor INT NULL,
+    id_admin_cierre INT NULL,
+    fecha_cierre_utc DATETIME(3) NULL,
     PRIMARY KEY (id_pago),
+    UNIQUE KEY uq_pago_clave_idempotencia (clave_idempotencia),
+    UNIQUE KEY uq_pago_clave_acreditacion (clave_idempotencia_acreditacion),
+    UNIQUE KEY uq_pago_clave_cierre (clave_idempotencia_cierre),
     KEY idx_pago_pedido (id_pedido),
     KEY idx_pago_cuenta (id_cuenta_corriente),
+    KEY idx_pago_cotizacion (id_cotizacion),
+    KEY idx_pago_admin_actor (id_admin_actor),
+    KEY idx_pago_admin_cierre (id_admin_cierre),
     CONSTRAINT fk_pago_pedido FOREIGN KEY (id_pedido)
         REFERENCES PEDIDO (id_pedido) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT fk_pago_cuenta FOREIGN KEY (id_cuenta_corriente)
         REFERENCES CUENTA_CORRIENTE (id_cuenta_corriente)
         ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_pago_cotizacion FOREIGN KEY (id_cotizacion)
+        REFERENCES COTIZACION (id_cotizacion) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_pago_admin_actor FOREIGN KEY (id_admin_actor)
+        REFERENCES USUARIO (id_usuario) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT fk_pago_admin_cierre FOREIGN KEY (id_admin_cierre)
+        REFERENCES USUARIO (id_usuario) ON DELETE RESTRICT ON UPDATE RESTRICT,
     CONSTRAINT chk_pago_destino CHECK (
         (id_pedido IS NOT NULL AND id_cuenta_corriente IS NULL)
         OR (id_pedido IS NULL AND id_cuenta_corriente IS NOT NULL)
     ),
-    CONSTRAINT chk_pago_monto CHECK (monto >= 0),
-    CONSTRAINT chk_pago_moneda CHECK (moneda IS NULL OR moneda IN ('USD', 'ARS'))
-)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    CONSTRAINT chk_pago_monto CHECK (monto > 0),
+    CONSTRAINT chk_pago_moneda CHECK (moneda IS NULL OR moneda IN ('USD', 'ARS')),
+    CONSTRAINT chk_pago_estado CHECK (
+        (
+            estado IN ('PENDIENTE', 'ACREDITADO', 'RECHAZADO', 'ANULADO')
+            OR (estado = 'DEMO_REGISTRADO' AND metodo_pago = 'DEMO_METODO')
+        )
+        AND BINARY estado = BINARY UPPER(estado)
+    ),
+    CONSTRAINT chk_pago_conversion CHECK (
+        (monto_usd IS NULL AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+        OR (
+            monto_usd IS NOT NULL AND monto_usd > 0
+            AND (
+                (moneda = 'USD' AND monto_usd = monto AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+                OR (moneda = 'ARS' AND id_cotizacion IS NOT NULL AND tasa_historica IS NOT NULL AND tasa_historica > 0)
+            )
+        )
+    ),
+    CONSTRAINT chk_pago_claves CHECK (
+        (clave_idempotencia IS NULL OR clave_idempotencia REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+        AND (clave_idempotencia_acreditacion IS NULL OR clave_idempotencia_acreditacion REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+        AND (clave_idempotencia_cierre IS NULL OR clave_idempotencia_cierre REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
+    ),
+    CONSTRAINT chk_pago_cierre CHECK (
+        (estado IN ('PENDIENTE', 'ACREDITADO', 'DEMO_REGISTRADO') AND motivo_cierre IS NULL AND id_admin_cierre IS NULL AND fecha_cierre_utc IS NULL)
+        OR (estado IN ('RECHAZADO', 'ANULADO') AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE MOVIMIENTO_CUENTA_CORRIENTE (
     id_movimiento_cuenta INT NOT NULL AUTO_INCREMENT,
@@ -709,10 +757,14 @@ CREATE TABLE IF NOT EXISTS COMPROBANTE_PAGO (
     bytes INT UNSIGNED NOT NULL,
     sha256 BINARY(32) NOT NULL,
     fecha_utc DATETIME(3) NOT NULL,
+    estado_revision VARCHAR(20) COLLATE utf8mb4_bin NOT NULL DEFAULT 'PENDIENTE',
     id_admin_revision INT NULL,
     revision_utc DATETIME(3) NULL,
+    motivo_rechazo VARCHAR(1000) NULL,
+    clave_idempotencia_revision CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
     PRIMARY KEY (id_comprobante),
     UNIQUE KEY uq_comprobante_contenido (id_cliente, pedido_clave, sha256),
+    UNIQUE KEY uq_comprobante_clave_revision (id_admin_revision, clave_idempotencia_revision),
     KEY idx_comprobante_pedido (id_pedido, fecha_utc),
     KEY idx_comprobante_cuenta (id_cuenta_corriente, fecha_utc),
     KEY idx_comprobante_fecha (fecha_utc, id_comprobante),
@@ -724,5 +776,31 @@ CREATE TABLE IF NOT EXISTS COMPROBANTE_PAGO (
     CONSTRAINT chk_comprobante_destino CHECK (id_pedido IS NOT NULL OR id_cuenta_corriente IS NOT NULL),
     CONSTRAINT chk_comprobante_tipo CHECK (tipo_mime IN ('application/pdf', 'image/jpeg', 'image/png')),
     CONSTRAINT chk_comprobante_bytes CHECK (bytes BETWEEN 1 AND 5242880),
-    CONSTRAINT chk_comprobante_revision CHECK ((id_admin_revision IS NULL) = (revision_utc IS NULL))
+    CONSTRAINT chk_comprobante_estado_revision CHECK (estado_revision IN ('PENDIENTE', 'APROBADO', 'RECHAZADO')),
+    CONSTRAINT chk_comprobante_clave_revision CHECK (
+        clave_idempotencia_revision IS NULL
+        OR clave_idempotencia_revision REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    ),
+    CONSTRAINT chk_comprobante_revision CHECK (
+        (
+            estado_revision = 'PENDIENTE'
+            AND id_admin_revision IS NULL
+            AND revision_utc IS NULL
+            AND motivo_rechazo IS NULL
+            AND clave_idempotencia_revision IS NULL
+        )
+        OR (
+            estado_revision = 'APROBADO'
+            AND id_admin_revision IS NOT NULL
+            AND revision_utc IS NOT NULL
+            AND motivo_rechazo IS NULL
+        )
+        OR (
+            estado_revision = 'RECHAZADO'
+            AND id_admin_revision IS NOT NULL
+            AND revision_utc IS NOT NULL
+            AND motivo_rechazo IS NOT NULL
+            AND CHAR_LENGTH(TRIM(motivo_rechazo)) > 0
+        )
+    )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
