@@ -84,11 +84,18 @@ Migración aditiva e idempotente de T-S7-10.2 (#333). Extiende `PAGO` para la
 declaración de pagos con comprobante, la revisión administrativa y la
 acreditación financiera autorizada: `monto_usd`, cotización histórica,
 idempotencia de declaración y acreditación, vínculo lógico al comprobante y
-actores/instantes de revisión y acreditación. No crea tablas, triggers ni
+actores/instantes de revisión y acreditación. También crea de forma idempotente
+las columnas compartidas con #158/S7-04.2 (`clave_idempotencia_acreditacion`,
+`clave_idempotencia_cierre`, `motivo_cierre`, `id_admin_actor`,
+`id_admin_cierre`, `fecha_cierre_utc`), sus índices únicos globales y el check
+`chk_pago_cierre`, para que la acreditación de #333 persista en un único UPDATE
+compatible con los triggers `s704_pago_*`. No crea tablas, triggers ni
 movimientos, no convierte datos y no agrega FKs nuevas a `PAGO`. Depende de
 `migrate-275-payment-receipts.sql` para que exista `COMPROBANTE_PAGO`. En una
 base nueva, `schema.sql` ya incluye las columnas; la migración es segura de
-repetir y debe aplicarse después de FER-20 y de #275.
+repetir y debe aplicarse después de FER-20 y de #275. Si #158 se integra
+primero, sus columnas e índices ya presentes hacen que esta migración no los
+duplique.
 
 ### `seed.sql`
 

@@ -471,7 +471,7 @@ export async function accreditPayment(
         montoUsd: conversion.montoUsd,
         idCotizacion: conversion.idCotizacion,
         tasaHistorica: conversion.tasaHistorica,
-        accreditedAt,
+        accreditedAt: sqlUtc(accreditedAt),
       });
     } catch (error) {
       mapAccreditationError(error);

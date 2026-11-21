@@ -3,13 +3,20 @@
 - **Rama:** `task/333-payment-accreditation`, creada desde `origin/develop`.
 - **Base inicial:** `5cf464c` (`Merge pull request #139`).
 - **Commit de implementación:** `1cb4d4c`.
-- **Merge final de `origin/develop`:** `ddac706` (integra #328 vía PR #148), merge local `416087b`.
+- **Merge final de `origin/develop`:** `dc59601` vía `aa6d154`.
+- **Corrección de auditoría:** `ee17442` (`fix(payments): address accreditation audit findings (#333)`).
 - **Responsable:** Santiago Agustín Lehnert.
 - **Revisor técnico:** Lucci.
 - **Validación UX/UI:** no requerida.
 - **Alcance:** cuentas corrientes de empresas. La implementación de #333 no
-  modificó frontend, checkout, comprobantes existentes ni el contrato financiero
-  FER-20. El merge local incorpora cambios de `develop` ya integrados allí.
+  modificó frontend ni checkout. La revisión posterior a la auditoría de Sprint 7
+  endureció privacidad, revalidación de comprobantes, conversión FER17-v1,
+  compatibilidad con triggers de #158 y filtrado de libros restringidos.
+- **Dependencias integradas:** #275/#328 (comprobantes), #332 (lecturas
+  legítimas de cuentas restringidas) y #323/#324 (checkout) están en `develop`.
+- **Dependencia abierta:** PR #158 / #317 (`feature/s7-04-2-order-payment-state-consistency`)
+  **no está integrado** en `develop`; su contrato de `/api/admin/pagos*` y sus
+  triggers `s704_pago_*` condicionan la unificación final (ver §13).
 
 ## 1. Diagnóstico inicial
 
@@ -33,7 +40,8 @@ contrato versionado [T-S7-04.1](../s7-04/T-S7-04.1-contrato-estados-transiciones
 | Dependencia | Estado en `develop` | Uso en #333 |
 | --- | --- | --- |
 | **#275 / #328 — comprobantes** | #275 integrado. #328 integrada en `develop` mediante PR #148 (`ddac706`); el código backend de comprobantes no cambió, se ampliaron pruebas y frontend. | Se reutiliza `COMPROBANTE_PAGO` y sus endpoints actuales. Las pruebas #328 de comprobantes pasan sobre el merge: **9/9**. |
-| **#332 — lecturas legítimas** | La rama `task/332-legitimate-account-reads` (`47b3787`) **no está integrada** en `develop`. | No se incorporaron sus cambios. `git merge-tree HEAD origin/task/332-legitimate-account-reads` no reporta conflictos; la acreditación ya respeta libro mixto y cobertura completa. |
+| **#332 — lecturas legítimas** | Integrada en `develop` mediante PR #153 (`02188a8`); #333 ya la contiene. | Se respetan los filtros de libros restringidos y la privacidad de respuestas ADMIN/CLIENTE. |
+| **#158 / #317 — consistencia de estados** | PR abierto sobre `feature/s7-04-2-order-payment-state-consistency` (HEAD `4cee553`); **no integrado** en `develop`. | #333 comparte `PAGO`, `registrarAbonoPorPago`, `PAGO_IDEMPOTENCIA` y los triggers `s704_pago_*`. La acreditación de #333 se validó contra la migración y triggers reales de #158 en una integración temporal. La deduplicación de rutas queda bloqueada hasta acordar el contrato de pagos directos (ver §13). |
 | **#323 / #324 — checkout y transferencia** | Integrados en `develop`/ramas de checkout. | No se modificó checkout. Las regresiones de pedidos, transferencia y sockets pasan. |
 | **#260 / FER-20** | Integrado. | Se reutiliza `registrarAbonoPorPago` y el contrato de saldo/FIFO. |
 | **S7-04.1 / #316** | Contrato documentado, implementación parcial. | Se alinean estados, locks, idempotencia y conversión ARS. |
@@ -86,10 +94,14 @@ CLIENTE                         ADMIN                         LEDGER
 | `POST` | `/api/cuenta-corriente/pagos` | CLIENTE empresa | `Idempotency-Key` UUID v4 obligatoria. |
 | `GET` | `/api/cuenta-corriente/pagos` | CLIENTE empresa | Solo propios, paginado por `pagina`. |
 | `GET` | `/api/cuenta-corriente/pagos/:id` | CLIENTE empresa | Solo propios; otro cliente recibe `404`. |
-| `GET` | `/api/admin/pagos` | ADMIN activo | Todos, paginado. |
+| `GET` | `/api/admin/pagos` | ADMIN activo | Todos los pagos de cuenta no restringidos, paginado por `pagina`. |
 | `GET` | `/api/admin/pagos/:id` | ADMIN activo | Detalle con actor de revisión y acreditación. |
 | `PATCH` | `/api/admin/pagos/:id/revision` | ADMIN activo | Idempotente por estado del recurso. `motivo` obligatorio al rechazar. |
-| `POST` | `/api/admin/pagos/:id/acreditar` | ADMIN activo | `Idempotency-Key` UUID v4 obligatoria. No acepta importe ni cuenta en el body. |
+| `POST` | `/api/admin/pagos/:id/acreditar` | ADMIN activo | `Idempotency-Key` UUID v4 obligatoria. Acepta `evidencia` y, por compatibilidad con #158, también `evidenciaAcreditacion`, `fechaAcreditacionUtc` y `observaciones`. No acepta importe ni cuenta en el body. |
+
+Todos los endpoints `/api/admin/pagos*` se montan una sola vez desde
+`backend/src/routes/adminPayment.routes.ts`. Ese archivo es el punto de
+integración con #158: no debe existir un segundo `adminRouter.use('/pagos', ...)`.
 
 ### 3.4. Locks y transacción
 
@@ -226,9 +238,10 @@ auto-remove) y datos aislados.
 | --- | --- |
 | `npm run type-check` | OK |
 | `npm run build` | OK |
-| `npm run test:unit` | **1351/1351** |
+| `npm run test:unit` | **1402/1402** |
 | `npm run test:dto-source` | **3/3** |
-| `npm run test:payments:isolated` | **17/17** |
+| `npm run test:payments:isolated` | **23/23** |
+| #333 sobre migración + triggers reales de #158 (worktree temporal) | **23/23** |
 | `npm run test:account:isolated` | **35/35** |
 | `npm run test:account:contract` | **32/32** |
 | `npm run test:account:client` | **38/38** |
@@ -237,7 +250,7 @@ auto-remove) y datos aislados.
 | `npm run test:orders:isolated` | **91/91** |
 | `npm run test:credit-workflow:isolated` | **23/23** |
 | `npm run test:company-approval:audit` | **22/22** |
-| `npm run test:integration` | **EXIT 0** (incluye todas las suites anteriores del script) |
+| `npm run test:integration` | **EXIT 0** (todas las suites del script). Ver §12 para la ejecución concurrente previa. |
 | Migración sobre base pre-#333 con datos, aplicada dos veces | **OK**: filas `PAGO` preservadas, columnas/índices/checks creados, `verify-seed` OK. |
 
 Evidencia de migración:
@@ -323,9 +336,10 @@ saldo 100.00 -> 99.00
 
 ## 10. Riesgos y limitaciones
 
-1. **Sin triggers de inmutabilidad de `PAGO`.** Un acceso SQL directo con
-   privilegios podría revertir un estado terminal. Las suites históricas
-   dependen de limpiar/actualizar fixtures; se documenta como deuda de #290.
+1. **Sin triggers de inmutabilidad propios en #333.** Los triggers `s704_*`
+   pertenecen a #158 y no están en `develop`. #333 se validó contra ellos en una
+   integración temporal, pero hasta que #158 se integre la inmutabilidad de
+   `PAGO`/`MOVIMIENTO` depende de la aplicación. Ver §13.
 2. **Compuerta documental conservadora.** La acreditación exige `APROBADO`.
    Si el negocio decide permitir acreditar con revisión pendiente, deberá
    cambiar una sola condición en `accreditPayment` y documentarlo.
@@ -344,16 +358,166 @@ saldo 100.00 -> 99.00
 6. **La revisión de la declaración no reutiliza `COMPROBANTE_PAGO.revision_utc`.**
    Son estados distintos: archivo vs. declaración. El DTO expone ambos.
 
-## 11. Commit y PR recomendados
+## 11. Commit y PR
 
 - **Base inicial:** `origin/develop` en `5cf464c`.
-- **Merge de `origin/develop`:** `ddac706` integrado localmente en `416087b`.
 - **Rama:** `task/333-payment-accreditation`.
 - **Commit de implementación:** `1cb4d4c`
-  `feat(payments): add client declaration, documentary review and authorized accreditation (#333)`
-- **HEAD actual:** `416087b` (merge local; sin push).
-- **PR recomendado:** contra `develop`, con CI completa y revisión cruzada de
-  Lucci. Incluir en la descripción el diagnóstico, la matriz de invariantes y
-  los comandos de prueba de este documento.
-- **No se hizo push ni merge remoto.** Solo se realizó el merge local de
-  `origin/develop` solicitado. No se modificó Taiga.
+  `feat(payments): add client declaration, documentary review and authorized accreditation (#333)`.
+- **Corrección de auditoría:** `ee17442`
+  `fix(payments): address accreditation audit findings (#333)`.
+- **PR:** #155 contra `develop`.
+- **No se modificó Taiga ni la rama de #158.**
+- **No se hizo merge remoto a `develop`.**
+
+## 12. Corrección integral de la auditoría Sprint 7
+
+### Matriz de hallazgos
+
+| Hallazgo | Corrección implementada | Evidencia |
+| --- | --- | --- |
+| **P1-01** Cotización ausente/inválida devolvía 500 | `resolveAccreditation` ejecuta `loadAccountQuote` antes de tocar `PAGO`. `mapAccreditationError` captura `PricingError` y distingue `COTIZACION_AUSENTE` (409) de `COTIZACION_INVALIDA` (422). Los errores de infraestructura desconocidos siguen propagándose como 500. | `#333 pago en ARS...` (sin calendario, sin cotización diaria y con cotización no verificada), `#333 conversión ARS...` |
+| **P1-02** Incompatibilidad con triggers `s704_pago_before_update` de #158 | La acreditación persiste en **un único UPDATE** `estado`, `monto_usd`, `id_cotizacion`, `tasa_historica`, `fecha_acreditacion_utc`, `evidencia_acreditacion`, `id_admin_acreditacion`, `id_admin_actor`, `clave_acreditacion`, `huella_acreditacion` y `clave_idempotencia_acreditacion`. `registrarAbonoPorPago` ya no reescribe `PAGO`; solo revalida y crea el único `ABONO` + FIFO. | Suite #333 ejecutada sobre la migración y los triggers reales de #158: **23/23**. |
+| **P2-01** Comprobante no revalidado en revisión/acreditación | `assertPaymentReceipt` exige `PAGO.id_comprobante`, bloquea el comprobante bajo lock y revalida cliente, cuenta y pedido (`CUENTA_CORRIENTE`, mismo titular). Un comprobante eliminado, ajeno o inconsistente responde 404 sin mover saldos. | `#333 revalida el comprobante...` |
+| **P2-02** Cliente propio inactivo devolvía 404 | `findAccountIdForUser` ya no filtra `CLIENTE.activo = 1` ni `USUARIO.activo = 1`; el estado se decide después del lock. Cliente inactivo propio → `403 CLIENTE_INACTIVO`; usuario inactivo → 401; cliente ajeno sigue siendo 404/anti-IDOR. | `#333 cliente propio inactivo...` |
+| **P2-03** Privacidad HTTP incompleta en `/api/admin/pagos*` | `adminAccountPrivacy.middleware` cubre `/api/admin/pagos`; el router y el controlador también fijan `Cache-Control: private, no-store`, `Pragma: no-cache` y `Vary: Cookie` antes de auth/validación. | `#333 cabeceras privadas...` (401, 400 de query y 400 de parámetro). |
+| **P2-04** Rechazo financiero y libros restringidos | Un `PAGO PENDIENTE` con revisión documental `APROBADO` puede rechazarse financieramente (terminal, sin movimientos). La conversión ARS que redondea a USD 0.00 responde `422 MONTO_USD_INVALIDO`. `findPayment`/`listPayments` excluyen siempre `DEMO_REGISTRADO`, cuentas `origen_datos='DEMO'` y libros con cualquier movimiento `origen='DEMO'`, tanto para CLIENTE como para ADMIN y sin depender de `NODE_ENV`. | `#333 revisión documental...`, `#333 conversión ARS...`, `#333 filtra pagos DEMO...` |
+| **P3-01** Documentación desactualizada | Este documento refleja #332 integrada, #158 abierta, contrato final, migración, idempotencia, invariantes, evidencia y bloqueantes. | §12 y §13 |
+
+### Contrato final de rutas
+
+```text
+CLIENTE
+  GET    /api/cuenta-corriente/pagos
+  GET    /api/cuenta-corriente/pagos/:id
+  POST   /api/cuenta-corriente/pagos                 Idempotency-Key UUID v4
+
+ADMIN
+  GET    /api/admin/pagos
+  GET    /api/admin/pagos/:id
+  PATCH  /api/admin/pagos/:id/revision               motivo obligatorio al rechazar
+  POST   /api/admin/pagos/:id/acreditar              Idempotency-Key UUID v4
+```
+
+La revisión documental **no** crea movimientos. La acreditación **sí** crea un
+único `ABONO` y sus imputaciones FIFO en la misma transacción.
+
+### Idempotencia
+
+- Declaración: `uq_pago_idempotencia (id_cuenta_corriente, clave_idempotencia)`
+  más verificación global en `PAGO` y `huella_declaracion`.
+- Acreditación: `uq_pago_acreditacion (id_cuenta_corriente, clave_acreditacion)`,
+  `uq_pago_clave_acreditacion (clave_idempotencia_acreditacion)` y hash de
+  payload (`huella_acreditacion`).
+- Migración: se crean de forma idempotente las columnas de clave global de #158
+  (`clave_idempotencia_acreditacion`, `clave_idempotencia_cierre`) y los campos
+  de cierre (`motivo_cierre`, `id_admin_actor`, `id_admin_cierre`,
+  `fecha_cierre_utc`) para que ambos flujos escriban la misma evidencia.
+- Una clave usada por otra cuenta u otro flujo responde
+  `409 CLAVE_IDEMPOTENCIA_REUTILIZADA`.
+- Misma clave con payload distinto responde `409`; mismo payload responde
+  `200 meta.replay=true` sin duplicar movimientos.
+
+### Evidencia transaccional
+
+```text
+Declaración:
+  PAGO PENDIENTE/PENDIENTE, monto_usd NULL, 0 ABONOS, saldo intacto.
+
+Revisión APROBADO:
+  PAGO PENDIENTE/APROBADO, 0 movimientos, saldo intacto.
+
+Rechazo financiero posterior:
+  PAGO RECHAZADO/RECHAZADO + motivo_cierre, 0 movimientos, saldo intacto.
+
+Acreditación USD:
+  UPDATE PAGO atómico (estado, monto_usd, evidencia, actor, claves)
+  + 1 ABONO USD + imputación FIFO + revisión de cuenta.
+
+Acreditación ARS:
+  loadAccountQuote(FER17-v1) ANTES del UPDATE
+  + UPDATE atómico (monto_usd, id_cotizacion, tasa_historica)
+  + 1 ABONO USD con monto_original/moneda_original ARS.
+
+Fallo de cotización o SQL:
+  rollback total; PAGO sigue PENDIENTE/APROBADO; 0 movimientos.
+```
+
+### Pruebas de esta corrección
+
+| Comando | Resultado |
+| --- | --- |
+| `npm run build` (backend) | OK |
+| `npm run type-check` (backend) | OK |
+| `npm run test:unit` | 1402/1402 |
+| `npm run test:payments:isolated` | 23/23 |
+| #333 sobre migración + triggers reales de #158 (worktree temporal) | 23/23 |
+| `npm run test:integration` | **EXIT 0**: todas las suites del script, incluida `payments`, sobre MariaDB 11.4 descartable. En una ejecución previa concurrente con la suite E2E completa se observó un fallo intermitente de `cart.operations.test.cjs`; la repetición aislada dio **53/53** y la ejecución completa posterior **EXIT 0**. |
+| `git diff --check` | OK |
+
+## 13. Compatibilidad real con #158 y bloqueantes
+
+### Lo que quedó implementado y demostrado
+
+1. **Esquema compartido:** #333 agrega de forma idempotente las columnas y
+   claves que #158 necesita (`clave_idempotencia_acreditacion`,
+   `clave_idempotencia_cierre`, `motivo_cierre`, `id_admin_actor`,
+   `id_admin_cierre`, `fecha_cierre_utc`). La migración de #158 puede aplicarse
+   después sin conflicto de columnas.
+2. **Triggers financieros:** la suite #333 completa se ejecutó en un worktree
+   temporal con `schema.sql` de #158, `migrate-s7-04-2-state-consistency.sql`
+   aplicada dos veces y los triggers `s704_pago_before_insert/update`,
+   `s704_movimiento_*` y `s704_comprobante_*` activos. Resultado: **23/23**.
+3. **Idempotencia cruzada:** #333 escribe `clave_idempotencia` y
+   `clave_idempotencia_acreditacion`, y valida claves globales contra todas las
+   columnas de #158 antes de insertar.
+4. **Repositorio común:** `registrarAbonoPorPago` ya no escribe `PAGO`, evitando
+   la violación de inmutabilidad de `s704_pago_before_update` y funcionando con
+   llamadas de ambos servicios.
+
+### Lo que queda bloqueado hasta integrar #158
+
+1. **Deduplicación de `/api/admin/pagos*`.** #158 publica
+   `GET /pagos`, `GET /pagos/:pagoId`, `POST /pagos`, `POST /pagos/:pagoId/acreditar`,
+   `POST /pagos/:pagoId/rechazar` y `POST /pagos/:pagoId/anular`. #333 publica
+   `GET /pagos`, `GET /pagos/:id`, `PATCH /pagos/:id/revision` y
+   `POST /pagos/:id/acreditar`. Los `GET` y `acreditar` se solapan. Ambos branches
+   crean `backend/src/routes/adminPayment.routes.ts`: el merge produce un
+   conflicto add/add explícito. No se resolvió unilateralmente porque exige
+   decidir el contrato de pagos directos de #158.
+2. **Pagos directos creados por ADMIN (#158).** Un pago creado por
+   `POST /api/admin/pagos` puede nacer `PENDIENTE` o `ACREDITADO` y no tiene
+   `id_comprobante` ni declaración del cliente. #333 exige comprobante y
+   revisión documental `APROBADO`. Unificarlos requiere una decisión de negocio:
+   - hacer que los pagos directos también se declaren/revisen, o
+   - agregar un `origen` explícito que permita a #158 omitir la compuerta
+     documental sin debilitar el flujo de declaraciones.
+3. **Formato de error y respuesta.** #158 usa `AdminPaymentError` con
+   `COTIZACION_NO_VERIFICADA`, `MONTO_USD_INVALIDO` y DTOs `idPago/montoUSD`;
+   #333 usa `PaymentError` con `COTIZACION_AUSENTE`/`COTIZACION_INVALIDA` y
+   DTOs `id/montoUsd`. La convergencia requiere un adaptador común.
+4. **`PAGO_IDEMPOTENCIA`.** #333 valida claves globales contra columnas de
+   `PAGO`, pero no escribe la tabla `PAGO_IDEMPOTENCIA` de #158 porque el hash
+   de payload y la operación son distintos. Al integrar #158 hay que definir un
+   único formato de hash para declaración, acreditación, rechazo y anulación.
+5. **Suite de #158 sobre el router de #333.** En el worktree temporal, la suite
+   de #158 (`run-state-consistency-mariadb.cjs`) pasó 2/8 porque los endpoints
+   resolvieron al contrato de #333. Esto confirma que la compatibilidad
+   financiera (triggers, conversión, ledger) está demostrada, pero la
+   compatibilidad HTTP no puede declararse sin unificar el router.
+
+### Cambio propuesto para #158 (no aplicado)
+
+Se propone que el responsable de #158 acuerde y aplique, en su rama:
+
+1. un único `adminPaymentRouter` que monte una sola vez `/pagos`;
+2. un único servicio de acreditación que reciba `id_comprobante` o `origen`
+   explícito y aplique la compuerta documental solo a declaraciones;
+3. un hash de idempotencia compartido y la tabla `PAGO_IDEMPOTENCIA` como fuente
+   única;
+4. un DTO de respuesta superset (`id`/`idPago`, `montoUsd`/`montoUSD`) durante
+   una ventana de compatibilidad.
+
+Hasta que eso ocurra, **#155 no debe declararse listo para merge por tener su
+CI individual verde**: la integración HTTP con #158 permanece bloqueada y así se
+documenta en el PR.

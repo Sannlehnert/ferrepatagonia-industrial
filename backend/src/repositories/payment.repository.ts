@@ -259,7 +259,7 @@ export async function updatePaymentAccreditation(
   input: {
     paymentId: number; adminId: number; key: string; hash: string; evidence: string;
     montoUsd: string; idCotizacion: number | null; tasaHistorica: string | null;
-    accreditedAt: Date;
+    accreditedAt: string;
   },
 ) {
   // Un solo UPDATE deja satisfechos los triggers de #158 antes de que el pago

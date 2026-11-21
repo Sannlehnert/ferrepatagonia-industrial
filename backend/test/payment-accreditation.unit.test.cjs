@@ -72,7 +72,15 @@ test('#333 DTO de revisión y acreditación exigen decisión y evidencia', async
   ]) assert.equal((await validateDtoInput(reviewPaymentPolicy, body)).valid, false, JSON.stringify(body));
 
   assert.equal((await validateDtoInput(accreditPaymentPolicy, { evidencia: 'Extracto BNA' })).valid, true);
-  for (const body of [{}, { evidencia: '' }, { evidencia: 'x', monto: '1.00' }]) {
+  assert.equal((await validateDtoInput(accreditPaymentPolicy, {
+    evidenciaAcreditacion: 'Extracto BNA',
+    fechaAcreditacionUtc: '2026-01-15T12:00:00.000Z',
+  })).valid, true);
+  for (const body of [
+    {}, { evidencia: '' }, { evidencia: 'x', monto: '1.00' },
+    { evidenciaAcreditacion: 'x', fechaAcreditacionUtc: '2026-02-30T00:00:00.000Z' },
+    { evidenciaAcreditacion: 'x', fechaAcreditacionUtc: '2026-01-15' },
+  ]) {
     assert.equal((await validateDtoInput(accreditPaymentPolicy, body)).valid, false, JSON.stringify(body));
   }
 });
