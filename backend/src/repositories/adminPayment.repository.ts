@@ -6,6 +6,7 @@ export interface AdminPaymentRow {
   id_pedido: number | null;
   id_cuenta_corriente: number | null;
   id_cliente: number;
+  cliente: string;
   fecha_iso: string;
   monto: string;
   moneda: 'USD' | 'ARS' | null;
@@ -14,9 +15,22 @@ export interface AdminPaymentRow {
   tasa_historica: string | null;
   metodo_pago: string;
   estado: string;
+  estado_documental: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  id_usuario_declarante: number | null;
+  id_admin_revision: number | null;
+  revision_iso: string | null;
+  motivo_revision: string | null;
+  id_admin_acreditacion: number | null;
+  clave_acreditacion: string | null;
+  huella_acreditacion: string | null;
   evidencia_acreditacion: string | null;
   fecha_acreditacion_iso: string | null;
   comprobante: string | null;
+  id_comprobante: string | null;
+  comprobante_tipo_mime: string | null;
+  comprobante_bytes: number | null;
+  comprobante_pedido_id: number | null;
+  comprobante_revisado_iso: string | null;
   observaciones: string | null;
   clave_idempotencia: string | null;
   clave_idempotencia_acreditacion: string | null;
@@ -26,6 +40,19 @@ export interface AdminPaymentRow {
   id_admin_cierre: number | null;
   fecha_cierre_iso: string | null;
   abono_movimiento_id: number | null;
+  movimiento_estado: string | null;
+  movimiento_monto: string | null;
+}
+
+export interface LockedPaymentReceiptRow {
+  id_comprobante: string | null;
+  id_cliente: number | null;
+  id_cuenta_corriente: number | null;
+  id_pedido: number | null;
+  estado_revision: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | null;
+  pedido_id: number | null;
+  pedido_cliente: number | null;
+  modalidad_pago: string | null;
 }
 
 export interface PaymentDestinationProbe {
@@ -64,7 +91,13 @@ export interface AdminActorRow {
   activo: number;
 }
 
-export type PaymentIdempotencyOperation = 'CREAR' | 'ACREDITAR' | 'RECHAZAR' | 'ANULAR';
+export type PaymentIdempotencyOperation =
+  | 'CREAR'
+  | 'DECLARAR'
+  | 'REVISAR_PAGO'
+  | 'ACREDITAR'
+  | 'RECHAZAR'
+  | 'ANULAR';
 
 export interface PaymentIdempotencyRow {
   clave_idempotencia: string;
@@ -77,12 +110,28 @@ export function utcSql(date: Date): string {
   return date.toISOString().slice(0, 23).replace('T', ' ');
 }
 
+const RESTRICTED_PAYMENT_PREDICATE = `
+  g.estado <> 'DEMO_REGISTRADO'
+  AND (
+    g.id_cuenta_corriente IS NULL
+    OR (
+      cc.origen_datos <> 'DEMO'
+      AND NOT EXISTS (
+        SELECT 1 FROM MOVIMIENTO_CUENTA_CORRIENTE m_demo
+        WHERE m_demo.id_cuenta_corriente = cc.id_cuenta_corriente
+          AND UPPER(TRIM(m_demo.origen)) = 'DEMO'
+      )
+    )
+  )
+`;
+
 const PAYMENT_SELECT = `
   SELECT
     g.id_pago,
     g.id_pedido,
     g.id_cuenta_corriente,
     COALESCE(p.id_cliente, cc.id_cliente) AS id_cliente,
+    c.nombre_razon_social AS cliente,
     DATE_FORMAT(g.fecha, '%Y-%m-%dT%H:%i:%s.000Z') AS fecha_iso,
     g.monto,
     g.moneda,
@@ -91,9 +140,22 @@ const PAYMENT_SELECT = `
     g.tasa_historica,
     g.metodo_pago,
     g.estado,
+    g.estado_documental,
+    g.id_usuario_declarante,
+    g.id_admin_revision,
+    DATE_FORMAT(g.revision_utc, '%Y-%m-%dT%H:%i:%s.%fZ') AS revision_iso,
+    g.motivo_revision,
+    g.id_admin_acreditacion,
+    g.clave_acreditacion,
+    g.huella_acreditacion,
     g.evidencia_acreditacion,
     DATE_FORMAT(g.fecha_acreditacion_utc, '%Y-%m-%dT%H:%i:%s.%fZ') AS fecha_acreditacion_iso,
     g.comprobante,
+    g.id_comprobante,
+    r.tipo_mime AS comprobante_tipo_mime,
+    r.bytes AS comprobante_bytes,
+    r.id_pedido AS comprobante_pedido_id,
+    DATE_FORMAT(r.revision_utc, '%Y-%m-%dT%H:%i:%s.%fZ') AS comprobante_revisado_iso,
     g.observaciones,
     g.clave_idempotencia,
     g.clave_idempotencia_acreditacion,
@@ -102,13 +164,21 @@ const PAYMENT_SELECT = `
     g.id_admin_actor,
     g.id_admin_cierre,
     DATE_FORMAT(g.fecha_cierre_utc, '%Y-%m-%dT%H:%i:%s.%fZ') AS fecha_cierre_iso,
-    m.id_movimiento_cuenta AS abono_movimiento_id
+    m.id_movimiento_cuenta AS abono_movimiento_id,
+    m.estado AS movimiento_estado,
+    m.monto AS movimiento_monto
   FROM PAGO g
   LEFT JOIN PEDIDO p ON p.id_pedido = g.id_pedido
   LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cuenta_corriente = g.id_cuenta_corriente
+  LEFT JOIN CLIENTE c ON c.id_cliente = COALESCE(p.id_cliente, cc.id_cliente)
+  LEFT JOIN COMPROBANTE_PAGO r ON r.id_comprobante = g.id_comprobante
   LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
     ON m.id_pago = g.id_pago AND m.tipo_movimiento = 'ABONO'
 `;
+
+function toIsoOrNull(value: unknown): string | null {
+  return value !== null && value !== undefined ? new Date(String(value)).toISOString() : null;
+}
 
 function mapRow(raw: Record<string, unknown>): AdminPaymentRow {
   return {
@@ -119,6 +189,7 @@ function mapRow(raw: Record<string, unknown>): AdminPaymentRow {
         ? Number(raw.id_cuenta_corriente)
         : null,
     id_cliente: Number(raw.id_cliente),
+    cliente: raw.cliente !== null && raw.cliente !== undefined ? String(raw.cliente) : '',
     fecha_iso: String(raw.fecha_iso),
     monto: String(raw.monto),
     moneda: raw.moneda ? (String(raw.moneda) as 'USD' | 'ARS') : null,
@@ -133,15 +204,58 @@ function mapRow(raw: Record<string, unknown>): AdminPaymentRow {
         : null,
     metodo_pago: String(raw.metodo_pago),
     estado: String(raw.estado),
+    estado_documental: (raw.estado_documental ? String(raw.estado_documental) : 'PENDIENTE') as
+      | 'PENDIENTE'
+      | 'APROBADO'
+      | 'RECHAZADO',
+    id_usuario_declarante:
+      raw.id_usuario_declarante !== null && raw.id_usuario_declarante !== undefined
+        ? Number(raw.id_usuario_declarante)
+        : null,
+    id_admin_revision:
+      raw.id_admin_revision !== null && raw.id_admin_revision !== undefined
+        ? Number(raw.id_admin_revision)
+        : null,
+    revision_iso: toIsoOrNull(raw.revision_iso),
+    motivo_revision:
+      raw.motivo_revision !== null && raw.motivo_revision !== undefined
+        ? String(raw.motivo_revision)
+        : null,
+    id_admin_acreditacion:
+      raw.id_admin_acreditacion !== null && raw.id_admin_acreditacion !== undefined
+        ? Number(raw.id_admin_acreditacion)
+        : null,
+    clave_acreditacion:
+      raw.clave_acreditacion !== null && raw.clave_acreditacion !== undefined
+        ? String(raw.clave_acreditacion)
+        : null,
+    huella_acreditacion:
+      raw.huella_acreditacion !== null && raw.huella_acreditacion !== undefined
+        ? String(raw.huella_acreditacion)
+        : null,
     evidencia_acreditacion:
       raw.evidencia_acreditacion !== null && raw.evidencia_acreditacion !== undefined
         ? String(raw.evidencia_acreditacion)
         : null,
-    fecha_acreditacion_iso:
-      raw.fecha_acreditacion_iso !== null && raw.fecha_acreditacion_iso !== undefined
-        ? new Date(String(raw.fecha_acreditacion_iso)).toISOString()
-        : null,
+    fecha_acreditacion_iso: toIsoOrNull(raw.fecha_acreditacion_iso),
     comprobante: raw.comprobante !== null && raw.comprobante !== undefined ? String(raw.comprobante) : null,
+    id_comprobante:
+      raw.id_comprobante !== null && raw.id_comprobante !== undefined
+        ? String(raw.id_comprobante)
+        : null,
+    comprobante_tipo_mime:
+      raw.comprobante_tipo_mime !== null && raw.comprobante_tipo_mime !== undefined
+        ? String(raw.comprobante_tipo_mime)
+        : null,
+    comprobante_bytes:
+      raw.comprobante_bytes !== null && raw.comprobante_bytes !== undefined
+        ? Number(raw.comprobante_bytes)
+        : null,
+    comprobante_pedido_id:
+      raw.comprobante_pedido_id !== null && raw.comprobante_pedido_id !== undefined
+        ? Number(raw.comprobante_pedido_id)
+        : null,
+    comprobante_revisado_iso: toIsoOrNull(raw.comprobante_revisado_iso),
     observaciones: raw.observaciones !== null && raw.observaciones !== undefined ? String(raw.observaciones) : null,
     clave_idempotencia:
       raw.clave_idempotencia !== null && raw.clave_idempotencia !== undefined
@@ -167,13 +281,18 @@ function mapRow(raw: Record<string, unknown>): AdminPaymentRow {
       raw.id_admin_cierre !== null && raw.id_admin_cierre !== undefined
         ? Number(raw.id_admin_cierre)
         : null,
-    fecha_cierre_iso:
-      raw.fecha_cierre_iso !== null && raw.fecha_cierre_iso !== undefined
-        ? new Date(String(raw.fecha_cierre_iso)).toISOString()
-        : null,
+    fecha_cierre_iso: toIsoOrNull(raw.fecha_cierre_iso),
     abono_movimiento_id:
       raw.abono_movimiento_id !== null && raw.abono_movimiento_id !== undefined
         ? Number(raw.abono_movimiento_id)
+        : null,
+    movimiento_estado:
+      raw.movimiento_estado !== null && raw.movimiento_estado !== undefined
+        ? String(raw.movimiento_estado)
+        : null,
+    movimiento_monto:
+      raw.movimiento_monto !== null && raw.movimiento_monto !== undefined
+        ? String(raw.movimiento_monto)
         : null,
   };
 }
@@ -296,9 +415,18 @@ export async function lockPaymentById(
        tasa_historica,
        metodo_pago,
        estado,
+       estado_documental,
+       id_usuario_declarante,
+       id_admin_revision,
+       DATE_FORMAT(revision_utc, '%Y-%m-%dT%H:%i:%s.%fZ') AS revision_iso,
+       motivo_revision,
+       id_admin_acreditacion,
+       clave_acreditacion,
+       huella_acreditacion,
        evidencia_acreditacion,
        DATE_FORMAT(fecha_acreditacion_utc, '%Y-%m-%dT%H:%i:%s.%fZ') AS fecha_acreditacion_iso,
        comprobante,
+       id_comprobante,
        observaciones,
        clave_idempotencia,
        clave_idempotencia_acreditacion,
@@ -313,7 +441,60 @@ export async function lockPaymentById(
     [pagoId],
   );
   if (!row) return null;
-  return mapRow({ ...row, id_cliente: clientId, abono_movimiento_id: null });
+  return mapRow({
+    ...row,
+    id_cliente: clientId,
+    cliente: '',
+    comprobante_tipo_mime: null,
+    comprobante_bytes: null,
+    comprobante_pedido_id: null,
+    comprobante_revisado_iso: null,
+    abono_movimiento_id: null,
+    movimiento_estado: null,
+    movimiento_monto: null,
+  });
+}
+
+export async function lockPaymentReceiptForAccreditation(
+  manager: EntityManager,
+  pagoId: number,
+): Promise<LockedPaymentReceiptRow | null> {
+  const [row] = await manager.query<Array<Record<string, unknown>>>(
+    `SELECT
+       r.id_comprobante,
+       r.id_cliente,
+       r.id_cuenta_corriente,
+       r.id_pedido,
+       r.estado_revision,
+       p.id_pedido AS pedido_id,
+       p.id_cliente AS pedido_cliente,
+       p.modalidad_pago
+     FROM PAGO g
+     LEFT JOIN COMPROBANTE_PAGO r ON r.id_comprobante = g.id_comprobante
+     LEFT JOIN PEDIDO p ON p.id_pedido = r.id_pedido
+     WHERE g.id_pago = ?
+     FOR UPDATE`,
+    [pagoId],
+  );
+  if (!row) return null;
+  return {
+    id_comprobante: row.id_comprobante !== null && row.id_comprobante !== undefined ? String(row.id_comprobante) : null,
+    id_cliente: row.id_cliente !== null && row.id_cliente !== undefined ? Number(row.id_cliente) : null,
+    id_cuenta_corriente:
+      row.id_cuenta_corriente !== null && row.id_cuenta_corriente !== undefined
+        ? Number(row.id_cuenta_corriente)
+        : null,
+    id_pedido: row.id_pedido !== null && row.id_pedido !== undefined ? Number(row.id_pedido) : null,
+    estado_revision:
+      row.estado_revision !== null && row.estado_revision !== undefined
+        ? (String(row.estado_revision) as 'PENDIENTE' | 'APROBADO' | 'RECHAZADO')
+        : null,
+    pedido_id: row.pedido_id !== null && row.pedido_id !== undefined ? Number(row.pedido_id) : null,
+    pedido_cliente:
+      row.pedido_cliente !== null && row.pedido_cliente !== undefined ? Number(row.pedido_cliente) : null,
+    modalidad_pago:
+      row.modalidad_pago !== null && row.modalidad_pago !== undefined ? String(row.modalidad_pago) : null,
+  };
 }
 
 export async function findPaymentByAnyKey(
@@ -324,9 +505,10 @@ export async function findPaymentByAnyKey(
     `${PAYMENT_SELECT}
      WHERE g.clave_idempotencia = ?
         OR g.clave_idempotencia_acreditacion = ?
+        OR g.clave_acreditacion = ?
         OR g.clave_idempotencia_cierre = ?
      LIMIT 1`,
-    [key, key, key],
+    [key, key, key, key],
   );
   return row ? mapRow(row) : null;
 }
@@ -376,9 +558,13 @@ export async function insertPaymentIdempotency(
 export async function findPaymentById(
   manager: EntityManager,
   pagoId: number,
+  options: { excludeRestricted?: boolean } = {},
 ): Promise<AdminPaymentRow | null> {
   const [row] = await manager.query<Array<Record<string, unknown>>>(
-    `${PAYMENT_SELECT} WHERE g.id_pago = ? LIMIT 1`,
+    `${PAYMENT_SELECT}
+     WHERE g.id_pago = ?
+     ${options.excludeRestricted ? `AND ${RESTRICTED_PAYMENT_PREDICATE}` : ''}
+     LIMIT 1`,
     [pagoId],
   );
   return row ? mapRow(row) : null;
@@ -388,7 +574,7 @@ export async function listPayments(
   manager: EntityManager,
   query: AdminPaymentListQuery,
 ): Promise<AdminPaymentRow[]> {
-  const conditions: string[] = [];
+  const conditions: string[] = [RESTRICTED_PAYMENT_PREDICATE];
   const params: Array<string | number> = [];
 
   if (query.antesDeId !== undefined) {
@@ -412,10 +598,11 @@ export async function listPayments(
     params.push(query.clienteId);
   }
 
-  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const where = `WHERE ${conditions.join(' AND ')}`;
+  const offset = query.pagina !== undefined ? (query.pagina - 1) * query.limite : 0;
   const rows = await manager.query<Array<Record<string, unknown>>>(
-    `${PAYMENT_SELECT} ${where} ORDER BY g.id_pago DESC LIMIT ?`,
-    [...params, query.limite + 1],
+    `${PAYMENT_SELECT} ${where} ORDER BY g.id_pago DESC LIMIT ?${offset > 0 ? ' OFFSET ?' : ''}`,
+    offset > 0 ? [...params, query.limite + 1, offset] : [...params, query.limite + 1],
   );
   return rows.map(mapRow);
 }
@@ -479,6 +666,7 @@ export async function markPaymentAccredited(
     fechaAcreditacionUtc: string;
     observaciones: string | null | undefined;
     claveIdempotenciaAcreditacion: string;
+    huellaAcreditacion: string;
     adminId: number;
   },
 ): Promise<number> {
@@ -492,7 +680,10 @@ export async function markPaymentAccredited(
          fecha_acreditacion_utc = ?,
          observaciones = CASE WHEN ? IS NOT NULL THEN ? ELSE observaciones END,
          clave_idempotencia_acreditacion = ?,
-         id_admin_actor = ?
+         id_admin_actor = ?,
+         id_admin_acreditacion = ?,
+         clave_acreditacion = ?,
+         huella_acreditacion = ?
      WHERE id_pago = ?
        AND estado = 'PENDIENTE'`,
     [
@@ -505,6 +696,9 @@ export async function markPaymentAccredited(
       values.observaciones ?? null,
       values.claveIdempotenciaAcreditacion,
       values.adminId,
+      values.adminId,
+      values.claveIdempotenciaAcreditacion,
+      values.huellaAcreditacion,
       values.pagoId,
     ],
   );

@@ -115,7 +115,6 @@ adminRouter.get('/clientes/listas-precio', getClientPriceLists);
 adminRouter.put('/clientes/:id/lista-precio',
     validateDto('params', clientIdPolicy), validateDto('body', priceListAssignmentPolicy), putClientPriceList);
 adminRouter.use('/pedidos', adminOrderRouter);
-adminRouter.use('/pagos', adminPaymentRouter);
 adminRouter.use('/productos/importar', productImportRouter);
 adminRouter.use('/productos', adminProductRouter);
 adminRouter.use('/categorias', adminCategoryRouter);

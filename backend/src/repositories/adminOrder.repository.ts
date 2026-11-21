@@ -117,21 +117,7 @@ interface RawOrderRow {
     estado_aprobacion_empresa: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | null;
     es_fiel: number | boolean;
     cliente_activo: number | boolean;
-    comprobantes_total: number | string;
-    comprobantes_pendientes: number | string;
 }
-
-// Mismo alcance documental que el listado de comprobantes ADMIN. Consultas
-// por pedido indexado: no descargar ni recorrer todos los comprobantes en la UI.
-const receiptOwnerPredicate = `r.id_pedido = p.id_pedido AND r.id_cliente = p.id_cliente
-  AND (r.id_cuenta_corriente IS NULL OR EXISTS (
-    SELECT 1 FROM CUENTA_CORRIENTE rc
-    WHERE rc.id_cuenta_corriente = r.id_cuenta_corriente AND rc.id_cliente = r.id_cliente
-  ))`;
-const receiptSummaryColumns = `
-  (SELECT COUNT(*) FROM COMPROBANTE_PAGO r WHERE ${receiptOwnerPredicate}) AS comprobantes_total,
-  (SELECT COUNT(*) FROM COMPROBANTE_PAGO r WHERE ${receiptOwnerPredicate} AND r.revision_utc IS NULL) AS comprobantes_pendientes,
-`;
 
 interface RawOrderLineRow {
     id_detalle_pedido: number | string;
@@ -252,15 +238,20 @@ const ADMIN_ORDER_PROJECTION_JOINS = `
             ) imp_stat ON imp_stat.id_cargo = mcc.id_movimiento_cuenta
             LEFT JOIN (
                 SELECT
-                    id_pedido,
+                    r.id_pedido,
+                    r.id_cliente,
                     COUNT(*) AS total,
-                    SUM(CASE WHEN estado_revision = 'APROBADO' THEN 1 ELSE 0 END) AS aprobados,
-                    SUM(CASE WHEN estado_revision = 'PENDIENTE' THEN 1 ELSE 0 END) AS pendientes,
-                    SUM(CASE WHEN estado_revision = 'RECHAZADO' THEN 1 ELSE 0 END) AS rechazados
-                FROM COMPROBANTE_PAGO
-                WHERE id_pedido IS NOT NULL
-                GROUP BY id_pedido
-            ) cp_stat ON cp_stat.id_pedido = p.id_pedido
+                    SUM(CASE WHEN r.estado_revision = 'APROBADO' THEN 1 ELSE 0 END) AS aprobados,
+                    SUM(CASE WHEN r.estado_revision = 'PENDIENTE' THEN 1 ELSE 0 END) AS pendientes,
+                    SUM(CASE WHEN r.estado_revision = 'RECHAZADO' THEN 1 ELSE 0 END) AS rechazados
+                FROM COMPROBANTE_PAGO r
+                WHERE r.id_pedido IS NOT NULL
+                  AND (r.id_cuenta_corriente IS NULL OR EXISTS (
+                      SELECT 1 FROM CUENTA_CORRIENTE rc
+                      WHERE rc.id_cuenta_corriente = r.id_cuenta_corriente AND rc.id_cliente = r.id_cliente
+                  ))
+                GROUP BY r.id_pedido, r.id_cliente
+            ) cp_stat ON cp_stat.id_pedido = p.id_pedido AND cp_stat.id_cliente = p.id_cliente
             LEFT JOIN (
                 SELECT
                     id_pedido,
@@ -360,7 +351,6 @@ export async function findAdminOrders(
                 p.descuento,
                 p.total,
                 p.observaciones,
-                ${receiptSummaryColumns}
                 COALESCE(agg.cantidad_items, 0) AS cantidad_items,
                 COALESCE(agg.total_unidades, 0) AS total_unidades,
                 COALESCE(cpcc.id_cargo, mcc.id_movimiento_cuenta) AS id_cargo,
@@ -424,7 +414,6 @@ export async function findAdminOrderById(
                 p.descuento,
                 p.total,
                 p.observaciones,
-                ${receiptSummaryColumns}
                 0 AS cantidad_items,
                 0 AS total_unidades,
                 COALESCE(cpcc.id_cargo, mcc.id_movimiento_cuenta) AS id_cargo,

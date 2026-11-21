@@ -33,6 +33,7 @@ function fail(res: Response, error: unknown, fallback: string): void {
     res.status(error.status).json({
       message: error.message,
       code: error.code,
+      ...(error.details ?? {}),
     });
     return;
   }

@@ -28,6 +28,7 @@ import {
   lockClientById,
   lockOrderById,
   lockPaymentById,
+  lockPaymentReceiptForAccreditation,
   markPaymentAccredited,
   markPaymentClosed,
   probePaymentDestination,
@@ -40,6 +41,7 @@ import {
 import { loadAccountQuote } from '../../repositories/cuentaCorriente.quote';
 import {
   anularMovimiento,
+  calcularEstadoCuenta,
   registrarAbonoPorPago,
 } from '../../repositories/cuentaCorriente.repository';
 import type { AuthContext } from '../../types/auth';
@@ -49,37 +51,65 @@ import { PricingError } from '../pricing/money';
 import {
   AdminPaymentError,
   claveIdempotenciaReutilizada,
+  comprobanteNoEncontrado,
   conflictoConcurrencia,
+  cotizacionAusente,
+  cotizacionInvalida,
   cotizacionNoVerificada,
+  cuentaNoAcreditada,
   cuentaNoEncontrada,
+  cuentaRestringida,
   invalidPaymentRequest,
+  montoUsdInvalido,
   noAutenticado,
+  pagoDocumentalmenteRechazado,
   pagoNoEncontrado,
+  pagoPendienteRevision,
+  pagoYaAcreditado,
   pedidoNoEncontrado,
   sinPermiso,
   transicionPagoInvalida,
 } from './admin-payment.errors';
 
 export interface AdminPaymentDto {
+  id: number;
   idPago: number;
   pedidoId: number | null;
   cuentaCorrienteId: number | null;
   clienteId: number;
+  cliente: string;
+  declaranteUsuarioId: number | null;
+  revisadoPorUsuarioId: number | null;
+  acreditadoPorUsuarioId: number | null;
   fecha: string;
   monto: string;
   moneda: 'USD' | 'ARS' | null;
   montoUSD: string | null;
+  montoUsd: string | null;
   idCotizacion: number | null;
   tasaHistorica: string | null;
   metodoPago: string;
   estado: string;
+  estadoDocumental: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+  motivoRevision: string | null;
+  revisadoEn: string | null;
   evidenciaAcreditacion: string | null;
   fechaAcreditacion: string | null;
+  acreditadoEn: string | null;
   comprobante: string | null;
+  comprobanteId: string | null;
+  comprobanteTipoMime: string | null;
+  comprobanteBytes: number | null;
+  comprobanteRevisadoEn: string | null;
   observaciones: string | null;
   motivoCierre: string | null;
   fechaCierre: string | null;
+  claveIdempotencia: string | null;
+  claveAcreditacion: string | null;
   abonoMovimientoId: number | null;
+  movimientoId: number | null;
+  movimientoEstado: string | null;
+  movimientoMonto: string | null;
 }
 
 export interface AdminPaymentActionResult {
@@ -88,26 +118,51 @@ export interface AdminPaymentActionResult {
 }
 
 function toDto(row: AdminPaymentRow): AdminPaymentDto {
+  const acreditadoPor =
+    row.id_admin_acreditacion !== null
+      ? row.id_admin_acreditacion
+      : row.estado === 'ACREDITADO'
+        ? row.id_admin_actor
+        : null;
   return {
+    id: row.id_pago,
     idPago: row.id_pago,
     pedidoId: row.id_pedido,
     cuentaCorrienteId: row.id_cuenta_corriente,
     clienteId: row.id_cliente,
+    cliente: row.cliente,
+    declaranteUsuarioId: row.id_usuario_declarante,
+    revisadoPorUsuarioId: row.id_admin_revision,
+    acreditadoPorUsuarioId: acreditadoPor,
     fecha: row.fecha_iso,
     monto: row.monto,
     moneda: row.moneda,
     montoUSD: row.monto_usd,
+    montoUsd: row.monto_usd,
     idCotizacion: row.id_cotizacion,
     tasaHistorica: row.tasa_historica,
     metodoPago: row.metodo_pago,
     estado: row.estado,
+    estadoDocumental: row.estado_documental,
+    motivoRevision: row.motivo_revision,
+    revisadoEn: row.revision_iso,
     evidenciaAcreditacion: row.evidencia_acreditacion,
     fechaAcreditacion: row.fecha_acreditacion_iso,
+    acreditadoEn: row.fecha_acreditacion_iso,
     comprobante: row.comprobante,
+    comprobanteId: row.id_comprobante,
+    comprobanteTipoMime: row.comprobante_tipo_mime,
+    comprobanteBytes: row.comprobante_bytes,
+    comprobanteRevisadoEn: row.comprobante_revisado_iso,
     observaciones: row.observaciones,
     motivoCierre: row.motivo_cierre,
     fechaCierre: row.fecha_cierre_iso,
+    claveIdempotencia: row.clave_idempotencia,
+    claveAcreditacion: row.clave_acreditacion ?? row.clave_idempotencia_acreditacion,
     abonoMovimientoId: row.abono_movimiento_id,
+    movimientoId: row.abono_movimiento_id,
+    movimientoEstado: row.movimiento_estado,
+    movimientoMonto: row.movimiento_monto,
   };
 }
 
@@ -122,12 +177,77 @@ async function assertActiveAdmin(
   if (actor.rol !== 'ADMIN') throw sinPermiso();
 }
 
-async function resolveUsdConversion(
+const FER17_QUOTE_ERROR_CODES: ReadonlySet<string> = new Set([
+  'CALENDARIO_NO_VERIFICADO',
+  'COTIZACION_AUSENTE',
+  'COTIZACION_INVALIDA',
+  'DATOS_COMERCIALES_INVALIDOS',
+  'IMPORTE_FUERA_DE_RANGO',
+]);
+
+export function isDatabaseOrInfrastructureError(error: unknown): boolean {
+  const pending = [error];
+  const seen = new Set<object>();
+  while (pending.length) {
+    const next = pending.pop();
+    if (!next || typeof next !== 'object' || seen.has(next)) continue;
+    seen.add(next);
+    const candidate = next as {
+      name?: unknown;
+      code?: unknown;
+      errno?: unknown;
+      sqlState?: unknown;
+      driverError?: unknown;
+      cause?: unknown;
+    };
+    if (candidate.name === 'QueryFailedError') return true;
+    if (typeof candidate.errno === 'number' && candidate.errno !== 0) return true;
+    if (typeof candidate.sqlState === 'string' && candidate.sqlState.length > 0) return true;
+    if (
+      typeof candidate.code === 'string' &&
+      (
+        candidate.code.startsWith('ER_') ||
+        candidate.code.startsWith('ECONN') ||
+        candidate.code.startsWith('ETIMEDOUT') ||
+        candidate.code.startsWith('PROTOCOL_') ||
+        candidate.code === 'ENOTFOUND' ||
+        candidate.code === 'EPIPE' ||
+        candidate.code === 'EHOSTUNREACH'
+      )
+    ) {
+      return true;
+    }
+    pending.push(candidate.driverError, candidate.cause);
+  }
+  return false;
+}
+
+export function extractFer17QuoteErrorCode(error: unknown): string | null {
+  if (error instanceof PricingError) {
+    return error.code;
+  }
+  // loadAccountQuote lanza Error('CALENDARIO_NO_VERIFICADO') si dias_json no es un objeto plano.
+  if (
+    error instanceof Error &&
+    error.name === 'Error' &&
+    !isDatabaseOrInfrastructureError(error) &&
+    FER17_QUOTE_ERROR_CODES.has(error.message)
+  ) {
+    return error.message;
+  }
+  return null;
+}
+
+export async function resolveUsdConversion(
   manager: EntityManager,
   moneda: 'USD' | 'ARS',
   montoCents: bigint,
   accreditedAt: Date,
   allowSyntheticQuote: boolean,
+  options: {
+    isClientDeclared?: boolean;
+    quoteLoader?: typeof loadAccountQuote;
+  } = {},
 ): Promise<{ montoUsd: string; idCotizacion: number | null; tasaHistorica: string | null }> {
   if (moneda === 'USD') {
     return {
@@ -137,30 +257,39 @@ async function resolveUsdConversion(
     };
   }
 
+  const isClientDeclared = Boolean(options.isClientDeclared);
+  const loader = options.quoteLoader ?? loadAccountQuote;
+
   let quote: Awaited<ReturnType<typeof loadAccountQuote>>;
   try {
-    quote = await loadAccountQuote(manager, accreditedAt);
+    quote = await loader(manager, accreditedAt);
   } catch (error) {
-    if (error instanceof PricingError || error instanceof Error) {
-      throw cotizacionNoVerificada();
+    const fer17Code = extractFer17QuoteErrorCode(error);
+    if (fer17Code === null) {
+      // R01: todo fallo SQL, de concurrencia o infraestructura se relanza sin envolver como 422.
+      throw error;
     }
-    throw error;
+    if (fer17Code === 'COTIZACION_AUSENTE') {
+      throw cotizacionAusente();
+    }
+    throw isClientDeclared ? cotizacionInvalida() : cotizacionNoVerificada();
   }
 
   if (quote.sintetica && !allowSyntheticQuote) {
+    if (isClientDeclared) {
+      throw cuentaRestringida();
+    }
     throw cotizacionNoVerificada('Una cotización sintética DEMO no es válida para operaciones reales.');
   }
 
   const rate = BigInt(quote.valor.replace('.', ''));
-  if (rate <= 0n) throw cotizacionNoVerificada();
+  if (rate <= 0n) {
+    throw isClientDeclared ? cotizacionInvalida() : cotizacionNoVerificada();
+  }
 
   const usdCents = (montoCents * 100000000n + rate / 2n) / rate;
   if (usdCents <= 0n || usdCents > MAX_PAYMENT_CENTS) {
-    throw new AdminPaymentError(
-      'MONTO_USD_INVALIDO',
-      422,
-      'El importe convertido a USD resulta no positivo o fuera del rango permitido.',
-    );
+    throw montoUsdInvalido();
   }
 
   return {
@@ -204,15 +333,16 @@ function createPaymentPayloadHash(
 
 function accreditPaymentPayloadHash(
   pagoId: number,
-  input: AccreditAdminPaymentDto,
-  normalizedDateIso: string,
+  evidenciaAcreditacion: string,
+  normalizedRequestedDateIso: string | null,
+  observaciones: string | null,
 ): string {
   return hashPaymentPayload({
     operacion: 'ACREDITAR',
     pagoId,
-    evidenciaAcreditacion: input.evidenciaAcreditacion,
-    fechaAcreditacionUtc: normalizedDateIso,
-    observaciones: input.observaciones ?? null,
+    evidenciaAcreditacion,
+    fechaAcreditacionUtc: normalizedRequestedDateIso,
+    observaciones,
   });
 }
 
@@ -258,18 +388,27 @@ function matchesCreationPayload(
   return true;
 }
 
-function mapLedgerError(error: unknown): never {
+function mapLedgerError(error: unknown, isClientDeclared = false): never {
   if (error instanceof AdminPaymentError) throw error;
+  if (error instanceof PricingError) {
+    if (error.code === 'COTIZACION_AUSENTE') throw cotizacionAusente();
+    throw isClientDeclared ? cotizacionInvalida() : cotizacionNoVerificada();
+  }
+  if (isDatabaseOrInfrastructureError(error)) {
+    throw error;
+  }
   if (error instanceof Error) {
-    if (/cobertura histórica no acreditada|corte conciliado/i.test(error.message)) {
-      throw new AdminPaymentError(
-        'COBERTURA_CUENTA_NO_ACREDITADA',
-        409,
-        'La cuenta corriente no posee cobertura histórica acreditada para registrar o anular el abono.',
-      );
+    if (/libro mixto|procedencia del libro|Datos DEMO restringidos|Cotización DEMO/i.test(error.message)) {
+      throw cuentaRestringida();
     }
-    if (/Cotización DEMO|CALENDARIO|COTIZACION/i.test(error.message)) {
-      throw cotizacionNoVerificada();
+    if (/cobertura histórica no acreditada|corte conciliado/i.test(error.message)) {
+      throw cuentaNoAcreditada();
+    }
+    if (/CALENDARIO_NO_VERIFICADO|Cotización histórica del pago inconsistente/i.test(error.message)) {
+      throw isClientDeclared ? cotizacionInvalida() : cotizacionNoVerificada();
+    }
+    if (/Importe USD distinto del pago acreditado|fuera de rango/i.test(error.message)) {
+      throw montoUsdInvalido();
     }
     if (/Fecha de acreditación inválida/i.test(error.message)) {
       throw invalidPaymentRequest('La fecha de acreditación UTC es inválida.');
@@ -281,7 +420,7 @@ function mapLedgerError(error: unknown): never {
 export async function listAdminPaymentsService(
   auth: AuthContext,
   query: AdminPaymentListQuery,
-): Promise<{ items: AdminPaymentDto[]; siguienteAntesDeId: number | null }> {
+): Promise<{ items: AdminPaymentDto[]; siguienteAntesDeId: number | null; paginaSiguiente?: number | null }> {
   return inTransaction(async manager => {
     await assertActiveAdmin(manager, auth, false);
     const rows = await listPayments(manager, query);
@@ -290,6 +429,7 @@ export async function listAdminPaymentsService(
     return {
       items: page.map(toDto),
       siguienteAntesDeId: hasMore && page.length > 0 ? page[page.length - 1].id_pago : null,
+      ...(query.pagina !== undefined ? { paginaSiguiente: hasMore ? query.pagina + 1 : null } : {}),
     };
   }, { isolation: 'REPEATABLE READ' });
 }
@@ -300,7 +440,7 @@ export async function getAdminPaymentDetailService(
 ): Promise<AdminPaymentDto> {
   return inTransaction(async manager => {
     await assertActiveAdmin(manager, auth, false);
-    const row = await findPaymentById(manager, pagoId);
+    const row = await findPaymentById(manager, pagoId, { excludeRestricted: true });
     if (!row) throw pagoNoEncontrado();
     return toDto(row);
   }, { isolation: 'READ COMMITTED' });
@@ -400,6 +540,13 @@ export async function createAdminPaymentService(
         return { result: { data: toDto(existing), replay: true } };
       }
 
+      if (input.estado === 'ACREDITADO' && targetAccountId !== null) {
+        const accountState = await calcularEstadoCuenta(targetAccountId, manager, { lock: true });
+        if (!accountState) throw cuentaNoEncontrada();
+        if (accountState.libro_mixto) throw cuentaRestringida();
+        if (accountState.cobertura !== 'COMPLETA') throw cuentaNoAcreditada();
+      }
+
       const conversion = input.estado === 'ACREDITADO'
         ? await resolveUsdConversion(manager, input.moneda, montoCents, accreditedAt!, allowSyntheticQuote)
         : { montoUsd: null, idCotizacion: null, tasaHistorica: null };
@@ -438,6 +585,7 @@ export async function createAdminPaymentService(
             monto: conversion.montoUsd!,
             origen: 'PAGO',
             observaciones: input.observaciones ?? null,
+            autorizado_por: String(auth.id),
           }, manager);
         } catch (error) {
           mapLedgerError(error);
@@ -516,9 +664,18 @@ export async function accreditAdminPaymentService(
   key: string,
   notify?: NotifyCommittedChange,
 ): Promise<AdminPaymentActionResult> {
-  const accreditedAt = validateAccreditationInstant(input.fechaAcreditacionUtc);
-  const normalizedDateIso = accreditedAt.toISOString();
-  const payloadHash = accreditPaymentPayloadHash(pagoId, input, normalizedDateIso);
+  const evidence = (input.evidenciaAcreditacion ?? input.evidencia ?? '').trim();
+  if (!evidence || evidence.length > 1000) {
+    throw invalidPaymentRequest('La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.');
+  }
+  const requestedAt =
+    input.fechaAcreditacionUtc !== undefined && input.fechaAcreditacionUtc !== null
+      ? validateAccreditationInstant(input.fechaAcreditacionUtc)
+      : null;
+  const accreditedAt = requestedAt ?? new Date();
+  const normalizedRequestedDateIso = requestedAt ? requestedAt.toISOString() : null;
+  const normalizedObs = input.observaciones ?? null;
+  const payloadHash = accreditPaymentPayloadHash(pagoId, evidence, normalizedRequestedDateIso, normalizedObs);
 
   let committed: { result: AdminPaymentActionResult; change?: CommittedChange };
   try {
@@ -552,7 +709,7 @@ export async function accreditAdminPaymentService(
           );
         }
         if (lockedAccount.origen_datos === 'DEMO' && process.env.NODE_ENV !== 'test') {
-          throw new AdminPaymentError('CUENTA_DEMO', 409, 'La cuenta DEMO no admite operaciones reales.');
+          throw cuentaRestringida();
         }
         clientId = client.id_cliente;
         allowSyntheticQuote = lockedAccount.origen_datos === 'DEMO';
@@ -577,6 +734,8 @@ export async function accreditAdminPaymentService(
         throw conflictoConcurrencia();
       }
 
+      const isClientDeclared = locked.id_usuario_declarante !== null || locked.id_comprobante !== null;
+
       const idempotency = await findPaymentIdempotency(manager, key);
       if (idempotency) {
         if (
@@ -599,15 +758,23 @@ export async function accreditAdminPaymentService(
         throw claveIdempotenciaReutilizada();
       }
 
-      if (locked.estado === 'ACREDITADO' && locked.clave_idempotencia_acreditacion === key) {
+      if (
+        locked.estado === 'ACREDITADO' &&
+        (locked.clave_idempotencia_acreditacion === key || locked.clave_acreditacion === key)
+      ) {
         const samePayload =
-          locked.evidencia_acreditacion === input.evidenciaAcreditacion &&
-          locked.fecha_acreditacion_iso === normalizedDateIso &&
-          (locked.observaciones ?? null) === (input.observaciones ?? null);
+          locked.evidencia_acreditacion === evidence &&
+          (normalizedRequestedDateIso === null || locked.fecha_acreditacion_iso === normalizedRequestedDateIso) &&
+          (locked.observaciones ?? null) === normalizedObs;
         if (!samePayload) throw claveIdempotenciaReutilizada();
         const existing = await findPaymentById(manager, pagoId);
         if (!existing) throw pagoNoEncontrado();
         return { result: { data: toDto(existing), replay: true } };
+      }
+
+      if (locked.estado === 'ACREDITADO') {
+        if (isClientDeclared) throw pagoYaAcreditado();
+        throw transicionPagoInvalida('No se puede acreditar un pago en estado ACREDITADO.');
       }
 
       if (locked.estado !== 'PENDIENTE') {
@@ -616,12 +783,64 @@ export async function accreditAdminPaymentService(
         );
       }
 
+      // R03: Guardia documental obligatoria para pagos declarados por cliente (#333).
+      if (isClientDeclared) {
+        if (locked.estado_documental === 'PENDIENTE') {
+          throw pagoPendienteRevision();
+        }
+        if (locked.estado_documental === 'RECHAZADO') {
+          throw pagoDocumentalmenteRechazado();
+        }
+        if (locked.estado_documental !== 'APROBADO') {
+          throw pagoPendienteRevision();
+        }
+        if (!locked.id_comprobante) {
+          throw comprobanteNoEncontrado();
+        }
+        const receipt = await lockPaymentReceiptForAccreditation(manager, pagoId);
+        if (!receipt || !receipt.id_comprobante) {
+          throw comprobanteNoEncontrado();
+        }
+        if (Number(receipt.id_cliente) !== clientId) {
+          throw comprobanteNoEncontrado();
+        }
+        if (lockedAccount && Number(receipt.id_cuenta_corriente) !== lockedAccount.id_cuenta_corriente) {
+          throw comprobanteNoEncontrado();
+        }
+        if (lockedOrder && Number(receipt.id_pedido) !== lockedOrder.id_pedido) {
+          throw comprobanteNoEncontrado();
+        }
+        if (
+          lockedAccount &&
+          receipt.id_pedido !== null &&
+          (
+            receipt.pedido_id === null ||
+            Number(receipt.pedido_cliente) !== Number(receipt.id_cliente) ||
+            receipt.modalidad_pago !== 'CUENTA_CORRIENTE'
+          )
+        ) {
+          throw comprobanteNoEncontrado();
+        }
+        if (receipt.estado_revision === 'RECHAZADO') {
+          throw pagoDocumentalmenteRechazado(
+            'El comprobante asociado al pago fue rechazado documentalmente y no admite acreditación.',
+          );
+        }
+      }
+
       if (locked.moneda !== 'USD' && locked.moneda !== 'ARS') {
         throw invalidPaymentRequest('El pago no posee una moneda válida (USD o ARS).');
       }
       const montoCents = parsePaymentAmount(locked.monto);
       if (montoCents === null) {
         throw invalidPaymentRequest('El monto del pago es inválido.');
+      }
+
+      if (lockedAccount) {
+        const accountState = await calcularEstadoCuenta(lockedAccount.id_cuenta_corriente, manager, { lock: true });
+        if (!accountState) throw cuentaNoEncontrada();
+        if (accountState.libro_mixto) throw cuentaRestringida();
+        if (accountState.cobertura !== 'COMPLETA') throw cuentaNoAcreditada();
       }
 
       if (lockedOrder) {
@@ -647,6 +866,7 @@ export async function accreditAdminPaymentService(
         montoCents,
         accreditedAt,
         allowSyntheticQuote,
+        { isClientDeclared },
       );
 
       const affected = await markPaymentAccredited(manager, {
@@ -654,10 +874,11 @@ export async function accreditAdminPaymentService(
         montoUsd: conversion.montoUsd,
         idCotizacion: conversion.idCotizacion,
         tasaHistorica: conversion.tasaHistorica,
-        evidenciaAcreditacion: input.evidenciaAcreditacion,
+        evidenciaAcreditacion: evidence,
         fechaAcreditacionUtc: utcSql(accreditedAt),
         observaciones: input.observaciones,
         claveIdempotenciaAcreditacion: key,
+        huellaAcreditacion: payloadHash,
         adminId: auth.id,
       });
       if (affected !== 1) throw transicionPagoInvalida();
@@ -678,9 +899,10 @@ export async function accreditAdminPaymentService(
             monto: conversion.montoUsd,
             origen: 'PAGO',
             observaciones: input.observaciones ?? locked.observaciones ?? null,
+            autorizado_por: String(auth.id),
           }, manager);
         } catch (error) {
-          mapLedgerError(error);
+          mapLedgerError(error, isClientDeclared);
         }
         revisionCuenta = await readCurrentAccountRevision(manager, lockedAccount.id_cuenta_corriente);
       }
@@ -778,7 +1000,11 @@ export async function rejectAdminPaymentService(
       if (keyOwner && keyOwner.id_pago !== pagoId) {
         throw claveIdempotenciaReutilizada();
       }
-      if (locked.clave_idempotencia === key || locked.clave_idempotencia_acreditacion === key) {
+      if (
+        locked.clave_idempotencia === key ||
+        locked.clave_idempotencia_acreditacion === key ||
+        locked.clave_acreditacion === key
+      ) {
         throw claveIdempotenciaReutilizada();
       }
 
@@ -895,7 +1121,11 @@ export async function annulAdminPaymentService(
       if (keyOwner && keyOwner.id_pago !== pagoId) {
         throw claveIdempotenciaReutilizada();
       }
-      if (locked.clave_idempotencia === key || locked.clave_idempotencia_acreditacion === key) {
+      if (
+        locked.clave_idempotencia === key ||
+        locked.clave_idempotencia_acreditacion === key ||
+        locked.clave_acreditacion === key
+      ) {
         throw claveIdempotenciaReutilizada();
       }
 

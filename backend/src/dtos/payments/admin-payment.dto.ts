@@ -115,9 +115,14 @@ export class AccreditAdminPaymentDto {
     ? null : 'La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.')
   evidenciaAcreditacion!: string;
 
-  @Rule(value => parseUtcIsoTimestamp(value) !== null
+  @Rule(value => value === undefined
+    || (typeof value === 'string' && value.length >= 1 && value.length <= 1000)
+    ? null : 'La evidencia de acreditación debe contener hasta 1000 caracteres.')
+  evidencia?: string;
+
+  @Rule(value => value === undefined || parseUtcIsoTimestamp(value) !== null
     ? null : 'La fecha de acreditación debe ser un instante UTC válido en formato RFC 3339 (Z).')
-  fechaAcreditacionUtc!: string;
+  fechaAcreditacionUtc?: string;
 
   @Rule(value => value === undefined || value === null
     || (typeof value === 'string' && value.length >= 1 && value.length <= 1000)
@@ -188,14 +193,44 @@ export const createAdminPaymentPolicy: DtoPolicy<CreateAdminPaymentDto> = {
 
 export const accreditAdminPaymentPolicy: DtoPolicy<AccreditAdminPaymentDto> = {
   type: AccreditAdminPaymentDto,
-  fields: ['evidenciaAcreditacion', 'fechaAcreditacionUtc', 'observaciones'],
+  fields: ['evidenciaAcreditacion', 'evidencia', 'fechaAcreditacionUtc', 'observaciones'],
   unknownError: 'La solicitud contiene campos no permitidos.',
   objectError: 'El cuerpo de la solicitud debe ser un objeto JSON.',
-  prepare: input => ({
-    evidenciaAcreditacion: trimRequiredText(input.evidenciaAcreditacion),
-    fechaAcreditacionUtc: trimRequiredText(input.fechaAcreditacionUtc),
-    observaciones: trimOptionalText(input.observaciones),
-  }),
+  check: input => {
+    const hasPrimary = input.evidenciaAcreditacion !== undefined && input.evidenciaAcreditacion !== null;
+    const hasAlias = input.evidencia !== undefined && input.evidencia !== null;
+    if (hasPrimary && typeof input.evidenciaAcreditacion !== 'string') {
+      return 'La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.';
+    }
+    if (hasAlias && typeof input.evidencia !== 'string') {
+      return 'La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.';
+    }
+    const primary = hasPrimary ? (input.evidenciaAcreditacion as string).trim() : '';
+    const alias = hasAlias ? (input.evidencia as string).trim() : '';
+    if (hasPrimary && hasAlias && primary !== alias) {
+      return 'Los campos evidencia y evidenciaAcreditacion no pueden tener valores distintos.';
+    }
+    if (!primary && !alias) {
+      return 'La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.';
+    }
+    if (input.fechaAcreditacionUtc !== undefined && typeof input.fechaAcreditacionUtc !== 'string') {
+      return 'La fecha de acreditación debe ser un instante UTC válido en formato RFC 3339 (Z).';
+    }
+    return null;
+  },
+  prepare: input => {
+    const primary = trimRequiredText(input.evidenciaAcreditacion);
+    const alias = trimRequiredText(input.evidencia);
+    const resolved = primary && primary.length > 0 ? primary : alias;
+    return {
+      evidenciaAcreditacion: resolved,
+      evidencia: alias,
+      fechaAcreditacionUtc: input.fechaAcreditacionUtc === undefined
+        ? undefined
+        : trimRequiredText(input.fechaAcreditacionUtc),
+      observaciones: trimOptionalText(input.observaciones),
+    };
+  },
 };
 
 export const closeAdminPaymentPolicy: DtoPolicy<CloseAdminPaymentDto> = {
@@ -218,6 +253,7 @@ export const adminPaymentIdPolicy: DtoPolicy<AdminPaymentIdParams> = {
 
 export interface AdminPaymentListQuery {
   limite: number;
+  pagina?: number;
   antesDeId?: number;
   estado?: AdminPaymentState;
   pedidoId?: number;
@@ -235,7 +271,7 @@ const positiveQueryInt = (value: string, message: string): number => {
 export function parseAdminPaymentListQuery(url: string): AdminPaymentListQuery {
   const separator = url.indexOf('?');
   const params = new URLSearchParams(separator < 0 ? '' : url.slice(separator + 1));
-  const allowed = ['limite', 'antesDeId', 'estado', 'pedidoId', 'cuentaCorrienteId', 'clienteId'];
+  const allowed = ['limite', 'pagina', 'antesDeId', 'estado', 'pedidoId', 'cuentaCorrienteId', 'clienteId'];
   for (const key of params.keys()) {
     if (!allowed.includes(key) || params.getAll(key).length !== 1) {
       throw invalidPaymentRequest('La consulta contiene parámetros inválidos.');
@@ -249,6 +285,16 @@ export function parseAdminPaymentListQuery(url: string): AdminPaymentListQuery {
       throw invalidPaymentRequest('El límite debe ser un entero entre 1 y 100.');
     }
     query.limite = Number(value);
+  }
+  if (params.has('pagina')) {
+    const value = params.get('pagina')!;
+    if (!/^[1-9]\d{0,7}$/.test(value)) {
+      throw invalidPaymentRequest('La página debe ser un entero positivo.');
+    }
+    query.pagina = Number(value);
+    if (!params.has('limite')) {
+      query.limite = 50;
+    }
   }
   if (params.has('antesDeId')) {
     query.antesDeId = positiveQueryInt(params.get('antesDeId')!, 'El cursor es inválido.');
