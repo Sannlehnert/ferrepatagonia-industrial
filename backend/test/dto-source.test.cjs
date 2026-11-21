@@ -6,6 +6,7 @@ const { once } = require('node:events');
 const express = require('express');
 const { validateDto } = require('../src/middlewares/validate-dto.middleware.ts');
 const policies = require('../src/dtos/policies.ts');
+const { updatePerfilPolicy } = require('../src/dtos/profile/profile.dto.ts');
 
 test('tsx: decorated DTOs validate, transform and reject without emitted design metadata', async () => {
   const app = express(); app.use(express.json());
@@ -60,6 +61,58 @@ test('tsx: lista blanca exacta de orden en el DTO de query del catálogo', async
       'orden=precio_asc&orden=precio_desc', 'orden[]=precio_asc', 'orden[x]=precio_desc',
       'orden=precio_desc%2Cnombre_asc', 'sort=precio_asc', 'orden=nombre_asc&lista=2']) {
       assert.equal((await fetch(`${url}?${query}`)).status, 400, query);
+    }
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+  }
+});
+
+test('tsx: updatePerfilPolicy conserva limpieza, rechaza controles y no acepta campos ajenos', async () => {
+  const app = express();
+  app.use(express.json());
+  app.patch('/perfil', validateDto('body', updatePerfilPolicy), (_req, res) => {
+    assert.ok(res.locals.dto.body instanceof updatePerfilPolicy.type);
+    res.json(res.locals.dto.body);
+  });
+  app.use((error, _req, res, _next) => {
+    res.status(Number(error?.status) || 500).json({ message: 'Solicitud inválida.' });
+  });
+  const server = app.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const url = `http://127.0.0.1:${server.address().port}/perfil`;
+  const send = body => fetch(url, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+  try {
+    const valid = await send({ telefono: ' 294 400 0000 ', direccion: null });
+    assert.equal(valid.status, 200);
+    assert.deepEqual(await valid.json(), { telefono: '294 400 0000', direccion: null });
+
+    const multiline = await send({ direccion: '  Av. San Martín 123, Piso 4° B\nUnidad 2/3  ' });
+    assert.equal(multiline.status, 200);
+    assert.deepEqual(await multiline.json(), {
+      direccion: 'Av. San Martín 123, Piso 4° B\nUnidad 2/3',
+    });
+
+    for (const body of [
+      { telefono: '294\u0000400' },
+      { telefono: '294\u0001400' },
+      { direccion: 'Calle\u007f123' },
+      { direccion: 'Calle\u0085123' },
+      { telefono: 'x'.repeat(51) },
+      { direccion: 'x'.repeat(501) },
+      { telefono: 'x', email: 'otro@example.test' },
+      { telefono: undefined },
+      {},
+      [],
+      null,
+      'texto',
+      123,
+    ]) {
+      const response = await send(body);
+      assert.equal(response.status, 400, JSON.stringify(body));
+      const json = await response.json();
+      assert.equal(typeof json.message, 'string');
     }
   } finally {
     await new Promise(resolve => server.close(resolve));
