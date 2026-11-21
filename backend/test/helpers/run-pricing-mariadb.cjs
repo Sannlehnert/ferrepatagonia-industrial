@@ -65,6 +65,8 @@ async function main(signal) {
     });
     apply('migrate-fer-20-account-movements.sql');
     apply('migrate-fer-20-account-movements.sql');
+    apply('migrate-s7-04-2-state-consistency.sql');
+    apply('migrate-s7-04-2-state-consistency.sql');
 
     const inventory = await assertSchemaInventory(sql => connection.query(sql), 'complete');
     assert.match((await connection.query('SELECT VERSION() AS v'))[0].v, /^11\.4\.\d+-MariaDB\b/);

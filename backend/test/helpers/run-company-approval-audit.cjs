@@ -117,6 +117,7 @@ async function main() {
         applySql(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
         applySql(path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
         applySql(path.join(backend, '../database/migrate-s7-09-1-credit-workflow.sql'));
+        applySql(path.join(backend, '../database/migrate-s7-04-2-state-consistency.sql'));
 
         const [identity] = await connection.query('SELECT DATABASE() AS base');
         assert.equal(identity.base, database, 'La auditoría debe ejecutarse sobre la base aislada creada');
