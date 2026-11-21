@@ -133,6 +133,7 @@ function loadAccountView(account) {
         '@/stores/auth': { useAuthStore: () => ({ sessionVersion: 0 }) },
         '@/stores/cuentaCorriente': { useCuentaCorrienteStore: () => account },
         '@/components/CompanyStatus.vue': { default: {} },
+        '@/components/CreditRequestPanel.vue': { default: {} },
         '@/components/PaymentReceipts.vue': { default: {} },
         '@/services/paymentReceiptService': { accountReceiptsPath: '/cuenta-corriente/comprobantes' },
         '@/utils/companyStatus': loadTypeScript('utils/companyStatus.ts'),
