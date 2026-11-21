@@ -224,7 +224,8 @@ for (const width of [320, 360, 390, 768, 1024, 1280]) {
     await toggle.press('Enter')
     await expect(page.getByRole('button', { name: /^Ocultar detalle de PED-/ })).toBeFocused()
     await expect(page.getByText(product, { exact: true })).toBeVisible()
-    await expect(page.getByText('Cantidad 2 · Precio unitario 10.00 USD')).toBeVisible()
+    await expect(page.getByText('Cantidad: 2', { exact: true })).toBeVisible()
+    await expect(page.getByText('Precio unitario: 10.00 USD', { exact: true })).toBeVisible()
     await assertPageFits(page)
     await capture('historial')
 

@@ -102,10 +102,15 @@ async function logout() {
       <div class="mt-4 pt-3 border-t border-[#35556F]">
         <button
           type="button"
-          class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          class="inline-flex min-h-[44px] w-full items-center gap-2 rounded-[8px] border border-[#7595AD] bg-transparent px-3 text-left text-sm font-semibold text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           :disabled="isLoggingOut"
           @click="logout"
-        >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 17v2H5V5h5v2m4 1 4 4-4 4m4-4H9" />
+          </svg>
+          {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
+        </button>
       </div>
     </div>
 
@@ -134,10 +139,15 @@ async function logout() {
           <p v-if="logoutError" role="alert" class="text-red-400 text-xs mb-2">{{ logoutError }}</p>
           <button
             type="button"
-            class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            class="inline-flex min-h-[44px] w-full items-center gap-2 rounded-[8px] border border-[#7595AD] bg-transparent px-3 text-left text-sm font-semibold text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             :disabled="isLoggingOut"
             @click="logout"
-          >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
+          >
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 17v2H5V5h5v2m4 1 4 4-4 4m4-4H9" />
+            </svg>
+            {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
+          </button>
         </div>
       </aside>
       <main class="min-w-0 flex-1 p-4 sm:p-6 md:p-8">

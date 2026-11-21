@@ -49,17 +49,17 @@ onRealtime(change => {
     </div>
 
     <template v-else-if="detail">
-      <h5 class="m-0 mb-3 font-semibold text-[#0B2438]">Productos del pedido</h5>
+      <h4 class="m-0 mb-3 font-semibold text-[#0B2438]">Productos del pedido</h4>
       <p v-if="!detail.items.length" class="text-sm text-slate-600">Este pedido no tiene productos registrados.</p>
       <ul v-else class="m-0 list-none divide-y divide-slate-200 p-0">
         <li v-for="item in detail.items" :key="item.detalleId" class="py-3 text-sm">
-          <p class="m-0 break-words font-semibold text-[#0B2438]">{{ item.nombre }}</p>
-          <p class="m-0 break-words text-slate-500">Código {{ item.codigo }}</p>
-          <p class="m-0 mt-1">
-            Cantidad {{ item.cantidad }} · Precio unitario {{ item.precioUnitario }}
-            {{ detail.moneda ?? '' }}
-          </p>
-          <p class="m-0 mt-0.5 font-medium">Subtotal de la línea {{ item.subtotal }} {{ detail.moneda ?? '' }}</p>
+          <p class="m-0 font-semibold text-[#0B2438] [overflow-wrap:anywhere]">{{ item.nombre }}</p>
+          <p class="m-0 text-slate-600 [overflow-wrap:anywhere]">Código {{ item.codigo }}</p>
+          <dl class="mb-0 mt-2 grid grid-cols-1 gap-1 text-slate-700 sm:grid-cols-2">
+            <div><dt class="inline">Cantidad: </dt><dd class="m-0 inline font-medium">{{ item.cantidad }}</dd></div>
+            <div class="[overflow-wrap:anywhere]"><dt class="inline">Precio unitario: </dt><dd class="m-0 inline font-medium">{{ item.precioUnitario }} {{ detail.moneda ?? '' }}</dd></div>
+            <div class="[overflow-wrap:anywhere]"><dt class="inline">Subtotal de la línea: </dt><dd class="m-0 inline font-semibold">{{ item.subtotal }} {{ detail.moneda ?? '' }}</dd></div>
+          </dl>
         </li>
       </ul>
       <OrderPaymentReceipts v-if="showReceipts" :order="detail" @updated="emit('receiptUpdated')" />

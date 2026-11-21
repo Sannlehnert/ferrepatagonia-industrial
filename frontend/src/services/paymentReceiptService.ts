@@ -26,7 +26,7 @@ export const orderReceiptsPath = (orderId: number) =>
 export function supportsOrderReceipts(
   clientType: string | null | undefined,
   paymentMethod: string,
-  companyApproval?: string | null,
+  companyApproval: string | null | undefined = null,
   companyAccountEnabled?: boolean | null,
 ) {
   return (
