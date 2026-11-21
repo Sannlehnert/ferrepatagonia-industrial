@@ -15,10 +15,11 @@ const profile = newProfile('E2E');
 const args = process.argv.slice(2);
 const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
 const receipts = args.includes('--receipts');
+const payments = args.includes('--payments');
 const demoCatalog = args.includes('--demo-catalog');
 const demoInteractive = args.includes('--demo-interactiva');
-const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--demo-catalog', '--demo-interactiva'].includes(arg));
-assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--payments', '--demo-catalog', '--demo-interactiva'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(payments) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
 assert.ok(!demoInteractive || (demoCatalog && process.stdin.isTTY && testArgs.length === 0),
   'Para la demo interactiva usá --demo-catalog --demo-interactiva en una terminal, sin otros argumentos.');
 
@@ -125,11 +126,12 @@ async function main() {
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
   if (!fer19) await seedFixtures(connection, {
-    includeAccountOrderFixture: receipts || demoCatalog,
-    includeReceiptFixture: receipts,
+    includeAccountOrderFixture: receipts || payments || demoCatalog,
+    includeReceiptFixture: receipts || payments,
     includeCatalogProducts: !demoCatalog,
+    accountOrigin: payments ? 'REAL' : 'DEMO',
   });
-  if (receipts || demoInteractive) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+  if (receipts || payments || demoInteractive) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
@@ -163,6 +165,7 @@ async function main() {
     JWT_SECRET: randomUUID(),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
+    E2E_PAYMENTS: payments ? '1' : '',
     RECEIPT_STORAGE_DIR: receiptStorage ?? '',
     PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
     DB_HOST: profile.host,
@@ -192,6 +195,7 @@ async function main() {
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
+    E2E_PAYMENTS: payments ? '1' : '',
   };
   if (fer19 === 'production') browserEnv.E2E_PRODUCTION_BUILD = '1';
   else if (fer19) browserEnv.E2E_PRODUCTION_BUILD = '0';

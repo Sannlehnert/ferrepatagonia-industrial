@@ -3,6 +3,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import CompanyStatus from '@/components/CompanyStatus.vue'
 import CreditRequestPanel from '@/components/CreditRequestPanel.vue'
+import PaymentDeclarationForm from '@/components/PaymentDeclarationForm.vue'
+import PaymentHistory from '@/components/PaymentHistory.vue'
 import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { accountReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
@@ -15,13 +17,22 @@ import {
     formatInstant,
     formatUsd,
 } from '@/utils/cuentaCorriente'
+import { sumExactDecimals } from '@/utils/payment'
 
 const auth = useAuthStore()
 const cuenta = useCuentaCorrienteStore()
 const creditRefreshVersion = ref(0)
+const receiptRefreshVersion = ref(0)
+const paymentHistoryVersion = ref(0)
 function refreshAccount() {
     creditRefreshVersion.value += 1
     void cuenta.load()
+}
+function handleReceiptsUpdated() {
+    receiptRefreshVersion.value += 1
+}
+function handlePaymentDeclared() {
+    paymentHistoryVersion.value += 1
 }
 const resumen = computed(() => {
     const consulta = cuenta.consulta
@@ -57,6 +68,21 @@ const demoDataBlocked = computed(() => financialDataReady.value && !import.meta.
     movimientos.value.some(item => item.origen === 'DEMO') ||
     vencimientos.value.some(item => item.origen === 'DEMO')
 ))
+const movementTotals = computed<{ cargos: string; abonos: string } | null>(() => {
+    if (!resumen.value || resumen.value.cobertura !== 'COMPLETA') return null
+    const page = cuenta.movimientos
+    if (!page || !('items' in page) || page.siguienteCursor !== null) return null
+    if (page.revision !== cuenta.consulta?.revision) return null
+    const active = page.items.filter(item => item.estado === 'VIGENTE' && item.moneda === 'USD')
+    const cargos = sumExactDecimals(active.filter(item => item.tipo === 'CARGO').map(item => item.importe))
+    const abonos = sumExactDecimals(active.filter(item => item.tipo === 'ABONO').map(item => item.importe))
+    return cargos !== null && abonos !== null ? { cargos, abonos } : null
+})
+const totalsNote = computed(() =>
+    movementTotals.value
+        ? ''
+        : 'Los totales no se muestran porque la API no expone agregados y el historial cargado no cubre toda la cuenta.',
+)
 const financialDataUnavailable = computed(() =>
     !cuenta.consultaCargando &&
     !cuenta.movimientosCargando &&
@@ -87,6 +113,16 @@ function emptyMessage(coverage: string): string {
     return coverage === 'COMPLETA'
         ? 'No hay movimientos registrados en esta cuenta.'
         : 'No hay movimientos suficientes para mostrar un historial completo.'
+}
+
+function accountStateLabel(estado: CuentaCorrienteResumen['estado']): string {
+    return estado === 'HABILITADA' ? 'Habilitada' : 'Inhabilitada'
+}
+
+function coverageLabel(cobertura: CuentaCorrienteResumen['cobertura']): string {
+    if (cobertura === 'COMPLETA') return 'Completa'
+    if (cobertura === 'PARCIAL') return 'Parcial'
+    return 'No acreditada'
 }
 
 onMounted(() => void cuenta.load())
@@ -157,30 +193,67 @@ onBeforeRouteLeave(() => cuenta.clear())
                 Datos de demostración. No representan una cuenta real.
             </p>
 
-            <section aria-label="Resumen de la cuenta" class="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <article class="rounded-lg border border-slate-200 bg-white p-4">
-                    <h2 class="m-0 mb-2 text-sm font-medium text-slate-600">Saldo actual (USD)</h2>
-                    <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.saldo) }}</p>
-                </article>
-                <article class="rounded-lg border border-slate-200 bg-white p-4">
-                    <h2 class="m-0 mb-2 text-sm font-medium text-slate-600">Límite de crédito (USD)</h2>
-                    <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.limite) }}</p>
-                </article>
-                <article class="rounded-lg border border-slate-200 bg-white p-4">
-                    <h2 class="m-0 mb-2 text-sm font-medium text-slate-600">Crédito utilizado (USD)</h2>
-                    <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.utilizado) }}</p>
-                </article>
-                <article class="rounded-lg border border-slate-200 bg-white p-4">
-                    <h2 class="m-0 mb-2 text-sm font-medium text-slate-600">Crédito disponible (USD)</h2>
-                    <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.disponible) }}</p>
-                </article>
+            <section aria-labelledby="account-status-title"
+                class="mb-6 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+                <h2 id="account-status-title" class="m-0 mb-3 text-lg font-semibold">Estado de la cuenta</h2>
+                <dl class="m-0 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <div>
+                        <dt class="font-medium text-slate-600">Habilitación</dt>
+                        <dd class="m-0 mt-1 font-semibold">{{ accountStateLabel(resumen.estado) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-600">Cobertura financiera</dt>
+                        <dd class="m-0 mt-1 font-semibold">{{ coverageLabel(resumen.cobertura) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-600">Plazo de pago</dt>
+                        <dd class="m-0 mt-1 font-semibold">
+                            {{ resumen.plazoDias ? `${resumen.plazoDias} días` : 'No determinable' }}
+                        </dd>
+                    </div>
+                    <div>
+                        <dt class="font-medium text-slate-600">Revisión / actualización</dt>
+                        <dd class="m-0 mt-1 font-semibold break-words">
+                            Rev. {{ resumen.revision }} · {{ formatInstant(resumen.corte) }}
+                        </dd>
+                    </div>
+                </dl>
+                <p class="m-0 mt-3 text-sm text-slate-600">
+                    {{ coverageMessage(resumen.cobertura) }}
+                </p>
             </section>
 
-            <p class="mb-5 text-sm text-slate-600">
-                {{ coverageMessage(resumen.cobertura) }}
-                <span v-if="resumen.plazoDias">Plazo actual: {{ resumen.plazoDias }} días.</span>
-                Corte: {{ formatInstant(resumen.corte) }}.
-            </p>
+            <section aria-labelledby="financial-summary-title" class="mb-6">
+                <h2 id="financial-summary-title" class="mb-3 text-xl font-semibold">Resumen financiero</h2>
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <article class="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 class="m-0 mb-2 text-sm font-medium text-slate-600">Saldo actual / deuda vigente (USD)</h3>
+                        <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.saldo) }}</p>
+                    </article>
+                    <article class="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 class="m-0 mb-2 text-sm font-medium text-slate-600">Límite de crédito (USD)</h3>
+                        <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.limite) }}</p>
+                    </article>
+                    <article class="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 class="m-0 mb-2 text-sm font-medium text-slate-600">Crédito utilizado (USD)</h3>
+                        <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.utilizado) }}</p>
+                    </article>
+                    <article class="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 class="m-0 mb-2 text-sm font-medium text-slate-600">Crédito disponible (USD)</h3>
+                        <p class="m-0 text-xl font-semibold">{{ formatUsd(resumen.disponible) }}</p>
+                        <p class="m-0 mt-1 text-xs text-slate-500">No es el saldo contable de la cuenta.</p>
+                    </article>
+                    <article class="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 class="m-0 mb-2 text-sm font-medium text-slate-600">Total de cargos (USD)</h3>
+                        <p class="m-0 text-xl font-semibold">{{ formatUsd(movementTotals?.cargos) }}</p>
+                    </article>
+                    <article class="rounded-lg border border-slate-200 bg-white p-4">
+                        <h3 class="m-0 mb-2 text-sm font-medium text-slate-600">Total de abonos (USD)</h3>
+                        <p class="m-0 text-xl font-semibold">{{ formatUsd(movementTotals?.abonos) }}</p>
+                    </article>
+                </div>
+                <p v-if="totalsNote" class="m-0 mt-2 text-xs text-slate-500">{{ totalsNote }}</p>
+            </section>
 
             <section aria-labelledby="due-dates-title" class="mb-8">
                 <h2 id="due-dates-title" class="mb-3 text-xl font-semibold">Vencimientos</h2>
@@ -285,6 +358,10 @@ onBeforeRouteLeave(() => cuenta.clear())
             </section>
         </template>
         <PaymentReceipts v-if="resumen && auth.user?.tipo_cliente === 'EMPRESA' && !demoDataBlocked"
-            :path="accountReceiptsPath" mode="cuenta" />
+            :path="accountReceiptsPath" mode="cuenta" @updated="handleReceiptsUpdated" />
+        <PaymentDeclarationForm v-if="resumen && financialDataReady && !demoDataBlocked"
+            :refresh-version="receiptRefreshVersion" @declared="handlePaymentDeclared" />
+        <PaymentHistory v-if="resumen && financialDataReady && !demoDataBlocked"
+            :refresh-version="paymentHistoryVersion" />
     </section>
 </template>
