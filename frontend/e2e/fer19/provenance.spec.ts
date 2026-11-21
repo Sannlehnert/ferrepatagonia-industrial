@@ -35,25 +35,27 @@ test('build de producción muestra datos REAL del backend y bloquea DEMO y el li
   }
 })
 
-test('ADMIN fuera del perfil DEMO bloquea el libro mixto y recupera las cuentas REAL con un filtro', async ({ page }) => {
+test('ADMIN fuera del perfil DEMO omite el libro mixto y muestra las cuentas REAL', async ({ page }) => {
   await login(page, fixture.admin)
-  const rejection = page.waitForResponse(r => new URL(r.url()).pathname === adminList)
+  const listedResponse = page.waitForResponse(r => new URL(r.url()).pathname === adminList)
   await adminAccounts(page)
-  await apiError(await rejection, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE')
-  await expect(page.getByRole('alert')).toContainText('no está disponible')
-  await expect(page.getByRole('table')).toHaveCount(0)
+  const listed = await data<AccountList>(await listedResponse)
+  const realId = client('real').clientId
+  expect(listed.items.map(i => [i.clienteId, i.origen, i.saldo])).toEqual([[realId, 'REAL', '80.00']])
+  const row = page.getByRole('table').first().locator('tbody tr')
+  await expect(row).toHaveCount(1)
+  await expect(row).toContainText('USD 80,00')
 
   const mixed = adminDetail(client('mixta').clientId)
   for (const path of [mixed, mixed + '/movimientos?limite=25', mixed + '/vencimientos']) {
     await apiError(await page.request.get(path), 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE')
   }
+  expect((await data<AccountList>(await page.request.get(adminList + '?clienteId=' + client('mixta').clientId))).items).toEqual([])
   expect((await data<AccountList>(await page.request.get(adminList + '?clienteId=' + client('empresa30').clientId))).items).toEqual([])
-  const id = client('real').clientId
-  await page.getByLabel('ID de cliente', { exact: true }).fill(String(id))
+  await page.getByLabel('ID de cliente', { exact: true }).fill(String(realId))
   await page.getByRole('button', { name: 'Aplicar filtros' }).click()
-  const row = page.getByRole('table').first().locator('tbody tr')
   await expect(row).toHaveCount(1)
   await expect(row).toContainText('USD 80,00')
-  const result = await data<AccountList>(await page.request.get(adminList + '?clienteId=' + id))
-  expect(result.items.map(i => [i.clienteId, i.origen, i.saldo])).toEqual([[id, 'REAL', '80.00']])
+  const result = await data<AccountList>(await page.request.get(adminList + '?clienteId=' + realId))
+  expect(result.items.map(i => [i.clienteId, i.origen, i.saldo])).toEqual([[realId, 'REAL', '80.00']])
 })
