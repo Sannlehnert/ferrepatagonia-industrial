@@ -15,18 +15,27 @@ async function login(page: Page) {
 
 async function mockLongProduct(page: Page) {
     await page.route(list, async (route) => {
-        const response = await route.fetch();
-        const data = await response.json();
-        data.data[0] = {
-            ...data.data[0],
-            nombre: longName,
-            codigo: longSku,
-            categoria_nombre: 'Categoría E2E de prueba',
-            precio: 12345.67,
-            activo: true,
-            imagen: null,
-        };
-        await route.fulfill({ response, json: data });
+        if (route.request().method() !== 'GET') return route.continue();
+        await route.fulfill({
+            json: {
+                data: [{
+                    id_producto: 2,
+                    id_categoria: 1,
+                    nombre: longName,
+                    codigo: longSku,
+                    categoria_nombre: 'Categoría E2E de prueba',
+                    precio: 12345.67,
+                    descripcion: null,
+                    stock: 8,
+                    activo: true,
+                    imagen: null,
+                }],
+                page: 1,
+                limit: 20,
+                total: 1,
+                totalPages: 1,
+            },
+        });
     });
 }
 
