@@ -28,8 +28,21 @@ for (const width of [1280, 360]) {
       const table = page.getByRole('table').first()
       await expect(table.getByRole('row')).toHaveCount(26)
       await expect(table).toContainText('DEMO')
+      const nextPage = page.waitForResponse(response => {
+        const url = new URL(response.url())
+        return url.pathname === '/api/admin/cuentas-corrientes' &&
+          url.searchParams.has('cursor') && response.ok()
+      })
       await page.getByRole('button', { name: 'Siguiente página de cuentas' }).click()
-      await expect(table.getByRole('row')).toHaveCount(3)
+      const next = (await (await nextPage).json()).data as {
+        items: Array<{ clienteId: number }>; siguienteCursor: string | null
+      }
+      expect(next.items.length).toBeGreaterThan(0)
+      expect(next.siguienteCursor).toBeNull()
+      await expect(table.getByRole('row')).toHaveCount(next.items.length + 1)
+      for (const account of next.items) {
+        await expect(table.getByRole('button', { name: `Consultar cliente ${account.clienteId}`, exact: true })).toBeVisible()
+      }
       await expect(page.getByRole('button', { name: 'Siguiente página de cuentas' })).toHaveCount(0)
 
       const clientId = page.getByLabel('ID de cliente', { exact: true })
