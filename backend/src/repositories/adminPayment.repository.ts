@@ -64,6 +64,15 @@ export interface AdminActorRow {
   activo: number;
 }
 
+export type PaymentIdempotencyOperation = 'CREAR' | 'ACREDITAR' | 'RECHAZAR' | 'ANULAR';
+
+export interface PaymentIdempotencyRow {
+  clave_idempotencia: string;
+  id_pago: number;
+  operacion: PaymentIdempotencyOperation;
+  payload_hash: string;
+}
+
 export function utcSql(date: Date): string {
   return date.toISOString().slice(0, 23).replace('T', ' ');
 }
@@ -320,6 +329,48 @@ export async function findPaymentByAnyKey(
     [key, key, key],
   );
   return row ? mapRow(row) : null;
+}
+
+export async function findPaymentIdempotency(
+  manager: EntityManager,
+  key: string,
+): Promise<PaymentIdempotencyRow | null> {
+  const [row] = await manager.query<Array<Record<string, unknown>>>(
+    `SELECT clave_idempotencia, id_pago, operacion, payload_hash
+     FROM PAGO_IDEMPOTENCIA
+     WHERE clave_idempotencia = ?
+     LIMIT 1`,
+    [key],
+  );
+  if (!row) return null;
+  return {
+    clave_idempotencia: String(row.clave_idempotencia),
+    id_pago: Number(row.id_pago),
+    operacion: String(row.operacion) as PaymentIdempotencyOperation,
+    payload_hash: String(row.payload_hash),
+  };
+}
+
+export async function insertPaymentIdempotency(
+  manager: EntityManager,
+  values: {
+    claveIdempotencia: string;
+    pagoId: number;
+    operacion: PaymentIdempotencyOperation;
+    payloadHash: string;
+  },
+): Promise<void> {
+  await manager.query(
+    `INSERT INTO PAGO_IDEMPOTENCIA (
+       clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc
+     ) VALUES (?, ?, ?, ?, UTC_TIMESTAMP(3))`,
+    [
+      values.claveIdempotencia,
+      values.pagoId,
+      values.operacion,
+      values.payloadHash,
+    ],
+  );
 }
 
 export async function findPaymentById(

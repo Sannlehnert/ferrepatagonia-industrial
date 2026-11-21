@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import type { EntityManager } from 'typeorm';
 import { inTransaction } from '../../config/database.config';
 import {
@@ -19,7 +20,9 @@ import {
   findLinkedAccountAbonoForUpdate,
   findPaymentByAnyKey,
   findPaymentById,
+  findPaymentIdempotency,
   insertPayment,
+  insertPaymentIdempotency,
   listPayments,
   lockAccountById,
   lockClientById,
@@ -32,6 +35,7 @@ import {
   readCurrentAccountRevision,
   utcSql,
   type AdminPaymentRow,
+  type PaymentIdempotencyOperation,
 } from '../../repositories/adminPayment.repository';
 import { loadAccountQuote } from '../../repositories/cuentaCorriente.quote';
 import {
@@ -174,6 +178,56 @@ function validateAccreditationInstant(raw: string): Date {
   return parsed;
 }
 
+function hashPaymentPayload(payload: Record<string, unknown>): string {
+  return createHash('sha256').update(JSON.stringify(payload)).digest('hex');
+}
+
+function createPaymentPayloadHash(
+  input: CreateAdminPaymentDto,
+  normalizedMonto: string,
+  normalizedDateIso: string | null,
+): string {
+  return hashPaymentPayload({
+    operacion: 'CREAR',
+    pedidoId: input.pedidoId,
+    cuentaCorrienteId: input.cuentaCorrienteId,
+    monto: normalizedMonto,
+    moneda: input.moneda,
+    metodoPago: input.metodoPago,
+    estado: input.estado,
+    evidenciaAcreditacion: input.estado === 'ACREDITADO' ? (input.evidenciaAcreditacion ?? null) : null,
+    fechaAcreditacionUtc: input.estado === 'ACREDITADO' ? normalizedDateIso : null,
+    comprobante: input.comprobante ?? null,
+    observaciones: input.observaciones ?? null,
+  });
+}
+
+function accreditPaymentPayloadHash(
+  pagoId: number,
+  input: AccreditAdminPaymentDto,
+  normalizedDateIso: string,
+): string {
+  return hashPaymentPayload({
+    operacion: 'ACREDITAR',
+    pagoId,
+    evidenciaAcreditacion: input.evidenciaAcreditacion,
+    fechaAcreditacionUtc: normalizedDateIso,
+    observaciones: input.observaciones ?? null,
+  });
+}
+
+function closePaymentPayloadHash(
+  operacion: 'RECHAZAR' | 'ANULAR',
+  pagoId: number,
+  input: CloseAdminPaymentDto,
+): string {
+  return hashPaymentPayload({
+    operacion,
+    pagoId,
+    motivo: input.motivo,
+  });
+}
+
 function matchesCreationPayload(
   existing: AdminPaymentRow,
   key: string,
@@ -267,6 +321,7 @@ export async function createAdminPaymentService(
     ? validateAccreditationInstant(input.fechaAcreditacionUtc!)
     : null;
   const normalizedDateIso = accreditedAt ? accreditedAt.toISOString() : null;
+  const payloadHash = createPaymentPayloadHash(input, normalizedMonto, normalizedDateIso);
 
   let committed: { result: AdminPaymentActionResult; change?: CommittedChange };
 
@@ -327,6 +382,16 @@ export async function createAdminPaymentService(
         targetOrderId = order.id_pedido;
       }
 
+      const idempotency = await findPaymentIdempotency(manager, key);
+      if (idempotency) {
+        if (idempotency.operacion !== 'CREAR' || idempotency.payload_hash !== payloadHash) {
+          throw claveIdempotenciaReutilizada();
+        }
+        const existing = await findPaymentById(manager, idempotency.id_pago);
+        if (!existing) throw conflictoConcurrencia();
+        return { result: { data: toDto(existing), replay: true } };
+      }
+
       const existing = await findPaymentByAnyKey(manager, key);
       if (existing) {
         if (!matchesCreationPayload(existing, key, input, normalizedMonto, normalizedDateIso)) {
@@ -355,6 +420,13 @@ export async function createAdminPaymentService(
         observaciones: input.observaciones ?? null,
         claveIdempotencia: key,
         adminId: auth.id,
+      });
+
+      await insertPaymentIdempotency(manager, {
+        claveIdempotencia: key,
+        pagoId,
+        operacion: 'CREAR',
+        payloadHash,
       });
 
       let revisionCuenta: string | null = null;
@@ -396,7 +468,7 @@ export async function createAdminPaymentService(
     }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
   } catch (error) {
     if (hasDatabaseError(error, 'ER_DUP_ENTRY', 1062)) {
-      return recoverDuplicateCreatePayment(auth, input, key, normalizedMonto, normalizedDateIso);
+      return recoverDuplicatePaymentAction(auth, key, 'CREAR', payloadHash);
     }
     throw error;
   }
@@ -406,21 +478,34 @@ export async function createAdminPaymentService(
   return committed.result;
 }
 
-async function recoverDuplicateCreatePayment(
+async function recoverDuplicatePaymentAction(
   auth: AuthContext,
-  input: CreateAdminPaymentDto,
   key: string,
-  normalizedMonto: string,
-  normalizedDateIso: string | null,
+  expectedOp: PaymentIdempotencyOperation,
+  expectedHash: string,
+  expectedPagoId?: number,
 ): Promise<AdminPaymentActionResult> {
   return inTransaction(async manager => {
     await assertActiveAdmin(manager, auth, false);
+    const idempotency = await findPaymentIdempotency(manager, key);
+    if (idempotency) {
+      if (
+        idempotency.operacion !== expectedOp ||
+        idempotency.payload_hash !== expectedHash ||
+        (expectedPagoId !== undefined && idempotency.id_pago !== expectedPagoId)
+      ) {
+        throw claveIdempotenciaReutilizada();
+      }
+      const existing = await findPaymentById(manager, idempotency.id_pago);
+      if (!existing) throw conflictoConcurrencia();
+      return { data: toDto(existing), replay: true };
+    }
+
     const existing = await findPaymentByAnyKey(manager, key);
-    if (!existing) throw conflictoConcurrencia();
-    if (!matchesCreationPayload(existing, key, input, normalizedMonto, normalizedDateIso)) {
+    if (existing) {
       throw claveIdempotenciaReutilizada();
     }
-    return { data: toDto(existing), replay: true };
+    throw conflictoConcurrencia();
   }, { isolation: 'READ COMMITTED' });
 }
 
@@ -433,168 +518,198 @@ export async function accreditAdminPaymentService(
 ): Promise<AdminPaymentActionResult> {
   const accreditedAt = validateAccreditationInstant(input.fechaAcreditacionUtc);
   const normalizedDateIso = accreditedAt.toISOString();
+  const payloadHash = accreditPaymentPayloadHash(pagoId, input, normalizedDateIso);
 
-  const committed = await inTransaction(async manager => {
-    // §10.3 Fase 1 (sin lock): leer destino para determinar el agregado raiz.
-    const probe = await probePaymentDestination(manager, pagoId);
-    if (!probe) {
-      await assertActiveAdmin(manager, auth, true);
-      throw pagoNoEncontrado();
-    }
-
-    // §10.3 Fase 2: bloquear agregado raiz ANTES que PAGO FOR UPDATE.
-    let clientId: number;
-    let allowSyntheticQuote = false;
-    let lockedOrder: Awaited<ReturnType<typeof lockOrderById>> = null;
-    let lockedAccount: Awaited<ReturnType<typeof lockAccountById>> = null;
-
-    if (probe.id_cuenta_corriente !== null) {
-      lockedAccount = await lockAccountById(manager, probe.id_cuenta_corriente);
-      if (!lockedAccount) {
+  let committed: { result: AdminPaymentActionResult; change?: CommittedChange };
+  try {
+    committed = await inTransaction(async manager => {
+      // §10.3 Fase 1 (sin lock): leer destino para determinar el agregado raiz.
+      const probe = await probePaymentDestination(manager, pagoId);
+      if (!probe) {
         await assertActiveAdmin(manager, auth, true);
-        throw cuentaNoEncontrada();
+        throw pagoNoEncontrado();
       }
-      const client = await lockClientById(manager, lockedAccount.id_cliente);
-      await assertActiveAdmin(manager, auth, true);
-      if (!client || client.tipo_cliente !== 'EMPRESA') {
-        throw new AdminPaymentError(
-          'DESTINO_PAGO_INVALIDO',
-          409,
-          'La cuenta corriente indicada no corresponde a una empresa válida.',
+
+      // §10.3 Fase 2: bloquear agregado raiz ANTES que PAGO FOR UPDATE.
+      let clientId: number;
+      let allowSyntheticQuote = false;
+      let lockedOrder: Awaited<ReturnType<typeof lockOrderById>> = null;
+      let lockedAccount: Awaited<ReturnType<typeof lockAccountById>> = null;
+
+      if (probe.id_cuenta_corriente !== null) {
+        lockedAccount = await lockAccountById(manager, probe.id_cuenta_corriente);
+        if (!lockedAccount) {
+          await assertActiveAdmin(manager, auth, true);
+          throw cuentaNoEncontrada();
+        }
+        const client = await lockClientById(manager, lockedAccount.id_cliente);
+        await assertActiveAdmin(manager, auth, true);
+        if (!client || client.tipo_cliente !== 'EMPRESA') {
+          throw new AdminPaymentError(
+            'DESTINO_PAGO_INVALIDO',
+            409,
+            'La cuenta corriente indicada no corresponde a una empresa válida.',
+          );
+        }
+        if (lockedAccount.origen_datos === 'DEMO' && process.env.NODE_ENV !== 'test') {
+          throw new AdminPaymentError('CUENTA_DEMO', 409, 'La cuenta DEMO no admite operaciones reales.');
+        }
+        clientId = client.id_cliente;
+        allowSyntheticQuote = lockedAccount.origen_datos === 'DEMO';
+      } else if (probe.id_pedido !== null) {
+        lockedOrder = await lockOrderById(manager, probe.id_pedido);
+        await assertActiveAdmin(manager, auth, true);
+        if (!lockedOrder) throw pedidoNoEncontrado();
+        clientId = lockedOrder.id_cliente;
+        allowSyntheticQuote = Boolean(lockedOrder.evidencia_total_usd?.startsWith(academicOrderReference));
+      } else {
+        await assertActiveAdmin(manager, auth, true);
+        throw conflictoConcurrencia();
+      }
+
+      // §10.3 Fase 3: bloquear PAGO FOR UPDATE bajo la jerarquia y revalidar existencia, destino, estado y moneda/importe.
+      const locked = await lockPaymentById(manager, pagoId, clientId);
+      if (!locked) throw pagoNoEncontrado();
+      if (
+        locked.id_cuenta_corriente !== probe.id_cuenta_corriente ||
+        locked.id_pedido !== probe.id_pedido
+      ) {
+        throw conflictoConcurrencia();
+      }
+
+      const idempotency = await findPaymentIdempotency(manager, key);
+      if (idempotency) {
+        if (
+          idempotency.operacion !== 'ACREDITAR' ||
+          idempotency.id_pago !== pagoId ||
+          idempotency.payload_hash !== payloadHash
+        ) {
+          throw claveIdempotenciaReutilizada();
+        }
+        const existing = await findPaymentById(manager, pagoId);
+        if (!existing) throw pagoNoEncontrado();
+        return { result: { data: toDto(existing), replay: true } };
+      }
+
+      const keyOwner = await findPaymentByAnyKey(manager, key);
+      if (keyOwner && keyOwner.id_pago !== pagoId) {
+        throw claveIdempotenciaReutilizada();
+      }
+      if (locked.clave_idempotencia === key || locked.clave_idempotencia_cierre === key) {
+        throw claveIdempotenciaReutilizada();
+      }
+
+      if (locked.estado === 'ACREDITADO' && locked.clave_idempotencia_acreditacion === key) {
+        const samePayload =
+          locked.evidencia_acreditacion === input.evidenciaAcreditacion &&
+          locked.fecha_acreditacion_iso === normalizedDateIso &&
+          (locked.observaciones ?? null) === (input.observaciones ?? null);
+        if (!samePayload) throw claveIdempotenciaReutilizada();
+        const existing = await findPaymentById(manager, pagoId);
+        if (!existing) throw pagoNoEncontrado();
+        return { result: { data: toDto(existing), replay: true } };
+      }
+
+      if (locked.estado !== 'PENDIENTE') {
+        throw transicionPagoInvalida(
+          `No se puede acreditar un pago en estado ${locked.estado}.`,
         );
       }
-      if (lockedAccount.origen_datos === 'DEMO' && process.env.NODE_ENV !== 'test') {
-        throw new AdminPaymentError('CUENTA_DEMO', 409, 'La cuenta DEMO no admite operaciones reales.');
+
+      if (locked.moneda !== 'USD' && locked.moneda !== 'ARS') {
+        throw invalidPaymentRequest('El pago no posee una moneda válida (USD o ARS).');
       }
-      clientId = client.id_cliente;
-      allowSyntheticQuote = lockedAccount.origen_datos === 'DEMO';
-    } else if (probe.id_pedido !== null) {
-      lockedOrder = await lockOrderById(manager, probe.id_pedido);
-      await assertActiveAdmin(manager, auth, true);
-      if (!lockedOrder) throw pedidoNoEncontrado();
-      clientId = lockedOrder.id_cliente;
-      allowSyntheticQuote = Boolean(lockedOrder.evidencia_total_usd?.startsWith(academicOrderReference));
-    } else {
-      await assertActiveAdmin(manager, auth, true);
-      throw conflictoConcurrencia();
-    }
+      const montoCents = parsePaymentAmount(locked.monto);
+      if (montoCents === null) {
+        throw invalidPaymentRequest('El monto del pago es inválido.');
+      }
 
-    // §10.3 Fase 3: bloquear PAGO FOR UPDATE bajo la jerarquia y revalidar existencia, destino, estado y moneda/importe.
-    const locked = await lockPaymentById(manager, pagoId, clientId);
-    if (!locked) throw pagoNoEncontrado();
-    if (
-      locked.id_cuenta_corriente !== probe.id_cuenta_corriente ||
-      locked.id_pedido !== probe.id_pedido
-    ) {
-      throw conflictoConcurrencia();
-    }
+      if (lockedOrder) {
+        if (lockedOrder.estado.startsWith('DEMO_') || lockedOrder.modalidad_pago !== 'TRANSFERENCIA') {
+          throw new AdminPaymentError(
+            'MODALIDAD_PAGO_INCOMPATIBLE',
+            409,
+            'Solo se pueden acreditar pagos directos sobre pedidos TRANSFERENCIA.',
+          );
+        }
+        if (lockedOrder.moneda_total !== 'USD') {
+          throw new AdminPaymentError(
+            'MONEDA_PEDIDO_NO_ACREDITADA',
+            409,
+            'No se puede acreditar un pago directo sobre un pedido sin moneda USD verificada.',
+          );
+        }
+      }
 
-    const keyOwner = await findPaymentByAnyKey(manager, key);
-    if (keyOwner && keyOwner.id_pago !== pagoId) {
-      throw claveIdempotenciaReutilizada();
-    }
-    if (locked.clave_idempotencia === key || locked.clave_idempotencia_cierre === key) {
-      throw claveIdempotenciaReutilizada();
-    }
-
-    if (locked.estado === 'ACREDITADO' && locked.clave_idempotencia_acreditacion === key) {
-      const samePayload =
-        locked.evidencia_acreditacion === input.evidenciaAcreditacion &&
-        locked.fecha_acreditacion_iso === normalizedDateIso &&
-        (input.observaciones === undefined || input.observaciones === null || locked.observaciones === input.observaciones);
-      if (!samePayload) throw claveIdempotenciaReutilizada();
-      const existing = await findPaymentById(manager, pagoId);
-      if (!existing) throw pagoNoEncontrado();
-      return { result: { data: toDto(existing), replay: true } };
-    }
-
-    if (locked.estado !== 'PENDIENTE') {
-      throw transicionPagoInvalida(
-        `No se puede acreditar un pago en estado ${locked.estado}.`,
+      const conversion = await resolveUsdConversion(
+        manager,
+        locked.moneda,
+        montoCents,
+        accreditedAt,
+        allowSyntheticQuote,
       );
-    }
 
-    if (locked.moneda !== 'USD' && locked.moneda !== 'ARS') {
-      throw invalidPaymentRequest('El pago no posee una moneda válida (USD o ARS).');
-    }
-    const montoCents = parsePaymentAmount(locked.monto);
-    if (montoCents === null) {
-      throw invalidPaymentRequest('El monto del pago es inválido.');
-    }
+      const affected = await markPaymentAccredited(manager, {
+        pagoId,
+        montoUsd: conversion.montoUsd,
+        idCotizacion: conversion.idCotizacion,
+        tasaHistorica: conversion.tasaHistorica,
+        evidenciaAcreditacion: input.evidenciaAcreditacion,
+        fechaAcreditacionUtc: utcSql(accreditedAt),
+        observaciones: input.observaciones,
+        claveIdempotenciaAcreditacion: key,
+        adminId: auth.id,
+      });
+      if (affected !== 1) throw transicionPagoInvalida();
 
-    if (lockedOrder) {
-      if (lockedOrder.estado.startsWith('DEMO_') || lockedOrder.modalidad_pago !== 'TRANSFERENCIA') {
-        throw new AdminPaymentError(
-          'MODALIDAD_PAGO_INCOMPATIBLE',
-          409,
-          'Solo se pueden acreditar pagos directos sobre pedidos TRANSFERENCIA.',
-        );
+      await insertPaymentIdempotency(manager, {
+        claveIdempotencia: key,
+        pagoId,
+        operacion: 'ACREDITAR',
+        payloadHash,
+      });
+
+      let revisionCuenta: string | null = null;
+      if (lockedAccount) {
+        try {
+          await registrarAbonoPorPago({
+            id_cuenta_corriente: lockedAccount.id_cuenta_corriente,
+            id_pago: pagoId,
+            monto: conversion.montoUsd,
+            origen: 'PAGO',
+            observaciones: input.observaciones ?? locked.observaciones ?? null,
+          }, manager);
+        } catch (error) {
+          mapLedgerError(error);
+        }
+        revisionCuenta = await readCurrentAccountRevision(manager, lockedAccount.id_cuenta_corriente);
       }
-      if (lockedOrder.moneda_total !== 'USD') {
-        throw new AdminPaymentError(
-          'MONEDA_PEDIDO_NO_ACREDITADA',
-          409,
-          'No se puede acreditar un pago directo sobre un pedido sin moneda USD verificada.',
-        );
-      }
+
+      const saved = await findPaymentById(manager, pagoId);
+      if (!saved) throw conflictoConcurrencia();
+
+      const change: CommittedChange = {
+        kind: 'payment',
+        clientId,
+        payment: {
+          pagoId: saved.id_pago,
+          pedidoId: saved.id_pedido,
+          cuentaCorrienteId: saved.id_cuenta_corriente,
+          estadoPago: 'ACREDITADO',
+          montoUSD: saved.monto_usd!,
+          revisionCuenta,
+          actualizadoEn: new Date().toISOString(),
+        },
+      };
+
+      return { result: { data: toDto(saved), replay: false }, change };
+    }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
+  } catch (error) {
+    if (hasDatabaseError(error, 'ER_DUP_ENTRY', 1062)) {
+      return recoverDuplicatePaymentAction(auth, key, 'ACREDITAR', payloadHash, pagoId);
     }
-
-    const conversion = await resolveUsdConversion(
-      manager,
-      locked.moneda,
-      montoCents,
-      accreditedAt,
-      allowSyntheticQuote,
-    );
-
-    const affected = await markPaymentAccredited(manager, {
-      pagoId,
-      montoUsd: conversion.montoUsd,
-      idCotizacion: conversion.idCotizacion,
-      tasaHistorica: conversion.tasaHistorica,
-      evidenciaAcreditacion: input.evidenciaAcreditacion,
-      fechaAcreditacionUtc: utcSql(accreditedAt),
-      observaciones: input.observaciones,
-      claveIdempotenciaAcreditacion: key,
-      adminId: auth.id,
-    });
-    if (affected !== 1) throw transicionPagoInvalida();
-
-    let revisionCuenta: string | null = null;
-    if (lockedAccount) {
-      try {
-        await registrarAbonoPorPago({
-          id_cuenta_corriente: lockedAccount.id_cuenta_corriente,
-          id_pago: pagoId,
-          monto: conversion.montoUsd,
-          origen: 'PAGO',
-          observaciones: input.observaciones ?? locked.observaciones ?? null,
-        }, manager);
-      } catch (error) {
-        mapLedgerError(error);
-      }
-      revisionCuenta = await readCurrentAccountRevision(manager, lockedAccount.id_cuenta_corriente);
-    }
-
-    const saved = await findPaymentById(manager, pagoId);
-    if (!saved) throw conflictoConcurrencia();
-
-    const change: CommittedChange = {
-      kind: 'payment',
-      clientId,
-      payment: {
-        pagoId: saved.id_pago,
-        pedidoId: saved.id_pedido,
-        cuentaCorrienteId: saved.id_cuenta_corriente,
-        estadoPago: 'ACREDITADO',
-        montoUSD: saved.monto_usd!,
-        revisionCuenta,
-        actualizadoEn: new Date().toISOString(),
-      },
-    };
-
-    return { result: { data: toDto(saved), replay: false }, change };
-  }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
+    throw error;
+  }
 
   // Emision estrictamente post-COMMIT (§8).
   if (committed.change) notifyAfterCommit(notify, committed.change);
@@ -607,78 +722,107 @@ export async function rejectAdminPaymentService(
   input: CloseAdminPaymentDto,
   key: string,
 ): Promise<AdminPaymentActionResult> {
-  return inTransaction(async manager => {
-    // §10.3 Fase 1 (sin lock)
-    const probe = await probePaymentDestination(manager, pagoId);
-    if (!probe) {
-      await assertActiveAdmin(manager, auth, true);
-      throw pagoNoEncontrado();
-    }
+  const payloadHash = closePaymentPayloadHash('RECHAZAR', pagoId, input);
+  try {
+    return await inTransaction(async manager => {
+      // §10.3 Fase 1 (sin lock)
+      const probe = await probePaymentDestination(manager, pagoId);
+      if (!probe) {
+        await assertActiveAdmin(manager, auth, true);
+        throw pagoNoEncontrado();
+      }
 
-    // §10.3 Fase 2: root aggregate primero
-    let clientId: number;
-    if (probe.id_cuenta_corriente !== null) {
-      const account = await lockAccountById(manager, probe.id_cuenta_corriente);
-      if (account) await lockClientById(manager, account.id_cliente);
-      await assertActiveAdmin(manager, auth, true);
-      if (!account) throw cuentaNoEncontrada();
-      clientId = account.id_cliente;
-    } else if (probe.id_pedido !== null) {
-      const order = await lockOrderById(manager, probe.id_pedido);
-      await assertActiveAdmin(manager, auth, true);
-      if (!order) throw pedidoNoEncontrado();
-      clientId = order.id_cliente;
-    } else {
-      await assertActiveAdmin(manager, auth, true);
-      throw conflictoConcurrencia();
-    }
+      // §10.3 Fase 2: root aggregate primero
+      let clientId: number;
+      if (probe.id_cuenta_corriente !== null) {
+        const account = await lockAccountById(manager, probe.id_cuenta_corriente);
+        if (account) await lockClientById(manager, account.id_cliente);
+        await assertActiveAdmin(manager, auth, true);
+        if (!account) throw cuentaNoEncontrada();
+        clientId = account.id_cliente;
+      } else if (probe.id_pedido !== null) {
+        const order = await lockOrderById(manager, probe.id_pedido);
+        await assertActiveAdmin(manager, auth, true);
+        if (!order) throw pedidoNoEncontrado();
+        clientId = order.id_cliente;
+      } else {
+        await assertActiveAdmin(manager, auth, true);
+        throw conflictoConcurrencia();
+      }
 
-    // §10.3 Fase 3: PAGO FOR UPDATE + revalidacion
-    const locked = await lockPaymentById(manager, pagoId, clientId);
-    if (!locked) throw pagoNoEncontrado();
-    if (
-      locked.id_cuenta_corriente !== probe.id_cuenta_corriente ||
-      locked.id_pedido !== probe.id_pedido
-    ) {
-      throw conflictoConcurrencia();
-    }
+      // §10.3 Fase 3: PAGO FOR UPDATE + revalidacion
+      const locked = await lockPaymentById(manager, pagoId, clientId);
+      if (!locked) throw pagoNoEncontrado();
+      if (
+        locked.id_cuenta_corriente !== probe.id_cuenta_corriente ||
+        locked.id_pedido !== probe.id_pedido
+      ) {
+        throw conflictoConcurrencia();
+      }
 
-    const keyOwner = await findPaymentByAnyKey(manager, key);
-    if (keyOwner && keyOwner.id_pago !== pagoId) {
-      throw claveIdempotenciaReutilizada();
-    }
-    if (locked.clave_idempotencia === key || locked.clave_idempotencia_acreditacion === key) {
-      throw claveIdempotenciaReutilizada();
-    }
+      const idempotency = await findPaymentIdempotency(manager, key);
+      if (idempotency) {
+        if (
+          idempotency.operacion !== 'RECHAZAR' ||
+          idempotency.id_pago !== pagoId ||
+          idempotency.payload_hash !== payloadHash
+        ) {
+          throw claveIdempotenciaReutilizada();
+        }
+        const existing = await findPaymentById(manager, pagoId);
+        if (!existing) throw pagoNoEncontrado();
+        return { data: toDto(existing), replay: true };
+      }
 
-    if (locked.estado === 'RECHAZADO' && locked.clave_idempotencia_cierre === key) {
-      if (locked.motivo_cierre !== input.motivo) throw claveIdempotenciaReutilizada();
-      const existing = await findPaymentById(manager, pagoId);
-      if (!existing) throw pagoNoEncontrado();
-      return { data: toDto(existing), replay: true };
+      const keyOwner = await findPaymentByAnyKey(manager, key);
+      if (keyOwner && keyOwner.id_pago !== pagoId) {
+        throw claveIdempotenciaReutilizada();
+      }
+      if (locked.clave_idempotencia === key || locked.clave_idempotencia_acreditacion === key) {
+        throw claveIdempotenciaReutilizada();
+      }
+
+      if (locked.estado === 'RECHAZADO' && locked.clave_idempotencia_cierre === key) {
+        if (locked.motivo_cierre !== input.motivo) throw claveIdempotenciaReutilizada();
+        const existing = await findPaymentById(manager, pagoId);
+        if (!existing) throw pagoNoEncontrado();
+        return { data: toDto(existing), replay: true };
+      }
+
+      if (locked.estado !== 'PENDIENTE') {
+        throw transicionPagoInvalida(
+          `Solo se puede rechazar un pago preliminar en estado PENDIENTE (actual: ${locked.estado}).`,
+        );
+      }
+
+      const affected = await markPaymentClosed(manager, {
+        pagoId,
+        fromState: 'PENDIENTE',
+        toState: 'RECHAZADO',
+        motivo: input.motivo,
+        claveIdempotenciaCierre: key,
+        adminId: auth.id,
+        fechaCierreUtc: utcSql(new Date()),
+      });
+      if (affected !== 1) throw transicionPagoInvalida();
+
+      await insertPaymentIdempotency(manager, {
+        claveIdempotencia: key,
+        pagoId,
+        operacion: 'RECHAZAR',
+        payloadHash,
+      });
+
+      const saved = await findPaymentById(manager, pagoId);
+      if (!saved) throw conflictoConcurrencia();
+      return { data: toDto(saved), replay: false };
+    }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
+  } catch (error) {
+    if (hasDatabaseError(error, 'ER_DUP_ENTRY', 1062)) {
+      return recoverDuplicatePaymentAction(auth, key, 'RECHAZAR', payloadHash, pagoId);
     }
-
-    if (locked.estado !== 'PENDIENTE') {
-      throw transicionPagoInvalida(
-        `Solo se puede rechazar un pago preliminar en estado PENDIENTE (actual: ${locked.estado}).`,
-      );
-    }
-
-    const affected = await markPaymentClosed(manager, {
-      pagoId,
-      fromState: 'PENDIENTE',
-      toState: 'RECHAZADO',
-      motivo: input.motivo,
-      claveIdempotenciaCierre: key,
-      adminId: auth.id,
-      fechaCierreUtc: utcSql(new Date()),
-    });
-    if (affected !== 1) throw transicionPagoInvalida();
-
-    const saved = await findPaymentById(manager, pagoId);
-    if (!saved) throw conflictoConcurrencia();
-    return { data: toDto(saved), replay: false };
-  }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
+    throw error;
+  }
 }
 
 export async function annulAdminPaymentService(
@@ -688,118 +832,148 @@ export async function annulAdminPaymentService(
   key: string,
   notify?: NotifyCommittedChange,
 ): Promise<AdminPaymentActionResult> {
-  const committed = await inTransaction(async manager => {
-    // §10.3 Fase 1 (sin lock)
-    const probe = await probePaymentDestination(manager, pagoId);
-    if (!probe) {
-      await assertActiveAdmin(manager, auth, true);
-      throw pagoNoEncontrado();
-    }
-
-    // §10.3 Fase 2: root aggregate primero
-    let clientId: number;
-    let targetAccountId: number | null = null;
-    if (probe.id_cuenta_corriente !== null) {
-      const account = await lockAccountById(manager, probe.id_cuenta_corriente);
-      if (!account) {
+  const payloadHash = closePaymentPayloadHash('ANULAR', pagoId, input);
+  let committed: { result: AdminPaymentActionResult; change?: CommittedChange };
+  try {
+    committed = await inTransaction(async manager => {
+      // §10.3 Fase 1 (sin lock)
+      const probe = await probePaymentDestination(manager, pagoId);
+      if (!probe) {
         await assertActiveAdmin(manager, auth, true);
-        throw cuentaNoEncontrada();
+        throw pagoNoEncontrado();
       }
-      const client = await lockClientById(manager, account.id_cliente);
-      await assertActiveAdmin(manager, auth, true);
-      if (!client) throw cuentaNoEncontrada();
-      clientId = client.id_cliente;
-      targetAccountId = account.id_cuenta_corriente;
-    } else if (probe.id_pedido !== null) {
-      const order = await lockOrderById(manager, probe.id_pedido);
-      await assertActiveAdmin(manager, auth, true);
-      if (!order) throw pedidoNoEncontrado();
-      clientId = order.id_cliente;
-    } else {
-      await assertActiveAdmin(manager, auth, true);
-      throw conflictoConcurrencia();
-    }
 
-    // §10.3 Fase 3: PAGO FOR UPDATE + revalidacion
-    const locked = await lockPaymentById(manager, pagoId, clientId);
-    if (!locked) throw pagoNoEncontrado();
-    if (
-      locked.id_cuenta_corriente !== probe.id_cuenta_corriente ||
-      locked.id_pedido !== probe.id_pedido
-    ) {
-      throw conflictoConcurrencia();
-    }
-
-    const keyOwner = await findPaymentByAnyKey(manager, key);
-    if (keyOwner && keyOwner.id_pago !== pagoId) {
-      throw claveIdempotenciaReutilizada();
-    }
-    if (locked.clave_idempotencia === key || locked.clave_idempotencia_acreditacion === key) {
-      throw claveIdempotenciaReutilizada();
-    }
-
-    if (locked.estado === 'ANULADO' && locked.clave_idempotencia_cierre === key) {
-      if (locked.motivo_cierre !== input.motivo) throw claveIdempotenciaReutilizada();
-      const existing = await findPaymentById(manager, pagoId);
-      if (!existing) throw pagoNoEncontrado();
-      return { result: { data: toDto(existing), replay: true } };
-    }
-
-    if (locked.estado !== 'ACREDITADO') {
-      throw transicionPagoInvalida(
-        `Solo se puede anular un pago en estado ACREDITADO (actual: ${locked.estado}).`,
-      );
-    }
-
-    const affected = await markPaymentClosed(manager, {
-      pagoId,
-      fromState: 'ACREDITADO',
-      toState: 'ANULADO',
-      motivo: input.motivo,
-      claveIdempotenciaCierre: key,
-      adminId: auth.id,
-      fechaCierreUtc: utcSql(new Date()),
-    });
-    if (affected !== 1) throw transicionPagoInvalida();
-
-    let revisionCuenta: string | null = null;
-    if (targetAccountId !== null) {
-      const abono = await findLinkedAccountAbonoForUpdate(manager, targetAccountId, pagoId);
-      if (abono && abono.estado === 'ACREDITADO') {
-        try {
-          await anularMovimiento({
-            id_cuenta_corriente: targetAccountId,
-            id_movimiento_cuenta: abono.id_movimiento_cuenta,
-            evento: `PAGO_ANULADO:${key}`,
-            actor: String(auth.id),
-            motivo: input.motivo,
-          }, manager);
-        } catch (error) {
-          mapLedgerError(error);
+      // §10.3 Fase 2: root aggregate primero
+      let clientId: number;
+      let targetAccountId: number | null = null;
+      if (probe.id_cuenta_corriente !== null) {
+        const account = await lockAccountById(manager, probe.id_cuenta_corriente);
+        if (!account) {
+          await assertActiveAdmin(manager, auth, true);
+          throw cuentaNoEncontrada();
         }
+        const client = await lockClientById(manager, account.id_cliente);
+        await assertActiveAdmin(manager, auth, true);
+        if (!client) throw cuentaNoEncontrada();
+        clientId = client.id_cliente;
+        targetAccountId = account.id_cuenta_corriente;
+      } else if (probe.id_pedido !== null) {
+        const order = await lockOrderById(manager, probe.id_pedido);
+        await assertActiveAdmin(manager, auth, true);
+        if (!order) throw pedidoNoEncontrado();
+        clientId = order.id_cliente;
+      } else {
+        await assertActiveAdmin(manager, auth, true);
+        throw conflictoConcurrencia();
       }
-      revisionCuenta = await readCurrentAccountRevision(manager, targetAccountId);
+
+      // §10.3 Fase 3: PAGO FOR UPDATE + revalidacion
+      const locked = await lockPaymentById(manager, pagoId, clientId);
+      if (!locked) throw pagoNoEncontrado();
+      if (
+        locked.id_cuenta_corriente !== probe.id_cuenta_corriente ||
+        locked.id_pedido !== probe.id_pedido
+      ) {
+        throw conflictoConcurrencia();
+      }
+
+      const idempotency = await findPaymentIdempotency(manager, key);
+      if (idempotency) {
+        if (
+          idempotency.operacion !== 'ANULAR' ||
+          idempotency.id_pago !== pagoId ||
+          idempotency.payload_hash !== payloadHash
+        ) {
+          throw claveIdempotenciaReutilizada();
+        }
+        const existing = await findPaymentById(manager, pagoId);
+        if (!existing) throw pagoNoEncontrado();
+        return { result: { data: toDto(existing), replay: true } };
+      }
+
+      const keyOwner = await findPaymentByAnyKey(manager, key);
+      if (keyOwner && keyOwner.id_pago !== pagoId) {
+        throw claveIdempotenciaReutilizada();
+      }
+      if (locked.clave_idempotencia === key || locked.clave_idempotencia_acreditacion === key) {
+        throw claveIdempotenciaReutilizada();
+      }
+
+      if (locked.estado === 'ANULADO' && locked.clave_idempotencia_cierre === key) {
+        if (locked.motivo_cierre !== input.motivo) throw claveIdempotenciaReutilizada();
+        const existing = await findPaymentById(manager, pagoId);
+        if (!existing) throw pagoNoEncontrado();
+        return { result: { data: toDto(existing), replay: true } };
+      }
+
+      if (locked.estado !== 'ACREDITADO') {
+        throw transicionPagoInvalida(
+          `Solo se puede anular un pago en estado ACREDITADO (actual: ${locked.estado}).`,
+        );
+      }
+
+      const affected = await markPaymentClosed(manager, {
+        pagoId,
+        fromState: 'ACREDITADO',
+        toState: 'ANULADO',
+        motivo: input.motivo,
+        claveIdempotenciaCierre: key,
+        adminId: auth.id,
+        fechaCierreUtc: utcSql(new Date()),
+      });
+      if (affected !== 1) throw transicionPagoInvalida();
+
+      await insertPaymentIdempotency(manager, {
+        claveIdempotencia: key,
+        pagoId,
+        operacion: 'ANULAR',
+        payloadHash,
+      });
+
+      let revisionCuenta: string | null = null;
+      if (targetAccountId !== null) {
+        const abono = await findLinkedAccountAbonoForUpdate(manager, targetAccountId, pagoId);
+        if (abono && abono.estado === 'ACREDITADO') {
+          try {
+            await anularMovimiento({
+              id_cuenta_corriente: targetAccountId,
+              id_movimiento_cuenta: abono.id_movimiento_cuenta,
+              evento: `PAGO_ANULADO:${key}`,
+              actor: String(auth.id),
+              motivo: input.motivo,
+            }, manager);
+          } catch (error) {
+            mapLedgerError(error);
+          }
+        }
+        revisionCuenta = await readCurrentAccountRevision(manager, targetAccountId);
+      }
+
+      const saved = await findPaymentById(manager, pagoId);
+      if (!saved) throw conflictoConcurrencia();
+
+      const change: CommittedChange = {
+        kind: 'payment',
+        clientId,
+        payment: {
+          pagoId: saved.id_pago,
+          pedidoId: saved.id_pedido,
+          cuentaCorrienteId: saved.id_cuenta_corriente,
+          estadoPago: 'ANULADO',
+          montoUSD: saved.monto_usd ?? saved.monto,
+          revisionCuenta,
+          actualizadoEn: new Date().toISOString(),
+        },
+      };
+
+      return { result: { data: toDto(saved), replay: false }, change };
+    }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
+  } catch (error) {
+    if (hasDatabaseError(error, 'ER_DUP_ENTRY', 1062)) {
+      return recoverDuplicatePaymentAction(auth, key, 'ANULAR', payloadHash, pagoId);
     }
-
-    const saved = await findPaymentById(manager, pagoId);
-    if (!saved) throw conflictoConcurrencia();
-
-    const change: CommittedChange = {
-      kind: 'payment',
-      clientId,
-      payment: {
-        pagoId: saved.id_pago,
-        pedidoId: saved.id_pedido,
-        cuentaCorrienteId: saved.id_cuenta_corriente,
-        estadoPago: 'ANULADO',
-        montoUSD: saved.monto_usd ?? saved.monto,
-        revisionCuenta,
-        actualizadoEn: new Date().toISOString(),
-      },
-    };
-
-    return { result: { data: toDto(saved), replay: false }, change };
-  }, { isolation: 'READ COMMITTED', lockWaitSeconds: 3 });
+    throw error;
+  }
 
   // Emision estrictamente post-COMMIT (§8).
   if (committed.change) notifyAfterCommit(notify, committed.change);

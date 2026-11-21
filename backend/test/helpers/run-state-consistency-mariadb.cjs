@@ -124,6 +124,7 @@ async function checkLegacyUpgrade(port) {
         DROP COLUMN id_admin_cierre,
         DROP COLUMN fecha_cierre_utc
     `);
+    await db.query('DROP TABLE IF EXISTS PAGO_IDEMPOTENCIA');
 
     // Insertar comprobante ya revisado bajo esquema #275 para verificar backfill seguro a APROBADO
     const legacyId = randomUUID();
@@ -138,7 +139,7 @@ async function checkLegacyUpgrade(port) {
     for (let run = 0; run < 2; run++) {
       applySql(sqlFile(stateMigration), { target });
       const inv = await assertSchemaInventory(query, 'complete');
-      assert.equal(inv.tables, 25);
+      assert.equal(inv.tables, 26);
       assert.equal(inv.triggers, 13);
       assert.equal(inv.views, 1);
     }
@@ -155,7 +156,7 @@ async function checkLegacyUpgrade(port) {
     // Las filas del seed siguen intactas
     const [pagoCount] = await db.query('SELECT COUNT(*) AS n FROM PAGO');
     assert.equal(Number(pagoCount.n), 2);
-    console.log('Upgrade aditivo #290 verificado: 25 tablas, 13 triggers (3 FER-20 + 4 FER-17 + 6 S7-04), backfill legado APROBADO y seed intacto.');
+    console.log('Upgrade aditivo #290 verificado: 26 tablas, 13 triggers (3 FER-20 + 4 FER-17 + 6 S7-04), backfill legado APROBADO y seed intacto.');
   } finally {
     await db.end();
   }
@@ -258,15 +259,15 @@ async function main() {
     assert.equal(code, 0, `Suite T-S7-04.2 falló (exit ${code})`);
     assert.equal(interrupted, false);
 
-    // Reaplicacion idempotente con datos reales poblados en las 25 tablas
+    // Reaplicacion idempotente con datos reales poblados en las 26 tablas
     const { tables } = await readSchemaInventory(query);
     const populated = await snapshot(query, tables);
-    for (const table of ['COMPROBANTE_PAGO', 'PAGO', 'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA', 'PEDIDO']) {
+    for (const table of ['COMPROBANTE_PAGO', 'PAGO', 'PAGO_IDEMPOTENCIA', 'MOVIMIENTO_CUENTA_CORRIENTE', 'IMPUTACION_MOVIMIENTO_CUENTA', 'PEDIDO']) {
       assert.ok(populated.some(entry => entry.table === table && entry.rows.length > 0), table);
     }
     applySql(sqlFile(stateMigration));
     assert.deepEqual(await snapshot(query, tables), populated);
-    console.log('Reaplicación idempotente #290 verificada: filas de las 25 tablas preservadas intactas.');
+    console.log('Reaplicación idempotente #290 verificada: filas de las 26 tablas preservadas intactas.');
   } finally {
     process.off('SIGINT', signal);
     process.off('SIGTERM', signal);
