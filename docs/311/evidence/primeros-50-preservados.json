@@ -1,0 +1,305 @@
+{
+  "base": "14abaa44828841f5ffcb65f5c94d16b01bd2c0f8",
+  "registros": [
+    {
+      "numero": 1,
+      "sku": "FP-DEMO-ABR-DISCO-LIJA-100-MM",
+      "archivo": "/demo-catalog/ilustrativa-abr.webp",
+      "sha256": "ae949a2e48ca97f5c31ff84adb4a1f5594df5ca410976f11deae9e0cab505b6e"
+    },
+    {
+      "numero": 2,
+      "sku": "FP-DEMO-ABR-DISCO-METAL-100-MM",
+      "archivo": "/demo-catalog/ilustrativa-abr-corte.webp",
+      "sha256": "eaaf6eb24a9f2817fcb720723de911147aff74fd8ea768cf542af9a2621602b2"
+    },
+    {
+      "numero": 3,
+      "sku": "FP-DEMO-ABR-LIJA-AGUA-GRANO-1000",
+      "archivo": "/demo-catalog/ilustrativa-abr-hoja.webp",
+      "sha256": "b51861dd1634ac5e1aec37a4cf0588be1dc204ded7fb882eb182ca92f679236a"
+    },
+    {
+      "numero": 4,
+      "sku": "FP-DEMO-ABR-LIJA-MADERA-GRANO-100",
+      "archivo": "/demo-catalog/ilustrativa-abr-hoja.webp",
+      "sha256": "b51861dd1634ac5e1aec37a4cf0588be1dc204ded7fb882eb182ca92f679236a"
+    },
+    {
+      "numero": 5,
+      "sku": "FP-DEMO-ADH-CINTA-DOBLE-12-MM",
+      "archivo": "/demo-catalog/ilustrativa-adh-cinta.webp",
+      "sha256": "94809838fb2139d07e5c8bd9759825f5e016694c5917f30e2d5f53b3bc247e0b"
+    },
+    {
+      "numero": 6,
+      "sku": "FP-DEMO-ADH-COLA-100-ML",
+      "archivo": "/demo-catalog/ilustrativa-adh-cola.webp",
+      "sha256": "c2753fc17893e76cd5281cc05e6fa9586da68fecd29d0d99ae352d3d18da885c"
+    },
+    {
+      "numero": 7,
+      "sku": "FP-DEMO-ADH-CONTACTO-100-ML",
+      "archivo": "/demo-catalog/ilustrativa-adh.webp",
+      "sha256": "c228e266796e11de01d8fdc3786316e36a8a11997c62c5ead4660c4a4094cc8a"
+    },
+    {
+      "numero": 8,
+      "sku": "FP-DEMO-ADH-SELLADOR-CAJA-DE-10-CARTUCHOS",
+      "archivo": "/demo-catalog/ilustrativa-adh-sellador.webp",
+      "sha256": "cc939f7ed89c68148ee6ce17a1c27e31f99aa2cef36bbd3b4099e2118ab1115b"
+    },
+    {
+      "numero": 9,
+      "sku": "FP-DEMO-ALT-ARNES-TALLE-2XL-3XL-AZUL",
+      "archivo": "/demo-catalog/ilustrativa-alt.webp",
+      "sha256": "0e42c757e964eff7286a1de995c0fddb18f359ec8a6a9f260ae71b33c0f26bae"
+    },
+    {
+      "numero": 10,
+      "sku": "FP-DEMO-ALT-BOLSO-ARNES-10-L",
+      "archivo": "/demo-catalog/ilustrativa-alt-bolso.webp",
+      "sha256": "7c431848edd90bf3ae64c4403bc5f8787701ea4f48e85ba9fa1bc2583b058d45"
+    },
+    {
+      "numero": 11,
+      "sku": "FP-DEMO-ALT-ETIQUETA-ARNES-PACK-DE-100-UNIDADES",
+      "archivo": "/demo-catalog/ilustrativa-alt-etiqueta.webp",
+      "sha256": "0c12b80316700186d5c51d4ad0f3611a02f3255b9c7cd96107b1df5853fb07b8"
+    },
+    {
+      "numero": 12,
+      "sku": "FP-DEMO-ALT-PROTECTOR-CINTA-150-MM",
+      "archivo": "/demo-catalog/ilustrativa-alt-protector.webp",
+      "sha256": "a5e361ec8e7f4e132e7a1f920e3f97550d40bce2df04f2ea7ca0957d7ab09bd2"
+    },
+    {
+      "numero": 13,
+      "sku": "FP-DEMO-AUD-TAPON-ALETAS-PACK-DE-100-UNIDADES",
+      "archivo": "/demo-catalog/tapones-aletas-cordon.webp",
+      "sha256": "31b8e2518db935f96955789d473437d7c0ead0842aa17915076c083fed01d6c4"
+    },
+    {
+      "numero": 14,
+      "sku": "FP-DEMO-AUD-TAPON-ESPUMA-PACK-DE-100-UNIDADES",
+      "archivo": "/demo-catalog/tapones-espuma.webp",
+      "sha256": "8473826cbbadcbe3a446194fcb5b1b12d85cff755c0f2b909988daf4af26211b"
+    },
+    {
+      "numero": 15,
+      "sku": "FP-DEMO-AUD-OREJERA-AMARILLO",
+      "archivo": "/demo-catalog/ilustrativa-aud.webp",
+      "sha256": "0e25988638855e79a1751579e660a2d218d6a95110c256b9842421a3b9d1ab40"
+    },
+    {
+      "numero": 16,
+      "sku": "FP-DEMO-AUD-TAPON-CORDON-PACK-DE-100-UNIDADES",
+      "archivo": "/demo-catalog/ilustrativa-aud-tapon.webp",
+      "sha256": "c636caca57f77aed2273a25a0ceef5f7d10745d2f27ee117188e716c3ab46526"
+    },
+    {
+      "numero": 17,
+      "sku": "FP-DEMO-CAB-CABLE-AZUL-0-5-MM2",
+      "archivo": "/demo-catalog/ilustrativa-cab.webp",
+      "sha256": "75b6dc94118a58863671ed8024426f154a258ca9b210362c163264ca995816c7"
+    },
+    {
+      "numero": 18,
+      "sku": "FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2",
+      "archivo": "/demo-catalog/ilustrativa-cab-bipolar.webp",
+      "sha256": "f0e7fd128fad9859aa9074ad50b99b4e8b8cecd4df52e112f290efb10c7689cd"
+    },
+    {
+      "numero": 19,
+      "sku": "FP-DEMO-CAB-CABLE-MARRON-0-5-MM2",
+      "archivo": "/demo-catalog/ilustrativa-cab-marron.webp",
+      "sha256": "e5a605dcc4d9445bf53c1945ed0855717d3214f087ffc1af393223f226f6f893"
+    },
+    {
+      "numero": 20,
+      "sku": "FP-DEMO-CAB-CABLE-NEGRO-0-5-MM2",
+      "archivo": "/demo-catalog/ilustrativa-cab-negro.webp",
+      "sha256": "7c8674632695b3e21723e45d9ef1c8ffda992279d69996596a289808ed3c3369"
+    },
+    {
+      "numero": 21,
+      "sku": "FP-DEMO-CAL-BOTIN-38-AR",
+      "archivo": "/demo-catalog/botin-trabajo-negro.webp",
+      "sha256": "837f1a0bab745574f056d50a13e7f5992241cb081dba6578c914e313cb99006b"
+    },
+    {
+      "numero": 22,
+      "sku": "FP-DEMO-CAL-ZAPATO-38-AR",
+      "archivo": "/demo-catalog/zapato-trabajo-bajo.webp",
+      "sha256": "ac24b2eaa952cb51fa7aa1914763acb9985b07063758f5dd81073c8bc7057564"
+    },
+    {
+      "numero": 23,
+      "sku": "FP-DEMO-CAL-BORCEGUI-38-AR",
+      "archivo": "/demo-catalog/borcegui-marron.webp",
+      "sha256": "07da905917d3415ade2b6b10baa20e33795650e7a65abd34b0476bf6444c1717"
+    },
+    {
+      "numero": 24,
+      "sku": "FP-DEMO-CAL-BOTA-PVC-38-AR",
+      "archivo": "/demo-catalog/ilustrativa-cal-bota-pvc.webp",
+      "sha256": "89a2a9d810e64651a68b0d72bb1efe079faa80416082060b9786f87c23a89c9a"
+    },
+    {
+      "numero": 25,
+      "sku": "FP-DEMO-CAS-CASCO-BLANCO-BARBOQUEJO",
+      "archivo": "/demo-catalog/casco-blanco-barboquejo.webp",
+      "sha256": "e64eb39d14dbf3815482761ca0b74a620b9e25f53f1d1c2f769d484c95cbe83c"
+    },
+    {
+      "numero": 26,
+      "sku": "FP-DEMO-CAS-CASCO-ALA-AMARILLO",
+      "archivo": "/demo-catalog/ilustrativa-cas-ala.webp",
+      "sha256": "8e3d921263862db7276e39f5b33d72f389bfc62b238cb6d977b191a191c45270"
+    },
+    {
+      "numero": 27,
+      "sku": "FP-DEMO-CAS-CASCO-CORTO-AMARILLO",
+      "archivo": "/demo-catalog/casco-visera-corta-amarillo.webp",
+      "sha256": "813c81e94707b2f4f64e33319a6d9bbf9b02b414e0899b74b7e2f067ea1376db"
+    },
+    {
+      "numero": 28,
+      "sku": "FP-DEMO-CAS-CASCO-RANURAS-AMARILLO",
+      "archivo": "/demo-catalog/ilustrativa-cas.webp",
+      "sha256": "154a417aad6ab64c7fefb3bef6e82a3df5503c5af618ec2dcfe18a543e270a0f"
+    },
+    {
+      "numero": 29,
+      "sku": "FP-DEMO-CHA-CHALECO-AMARILLO-TALLE-2XL",
+      "archivo": "/demo-catalog/ilustrativa-cha-cierre.webp",
+      "sha256": "76b3d3d84c264c1b652ccf7d9ad7f9c3d5344c70408afcf83eb2e4236d4aff26"
+    },
+    {
+      "numero": 30,
+      "sku": "FP-DEMO-CHA-CHALECO-BOLSILLO-TALLE-2XL",
+      "archivo": "/demo-catalog/ilustrativa-cha-bolsillos.webp",
+      "sha256": "ac2cd0d8a1f8145d107eddcb2d974c2f28a44607e85b0d95ff6317fa2edba2f0"
+    },
+    {
+      "numero": 31,
+      "sku": "FP-DEMO-CHA-CHALECO-MALLA-TALLE-2XL",
+      "archivo": "/demo-catalog/ilustrativa-cha-malla.webp",
+      "sha256": "23463ba344480d98e2c4721591a90de0d009a769e91be88bf237717b07bf4665"
+    },
+    {
+      "numero": 32,
+      "sku": "FP-DEMO-CHA-CHALECO-NARANJA-TALLE-2XL",
+      "archivo": "/demo-catalog/ilustrativa-cha-naranja.webp",
+      "sha256": "4446beb4e9c97a580ad56b7ab4493131705a3f1b882e67dceac593e1a1e7f0b3"
+    },
+    {
+      "numero": 33,
+      "sku": "FP-DEMO-CIN-CINTA-DELIMITAR-AMARILLA",
+      "archivo": "/demo-catalog/ilustrativa-cin-lisa.webp",
+      "sha256": "b768c4add49e3afc2cdb53a41df915f0c6317c94a9179f6b9ac1f137d76dd717"
+    },
+    {
+      "numero": 34,
+      "sku": "FP-DEMO-CIN-CINTA-PISO-AMARILLA",
+      "archivo": "/demo-catalog/ilustrativa-cin-lisa.webp",
+      "sha256": "b768c4add49e3afc2cdb53a41df915f0c6317c94a9179f6b9ac1f137d76dd717"
+    },
+    {
+      "numero": 35,
+      "sku": "FP-DEMO-CIN-CINTA-TEXTO-100-M",
+      "archivo": "/demo-catalog/ilustrativa-cin.webp",
+      "sha256": "c28773ccca8ae17d97f5c9121f642e728fba6dc2f8cc4ff30597a1dbb88a78fa"
+    },
+    {
+      "numero": 36,
+      "sku": "FP-DEMO-CIN-CINTA-VISUAL-12-MM",
+      "archivo": "/demo-catalog/ilustrativa-cin-lisa.webp",
+      "sha256": "b768c4add49e3afc2cdb53a41df915f0c6317c94a9179f6b9ac1f137d76dd717"
+    },
+    {
+      "numero": 37,
+      "sku": "FP-DEMO-CON-CONO-NARANJA-18-CM",
+      "archivo": "/demo-catalog/ilustrativa-con.webp",
+      "sha256": "738725db1610a62420188988fb6239dc6376869d5c010ced561caec70830c288"
+    },
+    {
+      "numero": 38,
+      "sku": "FP-DEMO-CON-CONO-NARANJA-30-CM",
+      "archivo": "/demo-catalog/cono-naranja-30-cm.webp",
+      "sha256": "ea1a4d05f0126f109d3e5ec2893c38a51c11bfd60d7c9c5ea92979458376d0a3"
+    },
+    {
+      "numero": 39,
+      "sku": "FP-DEMO-CON-BARRA-CONOS-0-6-M",
+      "archivo": "/demo-catalog/ilustrativa-con-barra.webp",
+      "sha256": "3a693ccf3581dfb3c25de5f3e7f03a42b951dcb0cc7601240256ffe9066a1b2c"
+    },
+    {
+      "numero": 40,
+      "sku": "FP-DEMO-CON-CADENA-100-M",
+      "archivo": "/demo-catalog/ilustrativa-con-cadena.webp",
+      "sha256": "ddd40a39c30e65bcf43fe9e754913d87081eef00f2a97e09a487e28042a07236"
+    },
+    {
+      "numero": 41,
+      "sku": "FP-DEMO-ELE-CALADORA-500-W",
+      "archivo": "/demo-catalog/caladora-500w.webp",
+      "sha256": "68bea604436770fb0356112f32a82debb4ea4388b27a38fe1a6493d52a24886f"
+    },
+    {
+      "numero": 42,
+      "sku": "FP-DEMO-ELE-AMOLADORA-1000-W",
+      "archivo": "/demo-catalog/ilustrativa-ele-amoladora.webp",
+      "sha256": "559b723d19a85353168b205d2e6976b3741a60baaa4be50d454cb2fda928cf23"
+    },
+    {
+      "numero": 43,
+      "sku": "FP-DEMO-ELE-LIJADORA-150-W",
+      "archivo": "/demo-catalog/ilustrativa-ele-lijadora.webp",
+      "sha256": "0074104897fe64cf723852c7c06ba045892769fd43388f1d9a1a7aadc6581cbf"
+    },
+    {
+      "numero": 44,
+      "sku": "FP-DEMO-ELE-TALADRO-500-W",
+      "archivo": "/demo-catalog/ilustrativa-ele.webp",
+      "sha256": "4831d692c31c8714026e762dcd602a95468799ec8e316ffbbf3749d528948f9c"
+    },
+    {
+      "numero": 45,
+      "sku": "FP-DEMO-FIJ-TARUGO-NYLON-10-MM",
+      "archivo": "/demo-catalog/ilustrativa-fij-tarugo.webp",
+      "sha256": "d537dc500570b9c16d3115b44b6d56152c21e5df0bfd244e4e0757eba1b6ddd5"
+    },
+    {
+      "numero": 46,
+      "sku": "FP-DEMO-FIJ-ABRAZADERA-12-MM",
+      "archivo": "/demo-catalog/ilustrativa-fij-abrazadera.webp",
+      "sha256": "cf02362a2b15a55909ec4d3f308870b5746e46d77aa761def37b3f413e95d033"
+    },
+    {
+      "numero": 47,
+      "sku": "FP-DEMO-FIJ-ANCLAJE-M10",
+      "archivo": "/demo-catalog/ilustrativa-fij-anclaje.webp",
+      "sha256": "ca03309843a38ea7821c102568eb71a45e6ce8f3ab88eecef89709995d99abeb"
+    },
+    {
+      "numero": 48,
+      "sku": "FP-DEMO-FIJ-VARILLA-M10",
+      "archivo": "/demo-catalog/ilustrativa-fij-varilla.webp",
+      "sha256": "584b0c2a39f507d55e357b0445d536533350f8b3a98ae15ba5f5fb123c1c8bd1"
+    },
+    {
+      "numero": 49,
+      "sku": "FP-DEMO-GUA-GUANTE-ALGODON-TALLE-2XL",
+      "archivo": "/demo-catalog/ilustrativa-gua-algodon.webp",
+      "sha256": "6c468f5fcc7739a117655f0f28e8d05c4519807976651e13dd2d20d34c20b82a"
+    },
+    {
+      "numero": 50,
+      "sku": "FP-DEMO-GUA-GUANTE-DESCARNE-TALLE-2XL",
+      "archivo": "/demo-catalog/ilustrativa-gua-descarne.webp",
+      "sha256": "f30afdfafa6503ef49a48dce2b021915a4b41550f9ec42fc874e1ca1392bbe36"
+    }
+  ]
+}
