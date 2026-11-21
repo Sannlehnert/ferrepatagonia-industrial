@@ -110,7 +110,7 @@ watch(
     if (!hasLockedAttempt.value) selected.value = 'TRANSFERENCIA'
     eligibilityFeedback.value = ''
     if (hasVerifiableTotal) {
-      void order.loadEligibility()
+      void order.loadEligibility(eligibilityKey.value ?? '')
       void transfer.loadEligibility()
     } else {
       order.invalidateEligibility()
@@ -139,7 +139,9 @@ watch(
 
 async function retryEligibility() {
   eligibilityFeedback.value = ''
-  if (await order.loadEligibility()) eligibilityFeedback.value = 'Elegibilidad actualizada.'
+  if (await order.loadEligibility(eligibilityKey.value ?? '')) {
+    eligibilityFeedback.value = 'Elegibilidad actualizada.'
+  }
 }
 
 async function confirmOrder() {
@@ -153,7 +155,7 @@ async function confirmTransfer() {
 async function retryAfterRejection() {
   order.prepareRetry()
   await cart.cargarCarrito()
-  await order.loadEligibility()
+  await order.loadEligibility(eligibilityKey.value ?? '')
 }
 
 async function retryTransferAfterRejection() {
@@ -170,7 +172,7 @@ async function retryTransferAfterRejection() {
     </p>
     <div v-if="showTotal && !hasLockedAttempt && order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
       <p role="alert" class="mb-2 mt-0 text-sm">{{ order.eligibilityError }}</p>
-      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="retryEligibility()">
+      <button type="button" :disabled="busy || order.eligibilityLoading" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60" @click="retryEligibility()">
         Volver a consultar elegibilidad
       </button>
     </div>

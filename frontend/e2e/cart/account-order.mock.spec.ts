@@ -199,6 +199,79 @@ test('no anuncia elegibilidad actualizada para una respuesta del carrito anterio
   await expect(summary).toContainText('USD 500.00')
 })
 
+test('A01: una confirmación anterior no bloquea la segunda compra tras navegar', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = eligibleOrder
+  await page.route('**/api/catalogo*', route => route.fulfill({
+    json: {
+      data: {
+        productos: [],
+        pagination: {
+          page: 1, limit: 12, total: 0, totalPages: 0,
+          hasNext: false, hasPrevious: false,
+        },
+      },
+    },
+  }))
+  await page.route('**/api/categorias', route => route.fulfill({
+    json: { data: { categorias: [] } },
+  }))
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
+  await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
+  await expect(page.getByText('Pedido #456 confirmado por USD 80.00.', { exact: false }).first())
+    .toBeVisible()
+  expect(state.orderRequests).toHaveLength(1)
+
+  await page.evaluate(() => {
+    ;(globalThis as { __fpSpaNavigation?: string }).__fpSpaNavigation = 'preserved'
+  })
+  await page.getByRole('link', { name: 'Explorar catálogo' }).click()
+  await expect(page).toHaveURL(/\/catalogo$/)
+  expect(await page.evaluate(() =>
+    (globalThis as { __fpSpaNavigation?: string }).__fpSpaNavigation,
+  )).toBe('preserved')
+
+  state.removed = false
+  state.quantity = 2
+  state.eligibility = {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: '160.00',
+    creditoDisponibleUSD: '20.00',
+    codigo: 'CREDITO_INSUFICIENTE',
+    mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: null,
+  }
+  const secondEligibility = page.waitForResponse(response =>
+    response.request().method() === 'GET' &&
+    new URL(response.url()).pathname === '/api/pedidos/cuenta-corriente/eligibilidad' &&
+    response.status() === 200)
+  await page.goBack()
+  await expect(page).toHaveURL(/\/carrito$/)
+  expect((await (await secondEligibility).json()).data).toMatchObject({
+    elegible: false,
+    totalUSD: '160.00',
+    creditoDisponibleUSD: '20.00',
+  })
+
+  const nextSummary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(nextSummary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+  await expect(nextSummary.getByRole('button', { name: 'Confirmar pedido por transferencia' }))
+    .toBeEnabled()
+  await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  await expect(nextSummary).toContainText(
+    'El crédito disponible no alcanza para confirmar el pedido.',
+  )
+  await expect(nextSummary.getByRole('button', { name: 'Volver a consultar elegibilidad' }))
+    .toBeVisible()
+  await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
+    .toContainText('USD 80.00')
+  expect(state.orderRequests).toHaveLength(1)
+})
+
 test('cancela la reconsulta si el carrito pierde un total verificable', async ({ page }) => {
   const state = await mockCart(page)
   state.eligibility = {
