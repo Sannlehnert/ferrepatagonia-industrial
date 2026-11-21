@@ -180,6 +180,32 @@ test('ignora una respuesta de elegibilidad de un carrito anterior', async t => {
     assert.equal(store.eligibilityLoading, false)
 })
 
+test('invalida y aborta una consulta cuando el carrito deja de ser verificable', async t => {
+    const response = deferred()
+    let requestSignal
+    const { store } = createRuntime(t, {
+        getEligibility: async signal => {
+            requestSignal = signal
+            return response.promise
+        },
+        confirm: async () => assert.fail('No debe enviar la confirmación'),
+        recover: async () => assert.fail('No debe consultar un intento'),
+    })
+    await tick()
+
+    const request = store.loadEligibility('cart-80')
+    store.invalidateEligibility()
+
+    assert.equal(requestSignal.aborted, true)
+    assert.equal(store.eligibility, null)
+    assert.equal(store.eligibilityLoading, false)
+    assert.equal(store.eligibilityUpdated, false)
+    response.resolve(eligibleOrder)
+    assert.equal(await request, false)
+    assert.equal(store.eligibility, null)
+    assert.equal(store.eligibilityUpdated, false)
+})
+
 test('ignora doble confirmación y mantiene el resultado incierto bajo la misma clave', async t => {
     const response = deferred()
     const requests = []

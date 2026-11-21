@@ -199,6 +199,56 @@ test('no anuncia elegibilidad actualizada para una respuesta del carrito anterio
   await expect(summary).toContainText('USD 500.00')
 })
 
+test('cancela la reconsulta si el carrito pierde un total verificable', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: '80.00',
+    creditoDisponibleUSD: '20.00',
+    codigo: 'CREDITO_INSUFICIENTE',
+    mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: null,
+  }
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(summary).toContainText('El crédito disponible no alcanza para confirmar el pedido.')
+
+  let eligibilityRequests = 0
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/pedidos/cuenta-corriente/eligibilidad') {
+      eligibilityRequests++
+    }
+  })
+  let release = () => {}
+  state.eligibilityGate = new Promise<void>(resolve => { release = resolve })
+  const retryRequest = page.waitForRequest(request =>
+    request.method() === 'GET' && request.url().includes('/pedidos/cuenta-corriente/eligibilidad'))
+  await summary.getByRole('button', { name: 'Volver a consultar elegibilidad' }).click()
+  const pendingRequest = await retryRequest
+  const requestFailed = page.waitForEvent('requestfailed', request => request === pendingRequest)
+
+  state.transform = snapshot => ({ ...snapshot, totalUSD: null })
+  const cartRefresh = page.waitForResponse(response =>
+    response.request().method() === 'GET' &&
+    new URL(response.url()).pathname === '/api/carrito')
+  const quantity = page.getByRole('spinbutton', { name: 'Cantidad de Producto de prueba' })
+  await quantity.fill('2')
+  await quantity.press('Tab')
+  const refreshedCart = await cartRefresh
+  expect((await refreshedCart.json()).totalUSD).toBeNull()
+  await expect(summary).toContainText('La confirmación requiere un total vigente y verificable del carrito.')
+  await requestFailed
+  expect(eligibilityRequests).toBe(1)
+
+  state.eligibility = eligibleOrder
+  release()
+  await expect(summary.getByText('Elegibilidad actualizada.', { exact: true })).toHaveCount(0)
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  expect(eligibilityRequests).toBe(1)
+})
+
 test('recupera un resultado pendiente con la misma clave idempotente', async ({
   page,
 }) => {

@@ -105,16 +105,18 @@ const transferReceiptPath = computed(() =>
 )
 
 watch(
-  eligibilityKey,
-  () => {
+  [eligibilityKey, showTotal],
+  ([, hasVerifiableTotal]) => {
     if (!hasLockedAttempt.value) selected.value = 'TRANSFERENCIA'
     eligibilityFeedback.value = ''
-    if (showTotal.value) {
+    if (hasVerifiableTotal) {
       void order.loadEligibility()
       void transfer.loadEligibility()
+    } else {
+      order.invalidateEligibility()
     }
   },
-  { immediate: true },
+  { immediate: true, flush: 'sync' },
 )
 
 watch(

@@ -183,6 +183,17 @@ export function createAccountOrderStore(
       }
     }
 
+    function invalidateEligibility() {
+      const request = activeEligibility
+      activeEligibility = undefined
+      eligibilityRequestKey = ''
+      eligibility.value = null
+      eligibilityLoading.value = false
+      eligibilityError.value = ''
+      eligibilityUpdated.value = false
+      request?.abort()
+    }
+
     function finishAttempt(
       result: AccountOrderAttempt,
       userId: number,
@@ -368,7 +379,7 @@ export function createAccountOrderStore(
       eligibility, eligibilityLoading, eligibilityError, eligibilityUpdated, canUseCredit, attemptState,
       attemptError, confirmation, receipts, pendingKey, storageError,
       pendingQuoteToken,
-      loadEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
+      loadEligibility, invalidateEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
     }
   })
 }
