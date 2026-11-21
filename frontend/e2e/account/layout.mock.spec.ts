@@ -199,7 +199,7 @@ for (const width of [320, 360, 390, 768, 1280]) {
       await page.setViewportSize({ width, height: 800 })
       await mockApi(page, tipo, true, tipo === 'EMPRESA' ? 'PENDIENTE' : 'APROBADA')
       const method = tipo === 'EMPRESA' ? 'CUENTA_CORRIENTE' : 'TRANSFERENCIA'
-      const unsupported = tipo === 'EMPRESA' ? 'TRANSFERENCIA' : 'CUENTA_CORRIENTE'
+      const otherMethod = tipo === 'EMPRESA' ? 'TRANSFERENCIA' : 'CUENTA_CORRIENTE'
       const makeOrder = (pedidoId: number, modalidadPago: string, estado: string) => ({
         pedidoId, numero: `PED-${String(pedidoId).padStart(6, '0')}`,
         fecha: '2026-11-16T12:00:00.000Z', estado, modalidadPago, moneda: 'USD',
@@ -209,7 +209,7 @@ for (const width of [320, 360, 390, 768, 1280]) {
       const orders = [
         makeOrder(1, method, 'CONFIRMADO'),
         makeOrder(2, method, 'PENDIENTE'),
-        makeOrder(3, unsupported, 'PENDIENTE'),
+        makeOrder(3, otherMethod, 'PENDIENTE'),
       ]
       await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
         const path = new URL(route.request().url()).pathname
@@ -313,7 +313,7 @@ test('EMPRESA: transferencia sin comprobante aparece en resumen, historial y per
   await missing.click()
   await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
   await expect(page.getByRole('heading', { name: 'PED-000001' })).toBeVisible()
-  await expect(page.getByRole('listitem').getByText('No adjunto', { exact: true })).toBeVisible()
+  await expect(page.getByRole('table').getByText('No adjunto', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Ver comprobantes de PED-000001' }).click()
   const dialog = page.getByRole('dialog')

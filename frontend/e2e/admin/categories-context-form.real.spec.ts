@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 
 const password = 'E2eLocal-214!'
 
@@ -300,14 +300,24 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
     const saving = dialog.getByRole('button', { name: 'Guardando…' })
     await expect(saving).toBeDisabled()
 
-    await pressEscapeThrice(page)
+    // «Guardando…» se pinta antes de que el PUT llegue a page.route: sin esta
+    // sincronización, Escape puede ejecutarse antes de que exista la solicitud.
+    await expect.poll(
+      () => putRequests,
+      { message: 'PUT de la categoría interceptado' },
+    ).toBe(1)
 
-    await expect(dialog).toBeVisible()
-    await expect(nameInput).toHaveValue(edited)
-    expect(putRequests).toBe(1)
+    try {
+      await pressEscapeThrice(page)
 
-    expect(releaseRequest).toBeTruthy()
-    releaseRequest!()
+      await expect(dialog).toBeVisible()
+      await expect(nameInput).toHaveValue(edited)
+      expect(putRequests).toBe(1)
+    } finally {
+      // Librar la solicitud retenida aunque falle una aserción.
+      releaseRequest!()
+    }
+
     await expect(dialog).toHaveCount(0)
     await expect(page.getByRole('heading', { name: edited, exact: true })).toBeVisible()
     expect(putRequests).toBe(1)
@@ -368,21 +378,48 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
     await expect(dialog).toBeVisible()
     await expect(alert).toBeVisible()
     await page.setViewportSize({ width: 360, height: 480 })
+
+    // Con el scroll al final, el footer sigue visible y la alerta no lo desplaza.
     await page.evaluate(() => {
       const body = (globalThis as any).document.querySelector('dialog form .overflow-y-auto')
       body.scrollTop = body.scrollHeight
     })
+    const footerMetrics = await dialog.evaluate((el: any) => {
+      const view = el.ownerDocument.defaultView
+      const footer = el.querySelector('footer').getBoundingClientRect()
+      const buttons = [...el.querySelectorAll('footer button')].map((button: any) => {
+        const rect = button.getBoundingClientRect()
+        return { top: rect.top, bottom: rect.bottom, label: button.textContent?.trim() }
+      })
+      return { footerTop: footer.top, footerBottom: footer.bottom, buttons, viewportHeight: view.innerHeight }
+    })
+    expect(footerMetrics.footerBottom).toBeLessThanOrEqual(footerMetrics.viewportHeight)
+    expect(footerMetrics.buttons.length).toBe(2)
+    for (const button of footerMetrics.buttons) {
+      expect(button.top, `${button.label} visible`).toBeGreaterThanOrEqual(footerMetrics.footerTop - 1)
+      expect(button.bottom, `${button.label} visible`).toBeLessThanOrEqual(footerMetrics.footerBottom + 1)
+    }
+
+    // La alerta vive en el área desplazable: al volver arriba queda a la vista.
+    await page.evaluate(() => {
+      const body = (globalThis as any).document.querySelector('dialog form .overflow-y-auto')
+      body.scrollTop = 0
+    })
     await expect(alert).toBeVisible()
     const visibility = await alert.evaluate((el: any) => {
       const rect = el.getBoundingClientRect()
+      const scroll = el.closest('form')!.querySelector('.overflow-y-auto')
+      const scrollRect = scroll.getBoundingClientRect()
       return {
         top: rect.top,
         bottom: rect.bottom,
+        scrollTop: scrollRect.top,
+        scrollBottom: scrollRect.bottom,
         viewportHeight: el.ownerDocument.defaultView.innerHeight,
-        scrollHeight: el.closest('form')!.querySelector('.overflow-y-auto').scrollTop,
       }
     })
-    expect(visibility.top).toBeGreaterThanOrEqual(0)
+    expect(visibility.top).toBeGreaterThanOrEqual(visibility.scrollTop - 1)
+    expect(visibility.top).toBeLessThanOrEqual(visibility.scrollBottom)
     expect(visibility.bottom).toBeLessThanOrEqual(visibility.viewportHeight)
     expect(reloadRequests).toBe(1)
 
@@ -437,7 +474,7 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
       await expect(dialog).toBeVisible()
       await page.evaluate(() => {
         const body = (globalThis as any).document.querySelector('dialog form .overflow-y-auto')
-        body.scrollTop = body.scrollHeight
+        body.scrollTop = 0
       })
       await expect(alert).toBeVisible()
       await expect(nameInput).toHaveValue(`${name} con error largo`)
@@ -446,15 +483,16 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
         const doc = el.ownerDocument
         const view = doc.defaultView
         const card = el.querySelector(':scope > div')
+        const scrollArea = el.querySelector('form .overflow-y-auto')
         const input = el.querySelector('#category-name')
         const textarea = el.querySelector('#category-description')
         const alertNode = [...el.querySelectorAll('[role="alert"]')]
           .find(node => node.textContent?.includes(expectedMessage))
         const cardRect = card.getBoundingClientRect()
+        const scrollRect = scrollArea.getBoundingClientRect()
         const inputRect = input.getBoundingClientRect()
         const textareaRect = textarea.getBoundingClientRect()
         const alertRect = alertNode.getBoundingClientRect()
-        const bodyTop = el.querySelector('form .overflow-y-auto').getBoundingClientRect().top
         return {
           docScroll: doc.documentElement.scrollWidth,
           viewportWidth: view.innerWidth,
@@ -471,7 +509,11 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
           alertRight: alertRect.right,
           alertTop: alertRect.top,
           alertBottom: alertRect.bottom,
-          bodyTop,
+          scrollTop: scrollRect.top,
+          scrollBottom: scrollRect.bottom,
+          scrollClientHeight: scrollArea.clientHeight,
+          scrollHeight: scrollArea.scrollHeight,
+          alertInsideScroll: scrollArea.contains(alertNode),
           alertClient: alertNode.clientWidth,
           alertScroll: alertNode.scrollWidth,
         }
@@ -483,11 +525,12 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
       expect(metrics.inputRight, `input derecha a ${width}`).toBeLessThanOrEqual(metrics.cardRight + 1)
       expect(metrics.textareaLeft, `textarea izquierda a ${width}`).toBeGreaterThanOrEqual(metrics.cardLeft - 1)
       expect(metrics.textareaRight, `textarea derecha a ${width}`).toBeLessThanOrEqual(metrics.cardRight + 1)
+      expect(metrics.alertInsideScroll, `alerta dentro del scroll a ${width}`).toBe(true)
       expect(metrics.alertLeft, `alerta izquierda a ${width}`).toBeGreaterThanOrEqual(metrics.cardLeft - 1)
       expect(metrics.alertRight, `alerta derecha a ${width}`).toBeLessThanOrEqual(metrics.cardRight + 1)
-      expect(metrics.alertTop, `alerta arriba a ${width}`).toBeGreaterThanOrEqual(0)
-      expect(metrics.alertBottom, `alerta abajo a ${width}`).toBeLessThanOrEqual(metrics.viewportHeight)
-      expect(metrics.alertBottom, `alerta no invade el cuerpo a ${width}`).toBeLessThanOrEqual(metrics.bodyTop + 1)
+      expect(metrics.alertTop, `alerta arriba a ${width}`).toBeGreaterThanOrEqual(metrics.scrollTop - 1)
+      expect(metrics.alertTop, `alerta dentro del área visible a ${width}`).toBeLessThanOrEqual(metrics.scrollBottom)
+      expect(metrics.scrollHeight, `scroll utilizable a ${width}`).toBeGreaterThanOrEqual(metrics.scrollClientHeight)
       expect(metrics.alertScroll, `alerta wrap a ${width}`).toBeLessThanOrEqual(metrics.alertClient + 1)
     }
 
@@ -510,5 +553,267 @@ test.describe('robustez del cierre y geometría del formulario contextual', () =
       return { width: style.outlineWidth, style: style.outlineStyle, color: style.outlineColor, offset: style.outlineOffset }
     })
     expect(saveOutline).toEqual({ width: '2px', style: 'solid', color: 'rgb(20, 90, 141)', offset: '2px' })
+  })
+})
+
+async function dialogGeometry(dialog: Locator, message?: string) {
+  return dialog.evaluate((el: any, expectedMessage: string | undefined) => {
+    const doc = el.ownerDocument
+    const view = doc.defaultView
+    const card = el.querySelector(':scope > div')
+    const scroll = el.querySelector('form .overflow-y-auto')
+    const footer = el.querySelector('footer')
+    const alertNode = expectedMessage
+      ? [...el.querySelectorAll('[role="alert"]')].find(node => node.textContent?.includes(expectedMessage))
+      : null
+    const rect = (node: any) => {
+      const value = node.getBoundingClientRect()
+      return {
+        left: value.left,
+        right: value.right,
+        top: value.top,
+        bottom: value.bottom,
+        width: value.width,
+        height: value.height,
+      }
+    }
+    const buttons = [...footer.querySelectorAll('button')].map((button: any) => {
+      const box = rect(button)
+      const target = doc.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2)
+      return {
+        label: button.textContent?.trim() ?? '',
+        rect: box,
+        clickable: target === button || button.contains(target),
+      }
+    })
+
+    return {
+      viewportWidth: view.innerWidth,
+      viewportHeight: view.innerHeight,
+      docScroll: doc.documentElement.scrollWidth,
+      card: rect(card),
+      scroll: rect(scroll),
+      footer: rect(footer),
+      scrollHeight: scroll.scrollHeight,
+      scrollClientHeight: scroll.clientHeight,
+      scrollTop: scroll.scrollTop,
+      alert: alertNode ? rect(alertNode) : null,
+      alertInsideScroll: alertNode ? scroll.contains(alertNode) : null,
+      buttons,
+    }
+  }, message)
+}
+
+test.describe('P3-01 altura extrema del formulario de categorías', () => {
+  test.use({ viewport: { width: 360, height: 640 } })
+
+  test('mantiene footer, acciones y alertas accesibles y conserva el borrador', async ({ page }) => {
+    test.setTimeout(120_000)
+    await login(page)
+
+    const suffix = randomUUID().slice(0, 8)
+    const name = `Categoría extrema ${suffix}`
+    await createCategory(page, name)
+    await page.goto('/admin/categorias')
+
+    const row = categoryRow(page, name)
+    await expect(row).toBeVisible()
+    await row.getByRole('button', { name: `Editar ${name}`, exact: true }).click()
+
+    const dialog = page.getByRole('dialog')
+    const nameInput = dialog.getByLabel('Nombre', { exact: true })
+    const draft = `${name} con borrador`
+    await nameInput.fill(draft)
+
+    const longMessage = `Error de servidor ${'X'.repeat(220)}`
+    const rejectUpdate = async (route: import('@playwright/test').Route) => {
+      if (route.request().method() !== 'PUT') {
+        await route.continue()
+        return
+      }
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ message: longMessage }),
+      })
+    }
+    await page.route('**/api/admin/categorias/*', rejectUpdate)
+
+    await dialog.getByRole('button', { name: 'Guardar categoría' }).click()
+    const errorAlert = dialog.getByRole('alert').filter({ hasText: longMessage })
+    await expect(errorAlert).toBeVisible()
+
+    const viewports = [
+      { width: 320, height: 380 },
+      { width: 360, height: 380 },
+      { width: 360, height: 480 },
+      { width: 360, height: 640 },
+      { width: 768, height: 1024 },
+      { width: 1280, height: 800 },
+    ]
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport)
+      await expect(dialog).toBeVisible()
+      await expect(nameInput).toHaveValue(draft)
+      await dialog.evaluate((el: any) => {
+        const scroll = el.querySelector('form .overflow-y-auto')
+        scroll.scrollTop = 0
+      })
+
+      const metrics = await dialogGeometry(dialog, longMessage)
+      const label = `${viewport.width}x${viewport.height}`
+
+      expect(metrics.docScroll, `documento desborda a ${label}`).toBeLessThanOrEqual(metrics.viewportWidth)
+      expect(metrics.card.left, `tarjeta izquierda a ${label}`).toBeGreaterThanOrEqual(-1)
+      expect(metrics.card.right, `tarjeta derecha a ${label}`).toBeLessThanOrEqual(metrics.viewportWidth + 1)
+      expect(metrics.card.top, `tarjeta arriba a ${label}`).toBeGreaterThanOrEqual(-1)
+      expect(metrics.card.bottom, `tarjeta abajo a ${label}`).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+      expect(metrics.footer.top, `footer arriba a ${label}`).toBeGreaterThanOrEqual(metrics.card.top - 1)
+      expect(metrics.footer.bottom, `footer abajo a ${label}`).toBeLessThanOrEqual(metrics.card.bottom + 1)
+      expect(metrics.footer.bottom, `footer visible a ${label}`).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+      expect(metrics.scrollHeight, `scroll disponible a ${label}`).toBeGreaterThanOrEqual(metrics.scrollClientHeight)
+
+      expect(metrics.buttons.length, `acciones del footer a ${label}`).toBe(2)
+      for (const button of metrics.buttons) {
+        expect(button.rect.top, `${button.label} arriba a ${label}`).toBeGreaterThanOrEqual(metrics.footer.top - 1)
+        expect(button.rect.bottom, `${button.label} abajo a ${label}`).toBeLessThanOrEqual(metrics.footer.bottom + 1)
+        expect(button.rect.bottom, `${button.label} visible a ${label}`).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+        expect(button.clickable, `${button.label} accionable a ${label}`).toBe(true)
+      }
+
+      expect(metrics.alertInsideScroll, `alerta en el scroll a ${label}`).toBe(true)
+      expect(metrics.alert, `alerta presente a ${label}`).not.toBeNull()
+      expect(metrics.alert!.left, `alerta izquierda a ${label}`).toBeGreaterThanOrEqual(metrics.card.left - 1)
+      expect(metrics.alert!.right, `alerta derecha a ${label}`).toBeLessThanOrEqual(metrics.card.right + 1)
+      expect(metrics.alert!.top, `alerta arriba a ${label}`).toBeGreaterThanOrEqual(metrics.scroll.top - 1)
+      expect(metrics.alert!.top, `alerta alcanzable a ${label}`).toBeLessThanOrEqual(metrics.scroll.bottom)
+    }
+
+    await page.unroute('**/api/admin/categorias/*', rejectUpdate)
+    const abortUpdate = async (route: import('@playwright/test').Route) => {
+      if (route.request().method() !== 'PUT') {
+        await route.continue()
+        return
+      }
+      await route.abort('failed')
+    }
+    await page.route('**/api/admin/categorias/*', abortUpdate)
+
+    await dialog.getByRole('button', { name: 'Guardar categoría' }).click()
+    const uncertainAlert = dialog.getByRole('alert').filter({ hasText: 'No se pudo confirmar el resultado' })
+    await expect(uncertainAlert).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
+    await expect(dialog.getByRole('button', { name: 'Guardar categoría' })).toBeDisabled()
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport)
+      await expect(dialog).toBeVisible()
+      await expect(nameInput).toHaveValue(draft)
+
+      const metrics = await dialogGeometry(dialog, 'No se pudo confirmar el resultado')
+      const label = `${viewport.width}x${viewport.height} incierto`
+
+      expect(metrics.docScroll, `documento desborda a ${label}`).toBeLessThanOrEqual(metrics.viewportWidth)
+      expect(metrics.card.bottom, `tarjeta abajo a ${label}`).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+      expect(metrics.footer.bottom, `footer visible a ${label}`).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+      expect(metrics.alertInsideScroll, `alerta en el scroll a ${label}`).toBe(true)
+
+      for (const button of metrics.buttons) {
+        expect(button.rect.bottom, `${button.label} visible a ${label}`).toBeLessThanOrEqual(metrics.viewportHeight + 1)
+        expect(button.clickable, `${button.label} accionable a ${label}`).toBe(true)
+      }
+
+      const reloadMetrics = await dialog.getByRole('button', { name: 'Recargar listado' }).evaluate((el: any) => {
+        el.scrollIntoView({ block: 'nearest' })
+        const scroll = el.closest('.overflow-y-auto')
+        const buttonRect = el.getBoundingClientRect()
+        const scrollRect = scroll.getBoundingClientRect()
+        const target = el.ownerDocument.elementFromPoint(
+          buttonRect.left + buttonRect.width / 2,
+          buttonRect.top + buttonRect.height / 2,
+        )
+        return {
+          top: buttonRect.top,
+          bottom: buttonRect.bottom,
+          scrollTop: scrollRect.top,
+          scrollBottom: scrollRect.bottom,
+          clickable: target === el || el.contains(target),
+        }
+      })
+      expect(reloadMetrics.top, `recargar arriba a ${label}`).toBeGreaterThanOrEqual(reloadMetrics.scrollTop - 1)
+      expect(reloadMetrics.bottom, `recargar abajo a ${label}`).toBeLessThanOrEqual(reloadMetrics.scrollBottom + 1)
+      expect(reloadMetrics.clickable, `recargar accionable a ${label}`).toBe(true)
+    }
+
+    await page.setViewportSize({ width: 360, height: 380 })
+    await pressEscapeThrice(page)
+    await expect(dialog).toBeVisible()
+    await expect(uncertainAlert).toBeVisible()
+    await expect(nameInput).toHaveValue(draft)
+  })
+})
+
+test.describe('P3-02 herencia tipográfica en categorías', () => {
+  test.use({ viewport: { width: 360, height: 640 } })
+
+  test('controles nativos de lista, formulario y desactivación heredan la tipografía', async ({ page }) => {
+    test.setTimeout(60_000)
+    await login(page)
+
+    const suffix = randomUUID().slice(0, 8)
+    const name = `Categoría tipografía ${suffix}`
+    await createCategory(page, name)
+    await page.goto('/admin/categorias')
+
+    const row = categoryRow(page, name)
+    await expect(row).toBeVisible()
+
+    // Forzamos una familia distintiva en el body para comprobar la herencia real.
+    await page.evaluate(() => {
+      ;(globalThis as any).document.body.style.fontFamily = '"Courier New", monospace'
+    })
+    const bodyFont = await page.evaluate(() =>
+      (globalThis as any).getComputedStyle((globalThis as any).document.body).fontFamily)
+    expect(bodyFont).toContain('Courier New')
+
+    async function expectInherited(locator: Locator, label: string) {
+      const fontFamily = await locator.evaluate((el: any) =>
+        (globalThis as any).getComputedStyle(el).fontFamily)
+      expect(fontFamily, `${label} hereda la tipografía`).toBe(bodyFont)
+    }
+
+    await expectInherited(page.getByRole('button', { name: 'Nueva categoría' }), 'Nueva categoría')
+    await expectInherited(page.getByLabel('Estado'), 'selector Estado')
+    await expectInherited(row.getByRole('button', { name: `Editar ${name}`, exact: true }), 'Editar')
+    await expectInherited(row.getByRole('button', { name: `Desactivar ${name}`, exact: true }), 'Desactivar')
+
+    await row.getByRole('button', { name: `Editar ${name}`, exact: true }).click()
+    const form = page.getByRole('dialog')
+    await expect(form).toBeVisible()
+    await expectInherited(form.getByLabel('Nombre', { exact: true }), 'input Nombre')
+    await expectInherited(form.getByLabel('Descripción (opcional)'), 'textarea Descripción')
+    await expectInherited(form.getByRole('button', { name: 'Cerrar formulario' }), 'cerrar formulario')
+    await expectInherited(form.getByRole('button', { name: 'Cancelar' }), 'cancelar formulario')
+    await expectInherited(form.getByRole('button', { name: 'Guardar categoría' }), 'guardar categoría')
+
+    await page.keyboard.press('Escape')
+    await expect(form).toHaveCount(0)
+
+    await row.getByRole('button', { name: `Desactivar ${name}`, exact: true }).click()
+    const deactivation = page.getByRole('dialog')
+    await expect(deactivation).toBeVisible()
+    await expectInherited(deactivation.getByRole('button', { name: 'Cancelar' }), 'cancelar desactivación')
+    await expectInherited(
+      deactivation.getByRole('button', { name: 'Confirmar desactivación' }),
+      'confirmar desactivación',
+    )
+
+    await page.keyboard.press('Escape')
+    await expect(deactivation).toHaveCount(0)
+
+    await page.evaluate(() => {
+      ;(globalThis as any).document.body.style.fontFamily = ''
+    })
   })
 })
