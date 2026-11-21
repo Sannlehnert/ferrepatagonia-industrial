@@ -40,8 +40,7 @@ const creditOrdersCount = computed(() =>
 )
 const pendingReceiptOrdersCount = computed(() =>
   orders.value?.filter(order =>
-    order.modalidadPago === 'TRANSFERENCIA'
-    && receipts.status(order) === 'NO_ADJUNTO'
+    receipts.status(order) === 'NO_ADJUNTO'
   ).length ?? 0,
 )
 const receiptError = computed(() => orders.value?.some(order => receipts.status(order) === 'ERROR') ?? false)

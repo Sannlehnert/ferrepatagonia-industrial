@@ -384,3 +384,44 @@ test('login respeta contexto público, protegido y destino inválido', async ({ 
   await signIn(page)
   await expect(page).toHaveURL('/mi-cuenta')
 })
+
+test('EMPRESA habilitada: contador coincide con pedidos sin comprobante del historial', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await mockApi(page, 'EMPRESA', true, 'APROBADA')
+  const makeOrder = (pedidoId: number, modalidadPago: string) => ({
+    pedidoId, numero: `PED-${String(pedidoId).padStart(6, '0')}`,
+    fecha: '2026-11-16T12:00:00.000Z', estado: 'CONFIRMADO', modalidadPago,
+    moneda: 'USD', subtotal: '20.00', descuento: '0.00', total: '20.00',
+    totalUSD: '20.00', cantidadLineas: 1, cantidadUnidades: 2,
+  })
+  const orders = [
+    makeOrder(1, 'CUENTA_CORRIENTE'),
+    makeOrder(2, 'CUENTA_CORRIENTE'),
+    makeOrder(3, 'TRANSFERENCIA'),
+    makeOrder(4, 'TRANSFERENCIA'),
+  ]
+  await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: orders } } })
+    const receiptPath = path.match(/^\/api\/pedidos\/(\d+)\/comprobantes$/)
+    if (receiptPath) {
+      const orderId = Number(receiptPath[1])
+      const items = [2, 4].includes(orderId) ? [{ estadoRevision: 'PENDIENTE' }] : []
+      return route.fulfill({ json: { data: { items, paginaSiguiente: null } } })
+    }
+    return route.continue()
+  })
+
+  await page.goto('/mi-cuenta')
+  const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+  const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+  await expect(missing.getByText('2', { exact: true })).toBeVisible()
+  await missing.click()
+  await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+  for (const id of [1, 3]) {
+    await expect(page.getByRole('heading', { name: `PED-${String(id).padStart(6, '0')}` })).toBeVisible()
+  }
+  for (const id of [2, 4]) {
+    await expect(page.getByRole('heading', { name: `PED-${String(id).padStart(6, '0')}` })).toHaveCount(0)
+  }
+})
