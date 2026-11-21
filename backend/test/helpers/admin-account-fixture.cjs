@@ -58,9 +58,9 @@ async function seedAdminAccounts(session, { browser = false } = {}) {
       async function credit(acct, key, amount, at) {
         mock.timers.setTime(Date.parse(at));
         const id_pago = await insert(`INSERT INTO PAGO
-          (id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,fecha_acreditacion_utc,evidencia_acreditacion)
-          VALUES(?,?,?,'DEMO','ACREDITADO','USD',?,'Pago DEMO acreditado')`,
-        [acct.accountId, sqlDate(at), amount, sqlDate(at)]);
+          (id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,monto_usd,fecha_acreditacion_utc,evidencia_acreditacion)
+          VALUES(?,?,?,'DEMO','ACREDITADO','USD',?,?,'Pago DEMO acreditado')`,
+        [acct.accountId, sqlDate(at), amount, amount, sqlDate(at)]);
         acct.movements[key] = await ledger.registrarAbonoPorPago({
           id_cuenta_corriente: acct.accountId, id_pago, monto: amount, origen: 'DEMO', observaciones: 'interno-fixture-258',
         }, db);

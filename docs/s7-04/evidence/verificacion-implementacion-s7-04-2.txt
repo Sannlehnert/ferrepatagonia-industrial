@@ -3129,3 +3129,33 @@ Contenedores descartables por nombre (*-test-* / ferrepatagonia-e2e-*): 0
 git diff --check (working tree vs HEAD): Exit code 0 (salida vacía, sin trailing whitespace ni marcadores de conflicto)
 git diff --check origin/develop (working tree vs origin/develop): Exit code 0 (salida vacía, sin trailing whitespace ni marcadores de conflicto)
 Nota: git diff --check origin/develop...HEAD evalúa commits ya registrados; se mantiene HEAD sin nuevos commits por prohibición explícita de comandos Git de escritura.
+
+--- 23. Verificación Frontend CI (.github/workflows/ci.yml) y suites asociadas tras alineación de fixtures (HEAD base 36c12ac3) ---
+Fecha UTC: 2026-11-21T01:35:25Z
+Archivos de fixtures modificados:
+- database/fixtures/fer19-demo.cjs (demoPayment/seedDemo: motivo_cierre, id_admin_cierre, fecha_cierre_utc para estados RECHAZADO/ANULADO y monto_usd explícito para ACREDITADO USD)
+- backend/test/helpers/admin-account-fixture.cjs (monto_usd explícito en INSERT INTO PAGO ACREDITADO USD)
+
+Resultados exactos de los comandos ejecutados:
+1. backend: npm run build -> Exit code: 0
+2. frontend: npm run type-check -> Exit code: 0
+3. frontend: npm test -> Exit code: 0 (tests 291, suites 5, pass 291, fail 0, cancelled 0, skipped 0, todo 0)
+4. frontend: npm run build -> Exit code: 0 (vite build: 320 modules transformed, dist/ generada)
+5. node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+6. node backend/test/helpers/run-e2e.cjs --fer19-production -> Exit code: 0 (2 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+7. node backend/test/helpers/run-e2e.cjs -> Exit code: 0 (251 passed, 4 skipped [pruebas E2E_PRODUCTION_BUILD=1 cubiertas en pasos 6 y 11]; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+8. node --test data/demo-catalog/generar.test.cjs -> Exit code: 0 (tests 15, pass 15, fail 0, skipped 0)
+9. E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog -> Exit code: 0 (1 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+10. node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+11. E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs current-account.production.spec.ts -> Exit code: 0 (3 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+12. backend: node test/helpers/run-account-mariadb.cjs all -> Exit code: 0 (persistence: 35 passed; contract: 32 passed; client: 38 passed; total 105 passed, 0 failed)
+13. backend: npm run test:account-admin:isolated -> Exit code: 0 (tests 58, pass 58, fail 0, skipped 0; Limpieza #258 confirmada: contenedor propio eliminado, datos tmpfs)
+
+Verificación de limpieza Docker tras todas las corridas:
+- ferrepatagonia.e2e-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.account-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.cc258-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.cc260-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.s704-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.cc251-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.credit-test: 0 contenedores, 0 volúmenes
