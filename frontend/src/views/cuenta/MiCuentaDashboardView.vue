@@ -158,6 +158,6 @@ const isCompany = computed(() => auth.user?.tipo_cliente === 'EMPRESA')
       </div>
     </section>
 
-    <DatosClientes />
+    <DatosClientes summary-only />
   </div>
 </template>

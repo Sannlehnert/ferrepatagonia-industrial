@@ -7,12 +7,16 @@ function view(name, auth) {
  const {descriptor}=parse(readFileSync(filename,'utf8'),{filename});
  const source=descriptor.scriptSetup ? compileScript(descriptor,{id:'account-test',inlineTemplate:true}).content : compileTemplate({source:descriptor.template.content,filename,id:'account-test'}).code;
  const m={exports:{}};
- new Function('require','module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(name=>name==='@/stores/auth'?{useAuthStore:()=>auth}:require(name),m,m.exports);
+ const dependencies={
+  '@/stores/auth':{useAuthStore:()=>auth},
+  '@/services/profileService':{getOwnProfile:async()=>({}),updateOwnProfile:async()=>({})},
+ };
+ new Function('require','module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(name=>dependencies[name] || require(name),m,m.exports);
  return m.exports.default || {render:m.exports.render};
 }
-test('account uses only session identity and escapes displayed values',async()=>{
+test('account data does not display stale session fields instead of the private profile',async()=>{
  const html=await renderToString(createSSRApp(view('DatosClientes',{user:{nombre:'<Cliente>',email:'cliente@example.test'}})));
- assert.match(html,/&lt;Cliente&gt;/);assert.match(html,/cliente@example.test/);assert.doesNotMatch(html,/Teléfono|Dirección/);
+ assert.match(html,/Mis datos/);assert.doesNotMatch(html,/&lt;Cliente&gt;|cliente@example\.test/);
 });
 function config(name, dependencies={}) {
  const m={exports:{}};

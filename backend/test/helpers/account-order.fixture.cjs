@@ -15,6 +15,14 @@ async function createOrderFixture(session, options = {}) {
     verified = true,
     synthetic = false,
     limit = '1000.00',
+    clientType = 'EMPRESA',
+    companyApproval = clientType === 'EMPRESA' ? 'APROBADA' : null,
+    withAccount = true,
+    accountEnabled = 1,
+    accountCoverage = 'COMPLETA',
+    accountOrigin = 'DEMO',
+    clientName = 'DEMO #261',
+    productName = 'DEMO #261',
   } = options;
 
   const adminId = await insert(`
@@ -32,8 +40,8 @@ async function createOrderFixture(session, options = {}) {
     INSERT INTO CLIENTE (
       tipo_cliente, nombre_razon_social,
       estado_aprobacion_empresa, es_fiel, activo, id_lista_precio
-    ) VALUES ('EMPRESA', 'DEMO #261', 'APROBADA', 0, 1, ?)
-  `, [listId]);
+    ) VALUES (?, ?, ?, 0, 1, ?)
+  `, [clientType, clientName, companyApproval, listId]);
 
   const userId = await insert(`
     INSERT INTO USUARIO (
@@ -41,18 +49,21 @@ async function createOrderFixture(session, options = {}) {
     ) VALUES (?, ?, 'fixture-no-login', 'CLIENTE', 1)
   `, [clientId, `${randomUUID()}@example.test`]);
 
-  const accountId = await insert(`
-    INSERT INTO CUENTA_CORRIENTE (
-      id_cliente, limite_credito, habilitada,
-      cobertura, plazo_dias, moneda_limite,
-      evidencia_limite, evidencia_plazo, evidencia_cobertura,
-      cobertura_desde_utc, origen_datos
-    ) VALUES (
-      ?, ?, 1, 'COMPLETA', 30, 'USD',
-      'DEMO #261', 'DEMO #261', 'DEMO #261',
-      UTC_TIMESTAMP(3) - INTERVAL 1 DAY, 'DEMO'
-    )
-  `, [clientId, limit]);
+  let accountId = null;
+  if (withAccount) {
+    accountId = await insert(`
+      INSERT INTO CUENTA_CORRIENTE (
+        id_cliente, limite_credito, habilitada,
+        cobertura, plazo_dias, moneda_limite,
+        evidencia_limite, evidencia_plazo, evidencia_cobertura,
+        cobertura_desde_utc, origen_datos
+      ) VALUES (
+        ?, ?, ?, ?, 30, 'USD',
+        'DEMO #261', 'DEMO #261', 'DEMO #261',
+        UTC_TIMESTAMP(3) - INTERVAL 1 DAY, ?
+      )
+    `, [clientId, limit, accountEnabled, accountCoverage, accountOrigin]);
+  }
 
   const categoryId = await insert(`
     INSERT INTO CATEGORIA (nombre, activo)
@@ -62,8 +73,8 @@ async function createOrderFixture(session, options = {}) {
   const productId = await insert(`
     INSERT INTO PRODUCTO (
       id_categoria, codigo, nombre, precio, stock, activo
-    ) VALUES (?, ?, 'DEMO #261', ?, ?, 1)
-  `, [categoryId, randomUUID(), price, stock]);
+    ) VALUES (?, ?, ?, ?, ?, 1)
+  `, [categoryId, randomUUID(), productName, price, stock]);
 
   if (verified && price !== null) {
     await db.query(`
@@ -82,11 +93,13 @@ async function createOrderFixture(session, options = {}) {
     [clientId],
   );
 
-  await db.query(`
-    INSERT INTO ITEM_CARRITO (
-      id_carrito, id_producto, cantidad
-    ) VALUES (?, ?, ?)
-  `, [cartId, productId, quantity]);
+  if (quantity > 0) {
+    await db.query(`
+      INSERT INTO ITEM_CARRITO (
+        id_carrito, id_producto, cantidad
+      ) VALUES (?, ?, ?)
+    `, [cartId, productId, quantity]);
+  }
 
   return {
     clientId, userId, adminId, accountId,

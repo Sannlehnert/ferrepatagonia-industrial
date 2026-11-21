@@ -1,0 +1,29 @@
+{
+  "fecha": "2026-11-20",
+  "rama": "feature/311-catalog-images",
+  "base": "14abaa44828841f5ffcb65f5c94d16b01bd2c0f8",
+  "alcance": "Verificación de implementación propia; revisión cruzada y CI del nuevo commit pendientes",
+  "pruebasCatalogo": {
+    "comando": "node --test data/demo-catalog/generar.test.cjs",
+    "aprobadas": 17
+  },
+  "frontend": {
+    "pruebasAprobadas": 274,
+    "build": "aprobado",
+    "typeCheck": "aprobado"
+  },
+  "backend": {
+    "build": "aprobado"
+  },
+  "e2e": {
+    "comando": "E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog",
+    "aprobadas": 1,
+    "maestroConImagen": 100,
+    "maestroSinImagen": 0,
+    "httpSku51a100": 50,
+    "skuVerificadosAmpliado": 221,
+    "anchoMovilPx": 360,
+    "limpieza": "Contenedor eliminado, datos tmpfs; confirmada por el lanzador"
+  },
+  "primeros50": "Huellas y rutas conservadas; prueba de regresión aprobada"
+}

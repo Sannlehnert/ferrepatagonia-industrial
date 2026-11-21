@@ -279,6 +279,55 @@ test('Home conserva el nombre completo y el acceso a la ficha a 360 px', async (
   await expect(page).toHaveURL(/\/producto\/1\?returnTo=/)
 })
 
+for (const width of [360, 768, 1280]) {
+  test(`Home conserva el espacio de la ilustración y breadcrumbs táctiles a ${width}px`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 900 })
+    const illustration = '/demo-catalog/ilustrativa-rop-camisa.webp'
+    await page.route('**/api/catalogo?*', async route => {
+      const response = await route.fetch()
+      const json = await response.json()
+      Object.assign(json.data.productos[0], { codigo: 'FP-DEMO-ROP-CAMISA-TALLE-2XL', imagen: illustration })
+      json.data.productos[1].imagen = '/demo-catalog/llave-ajustable.webp'
+      await route.fulfill({ response, json })
+    })
+    await page.goto('/')
+    const image = products(page).getByRole('img', { name: 'Producto E2E 01', exact: true })
+    await image.scrollIntoViewIfNeeded()
+    await expect.poll(() => image.evaluate(element => (element as unknown as { naturalWidth: number }).naturalWidth)).toBeGreaterThan(0)
+    const note = products(page).getByRole('note')
+    await expect(note).toBeVisible()
+    await expect(image).toHaveAttribute('aria-describedby', (await note.getAttribute('id'))!)
+    const imageBox = (await image.boundingBox())!
+    const padding = await image.evaluate(element => {
+      const style = element.ownerDocument.defaultView!.getComputedStyle(element)
+      return parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+    })
+    expect(imageBox.height - padding).toBeGreaterThan(40)
+    const photoBox = (await products(page).getByRole('img', { name: 'Producto E2E 02', exact: true }).boundingBox())!
+    expect(Math.abs(imageBox.height - photoBox.height)).toBeLessThan(1.5)
+    expect((await note.boundingBox())!.y).toBeGreaterThanOrEqual(imageBox.y + imageBox.height)
+    expect(await page.locator('html').evaluate(element => element.scrollWidth)).toBeLessThanOrEqual(width)
+    await products(page).screenshot({ path: info.outputPath(`home-ilustracion-${width}.png`) })
+
+    await page.route(`**${illustration}`, route => route.fulfill({ status: 404, body: '' }))
+    await page.reload()
+    await expect(products(page).getByRole('link', { name: 'Ver producto: Producto E2E 01' })).toBeVisible()
+    await expect(image).toHaveCount(0)
+    await expect(note).toHaveCount(0)
+    await products(page).getByRole('link', { name: 'Ver producto: Producto E2E 01' }).click()
+    for (const target of [undefined, '/catalogo?categoria=1']) {
+      if (target) await page.goto(target)
+      const navigation = page.getByRole('navigation', { name: 'Ruta de navegación', exact: true })
+      await expect(navigation.getByRole('link')).toHaveCount(2)
+      for (const link of await navigation.getByRole('link').all()) {
+        const box = (await link.boundingBox())!
+        expect(box.height).toBeGreaterThanOrEqual(44)
+        expect(box.width).toBeGreaterThanOrEqual(44)
+      }
+    }
+  })
+}
+
 for (const width of [360, 390, 768, 1024, 1280, 1440]) {
   test('Home responsive y navegación con teclado a ' + width + ' px', async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 })
