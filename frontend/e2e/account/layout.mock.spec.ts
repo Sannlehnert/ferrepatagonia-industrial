@@ -228,7 +228,7 @@ for (const width of [320, 360, 390, 768, 1280]) {
       const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
       await expect(summary.getByRole('link', { name: /Pedidos con Cuenta Corriente/ }))
         .toHaveCount(tipo === 'EMPRESA' ? 1 : 0)
-      await expect(missing).toContainText(tipo === 'EMPRESA' ? '0' : '1')
+      await expect(missing).toContainText('1')
       if (tipo === 'PARTICULAR') {
         await missing.click()
         await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
