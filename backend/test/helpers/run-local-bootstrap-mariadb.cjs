@@ -33,6 +33,7 @@ async function run() {
         applyFile(profile, path.join(backend, '../database/schema.sql'));
         applyFile(profile, path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
         applyFile(profile, path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
+        applyFile(profile, path.join(backend, '../database/migrate-s7-04-2-state-consistency.sql'));
         console.log(JSON.stringify({ mode: 'local-bootstrap', database: profile.database, host: profile.host,
             port: profile.port, container: profile.container }));
 

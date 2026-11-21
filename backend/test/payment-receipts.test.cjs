@@ -187,13 +187,24 @@ test('particular: carga, lista, descarga privada y revisión documental, sin cam
   assert.deepEqual(Buffer.from(await adminDownload.arrayBuffer()), pdf);
 
   const reviewPath = adminPath + '/' + saved.id + '/revision';
-  const first = (await body(await request(reviewPath, admin, { method: 'PATCH' }), 200)).data;
-  const repeated = (await body(await request(reviewPath, admin, { method: 'PATCH' }), 200)).data;
-  assert.equal(first.estadoRevision, 'REVISADO');
+  const reviewKey = randomUUID();
+  const reviewHeaders = { 'Content-Type': 'application/json', 'Idempotency-Key': reviewKey };
+  const first = (await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: reviewHeaders,
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 200)).data;
+  const repeated = (await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: reviewHeaders,
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 200)).data;
+  assert.equal(first.estadoRevision, 'APROBADO');
+  assert.equal(first.motivoRechazo, null);
   assert.ok(first.revisadoEn.endsWith('Z'));
   assert.deepEqual(first, repeated);
   assert.equal((await db.query('SELECT id_admin_revision FROM COMPROBANTE_PAGO WHERE id_comprobante = ?', [saved.id]))[0].id_admin_revision, admin.id);
-  assert.equal((await body(await request(path, particular.auth), 200)).data.items[0].estadoRevision, 'REVISADO');
+  assert.equal((await body(await request(path, particular.auth), 200)).data.items[0].estadoRevision, 'APROBADO');
   assert.deepEqual(await financialState(), before);
 
   const file = join(storage, saved.id);
@@ -521,10 +532,12 @@ test('#328 seguridad de sesión (401), cliente inactivo (404) y protección CSRF
   assert.equal(current[0].estadoRevision, 'PENDIENTE');
 });
 
-test('#328 revisión ADMIN: rechaza body/query, 404 en inexistente e idempotencia entre dos ADMIN', async () => {
+test('#328/#290 revisión ADMIN: valida Idempotency-Key/body, 404 en inexistente, replay idempotente y bloqueo terminal', async () => {
   const ownerClient = await createCustomClient({ type: 'PARTICULAR', approval: null, orderModality: 'TRANSFERENCIA' });
   const saved = (await body(await upload(orderPath(ownerClient), ownerClient.auth, jpg, 'image/jpeg'), 201)).data;
+  const rejectedTarget = (await body(await upload(orderPath(ownerClient), ownerClient.auth, png, 'image/png'), 201)).data;
   const reviewPath = adminPath + '/' + saved.id + '/revision';
+  const rejectPath = adminPath + '/' + rejectedTarget.id + '/revision';
   const secondAdmin = {
     id: await insert(
       "INSERT INTO USUARIO (email, password_hash, rol, activo) VALUES (?, 'test-only', 'ADMIN', 1)",
@@ -534,33 +547,91 @@ test('#328 revisión ADMIN: rechaza body/query, 404 en inexistente e idempotenci
   };
   const before = await financialState();
 
-  // Body presente o query extra -> 400 SOLICITUD_INVALIDA
-  const withBody = await body(await request(reviewPath, admin, {
+  // Sin Idempotency-Key -> 400 CLAVE_IDEMPOTENCIA_REQUERIDA
+  const missingKey = await body(await request(reviewPath, admin, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 400);
+  assert.equal(missingKey.code, 'CLAVE_IDEMPOTENCIA_REQUERIDA');
+
+  // Body inválido o query extra -> 400 SOLICITUD_INVALIDA
+  const withInvalidBody = await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
     body: JSON.stringify({ estadoRevision: 'REVISADO' }),
   }), 400);
-  assert.equal(withBody.code, 'SOLICITUD_INVALIDA');
+  assert.equal(withInvalidBody.code, 'SOLICITUD_INVALIDA');
 
-  const withQuery = await body(await request(reviewPath + '?forzar=1', admin, { method: 'PATCH' }), 400);
+  const rejectWithoutReason = await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+    body: JSON.stringify({ estado: 'RECHAZADO' }),
+  }), 400);
+  assert.equal(rejectWithoutReason.code, 'SOLICITUD_INVALIDA');
+
+  const withQuery = await body(await request(reviewPath + '?forzar=1', admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 400);
   assert.equal(withQuery.code, 'SOLICITUD_INVALIDA');
 
   // UUID inexistente -> 404
-  const missing = await body(await request(adminPath + '/' + randomUUID() + '/revision', admin, { method: 'PATCH' }), 404);
+  const missing = await body(await request(adminPath + '/' + randomUUID() + '/revision', admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 404);
   assert.equal(missing.code, 'COMPROBANTE_NO_ENCONTRADO');
 
-  // Primera revisión por admin 1 y reintento por admin 2 conserva id_admin_revision y revision_utc del primero
-  const first = (await body(await request(reviewPath, admin, { method: 'PATCH' }), 200)).data;
-  assert.equal(first.estadoRevision, 'REVISADO');
+  // Primera aprobación por admin 1 con key K1, replay idempotente y bloqueo ante otra clave / otro payload
+  const approveKey = randomUUID();
+  const first = (await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': approveKey },
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 200)).data;
+  assert.equal(first.estadoRevision, 'APROBADO');
+  assert.equal(first.motivoRechazo, null);
   assert.ok(first.revisadoEn.endsWith('Z'));
 
-  const second = (await body(await request(reviewPath, secondAdmin, { method: 'PATCH' }), 200)).data;
-  assert.deepEqual(second, first);
+  const replay = (await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': approveKey },
+    body: JSON.stringify({ estado: 'APROBADO' }),
+  }), 200)).data;
+  assert.deepEqual(replay, first);
+
+  const reusedKey = await body(await request(reviewPath, admin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': approveKey },
+    body: JSON.stringify({ estado: 'RECHAZADO', motivo: 'Cambio inválido' }),
+  }), 409);
+  assert.equal(reusedKey.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
+  const resolvedConflict = await body(await request(reviewPath, secondAdmin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+    body: JSON.stringify({ estado: 'RECHAZADO', motivo: 'Intento tardío' }),
+  }), 409);
+  assert.equal(resolvedConflict.code, 'COMPROBANTE_YA_RESUELTO');
+
+  // Rechazo documental con motivo obligatorio sobre segundo comprobante
+  const rejected = (await body(await request(rejectPath, secondAdmin, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Idempotency-Key': randomUUID() },
+    body: JSON.stringify({ estado: 'RECHAZADO', motivo: 'Comprobante ilegible' }),
+  }), 200)).data;
+  assert.equal(rejected.estadoRevision, 'RECHAZADO');
+  assert.equal(rejected.motivoRechazo, 'Comprobante ilegible');
+
   const [row] = await db.query(
-    'SELECT id_admin_revision, CAST(revision_utc AS CHAR) AS rev FROM COMPROBANTE_PAGO WHERE id_comprobante = ?',
+    'SELECT id_admin_revision, CAST(revision_utc AS CHAR) AS rev, estado_revision FROM COMPROBANTE_PAGO WHERE id_comprobante = ?',
     [saved.id],
   );
   assert.equal(Number(row.id_admin_revision), admin.id);
+  assert.equal(row.estado_revision, 'APROBADO');
   assert.equal(new Date(row.rev.replace(' ', 'T') + 'Z').toISOString(), first.revisadoEn);
   assert.deepEqual(await financialState(), before);
 });

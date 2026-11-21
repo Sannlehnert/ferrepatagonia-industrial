@@ -73,7 +73,7 @@ async function checkUpgrade(port) {
     !creditTables.some(table => statement.includes(`CREATE TABLE IF NOT EXISTS ${table} (`)),
   ).join(';');
   applySql(file('schema.sql'), { target, contents: previous });
-  for (const name of ['migrate-fer-20-account-movements.sql', 'migrate-fer-17-price-verification.sql', 'seed.sql', 'verify-seed.sql']) {
+  for (const name of ['migrate-fer-20-account-movements.sql', 'migrate-fer-17-price-verification.sql', 'migrate-s7-04-2-state-consistency.sql', 'seed.sql', 'verify-seed.sql']) {
     applySql(file(name), { target });
   }
   const db = await mariadb.createConnection({ host: '127.0.0.1', port, user: 'root',
@@ -138,7 +138,7 @@ async function main() {
 
     const [version] = await connection.query('SELECT VERSION() AS version');
     assert.match(version.version, /^11\.4\..*MariaDB/i);
-    for (const name of ['schema.sql', 'migrate-fer-20-account-movements.sql', 'migrate-fer-17-price-verification.sql', creditMigration]) {
+    for (const name of ['schema.sql', 'migrate-fer-20-account-movements.sql', 'migrate-fer-17-price-verification.sql', 'migrate-s7-04-2-state-consistency.sql', creditMigration]) {
       applySql(file(name));
     }
     const query = sql => connection.query(sql);

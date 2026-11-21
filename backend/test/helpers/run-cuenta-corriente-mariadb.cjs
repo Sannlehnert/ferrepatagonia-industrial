@@ -47,6 +47,9 @@ async function run(mode = process.argv[2] || 'all') {
       storage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-test-'));
     }
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
+    if (receipts || orders) {
+      for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-s7-04-2-state-consistency.sql'));
+    }
       if (orders) {
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-273-order-instant.sql'));
         apply(path.join(
