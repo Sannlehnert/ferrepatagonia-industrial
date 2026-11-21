@@ -3207,3 +3207,40 @@ Verificación de higiene final:
 - Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
 - BOM UTF-8 en archivos modificados: 0 archivos con BOM
 - git diff --check: Exit code: 0 (salida vacía)
+
+--- 25. Cierre de S7-317-R04 (PR #158) y verificación CI local completa ---
+Fecha UTC: 2026-11-21T14:57:00Z
+Rama: feature/s7-04-2-order-payment-state-consistency
+HEAD base: c1b1215
+Alcance: corrección de fixture E2E sin relajar chk_comprobante_revision ni triggers s704_* y sin comandos Git de escritura.
+
+Detalle de corrección y auditoría preventiva:
+1. S7-317-R04 en backend/test/helpers/admin-preview-orders.cjs (seedAdminPreviewReceipts):
+   - Actualizado INSERT INTO COMPROBANTE_PAGO para incluir explícitamente estado_revision = 'APROBADO' cuando i % 3 === 2 (con id_admin_revision y revision_utc) y estado_revision = 'PENDIENTE' con campos de revisión en NULL en el resto, preservando exactamente conteos, importes y el comportamiento esperado por frontend/e2e/admin/dashboard-orders.real.spec.ts.
+2. Auditoría preventiva de todas las ocurrencias de INSERT INTO COMPROBANTE_PAGO y UPDATE COMPROBANTE_PAGO en backend/test/, frontend/e2e/ y database/:
+   - Ningún otro fixture inserta o actualiza id_admin_revision / revision_utc con estado_revision inconsistente respecto de chk_comprobante_revision (backend/test/helpers/run-state-consistency-mariadb.cjs simula intencionalmente el esquema previo a #290 para validar el backfill de migración; backend/test/state-consistency.mariadb.test.cjs verifica explícitamente el rechazo del trigger S704_COMPROBANTE_ESTADO_TERMINAL_INMUTABLE).
+
+Resultados exactos de las suites ejecutadas:
+1. backend: npm run build -> Exit code: 0
+2. backend: npm run type-check -> Exit code: 0
+3. backend: npm run test:unit -> Exit code: 0 (tests 1409, suites 3, pass 1406, fail 0, skipped 3)
+4. backend: npm run test:state-consistency:isolated -> Exit code: 0 (tests 10, pass 10, fail 0; CLEANUP OK T-S7-04.2)
+5. backend: npm run test:payments:isolated -> Exit code: 0 (tests 23, pass 23, fail 0; CLEANUP OK #260)
+6. backend: npm run test:receipts:isolated -> Exit code: 0 (tests 9, pass 9, fail 0; CLEANUP OK #260)
+7. backend: npm run test:admin-orders -> Exit code: 0 (tests 4, suites 1, pass 4, fail 0)
+8. frontend: npm run type-check -> Exit code: 0
+9. frontend: npm run build -> Exit code: 0 (vite build: 335 modules transformed)
+10. frontend: npm test -> Exit code: 0 (tests 294, suites 5, pass 294, fail 0)
+11. E2E raíz: node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada)
+12. E2E raíz: node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada)
+13. E2E raíz: node backend/test/helpers/run-e2e.cjs -> Exit code: 0 (290 tests en suite: 286 passed, 4 skipped [solo E2E_PRODUCTION_BUILD=1], 0 failed; e2e/admin/dashboard-orders.real.spec.ts 3/3 passed; Limpieza E2E confirmada)
+14. E2E raíz (build producción CI):
+    - E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog -> Exit code: 0 (1 passed, 0 failed; Limpieza E2E confirmada)
+    - E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs current-account.production.spec.ts -> Exit code: 0 (3 passed, 0 failed; Limpieza E2E confirmada)
+    - node backend/test/helpers/run-e2e.cjs --fer19-production -> Exit code: 0 (2 passed, 0 failed; Limpieza E2E confirmada)
+
+Verificación de higiene final tras todas las corridas:
+- Contenedores residuales de test Docker: 0 (preservado ferrepatagonia-dev-mariadb-1)
+- Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
+- BOM UTF-8 en archivos modificados: 0 archivos con BOM
+- git diff --check: Exit code: 0 (salida vacía)
