@@ -141,3 +141,34 @@ Validación local:
 - Limpieza E2E de contenedor y datos tmpfs confirmada. Se utilizó un navegador de prueba aislado.
 
 Pendientes commit/push, CI del nuevo HEAD y reauditoría técnica de S7-345-03/04; la aprobación final y validación UX/UI corresponden a sus revisores.
+
+
+## Acuerdo de alcance S7-345-05/06 · 21/11/2026
+
+Bruno y Lucci acordaron una solución intermedia para integrar el rediseño de #345 sin modificar esquema ni migraciones. Bruno decidió registrar los casos restantes para revisión de integración o una tarea de backend, sin esperar confirmación de Zahir. Este acuerdo no representa la aprobación técnica de Zahir ni el cierre completo de los hallazgos.
+
+- El PATCH/PUT acepta estadoEsperado opcional. Si está informado, se compara con el estado actual bajo el SELECT FOR UPDATE existente; una diferencia devuelve 409 sin escribir. Sin el campo, se conserva el contrato anterior. GET mantiene su estructura.
+- La vista envía el estado que muestra la fila. PATCH y GET tienen espera máxima de 15 segundos y cancelación local. La reconciliación GET comienza en el catch, después de fallar o vencer la espera local del PATCH. Esto no garantiza que la operación haya finalizado en el servidor.
+- Tras timeout, fallo de red, 5xx o 409 se consulta el estado actual. La fila queda bloqueada hasta recibir una respuesta válida; si falla la consulta puede reintentarse sin repetir la modificación. Se admite que el servidor conserve el estado anterior cuando el cambio no se aplicó. El bloqueo se aísla por empresa y las respuestas de sesiones anteriores se descartan.
+- Se retira la propuesta no publicada de columna de revisión, migración e If-Match obligatorio. No se agrega contador en memoria ni endpoint de verificación con efectos de escritura. Se conservan listas de precios, presentación y reglas financieras.
+
+### Casos diferidos y límites de la solución
+
+1. **S7-345-05 / ABA:** comparar estados no detecta un ciclo APROBADA → RECHAZADA → APROBADA. Una solicitud antigua que espere APROBADA podría ejecutarse después del ciclo. Una revisión persistida u otra garantía de concurrencia corresponde a una decisión de backend posterior.
+2. **S7-345-05 / solicitud tardía:** abortar la espera del navegador no garantiza que el servidor haya detenido la operación. Un GET exitoso muestra el estado observado en ese momento, pero no acredita que un PATCH antiguo haya terminado. La recarga, otra pestaña o un consumidor sin estadoEsperado siguen dejando escenarios de escritura posterior. El rechazo 409 cubre el caso en que el estado ya difiere; no constituye una barrera general contra operaciones tardías.
+3. **S7-345-06 / recuperación:** una lectura válida permite recuperar la fila incluso si el cambio falló antes de ejecutarse. Si el servidor sigue inaccesible se conserva «Por verificar», con reintento y esperas acotadas. La recuperación visual no certifica el resultado definitivo de una solicitud todavía procesada por el servidor.
+
+Revisar estos escenarios cuando se integre el flujo completo con #289 o registrarlos en una tarea de backend. No se asigna un número de tarea inexistente ni se presenta la protección parcial como resolución completa del P1.
+
+Validación local de esta variante sobre ce91685 más los cambios pendientes:
+
+- Builds de backend/frontend y TypeScript aprobados.
+- 304 pruebas frontend aprobadas, incluidas 17 focalizadas. Cubren precondición enviada, recuperación de 409 sin repetir PATCH, timeout, descarte de respuestas tardías, sesión y bloqueo independiente por empresa.
+- 1.399 pruebas backend aprobadas y 3 omitidas por plataforma; 4 pruebas de DTO source aprobadas.
+- 23 pruebas de aprobación empresarial en MariaDB descartable, incluida comparación del estado esperado, conflicto 409 sin sobrescritura, campo omitido compatible, valores inválidos y dos decisiones concurrentes con el mismo estado esperado (200/409).
+- 23 pruebas del flujo de crédito aprobadas sin adaptar sus consumidores al nuevo campo opcional.
+- 10 E2E de Clientes aprobados con build de producción, Chromium aislado y MariaDB descartable: escritorio/tablet/móvil, permisos, error antes de escritura y recuperación, timeout y recarga con decisión posterior que causa 409 a la solicitud retenida, y conservación del crédito de otras filas.
+- Los primeros intentos de backend/MariaDB no pudieron conectarse desde el entorno restringido. La ejecución con acceso a los servidores locales pasó completa; no se cambiaron aserciones para resolver esa restricción.
+- Limpieza de entornos descartables confirmada por los runners. Esquema y archivos de migración sin cambios respecto de HEAD. No se modificaron bases personales o compartidas.
+
+Estos resultados no demuestran protección frente a los casos diferidos anteriores. Quedan pendientes commit/push, CI del nuevo HEAD y revisión del alcance acordado en la integración; no se atribuye aprobación técnica a los revisores.

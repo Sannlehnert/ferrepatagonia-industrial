@@ -8,6 +8,9 @@ async function login(page: Page) {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/dashboard$/)
 }
+async function setApproval(page: Page, path: string, estado: string) {
+  return page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado } })
+}
 async function company(page: Page) {
   const response = await page.request.get('/api/admin/clientes')
   expect(response.ok()).toBe(true)
@@ -24,7 +27,7 @@ for (const width of [1280, 768, 360]) {
     await login(page)
     const { client, clients } = await company(page)
     const path = `/api/admin/clientes/${client.id}/estado-empresa`
-    expect((await page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado: 'PENDIENTE' } })).ok()).toBe(true)
+    expect((await setApproval(page, path, 'PENDIENTE')).ok()).toBe(true)
     const accountPath = `/api/admin/clientes/${client.id}/cuenta-corriente`
     const before = (await (await page.request.get(accountPath)).json()).data
     let mutations = 0
@@ -130,7 +133,7 @@ test('verifica una respuesta perdida y recupera una consulta de crédito fallida
   await login(page)
   const { client } = await company(page)
   const path = `/api/admin/clientes/${client.id}/estado-empresa`
-  expect((await page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado: 'PENDIENTE' } })).ok()).toBe(true)
+  expect((await setApproval(page, path, 'PENDIENTE')).ok()).toBe(true)
   let failCredit = true
   await page.route(`**/api/admin/clientes/${client.id}/cuenta-corriente`, async route => {
     if (failCredit) await route.fulfill({ status: 503, json: { message: 'Consulta no disponible' } })
@@ -229,55 +232,65 @@ test('un particular no puede consultar ni aprobar clientes desde ADMIN', async (
   await expect(page.getByRole('button', { name: /Aprobar cuenta empresa/ })).toHaveCount(0)
 })
 
-test('S7-345-03: libera el diálogo ante PATCH retenido y verifica el commit tardío sin repetirlo', async ({ page }) => {
+test('estadoEsperado rechaza una aprobación retenida si se confirmó otro estado tras recargar', async ({ page }) => {
   test.setTimeout(50_000)
   await login(page)
   const { client } = await company(page)
   const path = `/api/admin/clientes/${client.id}/estado-empresa`
-  expect((await page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado: 'PENDIENTE' } })).ok()).toBe(true)
+  expect((await setApproval(page,path,'PENDIENTE')).ok()).toBe(true)
   let release!: () => void
   const held = new Promise<void>(resolve => { release = resolve })
-  let mutations = 0
-  let committed!: () => void
-  const commit = new Promise<void>(resolve => { committed = resolve })
-  await page.route(`**${path}`, async route => {
-    mutations++
+  let finish!: (status: number) => void
+  const finished = new Promise<number>(resolve => { finish = resolve })
+  let first = true
+  await page.route('**'+path, async route => {
+    if (!first) return route.continue()
+    first = false
     await held
-    // El servidor puede procesar la operación aunque el navegador haya dejado de esperarla.
     const response = await route.fetch()
-    expect(response.ok()).toBe(true)
-    committed()
+    finish(response.status())
     await route.fulfill({ response }).catch(() => {})
   })
   try {
     await page.goto('/admin/clientes')
-    const row = page.getByRole('row').filter({ hasText: client.email })
-    const approve = row.getByRole('button', { name: `Aprobar cuenta empresa de ${client.nombreRazonSocial}` })
-    await approve.click()
-    const dialog = page.getByRole('dialog', { name: 'Aprobar empresa' })
-    await dialog.getByRole('button', { name: 'Confirmar aprobación' }).click()
-    const close = dialog.getByRole('button', { name: 'Cerrar detalle del cliente' })
-    await expect(close).toBeDisabled()
-    await expect(dialog).toContainText('El servidor no respondió a tiempo', { timeout: 20_000 })
-    await expect(close).toBeEnabled()
-    await dialog.getByRole('button', { name: 'Verificar estado actual' }).click()
-    await expect(dialog).toContainText('El servidor aún no confirma el cambio solicitado')
-    await expect(dialog.getByRole('button', { name: 'Confirmar aprobación' })).toHaveCount(0)
-    await page.keyboard.press('Escape')
-    await expect(dialog).toHaveCount(0)
-    await expect(approve).toBeDisabled()
-    await row.getByRole('button', { name: `Ver detalle de ${client.nombreRazonSocial}` }).click()
+    const row = page.getByRole('row').filter({hasText:client.email})
+    await row.getByRole('button',{name: 'Aprobar cuenta empresa de '+client.nombreRazonSocial}).click()
+    await page.getByRole('button',{name:'Confirmar aprobación'}).click()
+    await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'Estado verificado con el servidor.' })).toBeVisible({ timeout: 20_000 })
+    await page.reload()
+    await row.getByRole('button',{name:'Rechazar cuenta empresa de '+client.nombreRazonSocial}).click()
+    await page.getByRole('button',{name:'Confirmar rechazo'}).click()
+    await expect(page.getByRole('dialog').getByRole('status').filter({ hasText: 'Empresa rechazada.' })).toBeVisible()
     release()
-    await commit
-    const detail = page.getByRole('dialog', { name: 'Detalle del cliente' })
-    await expect(detail).toContainText('Por verificar')
-    await detail.getByRole('button', { name: 'Verificar estado actual' }).click()
-    await expect(detail.getByRole('status').filter({ hasText: 'Estado verificado con el servidor.' })).toBeVisible()
-    await expect(detail.locator('.company-badge')).toHaveText('Aprobada')
-    await detail.getByRole('button', { name: 'Cerrar detalle del cliente' }).click()
-    await expect(row.getByRole('button', { name: `Rechazar cuenta empresa de ${client.nombreRazonSocial}` })).toBeEnabled()
-    expect(mutations).toBe(1)
+    expect(await finished).toBe(409)
+    const fresh=(await (await page.request.get('/api/admin/clientes')).json()).data.clientes.find((c:{id:number})=>c.id===client.id)
+    expect(fresh.estadoAprobacionEmpresa).toBe('RECHAZADA')
+    await expect(row.locator('.company-badge')).toHaveText('Rechazada')
   } finally { release() }
+})
+
+test('S7-345-06: fallo antes del backend se recupera verificando y permite decidir de nuevo',async ({page})=>{
+  await login(page)
+  const {client}=await company(page)
+  const path=`/api/admin/clientes/${client.id}/estado-empresa`
+  expect((await setApproval(page,path,'PENDIENTE')).ok()).toBe(true)
+  let fail=true,mutations=0
+  await page.route('**'+path,async route=>{
+    mutations++
+    if(fail) await route.fulfill({status:503,json:{message:'No disponible'}})
+    else await route.continue()
+  })
+  await page.goto('/admin/clientes')
+  const row=page.getByRole('row').filter({hasText:client.email})
+  await row.getByRole('button',{name:'Aprobar cuenta empresa de '+client.nombreRazonSocial}).click()
+  const dialog=page.getByRole('dialog')
+  await dialog.getByRole('button',{name:'Confirmar aprobación'}).click()
+  await expect(dialog.getByRole('status').filter({ hasText: 'Estado verificado con el servidor.' })).toBeVisible()
+  await expect(dialog.locator('.company-badge')).toHaveText('Pendiente')
+  fail=false
+  await dialog.getByRole('button',{name:'Confirmar aprobación'}).click()
+  await expect(dialog.getByRole('status').filter({ hasText: 'Empresa aprobada.' })).toBeVisible()
+  expect(mutations).toBe(2)
 })
 
 test('S7-345-03: una verificación sin respuesta vence y permite cerrar y reintentar', async ({ page }) => {
@@ -285,7 +298,7 @@ test('S7-345-03: una verificación sin respuesta vence y permite cerrar y reinte
   await login(page)
   const { client } = await company(page)
   const path = `/api/admin/clientes/${client.id}/estado-empresa`
-  expect((await page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado: 'PENDIENTE' } })).ok()).toBe(true)
+  expect((await setApproval(page, path, 'PENDIENTE')).ok()).toBe(true)
   let holdRead = false, mutations = 0
   let release!: () => void
   const held = new Promise<void>(resolve => { release = resolve })
@@ -325,7 +338,7 @@ test('S7-345-04: aprobar una fila no borra ni reinicia el crédito ya visible de
   const companies = clients.filter((client: { tipoCliente: string }) => client.tipoCliente === 'EMPRESA')
   const target = companies[companies.length - 1]
   const path = `/api/admin/clientes/${target.id}/estado-empresa`
-  expect((await page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado: 'PENDIENTE' } })).ok()).toBe(true)
+  expect((await setApproval(page, path, 'PENDIENTE')).ok()).toBe(true)
   let afterChange = false
   let release!: () => void
   const held = new Promise<void>(resolve => { release = resolve })

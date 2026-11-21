@@ -179,10 +179,10 @@ test('adminClientService usa PATCH /admin/clientes/:id/estado-empresa y retorna 
   ]);
   const controller = new AbortController();
   await service.getAdminClients(controller.signal);
-  await service.updateAdminCompanyApproval(20, 'APROBADA', controller.signal);
+  await service.updateAdminCompanyApproval(20, 'APROBADA', controller.signal, 'PENDIENTE');
   assert.deepEqual(calls.slice(-2), [
     ['get', '/admin/clientes', { signal: controller.signal }],
-    ['patch', '/admin/clientes/20/estado-empresa', { estado: 'APROBADA' }, { signal: controller.signal }],
+    ['patch', '/admin/clientes/20/estado-empresa', { estado: 'APROBADA', estadoEsperado: 'PENDIENTE' }, { signal: controller.signal }],
   ]);
 });
 
@@ -374,7 +374,7 @@ async function approvalView(t, service, auth) {
   return app._instance.setupState;
 }
 
-test('S7-345-03: PATCH pendiente vence, permite cerrar y conserva incertidumbre ante lectura anterior', async t => {
+test('S7-345-03/06: PATCH vence y una lectura verificada permite recuperar sin aceptar la respuesta tardía', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   let release, signal, mutations = 0;
   const service = {
@@ -388,25 +388,25 @@ test('S7-345-03: PATCH pendiente vence, permite cerrar y conserva incertidumbre 
   state.openClient(client, 'APROBADA');
   const request = state.confirmApproval();
   await settle();
-  assert.equal(state.updatingApprovalClientId, 20);
+  assert.equal(state.updatingApprovalClientIds[20], true);
   state.confirmApproval();
   assert.equal(mutations, 1);
   t.mock.timers.tick(15_000);
   await settle();
-  assert.equal(state.updatingApprovalClientId, null);
-  assert.equal(state.uncertainApprovalClientIds[20], true);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
   assert.equal(signal.aborted, true);
   state.closeClient();
   assert.equal(state.selectedClient, null);
-  // El GET puede leer el estado anterior mientras el servidor aún procesa el PATCH.
+  // El GET automático admite el estado anterior; no demuestra que el servidor canceló el PATCH.
   await state.reconcileCompanyApproval(20);
-  assert.equal(state.uncertainApprovalClientIds[20], true);
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
   release({ ...sampleClients()[1], estadoAprobacionEmpresa: 'APROBADA' });
   await request;
   await settle();
   assert.equal(client.estadoAprobacionEmpresa, 'PENDIENTE');
-  assert.equal(state.uncertainApprovalClientIds[20], true);
-  // Solo una verificación posterior que observe el destino confirma el cambio.
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
+  // Una consulta posterior actualiza el estado, nunca la respuesta vencida.
   service.getAdminClients = async () => sampleClients().map(c => c.id === 20 ? { ...c, estadoAprobacionEmpresa: 'APROBADA' } : c);
   await state.reconcileCompanyApproval(20);
   assert.equal(client.estadoAprobacionEmpresa, 'APROBADA');
@@ -422,12 +422,12 @@ test('S7-345-03: verificación pendiente también vence y descarta su respuesta 
   service.getAdminClients = requestSignal => new Promise(resolve => { release = resolve; signal = requestSignal; });
   const request = state.setCompanyApproval(state.clients[1], 'APROBADA');
   await settle();
-  assert.equal(state.reconcilingApprovalClientId, 20);
+  assert.equal(state.reconcilingApprovalClientIds[20], true);
   t.mock.timers.tick(15_000);
   await request;
   assert.equal(signal.aborted, true);
-  assert.equal(state.updatingApprovalClientId, null);
-  assert.equal(state.reconcilingApprovalClientId, null);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
+  assert.equal(state.reconcilingApprovalClientIds[20], undefined);
   assert.equal(state.uncertainApprovalClientIds[20], true);
   release(sampleClients().map(c => ({ ...c, estadoAprobacionEmpresa: 'APROBADA' })));
   await settle();
@@ -447,7 +447,7 @@ test('S7-345-03: salir de sesión cancela la modificación sin contaminar la sig
   release({ ...sampleClients()[1], estadoAprobacionEmpresa: 'APROBADA' });
   await request;
   assert.equal(state.clients[1].estadoAprobacionEmpresa, 'PENDIENTE');
-  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
 });
 
 test('S7-345-04: cambiar aprobación refresca solo esa empresa y conserva resultados ajenos', async t => {
@@ -602,16 +602,18 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   };
 
   const inFlight = state.setCompanyApproval(empresaPendiente, 'APROBADA');
-  assert.equal(state.updatingApprovalClientId, 20);
+  assert.equal(state.updatingApprovalClientIds[20], true);
 
-  // Intentos concurrentes mientras updatingApprovalClientId !== null son ignorados
+  // El doble envío de la misma fila se ignora; otra empresa sigue operable.
   await state.setCompanyApproval(empresaPendiente, 'RECHAZADA');
   await state.setCompanyApproval(empresaAprobada, 'RECHAZADA');
-  assert.equal(calls.length, 1);
+  assert.equal(calls.length, 2);
+  assert.equal(empresaAprobada.estadoAprobacionEmpresa, 'RECHAZADA');
+  assert.equal(state.updatingApprovalClientIds[20], true);
 
   finishRequest();
   await inFlight;
-  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
   assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'APROBADA');
   assert.deepEqual(state.approvalFeedback[20], {
     text: 'Empresa aprobada.',
@@ -638,7 +640,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
     });
   };
   await state.setCompanyApproval(empresaPendiente, 'APROBADA');
-  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
   assert.equal(state.uncertainApprovalClientIds[20], undefined);
   assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'PENDIENTE');
   assert.deepEqual(state.approvalFeedback[20], {
@@ -661,7 +663,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   ];
 
   await state.setCompanyApproval(empresaPendiente, 'APROBADA');
-  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
   assert.equal(state.uncertainApprovalClientIds[20], undefined);
   assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'APROBADA');
   assert.deepEqual(state.approvalFeedback[20], {
@@ -684,7 +686,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   };
 
   await state.setCompanyApproval(empresaPendiente, 'RECHAZADA');
-  assert.equal(state.updatingApprovalClientId, null);
+  assert.equal(state.updatingApprovalClientIds[20], undefined);
   assert.equal(state.uncertainApprovalClientIds[20], true);
   assert.deepEqual(state.approvalFeedback[20], {
     text: 'No pudimos verificar el estado con el servidor. El resultado es incierto.',
@@ -758,4 +760,42 @@ test('no declara verificado un cliente ausente de la respuesta de reconciliació
   await state.reconcileCompanyApproval(20);
   assert.equal(state.uncertainApprovalClientIds[20], true);
   assert.equal(state.approvalFeedback[20].error, true);
+});
+
+test('409 reconcilia el estado actual y no repite la modificación', async t => {
+  let writes = 0, reads = 0;
+  const service = {
+    getAdminClients: async () => { reads++; return sampleClients().map(c => reads > 1 && c.id === 20 ? { ...c, estadoAprobacionEmpresa: 'RECHAZADA' } : c); },
+    updateAdminCompanyApproval: async (id, target, signal, expected) => {
+      writes++;
+      assert.equal(expected, 'PENDIENTE');
+      throw Object.assign(new Error('conflict'), { isAxiosError: true, response: { status: 409 } });
+    },
+  };
+  const state = await approvalView(t, service);
+  await state.setCompanyApproval(state.clients[1], 'APROBADA');
+  assert.equal(writes, 1);
+  assert.equal(reads, 2);
+  assert.equal(state.clients[1].estadoAprobacionEmpresa, 'RECHAZADA');
+  assert.equal(state.uncertainApprovalClientIds[20], undefined);
+});
+
+test('una verificación pendiente no bloquea modificaciones de otra empresa', async t => {
+  const service = { updateAdminCompanyApproval: async () => { throw Error('respuesta perdida'); } };
+  const state = await approvalView(t, service);
+  let finish;
+  service.getAdminClients = () => new Promise(resolve => { finish = resolve; });
+  const pending = state.setCompanyApproval(state.clients[1], 'APROBADA');
+  await settle();
+  assert.equal(state.reconcilingApprovalClientIds[20], true);
+  service.updateAdminCompanyApproval = async (id, status) => ({ ...sampleClients()[2], id, estadoAprobacionEmpresa: status });
+  state.openClient(state.clients[2], 'RECHAZADA');
+  await state.confirmApproval();
+  state.closeClient();
+  assert.equal(state.selectedClient, null);
+  assert.equal(state.clients[2].estadoAprobacionEmpresa, 'RECHAZADA');
+  assert.equal(state.reconcilingApprovalClientIds[20], true);
+  finish(sampleClients());
+  await pending;
+  assert.equal(state.clients[2].estadoAprobacionEmpresa, 'RECHAZADA', 'Reconciliar una fila no sustituye las demás');
 });

@@ -68,7 +68,7 @@ function openClient(client: AdminClient, target: CompanyApprovalStatus | null = 
     approvalTarget.value = target
 }
 function closeClient() {
-    if (updatingApprovalClientId.value !== null || reconcilingApprovalClientId.value !== null) return
+    if (selectedClientId.value !== null && (updatingApprovalClientIds.value[selectedClientId.value] || reconcilingApprovalClientIds.value[selectedClientId.value])) return
     selectedClientId.value = null
     approvalTarget.value = null
 }
@@ -84,10 +84,9 @@ const assignments = ref<Record<number, AdminClientPriceList | null>>({})
 const selections = ref<Record<number, number | ''>>({})
 const feedback = ref<Record<number, { text: string; error: boolean }>>({})
 const approvalFeedback = ref<Record<number, { text: string; error: boolean }>>({})
-const updatingApprovalClientId = ref<number | null>(null)
+const updatingApprovalClientIds = ref<Record<number, boolean>>({})
 const uncertainApprovalClientIds = ref<Record<number, boolean>>({})
-const uncertainApprovalTargets = ref<Record<number, CompanyApprovalStatus>>({})
-const reconcilingApprovalClientId = ref<number | null>(null)
+const reconcilingApprovalClientIds = ref<Record<number, boolean>>({})
 const priceListsLoading = ref(true)
 const priceListsError = ref<string | null>(null)
 const savingClientId = ref<number | null>(null)
@@ -166,26 +165,16 @@ async function savePriceList(id: number) {
 }
 
 async function reconcileCompanyApproval(clientId: number): Promise<void> {
-    if (!allowed() || reconcilingApprovalClientId.value !== null) return
+    if (!allowed() || reconcilingApprovalClientIds.value[clientId]) return
     const token = generation
-    reconcilingApprovalClientId.value = clientId
+    reconcilingApprovalClientIds.value[clientId] = true
     try {
         const freshClients = await withApprovalDeadline(signal => getAdminClients(signal))
         if (!isCurrent(token)) return
         const fresh = freshClients.find(c => c.id === clientId)
         const current = clients.value.find(c => c.id === clientId)
         if (!fresh || !current || fresh.tipoCliente !== 'EMPRESA' || !['APROBADA', 'RECHAZADA', 'PENDIENTE'].includes(fresh.estadoAprobacionEmpresa ?? '')) throw new Error('El cliente ya no está disponible en el listado.')
-        // Un GET puede adelantar al PATCH que sigue procesándose en el servidor.
-        // Observar el estado anterior no demuestra que la modificación se canceló.
-        const expected = uncertainApprovalTargets.value[clientId]
-        if (expected && fresh.estadoAprobacionEmpresa !== expected) {
-            uncertainApprovalClientIds.value[clientId] = true
-            approvalFeedback.value[clientId] = {
-                text: 'El servidor aún no confirma el cambio solicitado. El resultado es incierto; volvé a verificar antes de modificarlo.',
-                error: true,
-            }
-            return
-        }
+        // El GET informa el estado actual; no impide una escritura tardía del servidor.
         if (fresh && current) {
             current.estadoAprobacionEmpresa = fresh.estadoAprobacionEmpresa
             current.nombreRazonSocial = fresh.nombreRazonSocial
@@ -196,7 +185,6 @@ async function reconcileCompanyApproval(clientId: number): Promise<void> {
             current.fechaRegistro = fresh.fechaRegistro
         }
         delete uncertainApprovalClientIds.value[clientId]
-        delete uncertainApprovalTargets.value[clientId]
         approvalFeedback.value[clientId] = {
             text: 'Estado verificado con el servidor.',
             error: false,
@@ -209,30 +197,29 @@ async function reconcileCompanyApproval(clientId: number): Promise<void> {
             error: true,
         }
     } finally {
-        if (isCurrent(token)) reconcilingApprovalClientId.value = null
+        if (isCurrent(token)) delete reconcilingApprovalClientIds.value[clientId]
     }
 }
 
 async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprovalStatus) {
     if (
         !allowed() ||
-        updatingApprovalClientId.value !== null ||
-        reconcilingApprovalClientId.value !== null ||
+        updatingApprovalClientIds.value[client.id] ||
+        reconcilingApprovalClientIds.value[client.id] ||
         uncertainApprovalClientIds.value[client.id] ||
         client.tipoCliente !== 'EMPRESA' ||
         client.estadoAprobacionEmpresa === newStatus
     ) return
     const token = generation
-    updatingApprovalClientId.value = client.id
+    updatingApprovalClientIds.value[client.id] = true
     delete approvalFeedback.value[client.id]
     delete feedback.value[client.id]
     try {
-        const updated = await withApprovalDeadline(signal => updateAdminCompanyApproval(client.id, newStatus, signal))
+        const updated = await withApprovalDeadline(signal => updateAdminCompanyApproval(client.id, newStatus, signal, client.estadoAprobacionEmpresa ?? undefined))
         if (!isCurrent(token)) return
         if (updated.estadoAprobacionEmpresa !== newStatus || updated.id !== client.id) throw new Error('Respuesta de aprobación incompleta.')
         client.estadoAprobacionEmpresa = updated.estadoAprobacionEmpresa
         delete uncertainApprovalClientIds.value[client.id]
-        delete uncertainApprovalTargets.value[client.id]
         approvalFeedback.value[client.id] = {
             text: newStatus === 'APROBADA' ? 'Empresa aprobada.' : 'Empresa rechazada.',
             error: false,
@@ -240,26 +227,24 @@ async function setCompanyApproval(client: AdminClient, newStatus: CompanyApprova
     } catch (error: unknown) {
         if (!isCurrent(token)) return
         const response = axios.isAxiosError<{ message?: string }>(error) ? error.response : undefined
-        if (!response || response.status >= 500) {
+        if (!response || response.status >= 500 || response.status === 409) {
             uncertainApprovalClientIds.value[client.id] = true
-            uncertainApprovalTargets.value[client.id] = newStatus
             approvalFeedback.value[client.id] = {
                 text: error instanceof ApprovalTimeoutError
-                    ? 'El servidor no respondió a tiempo. El resultado es incierto: podés cerrar y verificar el estado antes de volver a modificarlo.'
+                    ? 'El servidor no respondió a tiempo. El resultado es incierto. Consultando el estado actual…'
                     : 'No pudimos confirmar el cambio en el servidor. Verificando estado actual…',
                 error: true,
             }
-            if (!(error instanceof ApprovalTimeoutError)) await reconcileCompanyApproval(client.id)
+            await reconcileCompanyApproval(client.id)
         } else {
             delete uncertainApprovalClientIds.value[client.id]
-            delete uncertainApprovalTargets.value[client.id]
             approvalFeedback.value[client.id] = {
                 text: response.data?.message ?? 'No se pudo actualizar el estado de la empresa.',
                 error: true,
             }
         }
     } finally {
-        if (isCurrent(token)) updatingApprovalClientId.value = null
+        if (isCurrent(token)) delete updatingApprovalClientIds.value[client.id]
     }
 }
 
@@ -274,7 +259,6 @@ async function loadClients(): Promise<void> {
         if (!isCurrent(token)) return
         clients.value = fresh
         uncertainApprovalClientIds.value = {}
-        uncertainApprovalTargets.value = {}
     } catch (error: unknown) {
         if (!isCurrent(token)) return
         const status = axios.isAxiosError(error)
@@ -300,9 +284,8 @@ watch([identity, allowed], () => {
     feedback.value = {}
     approvalFeedback.value = {}
     uncertainApprovalClientIds.value = {}
-    uncertainApprovalTargets.value = {}
-    updatingApprovalClientId.value = null
-    reconcilingApprovalClientId.value = null
+    updatingApprovalClientIds.value = {}
+    reconcilingApprovalClientIds.value = {}
     savingClientId.value = null
     selectedClientId.value = null
     approvalTarget.value = null
@@ -397,32 +380,32 @@ watch([identity, allowed], () => {
                                     <button
                                         v-if="client.estadoAprobacionEmpresa !== 'APROBADA'"
                                         type="button"
-                                        :disabled="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null || !!uncertainApprovalClientIds[client.id]"
+                                        :disabled="!!updatingApprovalClientIds[client.id] || !!reconcilingApprovalClientIds[client.id] || !!uncertainApprovalClientIds[client.id]"
                                         :class="[clientButtonClass, 'client-approve w-[88px] shrink-0 enabled:border-[#145a8d] enabled:text-[#103a5c] enabled:hover:bg-[#eff6ff] disabled:border-[#e2e8f0] disabled:bg-[#f3f4f6] disabled:text-[#64748b] disabled:opacity-100']"
                                         :aria-label="`Aprobar cuenta empresa de ${client.nombreRazonSocial}`"
                                         @click="openClient(client, 'APROBADA')"
                                     >
-                                        {{ updatingApprovalClientId === client.id ? '…' : 'Aprobar' }}
+                                        {{ updatingApprovalClientIds[client.id] ? '…' : 'Aprobar' }}
                                     </button>
                                     <button
                                         v-if="client.estadoAprobacionEmpresa !== 'RECHAZADA'"
                                         type="button"
-                                        :disabled="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null || !!uncertainApprovalClientIds[client.id]"
+                                        :disabled="!!updatingApprovalClientIds[client.id] || !!reconcilingApprovalClientIds[client.id] || !!uncertainApprovalClientIds[client.id]"
                                         :class="[clientButtonClass, 'client-reject w-[88px] shrink-0 enabled:border-[#fecaca] enabled:text-[#991b1b] enabled:hover:bg-[#fee2e2] disabled:border-[#e2e8f0] disabled:bg-[#f3f4f6] disabled:text-[#64748b] disabled:opacity-100']"
                                         :aria-label="`Rechazar cuenta empresa de ${client.nombreRazonSocial}`"
                                         @click="openClient(client, 'RECHAZADA')"
                                     >
-                                        {{ updatingApprovalClientId === client.id ? '…' : 'Rechazar' }}
+                                        {{ updatingApprovalClientIds[client.id] ? '…' : 'Rechazar' }}
                                     </button>
                                     <button
                                         v-if="uncertainApprovalClientIds[client.id]"
                                         type="button"
-                                        :disabled="reconcilingApprovalClientId === client.id"
+                                        :disabled="reconcilingApprovalClientIds[client.id]"
                                         :class="clientButtonClass"
                                         :aria-label="`Reintentar verificación de cuenta empresa de ${client.nombreRazonSocial}`"
                                         @click="reconcileCompanyApproval(client.id)"
                                     >
-                                        {{ reconcilingApprovalClientId === client.id ? 'Verificando…' : 'Reintentar verificación' }}
+                                        {{ reconcilingApprovalClientIds[client.id] ? 'Verificando…' : 'Reintentar verificación' }}
                                     </button>
                                 </div>
                                 <p
@@ -490,7 +473,7 @@ watch([identity, allowed], () => {
         </div>
         <AdminClientStatusDialog v-if="selectedClient" :key="selectedClient.id" :client="selectedClient"
             :target="approvalTarget" :credit="credit.status(selectedClient.id)"
-            :busy="updatingApprovalClientId !== null || reconcilingApprovalClientId !== null"
+            :busy="selectedClientId !== null && (!!updatingApprovalClientIds[selectedClientId] || !!reconcilingApprovalClientIds[selectedClientId])"
             :uncertain="!!uncertainApprovalClientIds[selectedClient.id]" :feedback="approvalFeedback[selectedClient.id]"
             @close="closeClient" @confirm="confirmApproval" @retry="reconcileCompanyApproval(selectedClient.id)" @refresh-credit="credit.refresh(selectedClient.id)" />
     </section>

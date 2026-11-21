@@ -18,10 +18,11 @@ export async function updateAdminCompanyApproval(
     idCliente: number,
     estado: CompanyApprovalStatus,
     signal?: AbortSignal,
+    estadoEsperado?: CompanyApprovalStatus,
 ): Promise<AdminClient> {
     const response = await api.patch<{ data: { cliente: AdminClient }; message: string }>(
         `/admin/clientes/${idCliente}/estado-empresa`,
-        { estado },
+        { estado, ...(estadoEsperado !== undefined ? { estadoEsperado } : {}) },
         ...(signal ? [{ signal }] : []),
     )
     return response.data.data.cliente
