@@ -62,7 +62,7 @@ function requestClose() {
                 <button
                     ref="cancelButton"
                     type="button"
-                    class="min-h-11 min-w-11 shrink-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 min-w-11 shrink-0 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     :disabled="busy"
                     aria-label="Cancelar revisión"
                     @click="requestClose"
@@ -109,11 +109,11 @@ function requestClose() {
                     la clave de idempotencia. Consultá el estado o reintentá con la misma clave.
                 </p>
                 <div class="flex flex-wrap gap-2">
-                    <button type="button" class="min-h-11 rounded-md bg-[#145A8D] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#145A8D] px-4 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :disabled="busy" @click="emit('checkStatus')">
                         Consultar estado
                     </button>
-                    <button type="button" class="min-h-11 rounded-md border border-[#145A8D] bg-white px-4 py-2 text-sm font-semibold text-[#145A8D] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-[#145A8D] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#145A8D] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :disabled="busy" @click="emit('retry')">
                         Reintentar con la misma clave
                     </button>
@@ -124,7 +124,7 @@ function requestClose() {
                 <label class="flex items-start gap-3 text-sm">
                     <input
                         type="checkbox"
-                        class="mt-0.5 h-5 w-5 shrink-0 accent-[#145A8D]"
+                        class="mt-0.5 box-border h-5 w-5 shrink-0 cursor-pointer accent-[#145A8D] disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :checked="checked"
                         :disabled="busy"
                         @change="emit('update:checked', ($event.target as HTMLInputElement).checked)"
@@ -135,11 +135,11 @@ function requestClose() {
                     </span>
                 </label>
                 <div class="flex flex-wrap justify-end gap-2">
-                    <button type="button" class="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :disabled="busy" @click="requestClose">
                         Volver
                     </button>
-                    <button type="submit" class="min-h-11 rounded-md bg-[#145A8D] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    <button type="submit" class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#145A8D] px-4 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :disabled="busy || !checked" :aria-busy="busy">
                         {{ busy ? 'Declarando…' : 'Confirmar declaración' }}
                     </button>

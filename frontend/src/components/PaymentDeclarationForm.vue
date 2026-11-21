@@ -211,7 +211,11 @@ function reopenUncertain() {
 function declarationFailed(error: unknown): string {
     const fallback = 'No se pudo registrar la declaración. Reintentá en unos instantes.'
     const message = paymentErrorMessage(error, fallback)
-    if (!isUncertainDeclarationError(error)) return message
+    if (!isUncertainDeclarationError(error)) {
+        // Un rechazo definitivo no debe quedar atrapado en el estado incierto anterior.
+        uncertain.value = false
+        return message
+    }
     uncertain.value = true
     return `${message} No generamos una nueva declaración: conservá esta clave y consultá el estado o reintentá.`
 }
@@ -348,11 +352,11 @@ onBeforeUnmount(() => {
                 Consultá el estado o reintentá con la misma clave.
             </p>
             <div class="flex flex-wrap gap-2">
-                <button type="button" class="min-h-11 rounded-md border border-amber-700 bg-white px-3 py-2 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:opacity-60"
+                <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-amber-700 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     :disabled="checking || submitting" @click="reopenUncertain">
                     Revisar declaración incierta
                 </button>
-                <button type="button" class="min-h-11 rounded-md bg-[#145A8D] px-3 py-2 text-sm font-semibold text-white hover:bg-[#103A5C] disabled:opacity-60"
+                <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#145A8D] px-3 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     :disabled="checking || submitting" @click="checkDeclarationStatus">
                     {{ checking ? 'Consultando…' : 'Consultar estado' }}
                 </button>
@@ -372,7 +376,7 @@ onBeforeUnmount(() => {
                 </p>
                 <div v-else-if="receiptsError" class="grid gap-2">
                     <p role="alert" class="m-0 text-sm text-red-800">{{ receiptsError }}</p>
-                    <button type="button" class="min-h-11 w-fit rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-900 hover:bg-red-50"
+                    <button type="button" class="box-border min-h-11 w-fit cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         @click="loadReceipts(receiptsPage)">
                         Reintentar comprobantes
                     </button>
@@ -388,7 +392,7 @@ onBeforeUnmount(() => {
                             :class="selectedReceiptId === receipt.id
                                 ? 'border-[#145A8D] bg-sky-50'
                                 : 'border-slate-200 bg-white hover:bg-slate-50'">
-                            <input type="radio" name="payment-receipt" class="mt-0.5 h-5 w-5 shrink-0 accent-[#145A8D]"
+                            <input type="radio" name="payment-receipt" class="mt-0.5 box-border h-5 w-5 shrink-0 cursor-pointer accent-[#145A8D] disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 :value="receipt.id" :checked="selectedReceiptId === receipt.id"
                                 @change="selectReceipt(receipt)">
                             <span class="min-w-0">
@@ -404,12 +408,12 @@ onBeforeUnmount(() => {
                     </div>
                     <div v-if="receiptsPage > 1 || receiptsNext" class="mt-3 flex flex-wrap gap-2">
                         <button v-if="receiptsPage > 1" type="button"
-                            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50"
+                            class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             @click="loadReceipts(receiptsPage - 1)">
                             Comprobantes anteriores
                         </button>
                         <button v-if="receiptsNext" type="button"
-                            class="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50"
+                            class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             @click="loadReceipts(receiptsNext)">
                             Más comprobantes
                         </button>
@@ -418,20 +422,20 @@ onBeforeUnmount(() => {
             </fieldset>
 
             <div class="grid gap-4 sm:grid-cols-2">
-                <label class="grid min-w-0 gap-1 text-sm font-medium" for="payment-amount">
+                <label class="grid min-w-0 content-start gap-1 text-sm font-medium" for="payment-amount">
                     Importe declarado
                     <input id="payment-amount" v-model="monto" inputmode="decimal" autocomplete="off"
                         placeholder="0.00" aria-describedby="payment-amount-help"
                         :disabled="submitting || uncertain"
-                        class="box-border min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
+                        class="box-border min-h-11 w-full min-w-0 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
                     <span id="payment-amount-help" class="font-normal text-slate-600">
                         Mayor a cero, hasta dos decimales. No se convierte desde la interfaz.
                     </span>
                 </label>
-                <label class="grid min-w-0 gap-1 text-sm font-medium" for="payment-currency">
+                <label class="grid min-w-0 content-start gap-1 text-sm font-medium" for="payment-currency">
                     Moneda
                     <select id="payment-currency" v-model="moneda" :disabled="submitting || uncertain"
-                        class="box-border min-h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
+                        class="box-border min-h-11 w-full min-w-0 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
                         <option value="USD">USD — dólares</option>
                         <option value="ARS">ARS — pesos argentinos</option>
                     </select>
@@ -442,13 +446,13 @@ onBeforeUnmount(() => {
                 Observaciones opcionales
                 <textarea id="payment-observations" v-model="observaciones" rows="3" maxlength="1000"
                     :disabled="submitting || uncertain"
-                    class="box-border w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]" />
+                    class="box-border w-full min-w-0 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm text-[#0B2438] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]" />
                 <span class="font-normal text-slate-600">{{ observaciones.length }} / 1000 caracteres.</span>
             </label>
 
             <div class="flex flex-wrap items-center gap-3">
                 <button type="submit"
-                    class="min-h-11 rounded-md bg-[#145A8D] px-4 py-2 text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#145A8D] px-4 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#103A5C] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     :disabled="!canReview">
                     Revisar declaración
                 </button>

@@ -54,8 +54,6 @@ const financialDataReady = computed(() =>
         !cuenta.consultaCargando &&
         !cuenta.movimientosCargando &&
         !cuenta.vencimientosCargando &&
-        !cuenta.movimientosMasCargando &&
-        !cuenta.vencimientosMasCargando &&
         !cuenta.consultaError &&
         !cuenta.movimientosError &&
         !cuenta.vencimientosError &&
@@ -150,8 +148,7 @@ onBeforeRouteLeave(() => cuenta.clear())
         <CompanyStatus class="mb-6" />
         <CreditRequestPanel :refresh-version="creditRefreshVersion" />
 
-        <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando ||
-            cuenta.movimientosMasCargando || cuenta.vencimientosMasCargando" role="status"
+        <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando" role="status"
             class="rounded-md bg-slate-50 p-4">
             Consultando la cuenta corriente…
         </p>
@@ -194,26 +191,26 @@ onBeforeRouteLeave(() => cuenta.clear())
             </p>
 
             <section aria-labelledby="account-status-title"
-                class="mb-6 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
+                class="mb-6 min-w-0 rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
                 <h2 id="account-status-title" class="m-0 mb-3 text-lg font-semibold">Estado de la cuenta</h2>
-                <dl class="m-0 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
-                    <div>
+                <dl class="m-0 grid min-w-0 grid-cols-1 gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <div class="min-w-0">
                         <dt class="font-medium text-slate-600">Habilitación</dt>
                         <dd class="m-0 mt-1 font-semibold">{{ accountStateLabel(resumen.estado) }}</dd>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <dt class="font-medium text-slate-600">Cobertura financiera</dt>
                         <dd class="m-0 mt-1 font-semibold">{{ coverageLabel(resumen.cobertura) }}</dd>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <dt class="font-medium text-slate-600">Plazo de pago</dt>
                         <dd class="m-0 mt-1 font-semibold">
                             {{ resumen.plazoDias ? `${resumen.plazoDias} días` : 'No determinable' }}
                         </dd>
                     </div>
-                    <div>
+                    <div class="min-w-0">
                         <dt class="font-medium text-slate-600">Revisión / actualización</dt>
-                        <dd class="m-0 mt-1 font-semibold break-words">
+                        <dd class="m-0 mt-1 min-w-0 font-semibold [overflow-wrap:anywhere]">
                             Rev. {{ resumen.revision }} · {{ formatInstant(resumen.corte) }}
                         </dd>
                     </div>

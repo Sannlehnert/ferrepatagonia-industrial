@@ -108,6 +108,8 @@ type Overrides = {
     onDeclare?: (route: Route, body: Record<string, unknown>, key: string) => Promise<void> | void
     onPaymentsGet?: (route: Route, page: number) => Promise<void> | void
     onReceiptsGet?: (route: Route) => Promise<void> | void
+    onMovementsGet?: (route: Route, cursor: string | null) => Promise<void> | void
+    onDuesGet?: (route: Route, cursor: string | null) => Promise<void> | void
 }
 
 async function mockApi(page: Page, overrides: Overrides = {}) {
@@ -139,9 +141,15 @@ async function mockApi(page: Page, overrides: Overrides = {}) {
             return route.fulfill({ json: { data: currentSummary } })
         }
         if (path === '/api/cuenta-corriente/movimientos') {
+            if (overrides.onMovementsGet) {
+                return overrides.onMovementsGet(route, url.searchParams.get('cursor'))
+            }
             return route.fulfill({ json: { data: overrides.movements ?? pageData([movement]) } })
         }
         if (path === '/api/cuenta-corriente/vencimientos') {
+            if (overrides.onDuesGet) {
+                return overrides.onDuesGet(route, url.searchParams.get('cursor'))
+            }
             return route.fulfill({ json: { data: overrides.dues ?? pageData([
                 {
                     movimientoId: '1',
@@ -540,6 +548,344 @@ for (const width of [320, 360, 390, 768, 1280]) {
         expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
     })
 }
+
+for (const width of [320, 360, 390, 768, 1280]) {
+    test(`revisión SHA-256 completa no desborda a ${width}px`, async ({ page }) => {
+        const revision = '0123456789abcdef'.repeat(4)
+        await page.setViewportSize({ width, height: 900 })
+        await mockApi(page, {
+            summary: { revision },
+            movements: pageData([movement], { revision }),
+            dues: pageData([], { revision }),
+        })
+        await signIn(page)
+        await openAccount(page)
+
+        const accountStatus = page.getByRole('region', { name: 'Estado de la cuenta' })
+        await expect(accountStatus).toContainText(revision)
+        expect(await accountStatus.getByText(`Rev. ${revision}`).count()).toBe(1)
+        expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+        const box = await accountStatus.boundingBox()
+        expect(box).not.toBeNull()
+        expect(box!.x + box!.width).toBeLessThanOrEqual(width)
+    })
+}
+
+test('timeout y luego clave reutilizada: cierra la incertidumbre y permite corregir el formulario', async ({ page }) => {
+    const keys: string[] = []
+    let attempts = 0
+    await mockApi(page, {
+        onDeclare: async (route, _body, key) => {
+            keys.push(key)
+            attempts++
+            if (attempts === 1) return route.abort('timedout')
+            return route.fulfill({
+                status: 409,
+                json: {
+                    code: 'CLAVE_IDEMPOTENCIA_REUTILIZADA',
+                    message: 'La clave de idempotencia ya fue utilizada con otros datos.',
+                },
+            })
+        },
+    })
+    await signIn(page)
+    await openAccount(page)
+    const dialog = await fillDeclaration(page)
+    await dialog.getByRole('button', { name: 'Confirmar declaración' }).click()
+
+    await expect(dialog.getByRole('status').filter({
+        hasText: 'resultado de la declaración no está confirmado',
+    })).toBeVisible()
+    const key = keys[0]!
+
+    await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
+
+    await expect(page.getByRole('alert').filter({ hasText: 'clave de idempotencia' })).toBeVisible()
+    await expect(dialog).toHaveCount(0)
+    const form = declaration(page)
+    await expect(form.getByLabel('Importe declarado')).toBeEnabled()
+    await expect(form.getByLabel('Moneda')).toBeEnabled()
+    await expect(form.getByRole('button', { name: 'Revisar declaración' })).toBeEnabled()
+    await expect(page.getByRole('status').filter({ hasText: 'Declaración registrada' })).toHaveCount(0)
+    expect(keys).toEqual([key, key])
+})
+
+test('timeout y luego comprobante ya declarado: muestra el rechazo real y no reutiliza la clave', async ({ page }) => {
+    const keys: string[] = []
+    let attempts = 0
+    await mockApi(page, {
+        onDeclare: async (route, _body, key) => {
+            keys.push(key)
+            attempts++
+            if (attempts === 1) return route.abort('timedout')
+            return route.fulfill({
+                status: 409,
+                json: {
+                    code: 'COMPROBANTE_YA_DECLARADO',
+                    message: 'Ese comprobante ya tiene una declaración registrada.',
+                },
+            })
+        },
+    })
+    await signIn(page)
+    await openAccount(page)
+    const dialog = await fillDeclaration(page)
+    await dialog.getByRole('button', { name: 'Confirmar declaración' }).click()
+    await expect(dialog.getByRole('status').filter({
+        hasText: 'resultado de la declaración no está confirmado',
+    })).toBeVisible()
+    const key = keys[0]!
+
+    await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
+
+    await expect(page.getByRole('alert').filter({ hasText: 'historial de pagos' })).toBeVisible()
+    await expect(dialog).toHaveCount(0)
+    await expect(page.getByRole('status').filter({ hasText: 'Declaración registrada' })).toHaveCount(0)
+    expect(keys).toEqual([key, key])
+})
+
+for (const [status, code, message, expected] of [
+    [400, 'SOLICITUD_INVALIDA', 'El importe declarado no es válido.', 'El importe declarado no es válido.'],
+    [404, 'COMPROBANTE_NO_ENCONTRADO', 'No se encontró el comprobante indicado.', 'No encontramos ese comprobante'],
+] as const) {
+    test(`resultado incierto y luego rechazo definitivo ${status}: libera el formulario sin declarar`, async ({ page }) => {
+        const keys: string[] = []
+        let attempts = 0
+        await mockApi(page, {
+            onDeclare: async (route, _body, key) => {
+                keys.push(key)
+                attempts++
+                if (attempts === 1) return route.abort('timedout')
+                return route.fulfill({ status, json: { code, message } })
+            },
+        })
+        await signIn(page)
+        await openAccount(page)
+        const dialog = await fillDeclaration(page)
+        await dialog.getByRole('button', { name: 'Confirmar declaración' }).click()
+        await expect(dialog.getByRole('status').filter({
+            hasText: 'resultado de la declaración no está confirmado',
+        })).toBeVisible()
+        const key = keys[0]!
+
+        await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
+
+        await expect(page.getByRole('alert').filter({ hasText: expected })).toBeVisible()
+        await expect(dialog).toHaveCount(0)
+        await expect(declaration(page).getByLabel('Importe declarado')).toBeEnabled()
+        await expect(page.getByRole('status').filter({ hasText: 'Declaración registrada' })).toHaveCount(0)
+        expect(keys).toEqual([key, key])
+    })
+}
+
+test('timeout y luego otro error incierto: conserva la misma clave y la revisión', async ({ page }) => {
+    const keys: string[] = []
+    let attempts = 0
+    await mockApi(page, {
+        onDeclare: async (route, _body, key) => {
+            keys.push(key)
+            attempts++
+            if (attempts === 1) return route.abort('timedout')
+            return route.fulfill({
+                status: 503,
+                json: { code: 'RESULTADO_DESCONOCIDO', message: 'No se pudo confirmar el resultado.' },
+            })
+        },
+    })
+    await signIn(page)
+    await openAccount(page)
+    const dialog = await fillDeclaration(page)
+    await dialog.getByRole('button', { name: 'Confirmar declaración' }).click()
+    await expect(dialog.getByRole('status').filter({
+        hasText: 'resultado de la declaración no está confirmado',
+    })).toBeVisible()
+    const key = keys[0]!
+
+    await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
+
+    await expect(dialog.getByRole('status').filter({
+        hasText: 'resultado de la declaración no está confirmado',
+    })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Reintentar con la misma clave' })).toBeVisible()
+    await expect(dialog.getByText('Importe declarado')).toBeVisible()
+    expect(keys).toEqual([key, key])
+})
+
+test('respuesta perdida y recuperación válida: conserva la clave y evita un pago duplicado', async ({ page }) => {
+    const keys: string[] = []
+    let attempts = 0
+    await mockApi(page, {
+        onDeclare: async (route, body, key) => {
+            keys.push(key)
+            attempts++
+            if (attempts === 1) return route.abort('failed')
+            return route.fulfill({
+                status: 201,
+                json: {
+                    data: payment({ id: 77, monto: body.monto, moneda: body.moneda }),
+                    meta: { replay: true },
+                },
+            })
+        },
+    })
+    await signIn(page)
+    await openAccount(page)
+    const dialog = await fillDeclaration(page)
+    await dialog.getByRole('button', { name: 'Confirmar declaración' }).click()
+    await expect(dialog.getByRole('status').filter({
+        hasText: 'resultado de la declaración no está confirmado',
+    })).toBeVisible()
+    const key = keys[0]!
+
+    await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
+
+    await expect(page.getByRole('status').filter({
+        hasText: 'La declaración ya estaba registrada. No se creó un pago duplicado.',
+    })).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: 'Declaración registrada' })).toHaveCount(0)
+    expect(keys).toEqual([key, key])
+})
+
+test('paginación de movimientos y vencimientos conserva el formulario y el borrador', async ({ page }) => {
+    let declarations = 0
+    const movementCursors: Array<string | null> = []
+    const dueCursors: Array<string | null> = []
+    await mockApi(page, {
+        onDeclare: async route => {
+            declarations++
+            return route.fulfill({ status: 201, json: { data: payment({ id: 90 }) } })
+        },
+        onMovementsGet: async (route, cursor) => {
+            movementCursors.push(cursor)
+            return route.fulfill({
+                json: {
+                    data: pageData(
+                        cursor
+                            ? [{ ...movement, id: '2', concepto: 'Movimiento adicional' }]
+                            : [movement],
+                        { siguienteCursor: cursor ? null : 'movimientos-2' },
+                    ),
+                },
+            })
+        },
+        onDuesGet: async (route, cursor) => {
+            dueCursors.push(cursor)
+            return route.fulfill({
+                json: {
+                    data: pageData(
+                        cursor
+                            ? [{ movimientoId: '2', venceEl: '2027-01-20', plazoDias: 60, moneda: 'USD', pendiente: '200.00', estado: 'POR_VENCER', origen: 'REAL' }]
+                            : [{ movimientoId: '1', venceEl: '2026-12-20', plazoDias: 30, moneda: 'USD', pendiente: '100.00', estado: 'POR_VENCER', origen: 'REAL' }],
+                        { siguienteCursor: cursor ? null : 'vencimientos-2' },
+                    ),
+                },
+            })
+        },
+    })
+    await signIn(page)
+    await openAccount(page)
+
+    const form = declaration(page)
+    await expect(form).toBeVisible()
+    await form.getByRole('radio').first().check()
+    await form.getByLabel('Importe declarado').fill('123.45')
+    await form.getByLabel('Moneda').selectOption('ARS')
+    await form.getByLabel('Observaciones opcionales').fill('Borrador sin enviar')
+    await form.evaluate(element => element.setAttribute('data-persistence-token', 'kept'))
+
+    await page.getByRole('button', { name: 'Ver más movimientos' }).click()
+    await expect(page.getByText('Movimiento adicional')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ver más movimientos' })).toHaveCount(0)
+    expect(await form.getAttribute('data-persistence-token')).toBe('kept')
+    await expect(form).toBeVisible()
+    await expect(form.getByLabel('Importe declarado')).toHaveValue('123.45')
+    await expect(form.getByLabel('Moneda')).toHaveValue('ARS')
+    await expect(form.getByLabel('Observaciones opcionales')).toHaveValue('Borrador sin enviar')
+    await expect(form.getByRole('radio').first()).toBeChecked()
+
+    await page.getByRole('button', { name: 'Ver más vencimientos' }).click()
+    const duesSection = page.getByRole('region', { name: 'Vencimientos' })
+    await expect(duesSection.getByText('US$ 200,00')).toBeVisible()
+    await expect(duesSection.getByRole('listitem')).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Ver más vencimientos' })).toHaveCount(0)
+    expect(await form.getAttribute('data-persistence-token')).toBe('kept')
+    await expect(form).toBeVisible()
+    await expect(form.getByLabel('Importe declarado')).toHaveValue('123.45')
+    await expect(form.getByLabel('Moneda')).toHaveValue('ARS')
+    await expect(form.getByLabel('Observaciones opcionales')).toHaveValue('Borrador sin enviar')
+    expect(movementCursors.filter(cursor => cursor !== null)).toEqual(['movimientos-2'])
+    expect(dueCursors.filter(cursor => cursor !== null)).toEqual(['vencimientos-2'])
+    expect(declarations).toBe(0)
+})
+
+test('controles de pago respetan tipografía, foco y áreas táctiles mínimas', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 900 })
+    await mockApi(page, {
+        payments: { items: [payment()], paginaSiguiente: null },
+    })
+    await signIn(page)
+    await openAccount(page)
+
+    const form = declaration(page)
+    const amount = form.getByLabel('Importe declarado')
+    const observations = form.getByLabel('Observaciones opcionales')
+    const currency = form.getByLabel('Moneda')
+    const submit = form.getByRole('button', { name: 'Revisar declaración' })
+
+    const fontFamily = await observations.evaluate(element =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).fontFamily)
+    expect(fontFamily).not.toMatch(/monospace/i)
+    expect(await amount.evaluate(element =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).fontFamily)).not.toMatch(/monospace/i)
+
+    await expect(submit).toBeDisabled()
+    expect(await submit.evaluate(element =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).cursor)).toBe('not-allowed')
+    expect(await currency.evaluate(element =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).cursor)).toBe('pointer')
+    expect(await observations.evaluate(element =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).cursor)).toBe('pointer')
+
+    const focus = await amount.evaluate(element => {
+        element.focus()
+        const styles = element.ownerDocument.defaultView!.getComputedStyle(element)
+        return {
+            visible: element.matches(':focus-visible'),
+            style: styles.outlineStyle,
+            width: parseFloat(styles.outlineWidth),
+        }
+    })
+    expect(focus.visible).toBe(true)
+    expect(focus.style).not.toBe('none')
+    expect(focus.width).toBeGreaterThanOrEqual(2)
+
+    await form.getByRole('radio').first().check()
+    await amount.fill('50.00')
+    await expect(submit).toBeEnabled()
+    await page.keyboard.press('Tab')
+    expect(await submit.evaluate(element =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).cursor)).toBe('pointer')
+    const buttonFocus = await submit.evaluate(element => {
+        element.focus()
+        const styles = element.ownerDocument.defaultView!.getComputedStyle(element)
+        return {
+            visible: element.matches(':focus-visible'),
+            style: styles.outlineStyle,
+            width: parseFloat(styles.outlineWidth),
+        }
+    })
+    expect(buttonFocus.visible).toBe(true)
+    expect(buttonFocus.style).not.toBe('none')
+    expect(buttonFocus.width).toBeGreaterThanOrEqual(2)
+
+    const link = page.getByRole('region', { name: 'Historial de pagos' })
+        .getByRole('link', { name: 'Descargar' }).first()
+    await expect(link).toBeVisible()
+    const box = await link.boundingBox()
+    expect(box).not.toBeNull()
+    expect(box!.height).toBeGreaterThanOrEqual(44)
+    expect(box!.width).toBeGreaterThanOrEqual(44)
+})
 
 test('historial paginado usa la página informada por el backend', async ({ page }) => {
     const requested: number[] = []

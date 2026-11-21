@@ -4,7 +4,7 @@ const { readFileSync } = require('node:fs')
 const { resolve } = require('node:path')
 const ts = require('typescript')
 const { parse, compileScript } = require('@vue/compiler-sfc')
-const { createSSRApp } = require('vue')
+const { createRenderer, createSSRApp, nextTick, reactive } = require('vue')
 const { renderToString } = require('@vue/server-renderer')
 
 function loadTypeScript(relativePath, dependencies = {}) {
@@ -38,6 +38,44 @@ function loadSfc(relativePath, dependencies = {}) {
         componentModule.exports,
     )
     return componentModule.exports.default
+}
+
+function loadMountableSfc(relativePath, dependencies = {}) {
+    const filename = resolve(__dirname, '../src', relativePath)
+    const { descriptor } = parse(readFileSync(filename, 'utf8'), { filename })
+    const componentSource = compileScript(descriptor, {
+        id: relativePath.replaceAll('/', '-') + '-mount',
+    }).content
+    const output = ts.transpileModule(componentSource, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS },
+    }).outputText
+    const componentModule = { exports: {} }
+    new Function('require', 'module', 'exports', output)(
+        name => dependencies[name] || require(name),
+        componentModule,
+        componentModule.exports,
+    )
+    return componentModule.exports.default
+}
+
+const renderer = createRenderer({
+    createElement: () => ({}),
+    createText: () => ({}),
+    createComment: () => ({}),
+    insert() {},
+    remove() {},
+    setText() {},
+    setElementText() {},
+    patchProp() {},
+    parentNode: () => null,
+    nextSibling: () => null,
+})
+
+async function settle() {
+    for (let index = 0; index < 6; index++) {
+        await new Promise(resolve => setImmediate(resolve))
+        await nextTick()
+    }
 }
 
 function payment(overrides = {}) {
@@ -80,6 +118,66 @@ function axiosError(status, data, withResponse = true) {
         isAxios: true,
         ...(withResponse ? { response: { status, data } } : {}),
     }
+}
+
+const accountReceipt = {
+    id: '00000000-0000-4000-8000-000000000001',
+    pedidoId: null,
+    cuentaCorrienteId: 1,
+    tipoMime: 'image/png',
+    bytes: 128,
+    fecha: '2026-11-09T11:00:00.000Z',
+    estadoRevision: 'PENDIENTE',
+    revisadoEn: null,
+}
+
+async function mountDeclarationForm(t, onDeclare) {
+    const calls = []
+    const events = []
+    const service = {
+        ...loadPaymentService({}),
+        declareClientPayment: async (payload, key) => {
+            calls.push({ payload, key })
+            return onDeclare(payload, key, calls.length)
+        },
+        findClientPaymentByReceipt: async () => null,
+    }
+    const receipts = {
+        accountReceiptsPath: '/cuenta-corriente/comprobantes',
+        listPaymentReceipts: async () => ({ items: [accountReceipt], paginaSiguiente: null }),
+    }
+    const auth = reactive({
+        user: { id: 5, tipo_cliente: 'EMPRESA' },
+        rol: 'CLIENTE',
+        sessionVersion: 1,
+        loggingIn: false,
+        loggingOut: false,
+    })
+    const component = loadMountableSfc('components/PaymentDeclarationForm.vue', {
+        '@/components/PaymentReviewDialog.vue': { default: {} },
+        '@/services/paymentReceiptService': receipts,
+        '@/services/paymentService': service,
+        '@/stores/auth': { useAuthStore: () => auth },
+        '@/utils/cuentaCorriente': loadTypeScript('utils/cuentaCorriente.ts'),
+        '@/utils/payment': loadTypeScript('utils/payment.ts'),
+    })
+    component.render = () => null
+    const app = renderer.createApp(component, {
+        refreshVersion: 0,
+        onDeclared: (...args) => events.push(args),
+    })
+    app.mount({})
+    t.after(() => app.unmount())
+    await settle()
+    return { state: app._instance.setupState, calls, events }
+}
+
+function prepareDeclaration(state) {
+    state.selectReceipt(state.receipts[0])
+    state.monto = '50.00'
+    state.moneda = 'USD'
+    state.reviewDeclaration()
+    state.checked = true
 }
 
 test('formatea importes declarados exactos en USD y ARS sin convertir moneda', () => {
@@ -262,4 +360,122 @@ test('renderiza un pago acreditado con su importe USD confirmado', async () => {
 
     assert.match(html, /Pago acreditado/)
     assert.match(html, /abono confirmado/)
+})
+
+test('un timeout seguido de clave de idempotencia reutilizada libera el estado incierto', async t => {
+    const { state, calls, events } = await mountDeclarationForm(t, async (_payload, _key, attempt) => {
+        if (attempt === 1) throw axiosError(0, null, false)
+        throw axiosError(409, {
+            code: 'CLAVE_IDEMPOTENCIA_REUTILIZADA',
+            message: 'La clave ya fue utilizada con otros datos.',
+        })
+    })
+    prepareDeclaration(state)
+    const key = state.idempotencyKey
+
+    await state.sendDeclaration()
+    assert.equal(state.uncertain, true)
+    assert.equal(state.idempotencyKey, key)
+
+    await state.sendDeclaration()
+    assert.equal(state.uncertain, false)
+    assert.equal(state.idempotencyKey, null)
+    assert.equal(state.reviewed, null)
+    assert.equal(state.checked, false)
+    assert.equal(state.reviewVisible, false)
+    assert.match(state.formError, /clave de idempotencia/i)
+    assert.deepEqual(calls.map(call => call.key), [key, key])
+    assert.deepEqual(events, [])
+})
+
+test('un timeout seguido de comprobante ya declarado cierra la incertidumbre y avisa al historial', async t => {
+    const { state, calls, events } = await mountDeclarationForm(t, async (_payload, _key, attempt) => {
+        if (attempt === 1) throw axiosError(0, null, false)
+        throw axiosError(409, {
+            code: 'COMPROBANTE_YA_DECLARADO',
+            message: 'Ese comprobante ya tiene una declaración registrada.',
+        })
+    })
+    prepareDeclaration(state)
+    const key = state.idempotencyKey
+
+    await state.sendDeclaration()
+    await state.sendDeclaration()
+
+    assert.equal(state.uncertain, false)
+    assert.equal(state.idempotencyKey, null)
+    assert.equal(state.reviewed, null)
+    assert.equal(state.reviewVisible, false)
+    assert.match(state.formError, /historial de pagos/)
+    assert.deepEqual(calls.map(call => call.key), [key, key])
+    assert.deepEqual(events, [[null]])
+})
+
+for (const [status, code, message] of [
+    [400, 'SOLICITUD_INVALIDA', 'Los datos de la declaración no son válidos.'],
+    [404, 'COMPROBANTE_NO_ENCONTRADO', 'No se encontró el comprobante indicado para esta cuenta.'],
+]) {
+    test(`un resultado incierto seguido de rechazo definitivo ${status} permite corregir el formulario`, async t => {
+        const { state, calls, events } = await mountDeclarationForm(t, async (_payload, _key, attempt) => {
+            if (attempt === 1) throw axiosError(undefined, null, false)
+            throw axiosError(status, { code, message })
+        })
+        prepareDeclaration(state)
+        const key = state.idempotencyKey
+
+        await state.sendDeclaration()
+        assert.equal(state.uncertain, true)
+
+        await state.sendDeclaration()
+        assert.equal(state.uncertain, false)
+        assert.equal(state.idempotencyKey, null)
+        assert.equal(state.reviewed, null)
+        assert.equal(state.checked, false)
+        assert.equal(state.reviewVisible, false)
+        assert.match(state.formError, status === 404 ? /comprobante propio/ : new RegExp(message))
+        assert.deepEqual(calls.map(call => call.key), [key, key])
+        assert.deepEqual(events, [])
+    })
+}
+
+test('un segundo error incierto conserva la misma clave y la revisión pendiente', async t => {
+    const { state, calls, events } = await mountDeclarationForm(t, async (_payload, _key, attempt) => {
+        if (attempt === 1) throw axiosError(undefined, null, false)
+        throw axiosError(503, {
+            code: 'RESULTADO_DESCONOCIDO',
+            message: 'No se pudo confirmar el resultado.',
+        })
+    })
+    prepareDeclaration(state)
+    const key = state.idempotencyKey
+
+    await state.sendDeclaration()
+    await state.sendDeclaration()
+
+    assert.equal(state.uncertain, true)
+    assert.equal(state.idempotencyKey, key)
+    assert.notEqual(state.reviewed, null)
+    assert.equal(state.checked, true)
+    assert.match(state.formError, /No generamos una nueva declaración/)
+    assert.deepEqual(calls.map(call => call.key), [key, key])
+    assert.deepEqual(events, [])
+})
+
+test('una respuesta perdida recuperada como replay no crea una segunda declaración', async t => {
+    const { state, calls, events } = await mountDeclarationForm(t, async (_payload, _key, attempt) => {
+        if (attempt === 1) throw axiosError(0, null, false)
+        return { payment: payment({ id: 99 }), replay: true }
+    })
+    prepareDeclaration(state)
+    const key = state.idempotencyKey
+
+    await state.sendDeclaration()
+    assert.equal(state.uncertain, true)
+
+    await state.sendDeclaration()
+    assert.equal(state.uncertain, false)
+    assert.equal(state.idempotencyKey, null)
+    assert.match(state.notice, /No se creó un pago duplicado/)
+    assert.deepEqual(calls.map(call => call.key), [key, key])
+    assert.deepEqual(events, [[99]])
 })

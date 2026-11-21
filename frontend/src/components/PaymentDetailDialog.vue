@@ -53,7 +53,7 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
                 <button ref="closeButton" type="button" aria-label="Cerrar detalle del pago"
-                    class="min-h-11 min-w-11 shrink-0 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 min-w-11 shrink-0 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="emit('close')">
                     Cerrar
                 </button>
@@ -64,7 +64,7 @@ onBeforeUnmount(() => {
             </p>
             <div v-else-if="error" class="grid gap-2 rounded-md border border-red-200 bg-red-50 p-3">
                 <p role="alert" class="m-0 text-sm text-red-900">{{ error }}</p>
-                <button type="button" class="min-h-11 w-fit rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-900 hover:bg-red-50"
+                <button type="button" class="box-border min-h-11 w-fit cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="emit('retry')">
                     Reintentar detalle
                 </button>
@@ -108,7 +108,7 @@ onBeforeUnmount(() => {
                     <div class="min-w-0">
                         <dt class="font-medium text-slate-600">Comprobante</dt>
                         <dd class="m-0 mt-1">
-                            <a v-if="payment.comprobanteId" class="font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-[#145A8D]"
+                            <a v-if="payment.comprobanteId" class="box-border inline-flex min-h-11 min-w-11 cursor-pointer items-center font-[inherit] font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 :href="'/api' + accountReceiptsPath + '/' + payment.comprobanteId">
                                 Descargar comprobante
                             </a>

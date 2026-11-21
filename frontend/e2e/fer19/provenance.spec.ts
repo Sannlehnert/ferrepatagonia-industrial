@@ -1,4 +1,4 @@
-﻿import { expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import type { AccountList, AccountQuery } from '../../src/types/adminAccount'
 import { adminAccounts, adminDetail, adminList, apiError, clientAccount, data, fixture, login, logout, own } from './support'
 

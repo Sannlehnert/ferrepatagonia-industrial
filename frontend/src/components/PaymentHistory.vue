@@ -131,7 +131,7 @@ onBeforeUnmount(() => {
                 </p>
             </div>
             <button type="button"
-                class="min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                 :disabled="loading" @click="reloadCurrent">
                 {{ loading ? 'Actualizando…' : 'Actualizar historial' }}
             </button>
@@ -143,12 +143,12 @@ onBeforeUnmount(() => {
         <div v-else-if="listError" class="grid gap-2 rounded-md border border-red-200 bg-red-50 p-3">
             <p role="alert" class="m-0 text-sm text-red-900">{{ listError }}</p>
             <div class="flex flex-wrap gap-2">
-                <button type="button" class="min-h-11 w-fit rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-900 hover:bg-red-50"
+                <button type="button" class="box-border min-h-11 w-fit cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="reloadCurrent">
                     Reintentar historial
                 </button>
                 <button v-if="page > 1" type="button"
-                    class="min-h-11 w-fit rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-900 hover:bg-red-50"
+                    class="box-border min-h-11 w-fit cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="loadPage(1)">
                     Volver a la página 1
                 </button>
@@ -172,7 +172,7 @@ onBeforeUnmount(() => {
                             </p>
                         </div>
                         <button type="button"
-                            class="min-h-11 rounded-md border border-[#145A8D] bg-white px-3 py-2 text-sm font-semibold text-[#145A8D] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                            class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-[#145A8D] bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#145A8D] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             :aria-label="`Ver detalle del pago ${payment.id}`" @click="openDetail(payment.id)">
                             Ver detalle
                         </button>
@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
                         <div>
                             <dt class="inline font-medium text-slate-600">Comprobante: </dt>
                             <dd class="m-0 inline">
-                                <a v-if="payment.comprobanteId" class="font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-[#145A8D]"
+                                <a v-if="payment.comprobanteId" class="box-border inline-flex min-h-11 min-w-11 cursor-pointer items-center font-[inherit] font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                     :href="'/api' + accountReceiptsPath + '/' + payment.comprobanteId">
                                     Descargar
                                 </a>
@@ -221,13 +221,13 @@ onBeforeUnmount(() => {
 
             <div v-if="page > 1 || data?.paginaSiguiente" class="mt-4 flex flex-wrap items-center gap-2">
                 <button v-if="page > 1" type="button"
-                    class="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:opacity-60"
+                    class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     :disabled="loading" @click="loadPage(page - 1)">
                     Pagos anteriores
                 </button>
                 <span class="text-sm text-slate-600">Página {{ page }}</span>
                 <button v-if="data?.paginaSiguiente" type="button"
-                    class="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:opacity-60"
+                    class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     :disabled="loading" @click="loadPage(data.paginaSiguiente)">
                     Más pagos
                 </button>

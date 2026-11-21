@@ -220,3 +220,73 @@ test('declaración ARS conserva la moneda y no inventa equivalente USD', async (
         expect(Number(movements.total)).toBe(0)
     })
 })
+
+test('respuesta perdida y reintento idempotente no duplica el pago ni crea un ABONO', async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.route('**/socket.io/**', route => route.abort())
+    await signIn(page, 'empresa-cuenta@e2e.test')
+    await page.goto('/mi-cuenta/cuenta-corriente')
+    await expect(page.getByRole('region', { name: 'Resumen financiero' })).toBeVisible()
+
+    const before = (await (await page.request.get('/api/cuenta-corriente')).json()).data
+    expect(before.origen).toBe('REAL')
+    const receiptId = await uploadAccountReceipt(page, 336)
+
+    const keys: string[] = []
+    let posts = 0
+    await page.route('**/api/cuenta-corriente/pagos', async route => {
+        if (route.request().method() !== 'POST') return route.continue()
+        posts += 1
+        keys.push(route.request().headers()['idempotency-key'] ?? '')
+        if (posts === 1) {
+            // La API confirma la declaración, pero el navegador pierde la respuesta.
+            await route.fetch()
+            return route.abort('failed')
+        }
+        return route.continue()
+    })
+
+    const declaration = page.getByRole('region', { name: 'Declarar un pago' })
+    await expect(declaration).toBeVisible()
+    const radio = declaration.locator(`input[name="payment-receipt"][value="${receiptId}"]`)
+    await radio.check()
+    await declaration.getByLabel('Importe declarado').fill('11.00')
+    await declaration.getByLabel('Moneda').selectOption('USD')
+    await declaration.getByRole('button', { name: 'Revisar declaración' }).click()
+
+    const dialog = page.getByRole('dialog', { name: 'Revisar declaración de pago' })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('checkbox').check()
+    await dialog.getByRole('button', { name: 'Confirmar declaración' }).click()
+
+    await expect(dialog.getByRole('status').filter({
+        hasText: 'resultado de la declaración no está confirmado',
+    })).toBeVisible()
+    expect(posts).toBe(1)
+
+    await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
+    await expect(page.getByRole('status').filter({
+        hasText: 'La declaración ya estaba registrada. No se creó un pago duplicado.',
+    })).toBeVisible()
+    expect(posts).toBe(2)
+    expect(keys).toHaveLength(2)
+    expect(keys[1]).toBe(keys[0])
+
+    const after = (await (await page.request.get('/api/cuenta-corriente')).json()).data
+    expect({ saldo: after.saldo, revision: after.revision })
+        .toEqual({ saldo: before.saldo, revision: before.revision })
+
+    await withDb(async connection => {
+        const payments = await connection.query(
+            'SELECT id_pago, estado, estado_documental FROM PAGO WHERE id_comprobante = ?',
+            [receiptId],
+        ) as Array<{ id_pago: number; estado: string; estado_documental: string }>
+        expect(payments).toHaveLength(1)
+        expect(payments[0]).toMatchObject({ estado: 'PENDIENTE', estado_documental: 'PENDIENTE' })
+        const [movements] = await connection.query(
+            'SELECT COUNT(*) AS total FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ?',
+            [payments[0]!.id_pago],
+        ) as Array<{ total: number }>
+        expect(Number(movements.total)).toBe(0)
+    })
+})
