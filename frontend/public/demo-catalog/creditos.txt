@@ -435,17 +435,17 @@ Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/f
 
 ilustrativa-gua-nitrilo.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-gua-pvc.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 lampara-led-e27.webp
 Fotografía de Kingled.
@@ -456,31 +456,31 @@ Registro: Kingled · https://commons.wikimedia.org/wiki/File:%C5%BBar%C3%B3wka_l
 
 ilustrativa-ilu-portalamparas.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-ilu-reflector.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-ilu-regleta.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-man-limas.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 llave-combinada-10mm.webp
 Fotografía de R. Henrik Nilsson.
@@ -491,38 +491,38 @@ Registro: R. Henrik Nilsson · https://commons.wikimedia.org/wiki/File:1970s_198
 
 ilustrativa-mat-bornera.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-mat-embutir.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-mat-superficie.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-mat-interruptor.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-mec-copa.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 mecha-madera.webp
 Fotografía de Tiesse.
@@ -540,108 +540,108 @@ Registro: Kszapsza · https://commons.wikimedia.org/wiki/File:Concrete_drill_bit
 
 ilustrativa-neu-pe.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-neu-pu.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-neu-manifold.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-neu-sopladora.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-obr-espaciador.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-obr-fibra.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-obr-plastica.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-obr-perfil.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-ocu-sobrelente.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-res-copa.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-res-plana.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-res-prefiltro.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-res-retenedor.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-rop-camisa.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-rop-campera.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 mameluco.webp
 Fotografía de Stuz.
@@ -652,31 +652,31 @@ Registro: Stuz · https://commons.wikimedia.org/wiki/File:Boilersuit2.jpg · htt
 
 ilustrativa-rop-pantalon.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-sen.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-sum-film.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 ilustrativa-sum-trapo.webp
 Ilustración de Proyecto Ferrepatagonia Industrial.
-Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs
+Fuente: https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs
 Licencia: Obra propia del proyecto (ilustración vectorial), https://github.com/Sannlehnert/ferrepatagonia-industrial
 Ilustración vectorial del tipo de producto, generada como SVG y convertida a WebP (720 × 540); no es una fotografía y no corresponde a la variante exacta
-Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/feature/311-catalog-images/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
+Registro: Proyecto Ferrepatagonia Industrial · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · https://github.com/Sannlehnert/ferrepatagonia-industrial/blob/develop/data/demo-catalog/ilustraciones-311.cjs · Obra propia del proyecto (ilustración vectorial) · https://github.com/Sannlehnert/ferrepatagonia-industrial
 
 arandela-grower.webp
 Fotografía de Tiesse y Xoristzatziki.

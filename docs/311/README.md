@@ -53,3 +53,15 @@ Resultado del 20/11/2026: **17/17 pruebas del catálogo, 274/274 pruebas fronten
 La cobertura completa corresponde al **maestro de 100 SKU**. El fixture ampliado de 904 contiene 221 asociaciones y mantiene 683 SKU sin imagen; esos SKU adicionales no forman parte de #311. Los informes históricos de #310 corresponden a su versión anterior y no se reescriben como si hubieran verificado este lote.
 
 La entrega queda preparada para comprobación visual manual, revisión técnica de Zahir y validación UX/UI de Lucci. El cierre requiere las revisiones y el CI del commit publicado. No sustituye la auditoría integral de catálogo/persistencia de #313 ni acredita un despliegue compartido. No se modifican pedidos, pagos, crédito ni controles ADMIN.
+
+## Ajustes de revisión UX/UI · 21/11/2026
+
+A partir de la devolución de Lucci en PR #124, se separó el recuadro de imagen del aviso ilustrativo en Home. La proporción 1.7 y el recorte se aplican únicamente a la imagen; el aviso ocupa su propio espacio debajo. Se mantienen el vínculo aria-describedby, el retiro del aviso ante imagen fallida y las ilustraciones entregadas. No se convierte el componente completo a Tailwind ni se modifican estilos globales.
+
+Se ampliaron a un mínimo de 44 × 44 px los enlaces de breadcrumbs de catálogo y ficha. Las fuentes de las ilustraciones propias de #311 apuntan a la ruta de develop que quedará disponible al integrar el PR, conservando coincidencia exacta entre registro operativo, matriz del lote y créditos públicos. No cambian archivos de imagen, asociaciones, autores ni licencias.
+
+La regresión reprodujo 0 px de contenido útil en la ilustración de Home a 360 px antes del ajuste. Tres escenarios a 360/768/1280 px comprueban contenido visible, misma altura del recuadro que la foto contigua, aviso debajo y vinculado, retiro ante 404, ausencia de desborde horizontal y áreas táctiles de breadcrumbs. Usan datos de API reales con una respuesta controlada para colocar una ilustración del lote junto a una fotografía. Las capturas home-ilustracion-*.png quedan en frontend/test-results/production y no se versionan.
+
+Validación sobre la rama integrada con develop (merge local dba5a8d): 17/17 pruebas del catálogo y cobertura visual aprobadas; 291/291 pruebas frontend, builds backend/frontend y TypeScript aprobados; 28/28 E2E de Home, ficha y carga/reemplazo de imágenes aprobados con build de producción. Capturas de los tres tamaños revisadas; limpieza del contenedor y datos tmpfs confirmada.
+
+Se conservan como limitaciones aceptadas para seguimiento posterior S7-311-01 (clasificación ilustrativa por SKU ante sustituciones futuras) y S7-311-02 (validación UUID preexistente del backend), según la devolución de Lucci. No se modifican esos mecanismos en esta corrección. Pendientes publicación, CI del nuevo HEAD y revalidación UX/UI para la aprobación final.
