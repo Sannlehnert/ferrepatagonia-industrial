@@ -3159,3 +3159,51 @@ Verificación de limpieza Docker tras todas las corridas:
 - ferrepatagonia.s704-test: 0 contenedores, 0 volúmenes
 - ferrepatagonia.cc251-test: 0 contenedores, 0 volúmenes
 - ferrepatagonia.credit-test: 0 contenedores, 0 volúmenes
+
+--- 24. Corrección de CI (TS2300) y hallazgos de auditoría PR #158 (R01, R02, R03) tras fusión con develop (PR #155 / #333) ---
+Fecha UTC: 2026-11-21T08:28:00Z
+Rama: feature/s7-04-2-order-payment-state-consistency
+HEAD base: d64dcee0ba12a49380ad5a1468e425c42fd0dcd7
+Merge-base (origin/develop): 51956113ce250668fa8e1d5e3e0ddd4e4c19c4c1
+Alcance: cambios en árbol de trabajo sin comandos Git de escritura; preservados intactos los 6 triggers s704_*, los 4 triggers FER-17 y los 3 triggers FER-20.
+
+Detalle de correcciones aplicadas:
+1. Reparación CI (error TS2300):
+   - backend/src/repositories/adminOrder.repository.ts: eliminadas propiedades duplicadas comprobantes_total/comprobantes_pendientes en RawOrderRow y subconsultas duplicadas receiptSummaryColumns; consolidado el alcance documental con titularidad (id_cliente + CUENTA_CORRIENTE) en cp_stat, preservando compatibilidad con order-state-projection.ts (#317), #333 y admin-orders.
+   - backend/src/routes/admin.routes.ts: eliminado el montaje duplicado de adminPaymentRouter sobre /pagos.
+2. R01 (clasificación estricta de errores en resolveUsdConversion):
+   - backend/src/services/payments/admin-payment.service.ts: eliminada la captura genérica error instanceof Error en resolveUsdConversion(); la traducción a HTTP 409/422 queda restringida exclusivamente a errores tipados FER17 (PricingError o CALENDARIO_NO_VERIFICADO sin metadatos SQL/infra). Endurecido también mapLedgerError() con isDatabaseOrInfrastructureError() para relanzar intactos ER_LOCK_DEADLOCK (1213), ER_LOCK_WAIT_TIMEOUT (1205), ECONNREFUSED, PROTOCOL_CONNECTION_LOST, QueryFailedError, TypeError y errores desconocidos, garantizando ROLLBACK.
+   - Pruebas de regresión agregadas en backend/test/state-consistency.test.cjs (test 7 unitario con inyección de 7 fallos infra/SQL vs errores FER17) y backend/test/state-consistency.mariadb.test.cjs (test 9 HTTP+MariaDB con inyección de ER_LOCK_DEADLOCK, ER_LOCK_WAIT_TIMEOUT y error SQL genérico sobre FER17_CALENDARIO).
+3. R03 (unificación /api/admin/pagos*, guardia documental, migraciones e idempotencia global):
+   - database/schema.sql, database/migrate-s7-04-2-state-consistency.sql y database/migrate-s7-10-2-payment-accreditation.sql: sincronizados chk_pago_declaracion y chk_pago_conversion para admitir alta directa ADMIN con clave_idempotencia (#317) y declaración de cliente (#333); ampliado chk_pago_idempotencia_operacion a ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR') y corregido literal 'RECHAZADO' -> 'RECHAZAR' en backfill de clave_idempotencia_cierre. Verificada idempotencia en ambos órdenes (s7-04-2 -> s7-10-2 y s7-10-2 -> s7-04-2) en MariaDB 11.4 descartable.
+   - backend/src/dtos/payments/admin-payment.dto.ts, backend/src/repositories/adminPayment.repository.ts, backend/src/services/payments/admin-payment.service.ts, backend/src/services/payments/admin-payment.errors.ts y backend/src/controllers/adminPayment.controller.ts: acreditación unificada en POST /api/admin/pagos/:pagoId/acreditar para pagos directos ADMIN y declarados por cliente (alias evidencia/evidenciaAcreditacion y fechaAcreditacionUtc opcional), guardia documental obligatoria 409 (PAGO_PENDIENTE_REVISION / PAGO_DOCUMENTALMENTE_RECHAZADO) con revalidación transaccional de COMPROBANTE_PAGO (existencia, cliente/cuenta y estado_revision <> RECHAZADO), cobertura/libro mixto, FER17-v1, ABONO+FIFO atómico con autorizado_por y emisión pago.acreditado.v1 post-COMMIT; listado/detalle ADMIN filtra DEMO_REGISTRADO y libros DEMO/mixtos y expone DTO superset (#317 + #333).
+   - backend/src/controllers/payment.controller.ts y backend/src/services/payments/payment.service.ts: registro y validación de Idempotency-Key en PAGO_IDEMPOTENCIA con SHA-256 canónico para DECLARAR, REVISAR_PAGO (si se envía cabecera) y ACREDITAR, previniendo colisiones cross-operación (409 CLAVE_IDEMPOTENCIA_REUTILIZADA).
+   - Pruebas cruzadas agregadas/verificadas en backend/test/state-consistency.mariadb.test.cjs (test 10), backend/test/helpers/run-state-consistency-mariadb.cjs (ambos órdenes de migración + backfill RECHAZAR) y backend/test/payment-accreditation.mariadb.test.cjs (actualizada llamada PATCH /admin/comprobantes/:id/revision al contrato #290).
+4. R02 (aclaración contractual sobre titulares inactivos):
+   - docs/s7-04/T-S7-04.1-contrato-estados-transiciones.md: agregada subsección §10.6 y precisión en TOCTOU-02 distinguiendo operaciones de CLIENTE (exigen USUARIO.activo = 1 y CLIENTE.activo = 1; 403 CLIENTE_INACTIVO alineado con #333; habilitada = 0 permitido para regularizar deuda si titular activo) frente a operaciones administrativas ADMIN de regularización/cierre (exigen ADMIN USUARIO.activo = 1 y rol ADMIN; CLIENTE.activo = 0 o cuenta inhabilitada no bloquean cierre/regularización y Socket.IO desconecta sesiones revocadas de cliente).
+
+Resultados exactos de las suites ejecutadas:
+1. backend: npm run type-check -> Exit code: 0
+2. backend: npm run build -> Exit code: 0
+3. backend: npm run test:dto-source -> Exit code: 0 (tests 4, pass 4, fail 0, skipped 0)
+4. backend: npm run test:unit -> Exit code: 0 (tests 1409, suites 3, pass 1406, fail 0, skipped 3; incluye payment-accreditation.unit.test.cjs y state-consistency.test.cjs 7/7 con R01/R03)
+5. backend: npm run test:state-consistency:isolated -> Exit code: 0 (tests 10, pass 10, fail 0; upgrade idempotente en ambos órdenes s7-04-2 <-> s7-10-2 con 26 tablas, 13 triggers y 1 vista; reaplicación idempotente sobre tablas pobladas OK; CLEANUP OK T-S7-04.2)
+6. backend: npm run test:payments:isolated -> Exit code: 0 (tests 23, pass 23, fail 0; CLEANUP OK #260)
+7. backend: npm run test:receipts:isolated -> Exit code: 0 (tests 9, pass 9, fail 0; CLEANUP OK #260)
+8. backend: npm run test:orders:isolated -> Exit code: 0 (tests 91, suites 1, pass 91, fail 0; CLEANUP OK #260)
+9. backend: npm run test:orders:sockets -> Exit code: 0 (tests 20, pass 20, fail 0; CLEANUP OK #260)
+10. backend: npm run test:cuenta-corriente -> Exit code: 0 (tests 73, pass 73, fail 0; CLEANUP OK #260)
+11. backend: npm run test:cuenta-corriente:client -> Exit code: 0 (cc251.h05: 31/31; MariaDB client: 14/14; total 45/45, fail 0)
+12. backend: npm run test:cuenta-corriente:safety -> Exit code: 0 (tests 20, pass 20, fail 0)
+13. backend: npm run test:admin-orders -> Exit code: 0 (tests 4, suites 1, pass 4, fail 0)
+14. frontend: npm run type-check -> Exit code: 0
+15. frontend: npm run build -> Exit code: 0 (vite build: 335 modules transformed)
+16. frontend: npm test -> Exit code: 0 (tests 294, suites 5, pass 294, fail 0)
+17. E2E raíz: node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada)
+18. E2E raíz: node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada)
+
+Verificación de higiene final:
+- Contenedores residuales de test Docker: 0 (preservado ferrepatagonia-dev-mariadb-1)
+- Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
+- BOM UTF-8 en archivos modificados: 0 archivos con BOM
+- git diff --check: Exit code: 0 (salida vacía)

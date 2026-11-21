@@ -13,7 +13,8 @@ Object.assign(process.env, {
 require('./helpers/test-env.cjs');
 
 const assert = require('node:assert/strict');
-const { describe, test } = require('node:test');
+const { after, describe, test } = require('node:test');
+const { destroyDatabase } = require('../dist/config/database.config');
 
 const {
   deriveOrderDocumentState,
@@ -34,8 +35,14 @@ const {
   parseUtcIsoTimestamp,
 } = require('../dist/dtos/payments/admin-payment.dto');
 const { validateDtoSync } = require('../dist/dtos/validation');
+const { resolveUsdConversion } = require('../dist/services/payments/admin-payment.service');
+const { AdminPaymentError } = require('../dist/services/payments/admin-payment.errors');
+const { PricingError } = require('../dist/services/pricing/money');
 
 describe('Task #317 (T-S7-04.2) — Consistencia de estados: proyección, DTOs e invariantes', () => {
+  after(async () => {
+    await destroyDatabase();
+  });
   test('§7.2 deriveOrderDocumentState agrega comprobantes con precedencia APROBADO > PENDIENTE > RECHAZADO > SIN_COMPROBANTE', () => {
     assert.equal(deriveOrderDocumentState({ total: 0, aprobados: 0, pendientes: 0, rechazados: 0 }), 'SIN_COMPROBANTE');
     assert.equal(deriveOrderDocumentState({ total: 1, aprobados: 0, pendientes: 1, rechazados: 0 }), 'PENDIENTE');
@@ -282,6 +289,26 @@ describe('Task #317 (T-S7-04.2) — Consistencia de estados: proyección, DTOs e
       }).valid,
       true,
     );
+    // R03: alias compatible con #333 (evidencia y fechaAcreditacionUtc opcional)
+    const aliasAccreditation = validateDtoSync(accreditAdminPaymentPolicy, {
+      evidencia: 'Extracto BNA #333',
+    });
+    assert.equal(aliasAccreditation.valid, true);
+    assert.equal(aliasAccreditation.data.evidenciaAcreditacion, 'Extracto BNA #333');
+    assert.equal(
+      validateDtoSync(accreditAdminPaymentPolicy, {
+        evidencia: 'Extracto A',
+        evidenciaAcreditacion: 'Extracto B',
+      }).valid,
+      false,
+    );
+    assert.equal(
+      validateDtoSync(accreditAdminPaymentPolicy, {
+        evidencia: 'Extracto BNA',
+        monto: '999.00',
+      }).valid,
+      false,
+    );
     assert.equal(
       validateDtoSync(accreditAdminPaymentPolicy, {
         evidenciaAcreditacion: '   ',
@@ -306,6 +333,70 @@ describe('Task #317 (T-S7-04.2) — Consistencia de estados: proyección, DTOs e
     assert.throws(
       () => parseAdminPaymentListQuery('/api/admin/pagos?foo=bar'),
       err => err.status === 400 && err.code === 'SOLICITUD_INVALIDA',
+    );
+  });
+
+  test('R01: resolveUsdConversion relanza errores SQL/concurrencia/infraestructura y solo traduce errores tipados FER17', async () => {
+    const dummyManager = {};
+    const at = new Date('2026-10-02T15:00:00.000Z');
+
+    // Fallos de infraestructura, SQL y concurrencia JAMAS deben envolverse como 422 COTIZACION_FER17_NO_VERIFICADA
+    const infraErrors = [
+      Object.assign(new Error('Deadlock found when trying to get lock'), { code: 'ER_LOCK_DEADLOCK', errno: 1213 }),
+      Object.assign(new Error('Lock wait timeout exceeded'), { code: 'ER_LOCK_WAIT_TIMEOUT', errno: 1205 }),
+      Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:3306'), { code: 'ECONNREFUSED' }),
+      Object.assign(new Error('Connection lost: The server closed the connection'), { code: 'PROTOCOL_CONNECTION_LOST' }),
+      Object.assign(new Error('SQL failure reading COTIZACION'), {
+        name: 'QueryFailedError',
+        driverError: { code: 'ER_BAD_FIELD_ERROR', errno: 1054 },
+      }),
+      new TypeError('Cannot read properties of undefined (reading dias_json)'),
+      new Error('Fallo generico inesperado'),
+    ];
+
+    for (const injected of infraErrors) {
+      await assert.rejects(
+        () => resolveUsdConversion(dummyManager, 'ARS', 100000n, at, false, {
+          quoteLoader: async () => { throw injected; },
+        }),
+        err => {
+          assert.equal(err, injected, `Debe relanzar la instancia original: ${injected.message}`);
+          assert.equal(err instanceof AdminPaymentError, false);
+          assert.notEqual(err.status, 422);
+          assert.notEqual(err.code, 'COTIZACION_FER17_NO_VERIFICADA');
+          return true;
+        },
+      );
+    }
+
+    // Errores tipados FER17 SI se traducen de forma deterministica a 409 / 422
+    await assert.rejects(
+      () => resolveUsdConversion(dummyManager, 'ARS', 100000n, at, false, {
+        quoteLoader: async () => { throw new PricingError('COTIZACION_AUSENTE'); },
+      }),
+      err => err instanceof AdminPaymentError && err.status === 409 && err.code === 'COTIZACION_AUSENTE',
+    );
+
+    await assert.rejects(
+      () => resolveUsdConversion(dummyManager, 'ARS', 100000n, at, false, {
+        quoteLoader: async () => { throw new PricingError('COTIZACION_INVALIDA'); },
+      }),
+      err => err instanceof AdminPaymentError && err.status === 422 && err.code === 'COTIZACION_FER17_NO_VERIFICADA',
+    );
+
+    await assert.rejects(
+      () => resolveUsdConversion(dummyManager, 'ARS', 100000n, at, false, {
+        isClientDeclared: true,
+        quoteLoader: async () => { throw new PricingError('COTIZACION_INVALIDA'); },
+      }),
+      err => err instanceof AdminPaymentError && err.status === 422 && err.code === 'COTIZACION_INVALIDA',
+    );
+
+    await assert.rejects(
+      () => resolveUsdConversion(dummyManager, 'ARS', 100000n, at, false, {
+        quoteLoader: async () => { throw new Error('CALENDARIO_NO_VERIFICADO'); },
+      }),
+      err => err instanceof AdminPaymentError && err.status === 422 && err.code === 'COTIZACION_FER17_NO_VERIFICADA',
     );
   });
 });

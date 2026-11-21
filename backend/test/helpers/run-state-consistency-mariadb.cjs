@@ -56,6 +56,7 @@ function applySql(file, { target = database, contents = fs.readFileSync(file) } 
 
 const sqlFile = name => path.join(backend, '../database', name);
 const stateMigration = 'migrate-s7-04-2-state-consistency.sql';
+const paymentMigration = 'migrate-s7-10-2-payment-accreditation.sql';
 
 async function snapshot(query, tables) {
   return Promise.all(tables.map(async table => ({
@@ -66,8 +67,70 @@ async function snapshot(query, tables) {
   })));
 }
 
-async function checkLegacyUpgrade(port) {
-  const target = `${database}_upgrade`;
+async function stripPagoAndReceiptAdditions(db) {
+  // Simular estado previo a #290 y #333 en COMPROBANTE_PAGO y PAGO
+  await db.query(`
+    ALTER TABLE COMPROBANTE_PAGO
+      ADD KEY fk_comprobante_admin (id_admin_revision),
+      DROP CONSTRAINT chk_comprobante_revision,
+      DROP CONSTRAINT chk_comprobante_estado_revision,
+      DROP CONSTRAINT chk_comprobante_clave_revision,
+      DROP INDEX uq_comprobante_clave_revision,
+      DROP COLUMN estado_revision,
+      DROP COLUMN motivo_rechazo,
+      DROP COLUMN clave_idempotencia_revision
+  `);
+  await db.query('ALTER TABLE COMPROBANTE_PAGO ADD CONSTRAINT chk_comprobante_revision CHECK ((id_admin_revision IS NULL) = (revision_utc IS NULL))');
+  await db.query('DROP TABLE IF EXISTS PAGO_IDEMPOTENCIA');
+  await db.query(`
+    ALTER TABLE PAGO
+      DROP FOREIGN KEY fk_pago_cotizacion,
+      DROP FOREIGN KEY fk_pago_admin_actor,
+      DROP FOREIGN KEY fk_pago_admin_cierre,
+      DROP CONSTRAINT chk_pago_estado,
+      DROP CONSTRAINT chk_pago_monto_usd,
+      DROP CONSTRAINT chk_pago_conversion,
+      DROP CONSTRAINT chk_pago_documental,
+      DROP CONSTRAINT chk_pago_revision,
+      DROP CONSTRAINT chk_pago_declaracion,
+      DROP CONSTRAINT chk_pago_acreditacion,
+      DROP CONSTRAINT chk_pago_claves,
+      DROP CONSTRAINT chk_pago_cierre,
+      DROP INDEX uq_pago_idempotencia,
+      DROP INDEX uq_pago_acreditacion,
+      DROP INDEX uq_pago_clave_idempotencia,
+      DROP INDEX uq_pago_clave_acreditacion,
+      DROP INDEX uq_pago_clave_cierre,
+      DROP INDEX uq_pago_comprobante,
+      DROP INDEX idx_pago_cuenta_estado,
+      DROP INDEX idx_pago_cotizacion,
+      DROP INDEX idx_pago_admin_actor,
+      DROP INDEX idx_pago_admin_cierre,
+      DROP COLUMN monto_usd,
+      DROP COLUMN id_cotizacion,
+      DROP COLUMN tasa_historica,
+      DROP COLUMN id_usuario_declarante,
+      DROP COLUMN clave_idempotencia,
+      DROP COLUMN huella_declaracion,
+      DROP COLUMN id_comprobante,
+      DROP COLUMN estado_documental,
+      DROP COLUMN id_admin_revision,
+      DROP COLUMN revision_utc,
+      DROP COLUMN motivo_revision,
+      DROP COLUMN id_admin_acreditacion,
+      DROP COLUMN clave_acreditacion,
+      DROP COLUMN huella_acreditacion,
+      DROP COLUMN clave_idempotencia_acreditacion,
+      DROP COLUMN clave_idempotencia_cierre,
+      DROP COLUMN motivo_cierre,
+      DROP COLUMN id_admin_actor,
+      DROP COLUMN id_admin_cierre,
+      DROP COLUMN fecha_cierre_utc
+  `);
+}
+
+async function verifyUpgradeOrder(port, suffix, orderFiles) {
+  const target = `${database}_${suffix}`;
   docker('exec', container, 'mariadb', '--protocol=socket', '--skip-ssl', '-uroot', `-p${password}`, '-e', `CREATE DATABASE ${target}`);
   for (const name of [
     'schema.sql',
@@ -85,46 +148,7 @@ async function checkLegacyUpgrade(port) {
     host: '127.0.0.1', port, user: 'root', password, database: target, timezone: 'Z', dateStrings: true,
   });
   try {
-    // Simular estado previo a #290 en COMPROBANTE_PAGO (sin columnas #290) y PAGO (sin columnas #290)
-    await db.query(`
-      ALTER TABLE COMPROBANTE_PAGO
-        ADD KEY fk_comprobante_admin (id_admin_revision),
-        DROP CONSTRAINT chk_comprobante_revision,
-        DROP CONSTRAINT chk_comprobante_estado_revision,
-        DROP CONSTRAINT chk_comprobante_clave_revision,
-        DROP INDEX uq_comprobante_clave_revision,
-        DROP COLUMN estado_revision,
-        DROP COLUMN motivo_rechazo,
-        DROP COLUMN clave_idempotencia_revision
-    `);
-    await db.query('ALTER TABLE COMPROBANTE_PAGO ADD CONSTRAINT chk_comprobante_revision CHECK ((id_admin_revision IS NULL) = (revision_utc IS NULL))');
-    await db.query(`
-      ALTER TABLE PAGO
-        DROP FOREIGN KEY fk_pago_cotizacion,
-        DROP FOREIGN KEY fk_pago_admin_actor,
-        DROP FOREIGN KEY fk_pago_admin_cierre,
-        DROP CONSTRAINT chk_pago_estado,
-        DROP CONSTRAINT chk_pago_conversion,
-        DROP CONSTRAINT chk_pago_claves,
-        DROP CONSTRAINT chk_pago_cierre,
-        DROP INDEX uq_pago_clave_idempotencia,
-        DROP INDEX uq_pago_clave_acreditacion,
-        DROP INDEX uq_pago_clave_cierre,
-        DROP INDEX idx_pago_cotizacion,
-        DROP INDEX idx_pago_admin_actor,
-        DROP INDEX idx_pago_admin_cierre,
-        DROP COLUMN monto_usd,
-        DROP COLUMN id_cotizacion,
-        DROP COLUMN tasa_historica,
-        DROP COLUMN clave_idempotencia,
-        DROP COLUMN clave_idempotencia_acreditacion,
-        DROP COLUMN clave_idempotencia_cierre,
-        DROP COLUMN motivo_cierre,
-        DROP COLUMN id_admin_actor,
-        DROP COLUMN id_admin_cierre,
-        DROP COLUMN fecha_cierre_utc
-    `);
-    await db.query('DROP TABLE IF EXISTS PAGO_IDEMPOTENCIA');
+    await stripPagoAndReceiptAdditions(db);
 
     // Insertar comprobante ya revisado bajo esquema #275 para verificar backfill seguro a APROBADO
     const legacyId = randomUUID();
@@ -137,7 +161,9 @@ async function checkLegacyUpgrade(port) {
 
     const query = sql => db.query(sql);
     for (let run = 0; run < 2; run++) {
-      applySql(sqlFile(stateMigration), { target });
+      for (const file of orderFiles) {
+        applySql(sqlFile(file), { target });
+      }
       const inv = await assertSchemaInventory(query, 'complete');
       assert.equal(inv.tables, 26);
       assert.equal(inv.triggers, 13);
@@ -153,13 +179,61 @@ async function checkLegacyUpgrade(port) {
     assert.equal(migrated.motivo_rechazo, null);
     assert.equal(migrated.clave_idempotencia_revision, null);
 
-    // Las filas del seed siguen intactas
+    // Verificar compatibilidad de chk_pago_declaracion con alta directa ADMIN (clave_idempotencia + id_usuario_declarante NULL)
+    // y con declaracion de cliente (id_usuario_declarante NOT NULL), ademas de PAGO_IDEMPOTENCIA con las 6 operaciones.
+    const directKey = randomUUID();
+    const directRes = await db.query(`
+      INSERT INTO PAGO (id_cuenta_corriente, monto, moneda, metodo_pago, estado, clave_idempotencia, id_admin_actor)
+      VALUES (1, 10.00, 'USD', 'TRANSFERENCIA', 'PENDIENTE', ?, 4)
+    `, [directKey]);
+    const directId = Number(directRes.insertId);
+    await db.query(`
+      INSERT INTO PAGO_IDEMPOTENCIA (clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc)
+      VALUES (?, ?, 'CREAR', SHA2('test-direct', 256), UTC_TIMESTAMP(3))
+    `, [directKey, directId]);
+
+    const declKey = randomUUID();
+    const declReceipt = randomUUID();
+    const declRes = await db.query(`
+      INSERT INTO PAGO (
+        id_cuenta_corriente, monto, moneda, metodo_pago, estado,
+        id_usuario_declarante, clave_idempotencia, huella_declaracion, id_comprobante, estado_documental
+      ) VALUES (1, 15.00, 'USD', 'TRANSFERENCIA', 'PENDIENTE', 3, ?, SHA2('test-decl', 256), ?, 'PENDIENTE')
+    `, [declKey, declReceipt]);
+    const declId = Number(declRes.insertId);
+    await db.query(`
+      INSERT INTO PAGO_IDEMPOTENCIA (clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc)
+      VALUES (?, ?, 'DECLARAR', SHA2('test-decl', 256), UTC_TIMESTAMP(3)),
+             (?, ?, 'REVISAR_PAGO', SHA2('test-rev', 256), UTC_TIMESTAMP(3))
+    `, [declKey, declId, randomUUID(), declId]);
+
+    // Verificar backfill de clave_idempotencia_cierre en estado RECHAZADO -> operacion 'RECHAZAR'
+    const closeKey = randomUUID();
+    await db.query(`
+      UPDATE PAGO
+      SET estado = 'RECHAZADO', motivo_cierre = 'Prueba backfill', id_admin_cierre = 4,
+          fecha_cierre_utc = UTC_TIMESTAMP(3), clave_idempotencia_cierre = ?
+      WHERE id_pago = ?
+    `, [closeKey, directId]);
+    applySql(sqlFile(stateMigration), { target });
+    const [closeBackfill] = await db.query(
+      'SELECT operacion FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+      [closeKey],
+    );
+    assert.equal(closeBackfill.operacion, 'RECHAZAR');
+
+    // Las 2 filas seed + 2 insertadas en la verificacion siguen intactas
     const [pagoCount] = await db.query('SELECT COUNT(*) AS n FROM PAGO');
-    assert.equal(Number(pagoCount.n), 2);
-    console.log('Upgrade aditivo #290 verificado: 26 tablas, 13 triggers (3 FER-20 + 4 FER-17 + 6 S7-04), backfill legado APROBADO y seed intacto.');
+    assert.equal(Number(pagoCount.n), 4);
   } finally {
     await db.end();
   }
+}
+
+async function checkLegacyUpgrade(port) {
+  await verifyUpgradeOrder(port, 'upgrade_a', [stateMigration, paymentMigration]);
+  await verifyUpgradeOrder(port, 'upgrade_b', [paymentMigration, stateMigration]);
+  console.log('Upgrade aditivo #290 + #333 verificado en ambos órdenes (s7-04-2 -> s7-10-2 y s7-10-2 -> s7-04-2): 26 tablas, 13 triggers, backfill APROBADO/RECHAZAR y chk_pago_declaracion unificado.');
 }
 
 async function main() {
@@ -211,7 +285,9 @@ async function main() {
       'migrate-s7-09-1-credit-workflow.sql',
       'migrate-s7-06-1-transfer-order-confirmation.sql',
       stateMigration,
+      paymentMigration,
       stateMigration,
+      paymentMigration,
     ]) {
       applySql(sqlFile(name));
     }
@@ -266,8 +342,9 @@ async function main() {
       assert.ok(populated.some(entry => entry.table === table && entry.rows.length > 0), table);
     }
     applySql(sqlFile(stateMigration));
+    applySql(sqlFile(paymentMigration));
     assert.deepEqual(await snapshot(query, tables), populated);
-    console.log('Reaplicación idempotente #290 verificada: filas de las 26 tablas preservadas intactas.');
+    console.log('Reaplicación idempotente #290 + #333 verificada: filas de las 26 tablas preservadas intactas.');
   } finally {
     process.off('SIGINT', signal);
     process.off('SIGTERM', signal);

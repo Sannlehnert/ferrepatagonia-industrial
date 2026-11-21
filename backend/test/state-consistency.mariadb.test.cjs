@@ -1375,3 +1375,364 @@ test('8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en
   );
   assert.equal(Number(ccMovCount.n), 1, 'El perdedor concurrente no debe crear ABONO en cuenta corriente');
 });
+
+test('9. R01: fallos SQL/concurrencia en consulta de cotización FER17 NO devuelven 422 COTIZACION_FER17_NO_VERIFICADA y hacen ROLLBACK', async t => {
+  const company = await createClient({ type: 'EMPRESA', withAccount: true, habilitada: 1, cobertura: 'COMPLETA' });
+  const ccOrder = await createOrder(company.clientId, { modalidad: 'CUENTA_CORRIENTE', total: '100.00' });
+  await ledger.registrarCargoPorPedido({
+    id_cuenta_corriente: company.accountId,
+    id_pedido: ccOrder,
+    monto: '100.00',
+    moneda: 'USD',
+  });
+
+  const pendingArs = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: {
+      cuentaCorrienteId: company.accountId,
+      monto: '25000.00',
+      moneda: 'ARS',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+    },
+  });
+  assert.equal(pendingArs.status, 201);
+  const pagoId = pendingArs.body.data.idPago;
+
+  const scenarios = [
+    {
+      label: 'ER_LOCK_DEADLOCK (1213)',
+      error: Object.assign(new Error('Deadlock found when trying to get lock'), {
+        name: 'QueryFailedError',
+        code: 'ER_LOCK_DEADLOCK',
+        errno: 1213,
+        driverError: { code: 'ER_LOCK_DEADLOCK', errno: 1213 },
+      }),
+      expectedStatus: 409,
+      expectedCode: 'CONFLICTO_CONCURRENCIA',
+    },
+    {
+      label: 'ER_LOCK_WAIT_TIMEOUT (1205)',
+      error: Object.assign(new Error('Lock wait timeout exceeded'), {
+        name: 'QueryFailedError',
+        code: 'ER_LOCK_WAIT_TIMEOUT',
+        errno: 1205,
+        driverError: { code: 'ER_LOCK_WAIT_TIMEOUT', errno: 1205 },
+      }),
+      expectedStatus: 409,
+      expectedCode: 'CONFLICTO_CONCURRENCIA',
+    },
+    {
+      label: 'Error SQL genérico sobre COTIZACION/FER17_CALENDARIO',
+      error: Object.assign(new Error('Unknown error querying FER17_CALENDARIO / COTIZACION'), {
+        name: 'QueryFailedError',
+        code: 'ER_INTERNAL_ERROR',
+        errno: 1815,
+        driverError: { code: 'ER_INTERNAL_ERROR', errno: 1815 },
+      }),
+      expectedStatus: 500,
+      expectedCode: undefined,
+    },
+  ];
+
+  const origCreateQueryRunner = dataSource.createQueryRunner.bind(dataSource);
+  for (const scenario of scenarios) {
+    let injectedOnce = false;
+    const seen = [];
+    t.mock.method(dataSource, 'createQueryRunner', (...args) => {
+      const runner = origCreateQueryRunner(...args);
+      const origQuery = runner.query.bind(runner);
+      runner.query = async (...qArgs) => {
+        const sql = qArgs[0];
+        if (typeof sql === 'string') seen.push(sql.slice(0, 60));
+        if (!injectedOnce && typeof sql === 'string' && sql.includes('FER17_CALENDARIO')) {
+          injectedOnce = true;
+          throw scenario.error;
+        }
+        return origQuery(...qArgs);
+      };
+      return runner;
+    });
+
+    const key = randomUUID();
+    const res = await api(`/admin/pagos/${pagoId}/acreditar`, {
+      method: 'POST',
+      auth: admin1,
+      key,
+      body: { evidenciaAcreditacion: `R01-${scenario.label}`, fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+    });
+    assert.equal(injectedOnce, true, `${scenario.label} status=${res.status} body=${JSON.stringify(res.body)} seen=${JSON.stringify(seen)}`);
+    assert.equal(res.status, scenario.expectedStatus, `${scenario.label}: ${JSON.stringify(res.body)}`);
+    assert.notEqual(res.status, 422, `${scenario.label} nunca debe mapearse a 422`);
+    assert.notEqual(res.body?.code, 'COTIZACION_FER17_NO_VERIFICADA', scenario.label);
+    if (scenario.expectedCode !== undefined) {
+      assert.equal(res.body.code, scenario.expectedCode, scenario.label);
+    }
+
+    // Verificar ROLLBACK íntegro: PAGO sigue PENDIENTE, sin ABONO ni clave persistida
+    const [pagoRow] = await q('SELECT estado, monto_usd, clave_idempotencia_acreditacion FROM PAGO WHERE id_pago = ?', [pagoId]);
+    assert.equal(pagoRow.estado, 'PENDIENTE', scenario.label);
+    assert.equal(pagoRow.monto_usd, null, scenario.label);
+    assert.equal(pagoRow.clave_idempotencia_acreditacion, null, scenario.label);
+    const [idemRow] = await q('SELECT COUNT(*) AS n FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?', [key]);
+    assert.equal(Number(idemRow.n), 0, scenario.label);
+    const [abonoRow] = await q('SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ?', [pagoId]);
+    assert.equal(Number(abonoRow.n), 0, scenario.label);
+
+    t.mock.restoreAll();
+  }
+});
+
+test('10. R03: contrato unificado /api/admin/pagos* (#317 + #333), guardia documental 409, idempotencia global y flujo completo con FER17-v1 + Socket.IO', async t => {
+  const company = await createClient({ type: 'EMPRESA', withAccount: true, habilitada: 1, cobertura: 'COMPLETA' });
+  const ccOrder = await createOrder(company.clientId, { modalidad: 'CUENTA_CORRIENTE', total: '120.00' });
+  await ledger.registrarCargoPorPedido({
+    id_cuenta_corriente: company.accountId,
+    id_pedido: ccOrder,
+    monto: '120.00',
+    moneda: 'USD',
+  });
+
+  const sClient = await connectSocket(t, company.auth);
+  const sAdmin = await connectSocket(t, admin1);
+
+  // 1) Alta directa ADMIN con clave_idempotencia e id_usuario_declarante IS NULL (chk_pago_declaracion unificado)
+  const directKey = randomUUID();
+  const directAdminPay = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: directKey,
+    body: {
+      cuentaCorrienteId: company.accountId,
+      monto: '20.00',
+      moneda: 'USD',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+    },
+  });
+  assert.equal(directAdminPay.status, 201, JSON.stringify(directAdminPay.body));
+  assert.equal(directAdminPay.body.data.declaranteUsuarioId, null);
+  const [directIdem] = await q(
+    'SELECT operacion FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+    [directKey],
+  );
+  assert.equal(directIdem.operacion, 'CREAR');
+
+  // 2) Cliente sube comprobante (#275) y declara pago ARS (#333)
+  const up1 = await api(`/cuenta-corriente/comprobantes?pedidoId=${ccOrder}`, {
+    method: 'POST',
+    auth: company.auth,
+    body: pdf1,
+    headers: { 'Content-Type': 'application/pdf' },
+  });
+  assert.equal(up1.status, 201);
+  const receiptId1 = up1.body.data.id;
+
+  const declKey1 = randomUUID();
+  const declared1 = await api('/cuenta-corriente/pagos', {
+    method: 'POST',
+    auth: company.auth,
+    key: declKey1,
+    body: {
+      monto: '50000.00',
+      moneda: 'ARS',
+      comprobanteId: receiptId1,
+      observaciones: 'Declaración ARS integrada R03',
+    },
+  });
+  assert.equal(declared1.status, 201, JSON.stringify(declared1.body));
+  const declaredId1 = declared1.body.data.id;
+  const [declIdemRow] = await q(
+    'SELECT operacion, id_pago FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+    [declKey1],
+  );
+  assert.equal(declIdemRow.operacion, 'DECLARAR');
+  assert.equal(Number(declIdemRow.id_pago), declaredId1);
+
+  // Colisión cross-operación: reusar clave de DECLARAR en POST /api/admin/pagos o /acreditar -> 409 CLAVE_IDEMPOTENCIA_REUTILIZADA
+  const crossReuseCreate = await api('/admin/pagos', {
+    method: 'POST',
+    auth: admin1,
+    key: declKey1,
+    body: {
+      cuentaCorrienteId: company.accountId,
+      monto: '10.00',
+      moneda: 'USD',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+    },
+  });
+  assert.equal(crossReuseCreate.status, 409);
+  assert.equal(crossReuseCreate.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
+  // 3) Guardia obligatoria R03: acreditar pago declarado por cliente con estado_documental = PENDIENTE -> 409 sin ABONO ni evento
+  const prematureAccredit = await api(`/admin/pagos/${declaredId1}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: { evidencia: 'Intento prematuro sin revisión', fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+  });
+  assert.equal(prematureAccredit.status, 409, JSON.stringify(prematureAccredit.body));
+  assert.equal(prematureAccredit.body.code, 'PAGO_PENDIENTE_REVISION');
+  assert.equal(Number((await q('SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ?', [declaredId1]))[0].n), 0);
+  assert.equal((await ledger.calcularEstadoCuenta(company.accountId)).deuda_vigente, '120.00');
+  await flushSockets(sClient, sAdmin);
+  assert.equal(sClient.events.payment.length, 0);
+
+  // 4) Guardia obligatoria R03: comprobante rechazado en COMPROBANTE_PAGO bloquea acreditación con 409 PAGO_DOCUMENTALMENTE_RECHAZADO
+  const up2 = await api('/cuenta-corriente/comprobantes', {
+    method: 'POST',
+    auth: company.auth,
+    body: png1,
+    headers: { 'Content-Type': 'image/png' },
+  });
+  assert.equal(up2.status, 201);
+  const receiptId2 = up2.body.data.id;
+  const declared2 = await api('/cuenta-corriente/pagos', {
+    method: 'POST',
+    auth: company.auth,
+    key: randomUUID(),
+    body: { monto: '10.00', moneda: 'USD', comprobanteId: receiptId2 },
+  });
+  assert.equal(declared2.status, 201);
+  const declaredId2 = declared2.body.data.id;
+  assert.equal((await api(`/admin/pagos/${declaredId2}/revision`, {
+    method: 'PATCH',
+    auth: admin1,
+    key: randomUUID(),
+    body: { decision: 'APROBADO' },
+  })).status, 200);
+  assert.equal((await api(`/admin/comprobantes/${receiptId2}/revision`, {
+    method: 'PATCH',
+    auth: admin1,
+    key: randomUUID(),
+    body: { estado: 'RECHAZADO', motivo: 'Archivo ilegible en auditoría' },
+  })).status, 200);
+
+  const rejectedReceiptAccredit = await api(`/admin/pagos/${declaredId2}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: { evidenciaAcreditacion: 'Intento con comprobante rechazado', fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+  });
+  assert.equal(rejectedReceiptAccredit.status, 409, JSON.stringify(rejectedReceiptAccredit.body));
+  assert.equal(rejectedReceiptAccredit.body.code, 'PAGO_DOCUMENTALMENTE_RECHAZADO');
+  assert.equal(Number((await q('SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ?', [declaredId2]))[0].n), 0);
+
+  // Y un pago rechazado documentalmente vía PATCH /admin/pagos/:id/revision -> 409 sin ABONO
+  const up3 = await api('/cuenta-corriente/comprobantes', {
+    method: 'POST',
+    auth: company.auth,
+    body: jpg1,
+    headers: { 'Content-Type': 'image/jpeg' },
+  });
+  assert.equal(up3.status, 201);
+  const declared3 = await api('/cuenta-corriente/pagos', {
+    method: 'POST',
+    auth: company.auth,
+    key: randomUUID(),
+    body: { monto: '15.00', moneda: 'USD', comprobanteId: up3.body.data.id },
+  });
+  assert.equal(declared3.status, 201);
+  const declaredId3 = declared3.body.data.id;
+  assert.equal((await api(`/admin/pagos/${declaredId3}/revision`, {
+    method: 'PATCH',
+    auth: admin1,
+    key: randomUUID(),
+    body: { decision: 'RECHAZADO', motivo: 'Comprobante no corresponde' },
+  })).status, 200);
+  const rejectedDocAccredit = await api(`/admin/pagos/${declaredId3}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: randomUUID(),
+    body: { evidencia: 'Intento tras rechazo documental', fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+  });
+  assert.equal(rejectedDocAccredit.status, 409, JSON.stringify(rejectedDocAccredit.body));
+  assert.equal(Number((await q('SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ?', [declaredId3]))[0].n), 0);
+
+  // 5) Flujo integrado completo: cliente declara ARS -> admin aprueba revisión documental -> admin acredita con FER17-v1 -> ABONO + FIFO + pago.acreditado.v1 post-COMMIT
+  const reviewKey1 = randomUUID();
+  const approvedDoc = await api(`/admin/pagos/${declaredId1}/revision`, {
+    method: 'PATCH',
+    auth: admin1,
+    key: reviewKey1,
+    body: { decision: 'APROBADO' },
+  });
+  assert.equal(approvedDoc.status, 200, JSON.stringify(approvedDoc.body));
+  assert.equal(approvedDoc.body.data.estado, 'PENDIENTE');
+  assert.equal(approvedDoc.body.data.estadoDocumental, 'APROBADO');
+  const [revIdemRow] = await q(
+    'SELECT operacion FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+    [reviewKey1],
+  );
+  assert.equal(revIdemRow.operacion, 'REVISAR_PAGO');
+  assert.equal((await ledger.calcularEstadoCuenta(company.accountId)).deuda_vigente, '120.00');
+
+  // Reusar clave de REVISAR_PAGO en ACREDITAR -> 409 CLAVE_IDEMPOTENCIA_REUTILIZADA
+  const reuseRevKey = await api(`/admin/pagos/${declaredId1}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: reviewKey1,
+    body: { evidencia: 'Reuso de clave revisión', fechaAcreditacionUtc: '2026-10-02T15:00:00Z' },
+  });
+  assert.equal(reuseRevKey.status, 409);
+  assert.equal(reuseRevKey.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+
+  // Acreditar con alias evidencia + fechaAcreditacionUtc -> 50000 ARS / 1000 = 50.00 USD
+  const accreditKey1 = randomUUID();
+  const accredited = await api(`/admin/pagos/${declaredId1}/acreditar`, {
+    method: 'POST',
+    auth: admin1,
+    key: accreditKey1,
+    body: {
+      evidencia: 'EXTRACTO-R03-FER17-ARS',
+      fechaAcreditacionUtc: '2026-10-02T15:00:00Z',
+    },
+  });
+  assert.equal(accredited.status, 200, JSON.stringify(accredited.body));
+  assert.equal(accredited.body.data.id, declaredId1);
+  assert.equal(accredited.body.data.idPago, declaredId1);
+  assert.equal(accredited.body.data.estado, 'ACREDITADO');
+  assert.equal(accredited.body.data.estadoDocumental, 'APROBADO');
+  assert.equal(accredited.body.data.montoUSD, '50.00');
+  assert.equal(accredited.body.data.montoUsd, '50.00');
+  assert.equal(accredited.body.data.idCotizacion, verifiedQuoteId);
+  assert.equal(accredited.body.data.tasaHistorica, '1000.00000000');
+  assert.ok(accredited.body.data.abonoMovimientoId > 0);
+  assert.equal(accredited.body.data.acreditadoPorUsuarioId, admin1.id);
+
+  // Verificar ABONO + imputación FIFO + saldo CC + proyección de pedido + PAGO_IDEMPOTENCIA
+  const [abono] = await q(
+    'SELECT tipo_movimiento, monto, moneda, monto_original, moneda_original, id_cotizacion, tasa_historica, autorizado_por FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ?',
+    [declaredId1],
+  );
+  assert.equal(abono.tipo_movimiento, 'ABONO');
+  assert.equal(abono.monto, '50.00');
+  assert.equal(abono.moneda, 'USD');
+  assert.equal(abono.monto_original, '50000.00');
+  assert.equal(abono.moneda_original, 'ARS');
+  assert.equal(Number(abono.id_cotizacion), verifiedQuoteId);
+  assert.equal(abono.autorizado_por, String(admin1.id));
+  assert.equal((await ledger.calcularEstadoCuenta(company.accountId)).deuda_vigente, '70.00');
+
+  const orderView = (await api(`/pedidos/${ccOrder}`, { auth: company.auth })).body.data;
+  assert.equal(orderView.estadoFinanciero, 'IMPUTADO_PARCIAL');
+  assert.equal(orderView.montoAcreditadoUSD, '50.00');
+
+  const [accIdemRow] = await q(
+    'SELECT operacion FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+    [accreditKey1],
+  );
+  assert.equal(accIdemRow.operacion, 'ACREDITAR');
+
+  // Evento pago.acreditado.v1 emitido post-COMMIT a cliente titular y ADMIN
+  await flushSockets(sClient, sAdmin);
+  assert.equal(sClient.events.payment.length, 1);
+  assert.equal(sAdmin.events.payment.length, 1);
+  assert.equal(sClient.events.payment[0].pagoId, declaredId1);
+  assert.equal(sClient.events.payment[0].estadoPago, 'ACREDITADO');
+  assert.equal(sClient.events.payment[0].montoUSD, '50.00');
+  assert.ok(sClient.events.payment[0].revisionCuenta !== null);
+});
