@@ -39,7 +39,10 @@ const creditOrdersCount = computed(() =>
   orders.value?.filter(o => o.modalidadPago === 'CUENTA_CORRIENTE').length ?? 0,
 )
 const pendingReceiptOrdersCount = computed(() =>
-  orders.value?.filter(order => receipts.status(order) === 'NO_ADJUNTO').length ?? 0,
+  orders.value?.filter(order =>
+    order.modalidadPago === 'TRANSFERENCIA'
+    && receipts.status(order) === 'NO_ADJUNTO'
+  ).length ?? 0,
 )
 const receiptError = computed(() => orders.value?.some(order => receipts.status(order) === 'ERROR') ?? false)
 const ultimoPedidoFecha = computed(() => {
