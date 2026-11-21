@@ -369,7 +369,8 @@ for (const demoFirst of [false, true]) {
         await expectCode(own + path, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE', token);
         await expectCode(detail(clientId, path), 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE');
       }
-      await expectCode(adminList, 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE');
+      const restrictedList = await data(adminList);
+      assert.equal(restrictedList.items.some(item => item.clienteId === clientId), false);
       assert.equal((await data(own, client)).estado, 'SIN_CUENTA');
     } finally { process.env.NODE_ENV = environment; }
     await assert.rejects(db.inTransaction(manager => lockAccountOrderContext(manager, auth, clientId)),
@@ -402,3 +403,68 @@ for (const demoFirst of [false, true]) {
     await expectCode(nextPath, 409, 'CONSULTA_DESACTUALIZADA', token);
   });
 }
+
+test('producción: el listado ADMIN omite libros restringidos y conserva cuentas REAL legítimas', async () => {
+  await assertOwned(session);
+  const connection = session.connection;
+  const insert = async (sql, args) => Number((await connection.query(sql, args)).insertId);
+  const makeClient = (label) => insert(`INSERT INTO CLIENTE
+    (tipo_cliente,nombre_razon_social,email,estado_aprobacion_empresa,es_fiel,activo)
+    VALUES('EMPRESA',?,CONCAT('fixture-',?,'@example.test'),'APROBADA',0,1)`, [label, label]);
+  const makeAccount = (clientId, coverage, complete) => insert(`INSERT INTO CUENTA_CORRIENTE
+    (id_cliente,limite_credito,habilitada,cobertura,plazo_dias,moneda_limite,evidencia_limite,evidencia_plazo,
+     evidencia_cobertura,cobertura_desde_utc,origen_datos)
+    VALUES(?,300,1,?,30,'USD','Límite fixture','Plazo fixture',?,?,'REAL')`,
+  [clientId, coverage, complete ? 'Alta fixture' : null, complete ? '2025-01-01 00:00:00' : null]);
+
+  const cleanClient = await makeClient('legit-clean');
+  const cleanUser = await insert(`INSERT INTO USUARIO(id_cliente,email,password_hash,rol,activo)
+    VALUES(?,?,'fixture-no-login','CLIENTE',1)`, [cleanClient, 'fixture-legit-clean@example.test']);
+  const cleanAccount = await makeAccount(cleanClient, 'COMPLETA', true);
+
+  const legacyClient = await makeClient('legacy-partial');
+  await insert(`INSERT INTO USUARIO(id_cliente,email,password_hash,rol,activo)
+    VALUES(?,?,'fixture-no-login','CLIENTE',1)`, [legacyClient, 'fixture-legacy-partial@example.test']);
+  const legacyAccount = await makeAccount(legacyClient, 'PARCIAL', false);
+
+  const mixedClient = await makeClient('legit-mixed');
+  const mixedAccount = await makeAccount(mixedClient, 'COMPLETA', true);
+  const paymentId = await insert(`INSERT INTO PAGO
+    (id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,fecha_acreditacion_utc,evidencia_acreditacion)
+    VALUES(?, '2026-03-02 12:00:00', 1.00, 'DEMO', 'ACREDITADO', 'USD', '2026-03-02 12:00:00', 'Pago fixture')`,
+  [mixedAccount]);
+  await ledger.registrarAbonoPorPago({ id_cuenta_corriente: mixedAccount, id_pago: paymentId, monto: '1.00', origen: 'DEMO' });
+
+  const environment = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  try {
+    const dto = await data(list + '?limite=100');
+    const byClient = new Map(dto.items.map(item => [item.clienteId, item]));
+    assert.deepEqual([byClient.get(cleanClient)?.origen, byClient.get(cleanClient)?.saldo,
+      byClient.get(cleanClient)?.cobertura], ['REAL', '0.00', 'COMPLETA']);
+    assert.deepEqual([byClient.get(legacyClient)?.saldo, byClient.get(legacyClient)?.cobertura,
+      byClient.get(legacyClient)?.estadoCredito, byClient.get(legacyClient)?.limite],
+    [null, 'PARCIAL', 'NO_DETERMINABLE', '300.00']);
+    assert.equal(byClient.has(mixedClient), false);
+
+    const page = async (cursor) => data(list + '?limite=1' + (cursor ? '&' + cursorParam(cursor) : ''));
+    const first = await page();
+    const second = await page(first.siguienteCursor);
+    assert.deepEqual([...first.items, ...second.items].map(item => item.clienteId), [cleanClient, legacyClient]);
+    assert.equal(second.siguienteCursor, null);
+
+    const revision = first.revision;
+    const secondPayment = await insert(`INSERT INTO PAGO
+      (id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,fecha_acreditacion_utc,evidencia_acreditacion)
+      VALUES(?, '2026-03-03 12:00:00', 2.00, 'DEMO', 'ACREDITADO', 'USD', '2026-03-03 12:00:00', 'Pago fixture')`,
+    [mixedAccount]);
+    await ledger.registrarAbonoPorPago({ id_cuenta_corriente: mixedAccount, id_pago: secondPayment, monto: '2.00', origen: 'DEMO' });
+    assert.equal((await data(list)).revision, revision);
+
+    assert.equal((await data('/cuenta-corriente', signToken({ id: cleanUser, rol: 'CLIENTE' }))).saldo, '0.00');
+    await expectCode(detail(mixedClient), 503, 'CUENTA_CORRIENTE_NO_DISPONIBLE');
+  } finally {
+    process.env.NODE_ENV = environment;
+  }
+  assert.ok(cleanAccount > 0 && legacyAccount > 0 && mixedAccount > 0);
+});

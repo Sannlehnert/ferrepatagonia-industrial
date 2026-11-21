@@ -1,5 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { deactivateE2ECategories } from '../helpers/e2e-category-cleanup'
+
+test.afterAll(async () => {
+  await deactivateE2ECategories({ prefix: 'Categoría ' })
+})
 
 const password = 'E2eLocal-214!'
 

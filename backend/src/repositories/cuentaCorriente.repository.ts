@@ -7,6 +7,13 @@ import { loadAccountQuote } from './cuentaCorriente.quote';
 
 const MAX_CENTS = 999999999999n; // DECIMAL(12,2); aggregates remain unbounded BigInt.
 const present = (s: unknown): s is string => typeof s === 'string' && s.trim().length > 0;
+// Mirrors summarize()'s taint rule: any DEMO-origin row, including anulado ones,
+// makes a REAL ledger mixed. Listings omit it as a whole instead of failing the
+// page, so restricted accounts cannot hide unrelated legitimate accounts.
+export const noSyntheticLedgerSql = (alias: string): string =>
+    `NOT EXISTS (SELECT 1 FROM MOVIMIENTO_CUENTA_CORRIENTE m
+        WHERE m.id_cuenta_corriente = ${alias}.id_cuenta_corriente
+          AND UPPER(TRIM(m.origen)) = 'DEMO')`;
 const utc = (d: Date) => d.toISOString().slice(0, 23).replace('T', ' ');
 const digest = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 const identifier = (v: number) => { if (!Number.isInteger(v) || v < 1 || v > 2147483647) throw Error('Identificador inválido.'); return v; };
@@ -305,7 +312,7 @@ export async function revisionConjunto(
         u.id_usuario,u.activo AS usuario_activo,u.rol FROM CUENTA_CORRIENTE c JOIN CLIENTE k USING(id_cliente)
         LEFT JOIN USUARIO u USING(id_cliente)
         WHERE (? IS NULL OR c.id_cliente=?) AND (? IS NULL OR c.habilitada=?)
-            ${filter.excludeDemo ? "AND c.origen_datos = 'REAL'" : ''}
+            ${filter.excludeDemo ? `AND c.origen_datos = 'REAL' AND ${noSyntheticLedgerSql('c')}` : ''}
         ORDER BY c.id_cuenta_corriente`,
         [filter.clienteId ?? null, filter.clienteId ?? null, filter.habilitada ?? null, filter.habilitada ?? null]);
     const hash = createHash('sha256');
