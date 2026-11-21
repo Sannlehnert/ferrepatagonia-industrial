@@ -190,10 +190,10 @@ async function main() {
     await admin.getByRole('link', { name: 'Comprobantes de pago', exact: true }).click();
     const row = admin.getByRole('region', { name: 'Comprobantes de pago' }).getByRole('listitem')
       .filter({ has: admin.locator('a[href$="/' + comprobanteId + '"]') });
-    const mark = row.getByRole('button', { name: 'Marcar revisado' });
+    const mark = row.getByRole('button', { name: 'Aprobar comprobante' });
     await expect(row).toBeVisible();
     if (await mark.count()) await mark.click();
-    await expect(row.getByText(/^Revisado/)).toBeVisible();
+    await expect(row.getByText(/^Aprobado/)).toBeVisible();
 
     const [effects] = await db.query(`SELECT
       (SELECT COUNT(*) FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pedido=? AND tipo_movimiento='CARGO'

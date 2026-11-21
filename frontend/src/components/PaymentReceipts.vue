@@ -30,6 +30,7 @@ const mutationErrors = {
   ARCHIVO_DEMASIADO_GRANDE: 'El comprobante debe pesar hasta 5 MB.',
   TIPO_NO_PERMITIDO: 'Seleccioná un archivo PDF, JPG o PNG.',
   CONTENIDO_INVALIDO: 'El archivo está dañado, contiene elementos no permitidos o no coincide con su tipo.',
+  COMPROBANTE_YA_RESUELTO: 'Este comprobante ya fue resuelto anteriormente.',
 } as const
 
 function reload(number = 1) {
@@ -113,7 +114,7 @@ function upload() {
 function review(id: string) {
   void mutate(async signal => {
     await markPaymentReceiptReviewed(props.path, id, signal)
-    return 'Revisión documental registrada.'
+    return 'Comprobante aprobado.'
   })
 }
 
@@ -201,13 +202,22 @@ function operation(receipt: PaymentReceipt) {
             <p class="m-0 flex flex-wrap items-center gap-1.5 text-slate-600">
               <span
                 class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
-                :class="receipt.estadoRevision === 'REVISADO'
+                :class="receipt.estadoRevision === 'APROBADO'
                   ? 'bg-[#DCFCE7] text-[#16A34A] border border-emerald-200'
-                  : 'bg-[#FEF3C7] text-[#D97706] border border-amber-200'"
+                  : receipt.estadoRevision === 'RECHAZADO'
+                    ? 'bg-[#FEE2E2] text-[#DC2626] border border-red-200'
+                    : 'bg-[#FEF3C7] text-[#D97706] border border-amber-200'"
               >
-                {{ receipt.estadoRevision === 'REVISADO' ? 'Revisado' : 'Pendiente de revisión' }}
+                {{ receipt.estadoRevision === 'APROBADO'
+                  ? 'Aprobado'
+                  : receipt.estadoRevision === 'RECHAZADO'
+                    ? 'Rechazado'
+                    : 'Pendiente de revisión' }}
               </span>
               <span v-if="receipt.revisadoEn" class="text-xs text-slate-500">· {{ formatInstant(receipt.revisadoEn) }}</span>
+              <span v-if="receipt.estadoRevision === 'RECHAZADO' && receipt.motivoRechazo" class="text-xs text-[#DC2626]">
+                · {{ receipt.motivoRechazo }}
+              </span>
             </p>
           </div>
           <div class="flex flex-wrap items-center gap-2">
@@ -219,7 +229,7 @@ function operation(receipt: PaymentReceipt) {
               :disabled="busy"
               @click="review(receipt.id)"
             >
-              Marcar revisado
+              Aprobar comprobante
             </button>
           </div>
         </li>
