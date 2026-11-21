@@ -19,6 +19,7 @@ import type {
   ClientOrderLine,
   ClientOrderSummary,
 } from '../services/orders/account-order.types';
+import { projectOrderStates } from '../services/orders/order-state-projection';
 
 function invalidAmount(): never {
   throw new AccountOrderError(
@@ -183,6 +184,16 @@ interface OrderSummaryRow {
   cantidadUnidades: number | string;
   cargoId: number | string | null;
   venceEl: string | null;
+  cargoEstado: string | null;
+  cargoMonto: string | number | null;
+  cuentaCobertura: string | null;
+  montoImputadoVigente: string | number | null;
+  comprobantesTotal: number | string;
+  comprobantesAprobados: number | string;
+  comprobantesPendientes: number | string;
+  comprobantesRechazados: number | string;
+  pagosAcreditadosSinUsd: number | string;
+  totalAcreditadoUsd: string | number | null;
 }
 
 interface OrderLineRow {
@@ -200,6 +211,26 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   const pedidoId = Number(row.pedidoId);
   const moneda = row.moneda !== null && row.moneda !== undefined ? String(row.moneda) : null;
   const total = String(row.total);
+  const projection = projectOrderStates(
+    row.estado,
+    {
+      total: Number(row.comprobantesTotal ?? 0),
+      aprobados: Number(row.comprobantesAprobados ?? 0),
+      pendientes: Number(row.comprobantesPendientes ?? 0),
+      rechazados: Number(row.comprobantesRechazados ?? 0),
+    },
+    {
+      modalidadPago: row.modalidadPago,
+      monedaTotal: moneda,
+      total,
+      pagosAcreditadosSinUsd: Number(row.pagosAcreditadosSinUsd ?? 0),
+      totalAcreditadoUsd: row.totalAcreditadoUsd,
+      cuentaCobertura: row.cuentaCobertura,
+      cargoEstado: row.cargoEstado,
+      cargoMonto: row.cargoMonto,
+      montoImputadoVigente: row.montoImputadoVigente,
+    },
+  );
 
   return {
     pedidoId,
@@ -207,6 +238,10 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
     numero: `PED-${String(pedidoId).padStart(6, '0')}`,
     fecha: serializeOrderInstant(row.fechaUtc),
     estado: row.estado,
+    estadoPedido: projection.estadoPedido,
+    estadoDocumental: projection.estadoDocumental,
+    estadoFinanciero: projection.estadoFinanciero,
+    montoAcreditadoUSD: projection.montoAcreditadoUSD,
     modalidadPago: row.modalidadPago,
     moneda,
     subtotal: String(row.subtotal),
@@ -223,12 +258,7 @@ function mapOrderSummary(row: OrderSummaryRow): ClientOrderSummary {
   };
 }
 
-export async function findClientOrdersByClientId(
-  clientId: number,
-  query: ReadQuery,
-): Promise<ClientOrderSummary[]> {
-  const rows = await query<OrderSummaryRow[]>(`
-    SELECT
+const CLIENT_ORDER_PROJECTION_SELECT = `
       p.id_pedido AS pedidoId,
       CAST(${orderInstant} AS CHAR) AS fechaUtc,
       p.estado AS estado,
@@ -241,8 +271,18 @@ export async function findClientOrdersByClientId(
       p.evidencia_total_usd AS evidencia,
       COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
       COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
-      m.id_movimiento_cuenta AS cargoId,
-      DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
+      CASE WHEN m.estado = 'ACREDITADO' THEN m.id_movimiento_cuenta ELSE NULL END AS cargoId,
+      CASE WHEN m.estado = 'ACREDITADO' THEN DATE_FORMAT(m.vence_el, '%Y-%m-%d') ELSE NULL END AS venceEl,
+      m.estado AS cargoEstado,
+      m.monto AS cargoMonto,
+      COALESCE(cc_mov.cobertura, cc_cli.cobertura) AS cuentaCobertura,
+      COALESCE(imp_stat.montoImputadoVigente, 0.00) AS montoImputadoVigente,
+      COALESCE(cp_stat.total, 0) AS comprobantesTotal,
+      COALESCE(cp_stat.aprobados, 0) AS comprobantesAprobados,
+      COALESCE(cp_stat.pendientes, 0) AS comprobantesPendientes,
+      COALESCE(cp_stat.rechazados, 0) AS comprobantesRechazados,
+      COALESCE(pago_stat.pagosSinUsd, 0) AS pagosAcreditadosSinUsd,
+      COALESCE(pago_stat.totalAcreditadoUsd, 0.00) AS totalAcreditadoUsd
     FROM PEDIDO p
     LEFT JOIN (
       SELECT
@@ -256,7 +296,51 @@ export async function findClientOrdersByClientId(
     LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
       ON m.id_pedido = p.id_pedido
       AND m.tipo_movimiento = 'CARGO'
-      AND m.estado = 'ACREDITADO'
+    LEFT JOIN CUENTA_CORRIENTE cc_mov
+      ON cc_mov.id_cuenta_corriente = m.id_cuenta_corriente
+    LEFT JOIN CUENTA_CORRIENTE cc_cli
+      ON cc_cli.id_cliente = p.id_cliente
+    LEFT JOIN (
+      SELECT
+        id_cargo,
+        COALESCE(SUM(monto_imputado), 0.00) AS montoImputadoVigente
+      FROM IMPUTACION_MOVIMIENTO_CUENTA
+      WHERE estado = 'VIGENTE'
+      GROUP BY id_cargo
+    ) imp_stat
+      ON imp_stat.id_cargo = m.id_movimiento_cuenta
+    LEFT JOIN (
+      SELECT
+        id_pedido,
+        COUNT(*) AS total,
+        SUM(CASE WHEN estado_revision = 'APROBADO' THEN 1 ELSE 0 END) AS aprobados,
+        SUM(CASE WHEN estado_revision = 'PENDIENTE' THEN 1 ELSE 0 END) AS pendientes,
+        SUM(CASE WHEN estado_revision = 'RECHAZADO' THEN 1 ELSE 0 END) AS rechazados
+      FROM COMPROBANTE_PAGO
+      WHERE id_pedido IS NOT NULL
+      GROUP BY id_pedido
+    ) cp_stat
+      ON cp_stat.id_pedido = p.id_pedido
+    LEFT JOIN (
+      SELECT
+        id_pedido,
+        SUM(CASE WHEN monto_usd IS NULL THEN 1 ELSE 0 END) AS pagosSinUsd,
+        COALESCE(SUM(monto_usd), 0.00) AS totalAcreditadoUsd
+      FROM PAGO
+      WHERE id_pedido IS NOT NULL
+        AND estado = 'ACREDITADO'
+      GROUP BY id_pedido
+    ) pago_stat
+      ON pago_stat.id_pedido = p.id_pedido
+`;
+
+export async function findClientOrdersByClientId(
+  clientId: number,
+  query: ReadQuery,
+): Promise<ClientOrderSummary[]> {
+  const rows = await query<OrderSummaryRow[]>(`
+    SELECT
+      ${CLIENT_ORDER_PROJECTION_SELECT}
     WHERE p.id_cliente = ?
     ORDER BY fechaUtc DESC, p.id_pedido DESC
   `, [env.legacyOrderOffset, clientId]);
@@ -271,34 +355,7 @@ export async function findClientOrderDetailById(
 ): Promise<ClientOrderDetail | null> {
   const [headerRow] = await query<OrderSummaryRow[]>(`
     SELECT
-      p.id_pedido AS pedidoId,
-      CAST(${orderInstant} AS CHAR) AS fechaUtc,
-      p.estado AS estado,
-      p.modalidad_pago AS modalidadPago,
-      p.moneda_total AS moneda,
-      p.subtotal AS subtotal,
-      p.descuento AS descuento,
-      p.total AS total,
-      p.observaciones AS observaciones,
-      p.evidencia_total_usd AS evidencia,
-      COALESCE(dp_stat.cantidadLineas, 0) AS cantidadLineas,
-      COALESCE(dp_stat.cantidadUnidades, 0) AS cantidadUnidades,
-      m.id_movimiento_cuenta AS cargoId,
-      DATE_FORMAT(m.vence_el, '%Y-%m-%d') AS venceEl
-    FROM PEDIDO p
-    LEFT JOIN (
-      SELECT
-        id_pedido,
-        COUNT(id_detalle_pedido) AS cantidadLineas,
-        COALESCE(SUM(cantidad), 0) AS cantidadUnidades
-      FROM DETALLE_PEDIDO
-      GROUP BY id_pedido
-    ) dp_stat
-      ON dp_stat.id_pedido = p.id_pedido
-    LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE m
-      ON m.id_pedido = p.id_pedido
-      AND m.tipo_movimiento = 'CARGO'
-      AND m.estado = 'ACREDITADO'
+      ${CLIENT_ORDER_PROJECTION_SELECT}
     WHERE p.id_pedido = ?
       AND p.id_cliente = ?
   `, [env.legacyOrderOffset, orderId, clientId]);

@@ -14,6 +14,9 @@ const clientRoom = (clientId: number) => `orders:client:${clientId}`;
 const adminRoom = 'orders:admin';
 const catalogRoom = 'catalog:authenticated';
 const orderEvent = 'pedido.confirmado.v1';
+const orderStatusEvent = 'pedido.estado.actualizado.v1';
+const receiptEvent = 'comprobante.estado.actualizado.v1';
+const paymentEvent = 'pago.acreditado.v1';
 const maxPendingChanges = 128;
 
 async function visibleProducts(productIds: readonly number[]): Promise<number[]> {
@@ -64,6 +67,56 @@ async function authorizeSocket(req: IncomingMessage) {
   };
 }
 
+function lifecycleEvent(
+  change: Extract<CommittedChange, { kind: 'orderStatus' | 'receipt' | 'payment' }>,
+): { name: string; payload: Record<string, unknown> } {
+  if (change.kind === 'orderStatus') {
+    return {
+      name: orderStatusEvent,
+      payload: {
+        version: 1,
+        idEvento: `${orderStatusEvent}:${change.order.pedidoId}:${change.order.estadoNuevo}:${change.order.actualizadoEn}`,
+        pedidoId: change.order.pedidoId,
+        estadoAnterior: change.order.estadoAnterior,
+        estadoNuevo: change.order.estadoNuevo,
+        actualizadoEn: change.order.actualizadoEn,
+      },
+    };
+  }
+
+  if (change.kind === 'receipt') {
+    // Nunca expone binarios ni observaciones/motivos privados de ADMIN en el broadcast.
+    return {
+      name: receiptEvent,
+      payload: {
+        version: 1,
+        idEvento: `${receiptEvent}:${change.receipt.comprobanteId}:${change.receipt.estadoDocumental}`,
+        comprobanteId: change.receipt.comprobanteId,
+        pedidoId: change.receipt.pedidoId,
+        cuentaCorrienteId: change.receipt.cuentaCorrienteId,
+        estadoDocumental: change.receipt.estadoDocumental,
+        actualizadoEn: change.receipt.actualizadoEn,
+      },
+    };
+  }
+
+  // Nunca expone evidencia ni observaciones privadas de ADMIN en el broadcast.
+  return {
+    name: paymentEvent,
+    payload: {
+      version: 1,
+      idEvento: `${paymentEvent}:${change.payment.pagoId}:${change.payment.estadoPago}:${change.payment.actualizadoEn}`,
+      pagoId: change.payment.pagoId,
+      pedidoId: change.payment.pedidoId,
+      cuentaCorrienteId: change.payment.cuentaCorrienteId,
+      estadoPago: change.payment.estadoPago,
+      montoUSD: change.payment.montoUSD,
+      revisionCuenta: change.payment.revisionCuenta,
+      actualizadoEn: change.payment.actualizadoEn,
+    },
+  };
+}
+
 export function attachOrderSockets(
   http: HttpServer, config: HttpSecurityConfig, trustProxy: TrustProxy,
 ) {
@@ -95,7 +148,47 @@ export function attachOrderSockets(
   });
   io.on('connection', socket => { void socket.join([socket.data.room, catalogRoom]); });
 
+  async function deliverLifecycle(
+    change: Extract<CommittedChange, { kind: 'orderStatus' | 'receipt' | 'payment' }>,
+  ) {
+    const targetClientRoom = clientRoom(change.clientId);
+    const rooms = io.sockets.adapter.rooms;
+    const recipients = new Set([
+      ...(rooms.get(targetClientRoom) ?? []),
+      ...(rooms.get(adminRoom) ?? []),
+    ]);
+    if (!recipients.size) return;
+
+    const event = lifecycleEvent(change);
+
+    for (const id of recipients) {
+      const socket = io.sockets.sockets.get(id);
+      if (!socket) continue;
+      try {
+        // Re-read current ownership and authorization immediately before sending.
+        const access = await authorizeSocket(socket.request);
+        if (!access || access.room !== socket.data.room || !claims(socket.request)) {
+          socket.disconnect(true);
+          continue;
+        }
+        if (!socket.connected) continue;
+        // Sin filtro canReceiveOrders: clientes PARTICULAR y EMPRESA con cuenta inhabilitada
+        // regularizando deuda reciben actualizaciones de sus propios registros, igual que ADMIN.
+        if (access.room === targetClientRoom || access.room === adminRoom) {
+          socket.emit(event.name, event.payload);
+        }
+      } catch {
+        console.error('No se pudo notificar a una conexión autorizada.');
+      }
+    }
+  }
+
   async function deliver(change: CommittedChange) {
+    if (change.kind === 'orderStatus' || change.kind === 'receipt' || change.kind === 'payment') {
+      await deliverLifecycle(change);
+      return;
+    }
+
     const room = change.kind === 'stock' ? undefined : clientRoom(change.clientId);
     const rooms = io.sockets.adapter.rooms;
     const catalog = change.kind === 'cart' ? undefined : rooms.get(catalogRoom);

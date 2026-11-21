@@ -5,6 +5,7 @@ import {
   parseAdminOrderListQuery,
   parseAdminOrderStatusBody,
 } from '../dtos/orders/admin-order.dto';
+import type { RealtimeRequest } from '../realtime/committed-change';
 import { AdminOrderError } from '../services/orders/admin-order.errors';
 import {
   changeAdminOrderStatusService,
@@ -52,7 +53,12 @@ export async function updateAdminOrderStatus(req: Request, res: Response) {
   try {
     const orderId = parseAdminOrderIdParam(req.params.id);
     const { estado } = parseAdminOrderStatusBody(req.body);
-    const data = await changeAdminOrderStatusService(orderId, estado);
+    const data = await changeAdminOrderStatusService(
+      req.auth!,
+      orderId,
+      estado,
+      (req as RealtimeRequest).notifyCommittedChange,
+    );
     return res.status(200).json({
       message: 'Estado del pedido actualizado correctamente.',
       data,

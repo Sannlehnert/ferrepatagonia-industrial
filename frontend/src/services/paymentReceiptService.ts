@@ -1,5 +1,11 @@
 import api from './api'
 
+export type ReceiptReviewStatus = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
+
+export type ReceiptReviewDecision =
+  | { estado: 'APROBADO' }
+  | { estado: 'RECHAZADO'; motivo: string }
+
 export interface PaymentReceipt {
   id: string
   clienteId?: number
@@ -9,8 +15,9 @@ export interface PaymentReceipt {
   tipoMime: 'application/pdf' | 'image/jpeg' | 'image/png'
   bytes: number
   fecha: string
-  estadoRevision: 'PENDIENTE' | 'REVISADO'
+  estadoRevision: ReceiptReviewStatus
   revisadoEn: string | null
+  motivoRechazo?: string | null
 }
 
 export interface ReceiptPage {
@@ -75,6 +82,11 @@ export async function markPaymentReceiptReviewed(
   path: string,
   id: string,
   signal: AbortSignal,
+  decision: ReceiptReviewDecision = { estado: 'APROBADO' },
+  idempotencyKey = crypto.randomUUID(),
 ) {
-  await api.patch(path + '/' + id + '/revision', undefined, { signal })
+  await api.patch(path + '/' + id + '/revision', decision, {
+    headers: { 'Idempotency-Key': idempotencyKey },
+    signal,
+  })
 }
