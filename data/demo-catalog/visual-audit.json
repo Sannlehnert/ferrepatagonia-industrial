@@ -1,10 +1,10 @@
 {
   "sku": 904,
-  "skuConFuente": 182,
-  "skuIlustrativos": 49,
-  "skuPendientes": 722,
-  "archivos": 22,
-  "archivosIlustrativos": 38,
+  "skuConFuente": 221,
+  "skuIlustrativos": 82,
+  "skuPendientes": 683,
+  "archivos": 28,
+  "archivosIlustrativos": 68,
   "grupos": [
     {
       "clave": "MAN-llave-combinada",
@@ -14,14 +14,15 @@
         "FP-DEMO-MAN-LLAVE-COMBINADA-6-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-8-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-9-MM",
-        "FP-DEMO-MAN-LLAVE-COMBINADA-10-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-11-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-12-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-13-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-17-MM",
         "FP-DEMO-MAN-LLAVE-COMBINADA-19-MM"
       ],
-      "archivos": []
+      "archivos": [
+        "llave-combinada-10mm.webp"
+      ]
     },
     {
       "clave": "MAN-prensa-c",
@@ -87,16 +88,6 @@
       "familia": "Herramientas manuales",
       "pendientes": [
         "FP-DEMO-MAN-LIMAS-9-PIEZAS"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "MAN-limas/10 piezas",
-      "modelo": "Juego de limas para metal",
-      "criterioVisible": "10 piezas",
-      "familia": "Herramientas manuales",
-      "pendientes": [
-        "FP-DEMO-MAN-LIMAS-10-PIEZAS"
       ],
       "archivos": []
     },
@@ -462,7 +453,6 @@
         "FP-DEMO-NEU-MANGUERA-PU-6-10-MM-INTERIOR-EXTERIOR",
         "FP-DEMO-NEU-MANGUERA-PU-8-10-MM-INTERIOR-EXTERIOR",
         "FP-DEMO-NEU-MANGUERA-PU-8-12-MM-INTERIOR-EXTERIOR",
-        "FP-DEMO-NEU-MANGUERA-PU-10-12-MM-INTERIOR-EXTERIOR",
         "FP-DEMO-NEU-MANGUERA-PU-12-16-MM-INTERIOR-EXTERIOR"
       ],
       "archivos": []
@@ -479,7 +469,6 @@
         "FP-DEMO-NEU-MANGUERA-PE-6-10-MM-INTERIOR-EXTERIOR",
         "FP-DEMO-NEU-MANGUERA-PE-8-10-MM-INTERIOR-EXTERIOR",
         "FP-DEMO-NEU-MANGUERA-PE-8-12-MM-INTERIOR-EXTERIOR",
-        "FP-DEMO-NEU-MANGUERA-PE-10-12-MM-INTERIOR-EXTERIOR",
         "FP-DEMO-NEU-MANGUERA-PE-12-16-MM-INTERIOR-EXTERIOR"
       ],
       "archivos": []
@@ -492,7 +481,6 @@
         "FP-DEMO-NEU-SOPLADORA-25-MM",
         "FP-DEMO-NEU-SOPLADORA-50-MM",
         "FP-DEMO-NEU-SOPLADORA-75-MM",
-        "FP-DEMO-NEU-SOPLADORA-100-MM",
         "FP-DEMO-NEU-SOPLADORA-150-MM",
         "FP-DEMO-NEU-SOPLADORA-200-MM",
         "FP-DEMO-NEU-SOPLADORA-250-MM",
@@ -558,16 +546,6 @@
       "familia": "Herramientas neumáticas",
       "pendientes": [
         "FP-DEMO-NEU-MANIFOLD-SALIDAS-8"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "NEU-manifold/salidas 10",
-      "modelo": "Distribuidor neumático de aluminio",
-      "criterioVisible": "salidas 10",
-      "familia": "Herramientas neumáticas",
-      "pendientes": [
-        "FP-DEMO-NEU-MANIFOLD-SALIDAS-10"
       ],
       "archivos": []
     },
@@ -995,7 +973,6 @@
         "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-M",
         "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-L",
         "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-XL",
-        "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-2XL",
         "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-3XL",
         "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-4XL",
         "FP-DEMO-GUA-GUANTE-NITRILO-TALLE-5XL"
@@ -1028,7 +1005,6 @@
         "FP-DEMO-GUA-GUANTE-PVC-TALLE-M",
         "FP-DEMO-GUA-GUANTE-PVC-TALLE-L",
         "FP-DEMO-GUA-GUANTE-PVC-TALLE-XL",
-        "FP-DEMO-GUA-GUANTE-PVC-TALLE-2XL",
         "FP-DEMO-GUA-GUANTE-PVC-TALLE-3XL",
         "FP-DEMO-GUA-GUANTE-PVC-TALLE-4XL",
         "FP-DEMO-GUA-GUANTE-PVC-TALLE-5XL"
@@ -1063,8 +1039,7 @@
         "FP-DEMO-OCU-SOBRELENTE-PACK-DE-25-UNIDADES",
         "FP-DEMO-OCU-SOBRELENTE-PACK-DE-40-UNIDADES",
         "FP-DEMO-OCU-SOBRELENTE-PACK-DE-50-UNIDADES",
-        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-75-UNIDADES",
-        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-100-UNIDADES"
+        "FP-DEMO-OCU-SOBRELENTE-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -1176,8 +1151,7 @@
         "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-25-UNIDADES",
         "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-40-UNIDADES",
         "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-50-UNIDADES",
-        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-75-UNIDADES",
-        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-100-UNIDADES"
+        "FP-DEMO-RES-MASCARILLA-PLANA-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -1193,8 +1167,7 @@
         "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-25-UNIDADES",
         "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-40-UNIDADES",
         "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-50-UNIDADES",
-        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-75-UNIDADES",
-        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-100-UNIDADES"
+        "FP-DEMO-RES-MASCARILLA-COPA-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -1210,8 +1183,7 @@
         "FP-DEMO-RES-PREFILTRO-PACK-DE-25-UNIDADES",
         "FP-DEMO-RES-PREFILTRO-PACK-DE-40-UNIDADES",
         "FP-DEMO-RES-PREFILTRO-PACK-DE-50-UNIDADES",
-        "FP-DEMO-RES-PREFILTRO-PACK-DE-75-UNIDADES",
-        "FP-DEMO-RES-PREFILTRO-PACK-DE-100-UNIDADES"
+        "FP-DEMO-RES-PREFILTRO-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -1227,8 +1199,7 @@
         "FP-DEMO-RES-RETENEDOR-PACK-DE-25-UNIDADES",
         "FP-DEMO-RES-RETENEDOR-PACK-DE-40-UNIDADES",
         "FP-DEMO-RES-RETENEDOR-PACK-DE-50-UNIDADES",
-        "FP-DEMO-RES-RETENEDOR-PACK-DE-75-UNIDADES",
-        "FP-DEMO-RES-RETENEDOR-PACK-DE-100-UNIDADES"
+        "FP-DEMO-RES-RETENEDOR-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -1258,7 +1229,6 @@
         "FP-DEMO-ROP-PANTALON-TALLE-M",
         "FP-DEMO-ROP-PANTALON-TALLE-L",
         "FP-DEMO-ROP-PANTALON-TALLE-XL",
-        "FP-DEMO-ROP-PANTALON-TALLE-2XL",
         "FP-DEMO-ROP-PANTALON-TALLE-3XL",
         "FP-DEMO-ROP-PANTALON-TALLE-4XL",
         "FP-DEMO-ROP-PANTALON-TALLE-5XL"
@@ -1275,7 +1245,6 @@
         "FP-DEMO-ROP-CAMISA-TALLE-M",
         "FP-DEMO-ROP-CAMISA-TALLE-L",
         "FP-DEMO-ROP-CAMISA-TALLE-XL",
-        "FP-DEMO-ROP-CAMISA-TALLE-2XL",
         "FP-DEMO-ROP-CAMISA-TALLE-3XL",
         "FP-DEMO-ROP-CAMISA-TALLE-4XL",
         "FP-DEMO-ROP-CAMISA-TALLE-5XL"
@@ -1292,12 +1261,13 @@
         "FP-DEMO-ROP-MAMELUCO-TALLE-M",
         "FP-DEMO-ROP-MAMELUCO-TALLE-L",
         "FP-DEMO-ROP-MAMELUCO-TALLE-XL",
-        "FP-DEMO-ROP-MAMELUCO-TALLE-2XL",
         "FP-DEMO-ROP-MAMELUCO-TALLE-3XL",
         "FP-DEMO-ROP-MAMELUCO-TALLE-4XL",
         "FP-DEMO-ROP-MAMELUCO-TALLE-5XL"
       ],
-      "archivos": []
+      "archivos": [
+        "mameluco.webp"
+      ]
     },
     {
       "clave": "ROP-campera",
@@ -1309,7 +1279,6 @@
         "FP-DEMO-ROP-CAMPERA-TALLE-M",
         "FP-DEMO-ROP-CAMPERA-TALLE-L",
         "FP-DEMO-ROP-CAMPERA-TALLE-XL",
-        "FP-DEMO-ROP-CAMPERA-TALLE-2XL",
         "FP-DEMO-ROP-CAMPERA-TALLE-3XL",
         "FP-DEMO-ROP-CAMPERA-TALLE-4XL",
         "FP-DEMO-ROP-CAMPERA-TALLE-5XL"
@@ -1808,16 +1777,6 @@
       "archivos": []
     },
     {
-      "clave": "SEN-cartel-pvc/Acceso restringido",
-      "modelo": "Cartel de PVC 20 × 30 cm",
-      "criterioVisible": "Acceso restringido",
-      "familia": "Señalización industrial",
-      "pendientes": [
-        "FP-DEMO-SEN-CARTEL-PVC-ACCESO-RESTRINGIDO"
-      ],
-      "archivos": []
-    },
-    {
       "clave": "SEN-cartel-pvc/Botiquín",
       "modelo": "Cartel de PVC 20 × 30 cm",
       "criterioVisible": "Botiquín",
@@ -1894,16 +1853,6 @@
       "familia": "Señalización industrial",
       "pendientes": [
         "FP-DEMO-SEN-CARTEL-ALUMINIO-PISO-MOJADO"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "SEN-cartel-aluminio/Acceso restringido",
-      "modelo": "Cartel de aluminio 30 × 40 cm",
-      "criterioVisible": "Acceso restringido",
-      "familia": "Señalización industrial",
-      "pendientes": [
-        "FP-DEMO-SEN-CARTEL-ALUMINIO-ACCESO-RESTRINGIDO"
       ],
       "archivos": []
     },
@@ -1988,16 +1937,6 @@
       "archivos": []
     },
     {
-      "clave": "SEN-cartel-vinilo/Acceso restringido",
-      "modelo": "Cartel autoadhesivo 15 × 20 cm",
-      "criterioVisible": "Acceso restringido",
-      "familia": "Señalización industrial",
-      "pendientes": [
-        "FP-DEMO-SEN-CARTEL-VINILO-ACCESO-RESTRINGIDO"
-      ],
-      "archivos": []
-    },
-    {
       "clave": "SEN-cartel-vinilo/Botiquín",
       "modelo": "Cartel autoadhesivo 15 × 20 cm",
       "criterioVisible": "Botiquín",
@@ -2078,16 +2017,6 @@
       "archivos": []
     },
     {
-      "clave": "SEN-cartel-acrilico/Acceso restringido",
-      "modelo": "Placa acrílica 15 × 25 cm",
-      "criterioVisible": "Acceso restringido",
-      "familia": "Señalización industrial",
-      "pendientes": [
-        "FP-DEMO-SEN-CARTEL-ACRILICO-ACCESO-RESTRINGIDO"
-      ],
-      "archivos": []
-    },
-    {
       "clave": "SEN-cartel-acrilico/Botiquín",
       "modelo": "Placa acrílica 15 × 25 cm",
       "criterioVisible": "Botiquín",
@@ -2164,12 +2093,13 @@
         "FP-DEMO-TOR-ARANDELA-GROWER-M5",
         "FP-DEMO-TOR-ARANDELA-GROWER-M6",
         "FP-DEMO-TOR-ARANDELA-GROWER-M8",
-        "FP-DEMO-TOR-ARANDELA-GROWER-M10",
         "FP-DEMO-TOR-ARANDELA-GROWER-M12",
         "FP-DEMO-TOR-ARANDELA-GROWER-M14",
         "FP-DEMO-TOR-ARANDELA-GROWER-M16"
       ],
-      "archivos": []
+      "archivos": [
+        "arandela-grower.webp"
+      ]
     },
     {
       "clave": "FIJ-varilla",
@@ -2295,8 +2225,7 @@
         "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-25-UNIDADES",
         "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-40-UNIDADES",
         "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-50-UNIDADES",
-        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-75-UNIDADES",
-        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-100-UNIDADES"
+        "FP-DEMO-MAT-INTERRUPTOR-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -2310,7 +2239,6 @@
         "FP-DEMO-MAT-CAJA-EMBUTIR-6-6-CM",
         "FP-DEMO-MAT-CAJA-EMBUTIR-7-7-CM",
         "FP-DEMO-MAT-CAJA-EMBUTIR-8-8-CM",
-        "FP-DEMO-MAT-CAJA-EMBUTIR-10-10-CM",
         "FP-DEMO-MAT-CAJA-EMBUTIR-12-12-CM",
         "FP-DEMO-MAT-CAJA-EMBUTIR-15-15-CM",
         "FP-DEMO-MAT-CAJA-EMBUTIR-20-20-CM"
@@ -2327,7 +2255,6 @@
         "FP-DEMO-MAT-CAJA-SUPERFICIE-6-6-CM",
         "FP-DEMO-MAT-CAJA-SUPERFICIE-7-7-CM",
         "FP-DEMO-MAT-CAJA-SUPERFICIE-8-8-CM",
-        "FP-DEMO-MAT-CAJA-SUPERFICIE-10-10-CM",
         "FP-DEMO-MAT-CAJA-SUPERFICIE-12-12-CM",
         "FP-DEMO-MAT-CAJA-SUPERFICIE-15-15-CM",
         "FP-DEMO-MAT-CAJA-SUPERFICIE-20-20-CM"
@@ -2401,16 +2328,6 @@
       "familia": "Interruptores y materiales eléctricos",
       "pendientes": [
         "FP-DEMO-MAT-BORNERA-CON-8-POSICIONES"
-      ],
-      "archivos": []
-    },
-    {
-      "clave": "MAT-bornera/con 10 posiciones",
-      "modelo": "Bornera de tornillo para montaje",
-      "criterioVisible": "con 10 posiciones",
-      "familia": "Interruptores y materiales eléctricos",
-      "pendientes": [
-        "FP-DEMO-MAT-BORNERA-CON-10-POSICIONES"
       ],
       "archivos": []
     },
@@ -2495,16 +2412,6 @@
       "archivos": []
     },
     {
-      "clave": "ILU-reflector/100 W",
-      "modelo": "Reflector LED con soporte",
-      "criterioVisible": "100 W",
-      "familia": "Iluminación de trabajo",
-      "pendientes": [
-        "FP-DEMO-ILU-REFLECTOR-100-W"
-      ],
-      "archivos": []
-    },
-    {
       "clave": "ILU-reflector/150 W",
       "modelo": "Reflector LED con soporte",
       "criterioVisible": "150 W",
@@ -2565,16 +2472,6 @@
       "archivos": []
     },
     {
-      "clave": "ILU-lampara-e27/10 W",
-      "modelo": "Lámpara LED rosca E27 luz fría",
-      "criterioVisible": "10 W",
-      "familia": "Iluminación de trabajo",
-      "pendientes": [
-        "FP-DEMO-ILU-LAMPARA-E27-10-W"
-      ],
-      "archivos": []
-    },
-    {
       "clave": "ILU-lampara-e27/12 W",
       "modelo": "Lámpara LED rosca E27 luz fría",
       "criterioVisible": "12 W",
@@ -2616,7 +2513,6 @@
         "FP-DEMO-ILU-REGLETA-LED-60-CM",
         "FP-DEMO-ILU-REGLETA-LED-75-CM",
         "FP-DEMO-ILU-REGLETA-LED-90-CM",
-        "FP-DEMO-ILU-REGLETA-LED-120-CM",
         "FP-DEMO-ILU-REGLETA-LED-150-CM"
       ],
       "archivos": []
@@ -2633,8 +2529,7 @@
         "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-25-UNIDADES",
         "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-40-UNIDADES",
         "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-50-UNIDADES",
-        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-75-UNIDADES",
-        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-100-UNIDADES"
+        "FP-DEMO-ILU-PORTALAMPARAS-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -2649,7 +2544,6 @@
         "FP-DEMO-OBR-MALLA-75-MM",
         "FP-DEMO-OBR-MALLA-80-MM",
         "FP-DEMO-OBR-MALLA-90-MM",
-        "FP-DEMO-OBR-MALLA-100-MM",
         "FP-DEMO-OBR-MALLA-125-MM",
         "FP-DEMO-OBR-MALLA-150-MM"
       ],
@@ -2660,7 +2554,6 @@
       "modelo": "Perfil angular de aluminio de 1 m",
       "familia": "Materiales de construcción",
       "pendientes": [
-        "FP-DEMO-OBR-PERFIL-10-10-MM",
         "FP-DEMO-OBR-PERFIL-12-12-MM",
         "FP-DEMO-OBR-PERFIL-15-15-MM",
         "FP-DEMO-OBR-PERFIL-20-20-MM",
@@ -2678,7 +2571,6 @@
       "familia": "Materiales de construcción",
       "pendientes": [
         "FP-DEMO-OBR-ESPACIADOR-1-MM",
-        "FP-DEMO-OBR-ESPACIADOR-1-5-MM",
         "FP-DEMO-OBR-ESPACIADOR-2-MM",
         "FP-DEMO-OBR-ESPACIADOR-2-5-MM",
         "FP-DEMO-OBR-ESPACIADOR-3-MM",
@@ -2694,7 +2586,6 @@
       "modelo": "Malla plástica para revoco",
       "familia": "Materiales de construcción",
       "pendientes": [
-        "FP-DEMO-OBR-MALLA-OBRA-0-3-M-DE-ANCHO",
         "FP-DEMO-OBR-MALLA-OBRA-0-4-M-DE-ANCHO",
         "FP-DEMO-OBR-MALLA-OBRA-0-5-M-DE-ANCHO",
         "FP-DEMO-OBR-MALLA-OBRA-0-6-M-DE-ANCHO",
@@ -3173,11 +3064,12 @@
         "FP-DEMO-MEC-MECHA-MADERA-6-MM",
         "FP-DEMO-MEC-MECHA-MADERA-7-MM",
         "FP-DEMO-MEC-MECHA-MADERA-8-MM",
-        "FP-DEMO-MEC-MECHA-MADERA-10-MM",
         "FP-DEMO-MEC-MECHA-MADERA-12-MM",
         "FP-DEMO-MEC-MECHA-MADERA-14-MM"
       ],
-      "archivos": []
+      "archivos": [
+        "mecha-madera.webp"
+      ]
     },
     {
       "clave": "MEC-mecha-mamposteria",
@@ -3190,18 +3082,18 @@
         "FP-DEMO-MEC-MECHA-MAMPOSTERIA-7-MM",
         "FP-DEMO-MEC-MECHA-MAMPOSTERIA-8-MM",
         "FP-DEMO-MEC-MECHA-MAMPOSTERIA-9-MM",
-        "FP-DEMO-MEC-MECHA-MAMPOSTERIA-10-MM",
         "FP-DEMO-MEC-MECHA-MAMPOSTERIA-12-MM",
         "FP-DEMO-MEC-MECHA-MAMPOSTERIA-14-MM"
       ],
-      "archivos": []
+      "archivos": [
+        "mecha-mamposteria.webp"
+      ]
     },
     {
       "clave": "MEC-copa",
       "modelo": "Sierra copa bimetálica",
       "familia": "Brocas, mechas y accesorios",
       "pendientes": [
-        "FP-DEMO-MEC-COPA-19-MM",
         "FP-DEMO-MEC-COPA-22-MM",
         "FP-DEMO-MEC-COPA-25-MM",
         "FP-DEMO-MEC-COPA-29-MM",
@@ -3225,8 +3117,7 @@
         "FP-DEMO-SUM-TRAPO-PACK-DE-25-UNIDADES",
         "FP-DEMO-SUM-TRAPO-PACK-DE-40-UNIDADES",
         "FP-DEMO-SUM-TRAPO-PACK-DE-50-UNIDADES",
-        "FP-DEMO-SUM-TRAPO-PACK-DE-75-UNIDADES",
-        "FP-DEMO-SUM-TRAPO-PACK-DE-100-UNIDADES"
+        "FP-DEMO-SUM-TRAPO-PACK-DE-75-UNIDADES"
       ],
       "archivos": []
     },
@@ -3237,7 +3128,6 @@
       "pendientes": [
         "FP-DEMO-SUM-FILM-50-MM",
         "FP-DEMO-SUM-FILM-75-MM",
-        "FP-DEMO-SUM-FILM-100-MM",
         "FP-DEMO-SUM-FILM-125-MM",
         "FP-DEMO-SUM-FILM-150-MM",
         "FP-DEMO-SUM-FILM-200-MM",

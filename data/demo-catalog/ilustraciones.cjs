@@ -121,10 +121,15 @@ const familias = {
   GUA: 'Guantes',
 };
 
+const recursos311 = require('./ilustraciones-311.cjs')({ dibujos, trazoDe, tinta, azul, ambar });
+Object.assign(familias, recursos311.familias);
+Object.assign(dibujos, recursos311.basicos);
+Object.assign(dibujosDeVariante, recursos311.dibujos);
 const claves = [...Object.keys(familias), ...Object.keys(dibujosDeVariante)];
 const familiaDe = clave => clave.split('-')[0];
 const archivoDe = clave => `ilustrativa-${clave.toLowerCase()}.webp`;
 const variantesPorSku = Object.freeze({
+  ...recursos311.variantesPorSku,
   'FP-DEMO-ABR-DISCO-METAL-100-MM': 'ABR-CORTE',
   'FP-DEMO-CAB-CABLE-BIPOLAR-0-5-MM2': 'CAB-BIPOLAR',
   'FP-DEMO-CAB-CABLE-MARRON-0-5-MM2': 'CAB-MARRON',
