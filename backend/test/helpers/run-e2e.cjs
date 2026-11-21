@@ -129,7 +129,14 @@ async function main() {
     includeReceiptFixture: receipts,
     includeCatalogProducts: !demoCatalog,
   });
-  if (receipts || demoInteractive) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+// Los E2E normales de checkout necesitan subir comprobantes.
+// Las pruebas específicas de comprobantes y demos interactivas
+// también requieren almacenamiento temporal.
+if (receipts || demoInteractive || (!fer19 && !demoCatalog)) {
+  receiptStorage = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'ferre-receipts-e2e-')
+  );
+}
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
