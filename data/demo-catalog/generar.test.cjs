@@ -67,8 +67,8 @@ test('cada ilustración de origen es generada con leyenda textual verificable', 
   assert.throws(() => validarLeyenda(svg('ABR').replace('IMAGEN ILUSTRATIVA', '')), /IMAGEN ILUSTRATIVA/);
   assert.throws(() => validarContenidoIlustrativo('ilustrativa-abr.webp', Buffer.from('WebP sin leyenda')),
     /versión con leyenda/);
-  assert.equal(archivos.size, 38);
-  assert.equal(claves.length, 42);
+  assert.equal(archivos.size, 68);
+  assert.equal(claves.length, 82);
 });
 
 test('rechaza huellas, autoría, licencias, fuentes y familias inconsistentes', () => {
@@ -160,15 +160,54 @@ test('rechaza asociaciones renombradas, familias incorrectas y fotografías de o
   assert.equal(archivoIlustrativoDeSku('FP-DEMO-CON-CONO-NARANJA-18-CM'), 'ilustrativa-con.webp');
 });
 
-test('prepara la asociación al catálogo maestro de 100 SKU sin exigir los SKU ausentes', () => {
+test('prepara la asociación de imágenes de los 100 SKU del catálogo maestro', () => {
   const fuentes = leerFuentes();
   const catalogo = leerCatalogoMaestro();
   const seleccion = seleccionarFuentesCatalogo(fuentes, catalogo);
   assert.equal(seleccion.total, 100);
-  assert.equal(seleccion.fuentes.size, 61);
-  assert.equal(seleccion.pendientes.length, 39);
+  assert.equal(seleccion.fuentes.size, 100);
+  assert.equal(seleccion.pendientes.length, 0);
   for (const [sku, fuente] of seleccion.fuentes) {
     assert.equal(fuente.nombre, catalogo.find(fila => fila.sku === sku).nombre_propuesto);
+  }
+});
+
+test('#311: los SKU 51–100 tienen recurso, procedencia y límites visuales documentados', () => {
+  const fuentes = leerFuentes();
+  const maestro = leerCatalogoMaestro().slice(50);
+  const { data: matriz, errors } = require('../../backend/node_modules/papaparse').parse(
+    readFileSync(join(__dirname, '../../docs/311/imagenes-51-100.csv'), 'utf8'), { header: true, skipEmptyLines: true });
+  assert.deepEqual(errors, []);
+  assert.equal(matriz.length, 50);
+  for (const [i, producto] of maestro.entries()) {
+    const fuente = fuentes.get(producto.sku);
+    assert.ok(fuente, `Falta imagen del alcance #311: ${producto.sku}`);
+    const row = matriz[i];
+    assert.equal(row.sku, producto.sku);
+    assert.equal(row.nombre, producto.nombre_propuesto);
+    assert.equal(row.url_imagen, fuente.ruta_final);
+    assert.equal(row.autor, fuente.autor);
+    assert.equal(row.fuente, fuente.fuente);
+    assert.equal(row.licencia, fuente.licencia);
+    assert.equal(row.tipo, fuente.archivo.startsWith('ilustrativa-') ? 'Ilustración' : 'Fotografía');
+    assert.ok(row.observaciones.length > 35);
+    assert.equal(row.sha256Origen, require('node:crypto').createHash('sha256').update(fuente.bytes).digest('hex'));
+  }
+  assert.equal(matriz.filter(row => row.tipo === 'Fotografía').length, 17);
+  assert.equal(matriz.filter(row => row.tipo === 'Ilustración').length, 33);
+  assert.equal(fuentes.get(maestro.find(row => +row.numero === 81).sku).archivo, 'ilustrativa-res-copa.webp');
+  assert.notEqual(archivoIlustrativoDeSku(maestro.find(row => +row.numero === 83).sku),
+    archivoIlustrativoDeSku(maestro.find(row => +row.numero === 84).sku));
+});
+
+test('#311: conserva los archivos de los 50 SKU revisados en #310', () => {
+  const fuentes = leerFuentes();
+  const { registros } = require('../../docs/311/evidence/primeros-50-preservados.json');
+  assert.equal(registros.length, 50);
+  for (const row of registros) {
+    const fuente = fuentes.get(row.sku);
+    assert.equal(fuente.ruta_final, row.archivo);
+    assert.equal(require('node:crypto').createHash('sha256').update(fuente.bytes).digest('hex'), row.sha256);
   }
 });
 
