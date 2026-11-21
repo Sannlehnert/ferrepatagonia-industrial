@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import PublicHeader from '@/components/PublicHeader.vue'
 import PublicFooter from '@/components/PublicFooter.vue'
@@ -14,11 +14,24 @@ const content = ref<HTMLElement | null>(null)
 
 function focusContent() {
   const anchor = route.hash ? document.getElementById(route.hash.slice(1)) : null
-  const destination = anchor && content.value?.contains(anchor) ? anchor : content.value
+  const isContentAnchor = anchor && content.value?.contains(anchor)
+  const destination = isContentAnchor ? anchor : content.value
   destination?.focus({ preventScroll: true })
+  if (isContentAnchor) anchor.scrollIntoView({ block: 'start', behavior: 'instant' })
 }
 
 watch(() => route.fullPath, () => panel.close())
+watch(
+  () => route.hash,
+  hash => {
+    if (route.name === 'home' && hash === '#empresas') focusContent()
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  if (route.name === 'home' && route.hash === '#empresas') focusContent()
+})
 
 watch(
   () => [auth.user?.id, auth.rol, auth.sessionVersion],
@@ -35,7 +48,7 @@ watch(
       <RouterView />
     </div>
 
-    <PublicFooter />
+    <PublicFooter @navigate="focusContent" />
 
     <CartDrawer
       v-if="panel.visible && auth.rol === 'CLIENTE'"

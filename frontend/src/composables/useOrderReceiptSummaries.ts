@@ -35,6 +35,7 @@ export function useOrderReceiptSummaries(orders: () => ClientOrderSummary[] | nu
     auth.sessionVersion,
     auth.user?.tipo_cliente,
     auth.user?.estadoAprobacionEmpresa,
+    auth.user?.cuentaCorrienteHabilitada,
   ].join(':')
   const allowed = () => auth.rol === 'CLIENTE' && !auth.loggingIn && !auth.loggingOut
   const query = usePrivateAccountRead<Record<number, OrderReceiptStatus>>(identity, allowed)
@@ -44,6 +45,7 @@ export function useOrderReceiptSummaries(orders: () => ClientOrderSummary[] | nu
       auth.user?.tipo_cliente,
       order.modalidadPago,
       auth.user?.estadoAprobacionEmpresa,
+      auth.user?.cuentaCorrienteHabilitada,
     )
   }
 

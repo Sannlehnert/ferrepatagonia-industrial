@@ -25,6 +25,11 @@
   configuración mínima de `backend/.env`, arranque de backend y frontend, salud
   y advertencias de persistencia.
 
+- [API segura de perfil y edición (T-S7-11.1)](s7-11/T-S7-11.1-api-perfil.md):
+  consulta y actualización parcial de teléfono y dirección por el cliente
+  autenticado, con identidad tomada de la sesión, bloqueo de campos protegidos,
+  rollback transaccional y contrato para la interfaz de #337.
+
 - [Verificación de precios posterior al alta o edición (T-S7-05.2)](s7-05/T-S7-05.2-verificacion-precios.md):
   procedimiento local autorizado, evidencia comercial, invalidación por cambio
   de precio, historial append-only y migración FER-17 de auditoría.
@@ -36,6 +41,11 @@
   flujo de solicitud, aprobación/rechazo, habilitación/deshabilitación y
   modificación de límite, con auditoría append-only y separación entre
   aprobación empresarial, crédito, habilitación y elegibilidad de compra.
+
+- [Declaración, revisión y acreditación de pagos (T-S7-10.2 / #333)](333/README.md):
+  declaración de cliente con comprobante e idempotencia, revisión documental
+  separada y acreditación financiera transaccional sobre cuentas corrientes,
+  con pruebas de concurrencia, rollback, permisos y conversión ARS.
 
 - [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
   matriz P0/P1/P2, cobertura existente frente a brechas, catálogo maestro de

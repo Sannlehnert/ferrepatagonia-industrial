@@ -142,6 +142,7 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
       await expect(checkout.getByRole('alert')).toHaveText('La empresa no está aprobada para esta operación.')
       await expect(checkout.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
       await expect(checkout.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      await expect(checkout.getByRole('radio', { name: 'Transferencia' })).toHaveCount(0)
     }
     const blocked = { elegible: false, codigo: 'EMPRESA_NO_HABILITADA', cotizacion: null }
     expect(await readEligibility(() => client.goto('/carrito'))).toMatchObject(blocked)
@@ -173,8 +174,9 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
     expect(await readEligibility(() =>
       client.getByRole('button', { name: 'Aumentar cantidad de ' + product }).click(),
     )).toMatchObject({ elegible: false, codigo: 'CREDITO_INSUFICIENTE', totalUSD: '30.00' })
-    await expect(checkout.getByRole('alert')).toHaveText('El crédito disponible no alcanza para confirmar el pedido.')
-    await expect(checkout.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
+    await expect(checkout.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+    await expect(checkout.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+    await expect(checkout.getByRole('button', { name: 'Confirmar pedido por transferencia' })).toBeEnabled()
   } finally {
     await clientContext.close()
   }

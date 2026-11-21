@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { deactivateE2ECategories } from '../helpers/e2e-category-cleanup'
 
 const password = 'E2eLocal-214!'
+const createdCategoryIds: number[] = []
+
+test.afterAll(async () => {
+  await deactivateE2ECategories({ ids: createdCategoryIds })
+})
 
 async function login(page: Page) {
   await page.goto('/login')
@@ -17,6 +23,8 @@ async function createCategory(page: Page, nombre: string, descripcion = 'Descrip
     data: { nombre, descripcion },
   })
   expect(response.ok(), `${response.status()} ${await response.text()}`).toBe(true)
+  const { id_categoria } = await response.json()
+  createdCategoryIds.push(Number(id_categoria))
 }
 
 function categoryRow(page: Page, nombre: string) {

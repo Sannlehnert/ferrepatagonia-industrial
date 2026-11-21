@@ -47,6 +47,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
 
   const summary = page.getByRole('region', { name: 'Resumen del carrito' })
   await expect(summary).toContainText('USD 124.00')
+  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
 
   const secondTab = await context.newPage()
@@ -81,6 +82,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   expect((await addedAgain).status()).toBe(204)
   await page.getByRole('link', { name: 'Ver carrito completo' }).click()
   const nextSummary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(nextSummary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
   await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
     .toContainText('USD 248.00')

@@ -72,6 +72,7 @@ test('receipt availability requires approved EMPRESA transfers and preserves oth
  assert.equal(supportsOrderReceipts('EMPRESA','TRANSFERENCIA',null),false);
  assert.equal(supportsOrderReceipts('PARTICULAR','TRANSFERENCIA'),true);
  assert.equal(supportsOrderReceipts('EMPRESA','CUENTA_CORRIENTE'),true);
+ assert.equal(supportsOrderReceipts('EMPRESA','CUENTA_CORRIENTE','APROBADA',null),false);
  assert.equal(supportsOrderReceipts('PARTICULAR','CUENTA_CORRIENTE'),false);
  assert.equal(supportsOrderReceipts(undefined,'TRANSFERENCIA'),false);
 });
