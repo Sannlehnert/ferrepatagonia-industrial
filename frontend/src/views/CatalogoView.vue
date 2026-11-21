@@ -258,7 +258,7 @@ onBeforeUnmount(() => {
     <nav aria-label="Ruta de navegación" class="mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
       <RouterLink
         :to="{ name: 'home' }"
-        class="box-border inline-flex min-h-11 items-center px-1 fp-focus text-[var(--fp-blue)]"
+        class="box-border inline-flex min-h-11 min-w-11 items-center justify-center px-1 fp-focus text-[var(--fp-blue)]"
       >Inicio</RouterLink>
       <span aria-hidden="true">/</span>
       <template v-if="categoriaId">
@@ -269,7 +269,7 @@ onBeforeUnmount(() => {
         >
           <a
             :href="href"
-            class="box-border inline-flex min-h-11 items-center px-1 fp-focus text-[var(--fp-blue)]"
+            class="box-border inline-flex min-h-11 min-w-11 items-center justify-center px-1 fp-focus text-[var(--fp-blue)]"
             @click="navigate"
           >Catálogo</a>
         </RouterLink>

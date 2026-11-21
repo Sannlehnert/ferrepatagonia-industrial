@@ -18,8 +18,8 @@ watch(() => props.image, () => {
 </script>
 
 <template>
-  <div class="product-media">
-    <div class="product-media-content">
+  <div class="product-media-wrapper min-w-0 shrink-0">
+    <div class="product-media">
       <ProductThumbnail
         :image="props.image"
         :alt="props.name"
@@ -28,12 +28,12 @@ watch(() => props.image, () => {
       >
         <CommerceIcon name="box" />
       </ProductThumbnail>
-      <IllustrativeImageNotice
-        v-if="isIllustrativeImage && !failedImage"
-        :id="noticeId"
-        class="mx-2 mb-2"
-      />
     </div>
+    <IllustrativeImageNotice
+      v-if="isIllustrativeImage && !failedImage"
+      :id="noticeId"
+      class="mx-2 my-2"
+    />
   </div>
 </template>
 
@@ -43,17 +43,10 @@ watch(() => props.image, () => {
   place-items: center;
   overflow: hidden;
   aspect-ratio: 1.7;
+  border-radius: inherit;
   border-bottom: 1px solid var(--fp-line);
   color: #527a97;
   background: repeating-linear-gradient(135deg, #edf3f8 0 9px, var(--fp-bg) 9px 18px);
-}
-.product-media-content {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: .35rem;
-  width: 100%;
-  height: 100%;
-  min-height: 0;
 }
 .product-media svg {
   box-sizing: content-box;
