@@ -2,6 +2,8 @@
 
 El comprobante documenta la recepción de una transferencia. La carga y la revisión documental conservan el pedido, el pago, la cuenta corriente, sus movimientos y los saldos. El campo histórico `PAGO.comprobante` sigue siendo una referencia del registro de pago.
 
+**La revisión de este comprobante no acredita dinero.** La declaración de pago, su revisión administrativa y la acreditación financiera autorizada son operaciones distintas de [#333](333/README.md): `POST /api/cuenta-corriente/pagos`, `PATCH /api/admin/pagos/:id/revision` y `POST /api/admin/pagos/:id/acreditar`. Ninguna ruta de comprobantes crea `PAGO`, `ABONO` ni modifica saldos.
+
 ## Operaciones y pantallas
 
 | Perfil | Operación | Pantalla |

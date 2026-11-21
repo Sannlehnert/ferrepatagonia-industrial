@@ -5,6 +5,7 @@ import { adminProductRouter } from './adminProduct.routes';
 import { adminCategoryRouter } from './adminCategory.routes';
 import { productImportRouter } from './productImport.routes';
 import { adminOrderRouter } from './adminOrder.routes';
+import { adminPaymentRouter } from './adminPayment.routes';
 import { getAdminPriceLists, getClientPriceLists, putClientPriceList, saveAdminPriceList } from '../controllers/clientPriceList.controller';
 import { clientIdPolicy, priceListAssignmentPolicy, priceListIdPolicy } from '../dtos/clients/price-list-assignment.dto';
 import { priceListPolicy } from '../dtos/clients/price-list.dto';
@@ -88,6 +89,10 @@ adminRouter.put(
     validateDto('body', changeCreditLimitPolicy),
     putCreditLimit,
 );
+
+// Declaraciones de pago: revisión documental y acreditación financiera son
+// operaciones distintas. Ninguna de las dos se dispara desde comprobantes.
+adminRouter.use('/pagos', adminPaymentRouter);
 
 adminRouter.get('/clientes', getClientes);
 adminRouter.patch(
