@@ -1,5 +1,6 @@
 import type { EntityManager } from 'typeorm';
 import { ClienteSchema, CuentaCorrienteSchema, UsuarioSchema } from '../entities/active.schemas';
+import { noSyntheticLedgerSql } from './cuentaCorriente.repository';
 
 export const adminAccountClientExists = (manager: EntityManager, clienteId: number): Promise<boolean> =>
   manager.getRepository(ClienteSchema).existsBy({ id_cliente: clienteId });
@@ -28,6 +29,9 @@ export async function listAccountKeys(manager: EntityManager, filters: ListFilte
   if (filters.habilitada !== undefined) {
     query.andWhere('account.habilitada = :enabled', { enabled: Number(filters.habilitada) });
   }
-  if (filters.excludeDemo) query.andWhere("account.origen_datos = 'REAL'");
+  if (filters.excludeDemo) {
+    query.andWhere("account.origen_datos = 'REAL'");
+    query.andWhere(noSyntheticLedgerSql('account'));
+  }
   return query.getMany();
 }
