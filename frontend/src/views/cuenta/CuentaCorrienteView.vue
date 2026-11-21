@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import CompanyStatus from '@/components/CompanyStatus.vue'
+import CreditRequestPanel from '@/components/CreditRequestPanel.vue'
 import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { accountReceiptsPath } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
@@ -17,6 +18,11 @@ import {
 
 const auth = useAuthStore()
 const cuenta = useCuentaCorrienteStore()
+const creditRefreshVersion = ref(0)
+function refreshAccount() {
+    creditRefreshVersion.value += 1
+    void cuenta.load()
+}
 const resumen = computed(() => {
     const consulta = cuenta.consulta
     return consulta && consulta.estado !== 'SIN_CUENTA'
@@ -99,13 +105,14 @@ onBeforeRouteLeave(() => cuenta.clear())
                 <h1 id="current-account-title" class="m-0 mb-2 text-[28px] font-semibold">Cuenta corriente</h1>
                 <p class="m-0 leading-6 text-slate-600">Saldo, límite de crédito y movimientos de tu cuenta.</p>
             </div>
-            <button type="button" class="min-h-11 rounded-md border border-slate-300 px-4 py-2 hover:bg-slate-50"
-                :disabled="cuenta.consultaCargando" @click="cuenta.load()">
+            <button type="button" class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                :disabled="cuenta.consultaCargando" @click="refreshAccount()">
                 {{ cuenta.consultaCargando ? 'Actualizando…' : 'Actualizar' }}
             </button>
         </header>
 
         <CompanyStatus class="mb-6" />
+        <CreditRequestPanel :refresh-version="creditRefreshVersion" />
 
         <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando ||
             cuenta.movimientosMasCargando || cuenta.vencimientosMasCargando" role="status"
