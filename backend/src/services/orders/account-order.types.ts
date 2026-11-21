@@ -1,3 +1,8 @@
+import type {
+  OrderDocumentState,
+  OrderFinancialState,
+} from './order-state-projection';
+
 export interface ConfirmedAccountOrder {
   simulado?: true;
   pedidoId: number;
@@ -32,6 +37,10 @@ export interface ClientOrderSummary {
   numero: string;
   fecha: string;
   estado: string;
+  estadoPedido: string;
+  estadoDocumental: OrderDocumentState;
+  estadoFinanciero: OrderFinancialState;
+  montoAcreditadoUSD: string | null;
   modalidadPago: string;
   moneda: string | null;
   subtotal: string;

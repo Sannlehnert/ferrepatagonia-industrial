@@ -48,22 +48,23 @@ async function run(mode = process.argv[2] || 'all') {
       storage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-test-'));
     }
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
-    if (payments) {
+    if (receipts || orders || payments) {
+      for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-s7-04-2-state-consistency.sql'));
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-s7-10-2-payment-accreditation.sql'));
     }
-      if (orders) {
+    if (orders) {
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-273-order-instant.sql'));
+      apply(path.join(
+        backend,
+        '../database/migrate-fer-20-order-confirmation.sql',
+      ));
+      for (let i = 0; i < 2; i++) {
         apply(path.join(
           backend,
-          '../database/migrate-fer-20-order-confirmation.sql',
+          '../database/migrate-s7-06-1-transfer-order-confirmation.sql',
         ));
-        for (let i = 0; i < 2; i++) {
-          apply(path.join(
-            backend,
-            '../database/migrate-s7-06-1-transfer-order-confirmation.sql',
-          ));
-        }
       }
+    }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
     const files = payments ? ['test/payment-accreditation.mariadb.test.cjs']

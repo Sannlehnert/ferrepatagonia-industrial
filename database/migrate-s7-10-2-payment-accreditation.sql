@@ -98,17 +98,36 @@ BEGIN NOT ATOMIC
             CHECK (monto_usd IS NULL OR monto_usd > 0);
     END IF;
 
-    IF NOT EXISTS (
+    IF EXISTS (
         SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO'
           AND CONSTRAINT_NAME = 'chk_pago_conversion'
     ) THEN
-        ALTER TABLE PAGO ADD CONSTRAINT chk_pago_conversion CHECK (
-            monto_usd IS NULL OR (
-                (moneda = 'USD' AND monto_usd = monto AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+        ALTER TABLE PAGO DROP CONSTRAINT chk_pago_conversion,
+            ADD CONSTRAINT chk_pago_conversion CHECK (
+                (monto_usd IS NULL AND id_cotizacion IS NULL AND tasa_historica IS NULL)
                 OR (
-                    moneda = 'ARS' AND id_cotizacion IS NOT NULL
-                    AND tasa_historica IS NOT NULL AND tasa_historica > 0
+                    monto_usd IS NOT NULL AND monto_usd > 0
+                    AND (
+                        (moneda = 'USD' AND monto_usd = monto AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+                        OR (
+                            moneda = 'ARS' AND id_cotizacion IS NOT NULL
+                            AND tasa_historica IS NOT NULL AND tasa_historica > 0
+                        )
+                    )
+                )
+            );
+    ELSE
+        ALTER TABLE PAGO ADD CONSTRAINT chk_pago_conversion CHECK (
+            (monto_usd IS NULL AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+            OR (
+                monto_usd IS NOT NULL AND monto_usd > 0
+                AND (
+                    (moneda = 'USD' AND monto_usd = monto AND id_cotizacion IS NULL AND tasa_historica IS NULL)
+                    OR (
+                        moneda = 'ARS' AND id_cotizacion IS NOT NULL
+                        AND tasa_historica IS NOT NULL AND tasa_historica > 0
+                    )
                 )
             )
         );
@@ -139,14 +158,20 @@ BEGIN NOT ATOMIC
         );
     END IF;
 
-    IF NOT EXISTS (
+    IF EXISTS (
         SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO'
           AND CONSTRAINT_NAME = 'chk_pago_declaracion'
     ) THEN
+        ALTER TABLE PAGO DROP CONSTRAINT chk_pago_declaracion,
+            ADD CONSTRAINT chk_pago_declaracion CHECK (
+                (id_usuario_declarante IS NULL AND huella_declaracion IS NULL AND id_comprobante IS NULL)
+                OR (id_usuario_declarante IS NOT NULL AND clave_idempotencia IS NOT NULL
+                    AND huella_declaracion IS NOT NULL AND id_comprobante IS NOT NULL)
+            );
+    ELSE
         ALTER TABLE PAGO ADD CONSTRAINT chk_pago_declaracion CHECK (
-            (id_usuario_declarante IS NULL AND clave_idempotencia IS NULL
-                AND huella_declaracion IS NULL AND id_comprobante IS NULL)
+            (id_usuario_declarante IS NULL AND huella_declaracion IS NULL AND id_comprobante IS NULL)
             OR (id_usuario_declarante IS NOT NULL AND clave_idempotencia IS NOT NULL
                 AND huella_declaracion IS NOT NULL AND id_comprobante IS NOT NULL)
         );
@@ -175,6 +200,28 @@ BEGIN NOT ATOMIC
             OR (estado IN ('RECHAZADO', 'ANULADO')
                 AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
         );
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLES
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO_IDEMPOTENCIA'
+    ) THEN
+        IF EXISTS (
+            SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+            WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO_IDEMPOTENCIA'
+              AND CONSTRAINT_NAME = 'chk_pago_idempotencia_operacion'
+        ) THEN
+            ALTER TABLE PAGO_IDEMPOTENCIA
+                DROP CONSTRAINT chk_pago_idempotencia_operacion,
+                ADD CONSTRAINT chk_pago_idempotencia_operacion CHECK (
+                    operacion IN ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+                );
+        ELSE
+            ALTER TABLE PAGO_IDEMPOTENCIA
+                ADD CONSTRAINT chk_pago_idempotencia_operacion CHECK (
+                    operacion IN ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+                );
+        END IF;
     END IF;
 
     -- No se agregan FKs nuevas a PAGO: las suites históricas limpian COTIZACION

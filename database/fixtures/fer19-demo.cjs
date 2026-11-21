@@ -49,13 +49,31 @@ async function demoOrder(db, client, amount, instant = new Date().toISOString())
 
 async function demoPayment(db, client, amount, {
   instant = new Date().toISOString(), state = 'ACREDITADO', currency = 'USD',
+  closureReason = null, closureAdminId = null,
 } = {}) {
   const date = sqlTime(instant);
+  const accredited = state === 'ACREDITADO';
+  const closed = state === 'RECHAZADO' || state === 'ANULADO';
+  const resolvedClosureReason = closed
+    ? (closureReason ?? (state === 'ANULADO' ? 'DEMO: anulación de pago de prueba' : 'DEMO: rechazo de pago de prueba'))
+    : null;
   return id(await db.query(
-    "INSERT INTO PAGO(id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,fecha_acreditacion_utc,evidencia_acreditacion) " +
-    "VALUES(?,?,?,'DEMO_TRANSFERENCIA',?,?,?,?)",
-    [client.accountId, date, amount, state, currency, state === 'ACREDITADO' ? date : null,
-      state === 'ACREDITADO' ? 'DEMO: constancia sintética de acreditación' : null]));
+    "INSERT INTO PAGO(id_cuenta_corriente,fecha,monto,metodo_pago,estado,moneda,monto_usd," +
+    "fecha_acreditacion_utc,evidencia_acreditacion,motivo_cierre,id_admin_cierre,fecha_cierre_utc) " +
+    "VALUES(?,?,?,'DEMO_TRANSFERENCIA',?,?,?,?,?,?,?,?)",
+    [
+      client.accountId,
+      date,
+      amount,
+      state,
+      currency,
+      accredited && currency === 'USD' ? amount : null,
+      accredited ? date : null,
+      accredited ? 'DEMO: constancia sintética de acreditación' : null,
+      resolvedClosureReason,
+      closed ? closureAdminId : null,
+      closed ? date : null,
+    ]));
 }
 
 async function seedDemo(session, { browser = false } = {}) {
@@ -153,7 +171,13 @@ async function seedDemo(session, { browser = false } = {}) {
       await manager.query("UPDATE CUENTA_CORRIENTE SET cobertura='PARCIAL',evidencia_cobertura=NULL,cobertura_desde_utc=NULL WHERE id_cuenta_corriente=?",
         [fixture.clients.parcial.accountId]);
       for (const state of ['PENDIENTE', 'RECHAZADO']) {
-        await demoPayment(manager, fixture.clients.empresa30, '999.00', { state, instant: '2026-02-10T12:00:00Z' });
+        await demoPayment(manager, fixture.clients.empresa30, '999.00', {
+          state,
+          instant: '2026-02-10T12:00:00Z',
+          ...(state === 'RECHAZADO'
+            ? { closureReason: 'DEMO: rechazo de pago de prueba', closureAdminId: adminId }
+            : {}),
+        });
       }
       if (browser) {
         for (let i = 0; i < 27; i++) await movement('paginada', 'CARGO', '1.00', '2026-02-01T12:00:00Z');
