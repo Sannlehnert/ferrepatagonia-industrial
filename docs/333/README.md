@@ -4,7 +4,8 @@
 - **Base inicial:** `5cf464c` (`Merge pull request #139`).
 - **Commit de implementación:** `1cb4d4c`.
 - **Merge final de `origin/develop`:** `dc59601` vía `aa6d154`.
-- **Corrección de auditoría:** `ee17442` (`fix(payments): address accreditation audit findings (#333)`).
+- **Corrección de auditoría:** `ee17442` (`fix(payments): address accreditation audit findings (#333)`) y `dd04e4e` (`docs(payments): record audit corrections and #158 compatibility (#333)`).
+- **HEAD local:** commits de corrección `ee17442`/`dd04e4e` más merge de `dc59601` y documentación final.
 - **Responsable:** Santiago Agustín Lehnert.
 - **Revisor técnico:** Lucci.
 - **Validación UX/UI:** no requerida.
