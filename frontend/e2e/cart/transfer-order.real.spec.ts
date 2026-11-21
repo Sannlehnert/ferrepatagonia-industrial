@@ -12,6 +12,7 @@ interface OwnedSession {
 interface DisposableDatabase {
   session: OwnedSession
   connection: OwnedSession['connection']
+  fixtures: OrderFixture[]
 }
 
 interface OrderFixture {
@@ -61,11 +62,26 @@ const databaseTest = test.extend<{ database: DisposableDatabase }>({
     const profile = process.env.CCE2E_TEST_PROFILE
     if (!profile) throw new Error('Ejecutá las pruebas con backend/test/helpers/run-e2e.cjs')
     const session = await connectOwned(JSON.parse(profile), 'E2E')
-    const database = { session, connection: session.connection }
+    const database = { session, connection: session.connection, fixtures: [] as OrderFixture[] }
     try {
       await use(database)
     } finally {
-      await session.connection.end()
+      try {
+        // Los productos y categorías creados por estas pruebas no deben quedar
+        // visibles para las suites de catálogo que comparten la base temporal.
+        for (const fixture of database.fixtures) {
+          await session.connection.query(
+            'UPDATE PRODUCTO SET activo = 0 WHERE id_producto = ?',
+            [fixture.productId],
+          )
+          await session.connection.query(
+            'UPDATE CATEGORIA SET activo = 0 WHERE id_categoria = ?',
+            [fixture.categoryId],
+          )
+        }
+      } finally {
+        await session.connection.end()
+      }
     }
   },
 })
@@ -75,6 +91,7 @@ async function customer(
   options: FixtureOptions = {},
 ): Promise<Customer> {
   const fixture = await createOrderFixture(database.session, options)
+  database.fixtures.push(fixture)
   const email = randomUUID() + '@example.test'
   const password = 'Transfer-' + randomUUID() + '!'
   const name = 'Producto transferencia ' + fixture.productId
