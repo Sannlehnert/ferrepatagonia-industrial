@@ -66,6 +66,16 @@ const settle = async () => {
 };
 
 function load(file, mocks = {}, inlineTemplate = false) {
+  const defaults = {
+    '@/stores/auth': { useAuthStore: () => vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false }) },
+    '@/composables/useAdminClientCredit': { useAdminClientCredit: () => ({ status: () => null, refresh: async () => {} }) },
+    '@/components/AdminClientCreditStatus.vue': { __esModule: true, default: { render: () => null } },
+    '@/components/AdminClientStatusDialog.vue': { __esModule: true, default: {
+      emits: ['confirm'],
+      setup(_props, { emit }) { return () => vue.h('button', { 'aria-label': 'Confirmar aprobación de prueba', onClick: () => emit('confirm') }, 'Confirmar'); },
+    } },
+  };
+  mocks = { ...defaults, ...mocks };
   const filename = path.resolve(root, file);
   let source = fs.readFileSync(filename, 'utf8');
   if (file.endsWith('.vue')) {
@@ -202,6 +212,131 @@ test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y ac
   assert.match(tableHtml, /Rechazada/);
   assert.match(tableHtml, /Aprobar cuenta empresa de Constructora Sur SRL/);
   assert.match(tableHtml, /Rechazar cuenta empresa de Constructora Sur SRL/);
+  assert.doesNotMatch(tableHtml, /Aprobar cuenta empresa de Metalúrgica Austral SA/);
+  assert.match(tableHtml, /Rechazar cuenta empresa de Metalúrgica Austral SA/);
+  assert.match(tableHtml, /Aprobar cuenta empresa de Obras Patagónicas SA/);
+  assert.doesNotMatch(tableHtml, /Rechazar cuenta empresa de Obras Patagónicas SA/);
+});
+
+test('crédito compacto distingue disponibilidad de cuenta y reserva la procedencia para el detalle', async t => {
+  const component = load('components/AdminClientCreditStatus.vue', {}, true).default;
+  const state = vue.reactive({ compact: true, credit: {
+    state: 'READY', account: { estado: 'HABILITADA', estadoCredito: 'DISPONIBLE', origen: 'DEMO' },
+  } });
+  const dom = createTestRenderer();
+  const rootEl = dom.createRoot();
+  const app = dom.renderer.createApp({ render: () => vue.h(component, {
+    company: true, compact: state.compact, credit: state.credit,
+  }) });
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  const html = () => dom.serialize(rootEl);
+  assert.match(html(), /Cuenta habilitada/);
+  assert.match(html(), /Crédito disponible<\/p>/);
+  assert.doesNotMatch(html(), /según la cuenta|Datos de demostración/);
+  state.compact = false;
+  await settle();
+  assert.match(html(), /Crédito disponible según la cuenta/);
+  assert.match(html(), /Datos de demostración/);
+  state.compact = true;
+  for (const [status, label] of [['BLOQUEADO', 'Crédito bloqueado'], ['NO_DETERMINABLE', 'Crédito no determinable']]) {
+    state.credit.account.estadoCredito = status;
+    await settle();
+    assert.match(html(), new RegExp(label));
+    assert.doesNotMatch(html(), /Datos de demostración/);
+  }
+  state.credit = { state: 'ERROR' };
+  await settle();
+  assert.match(html(), /Crédito no disponible para consulta/);
+  assert.match(html(), /Reintentar crédito/);
+  assert.doesNotMatch(html(), /Sin cuenta corriente/);
+});
+
+function creditReader(t, read, ids = [1, 2, 3]) {
+  const auth = vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false });
+  const clients = vue.ref(ids.map(id => ({ id, tipoCliente: 'EMPRESA', estadoAprobacionEmpresa: 'APROBADA' })));
+  let dispose;
+  const { useAdminClientCredit } = load('composables/useAdminClientCredit.ts', {
+    vue: { ...vue, onBeforeUnmount: fn => { dispose = fn; } },
+    '@/stores/auth': { useAuthStore: () => auth },
+    '@/services/adminAccountService': { getAdminAccount: read },
+  });
+  const scope = vue.effectScope();
+  const credit = scope.run(() => useAdminClientCredit(() => clients.value));
+  t.after(() => { dispose(); scope.stop(); });
+  return { credit, auth, clients };
+}
+
+test('S7-345-02: publica errores y éxitos sin esperar a otra empresa y reintenta solo la afectada', async t => {
+  const calls = [];
+  let rejectSecond;
+  const { credit } = creditReader(t, (id, signal) => {
+    calls.push({ id, signal });
+    if (id === 1) return new Promise(() => {});
+    if (id === 2 && calls.filter(call => call.id === 2).length === 1)
+      return new Promise((_, reject) => { rejectSecond = reject; });
+    return Promise.resolve({ estado: 'HABILITADA', estadoCredito: 'DISPONIBLE' });
+  });
+  assert.deepEqual(calls.map(call => call.id), [1, 2]);
+  rejectSecond(Error('503'));
+  await settle();
+  assert.equal(credit.status(1), null);
+  assert.equal(credit.status(2).state, 'ERROR');
+  assert.equal(credit.status(3).state, 'READY');
+  credit.refresh(2);
+  credit.refresh(2);
+  await settle();
+  assert.equal(credit.status(2).state, 'READY');
+  assert.deepEqual(calls.map(call => call.id), [1, 2, 3, 2]);
+  assert.equal(calls[0].signal.aborted, false);
+});
+
+test('S7-345-02: vence la espera, permite reintentar y descarta una respuesta tardía', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  let resolveOld, oldSignal, attempts = 0;
+  const { credit } = creditReader(t, (id, signal) => {
+    if (id === 1 && ++attempts === 1) {
+      oldSignal = signal;
+      return new Promise(resolve => { resolveOld = resolve; });
+    }
+    return Promise.resolve({ estado: 'HABILITADA', estadoCredito: 'DISPONIBLE' });
+  }, [1, 2]);
+  await settle();
+  const other = credit.status(2);
+  t.mock.timers.tick(15_000);
+  await settle();
+  assert.equal(oldSignal.aborted, true);
+  assert.equal(credit.status(1).state, 'ERROR');
+  credit.refresh(1);
+  await settle();
+  resolveOld({ estado: 'INHABILITADA', estadoCredito: 'BLOQUEADO' });
+  await settle();
+  assert.equal(credit.status(1).account.estadoCredito, 'DISPONIBLE');
+  assert.equal(credit.status(2), other);
+});
+
+test('S7-345-02: cambiar de sesión o salir cancela consultas y descarta resultados anteriores', async t => {
+  const calls = [];
+  const { credit, auth } = creditReader(t, (id, signal) => new Promise(resolve => {
+    calls.push({ id, signal, resolve });
+  }), [1, 2]);
+  auth.sessionVersion++;
+  assert.equal(calls.length, 4);
+  assert.ok(calls.slice(0, 2).every(call => call.signal.aborted));
+  calls[0].resolve({ estadoCredito: 'BLOQUEADO' });
+  calls[1].resolve({ estadoCredito: 'BLOQUEADO' });
+  await settle();
+  assert.equal(credit.status(1), null);
+  calls[2].resolve({ estadoCredito: 'DISPONIBLE' });
+  await settle();
+  assert.equal(credit.status(1).account.estadoCredito, 'DISPONIBLE');
+  auth.loggingOut = true;
+  assert.equal(calls[3].signal.aborted, true);
+  calls[3].resolve({ estadoCredito: 'DISPONIBLE' });
+  await settle();
+  assert.equal(credit.status(1), null);
+  assert.equal(credit.status(2), null);
+  assert.equal(calls.length, 4);
 });
 
 function findNode(n, pred) {
@@ -251,6 +386,10 @@ test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea
   assert.ok(approveBtn, 'Botón de aprobar debe existir en el DOM');
 
   await approveBtn.props.onClick();
+  await settle();
+  const confirmation = findNode(rootEl, n => n.props?.['aria-label'] === 'Confirmar aprobación de prueba');
+  assert.ok(confirmation, 'La aprobación requiere confirmar el diálogo');
+  await confirmation.props.onClick();
   await settle();
 
   const html = dom.serialize(rootEl);
@@ -430,4 +569,51 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
     text: 'Estado verificado con el servidor.',
     error: false,
   });
+});
+
+test('descarta el listado de una sesión ADMIN anterior', async t => {
+  const auth = vue.reactive({ rol: 'ADMIN', user: { id: 1 }, sessionVersion: 1, loggingIn: false, loggingOut: false });
+  let release;
+  const component = load('views/admin/AdminClientsView.vue', {
+    '@/stores/auth': { useAuthStore: () => auth },
+    '@/services/adminClientService': {
+      getAdminClients: () => new Promise(resolve => { release = resolve; }),
+      getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  }).default;
+  component.render = () => null;
+  const dom = createTestRenderer();
+  const app = dom.renderer.createApp(component);
+  app.mount(dom.createRoot());
+  t.after(() => app.unmount());
+  const state = app._instance.setupState;
+  auth.loggingOut = true;
+  await settle();
+  release(sampleClients());
+  await settle();
+  assert.deepEqual(state.clients, []);
+  assert.equal(state.selectedClient, null);
+});
+
+test('no declara verificado un cliente ausente de la respuesta de reconciliación', async t => {
+  let result = sampleClients();
+  const component = load('views/admin/AdminClientsView.vue', {
+    '@/services/adminClientService': {
+      getAdminClients: async () => result,
+      getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  }).default;
+  component.render = () => null;
+  const dom = createTestRenderer();
+  const app = dom.renderer.createApp(component);
+  app.mount(dom.createRoot());
+  t.after(() => app.unmount());
+  await settle();
+  const state = app._instance.setupState;
+  result = [];
+  await state.reconcileCompanyApproval(20);
+  assert.equal(state.uncertainApprovalClientIds[20], true);
+  assert.equal(state.approvalFeedback[20].error, true);
 });
