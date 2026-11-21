@@ -36,6 +36,41 @@ async function insert(sql, params = []) {
   return Number((await db.query(sql, params)).insertId);
 }
 
+async function verifiedQuote(rate) {
+  const version = `fer333-${randomUUID()}`;
+  const { reference, days } = pricingReference();
+  assert.ok(reference, 'la referencia de cotización debe existir');
+  await insert(`
+    INSERT INTO FER17_CALENDARIO (version, dias_json, evidencia, id_admin, verificado_utc, activo, sintetica)
+    VALUES (?, ?, 'DEMO calendario verificado', ?, DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 SECOND), 1, 0)
+  `, [version, JSON.stringify(days), admin.id]);
+  const [existing] = await db.query(
+    'SELECT id_cotizacion FROM COTIZACION WHERE fecha_referencia = ?', [reference],
+  );
+  let quoteId;
+  if (existing) {
+    quoteId = Number(existing.id_cotizacion);
+    await db.query('UPDATE COTIZACION SET tasa = ?, valida = 1 WHERE id_cotizacion = ?', [rate, quoteId]);
+  } else {
+    quoteId = await insert(`
+      INSERT INTO COTIZACION (tasa, fecha_referencia, fecha_carga, actor, valida)
+      VALUES (?, ?, DATE_FORMAT(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 HOUR), '%Y-%m-%d %H:%i:%s'), 'DEMO BNA', 1)
+    `, [rate, reference]);
+  }
+  await db.query(`
+    INSERT INTO FER17_COTIZACION_VERIFICACION
+      (id_cotizacion, tasa_verificada, referencia_verificada, cargada_utc,
+       actor_carga_verificado, banco, tipo, evidencia, id_admin, verificado_utc, valida, sintetica)
+    VALUES (?, ?, ?, UTC_TIMESTAMP(3), 'DEMO BNA', 'BNA', 'VENDEDOR',
+      'DEMO verificación de cotización', ?, UTC_TIMESTAMP(3), 1, 0)
+    ON DUPLICATE KEY UPDATE
+      tasa_verificada = VALUES(tasa_verificada),
+      referencia_verificada = VALUES(referencia_verificada),
+      valida = 1, sintetica = 0
+  `, [quoteId, rate, reference, admin.id]);
+  return quoteId;
+}
+
 async function newCompany(label, { charge = '100.00', complete = true, enabled = 1 } = {}) {
   const suffix = randomUUID();
   const clientId = await insert(`
@@ -383,9 +418,21 @@ test('#333 revisión documental no acredita y el rechazo bloquea la acreditació
   assert.equal(repeated.body.data.revisadoEn, validation.body.data.revisadoEn);
   assert.equal(Number((await paymentsFor(company.accountId))[0].id_admin_revision), admin.id);
 
+  // P2-04: un pago PENDIENTE puede rechazarse financieramente aunque su
+  // revisión documental ya esté APROBADA. El rechazo es terminal y no mueve saldo.
   const contradictory = await review(paymentId, 'RECHAZADO', { motivo: 'Cambio de decisión' });
-  assert.equal(contradictory.status, 409);
-  assert.equal(contradictory.body.code, 'PAGO_YA_REVISADO');
+  assert.equal(contradictory.status, 200, JSON.stringify(contradictory.body));
+  assert.equal(contradictory.body.data.estado, 'RECHAZADO');
+  assert.equal(contradictory.body.data.estadoDocumental, 'RECHAZADO');
+  assert.equal(contradictory.body.data.motivoRevision, 'Cambio de decisión');
+  const afterContradictory = await ledgerSnapshot(company.accountId);
+  assert.deepEqual(afterContradictory.movements, before.movements);
+  assert.deepEqual(afterContradictory.imputations, before.imputations);
+  assert.equal(afterContradictory.saldo, before.saldo);
+  const blockedAfterRejection = await accredit(paymentId);
+  assert.equal(blockedAfterRejection.status, 409, JSON.stringify(blockedAfterRejection.body));
+  assert.equal(blockedAfterRejection.body.code, 'TRANSICION_PAGO_INVALIDA');
+  assert.equal((await movementForPayment(paymentId)).length, 0);
 
   const rejectedDeclaration = await declare(company, '5.00');
   assert.equal(rejectedDeclaration.status, 201, JSON.stringify(rejectedDeclaration.body));
@@ -773,9 +820,11 @@ test('#333 pago en ARS: sin cotización verificada no acredita; con cotización 
   const validation = await review(paymentId, 'APROBADO');
   assert.equal(validation.status, 200, JSON.stringify(validation.body));
 
-  const withoutQuote = await accredit(paymentId);
-  assert.equal(withoutQuote.status, 409, JSON.stringify(withoutQuote.body));
-  assert.equal(withoutQuote.body.code, 'TRANSICION_PAGO_INVALIDA');
+  // Sin calendario FER17 verificado no se puede convertir: error funcional 422,
+  // nunca un 500 genérico, y sin movimientos.
+  const withoutCalendar = await accredit(paymentId);
+  assert.equal(withoutCalendar.status, 422, JSON.stringify(withoutCalendar.body));
+  assert.equal(withoutCalendar.body.code, 'COTIZACION_INVALIDA');
   assert.equal((await movementForPayment(paymentId)).length, 0);
   assert.equal(await balance(company.accountId), '100.00');
 
@@ -787,10 +836,26 @@ test('#333 pago en ARS: sin cotización verificada no acredita; con cotización 
     INSERT INTO FER17_CALENDARIO (version, dias_json, evidencia, id_admin, verificado_utc, activo, sintetica)
     VALUES (?, ?, 'DEMO calendario verificado', ?, DATE_SUB(UTC_TIMESTAMP(3), INTERVAL 1 SECOND), 1, 0)
   `, [version, JSON.stringify(days), admin.id]);
+
+  // Con calendario pero sin cotización diaria en FER17_CALENDARIO: 409 funcional.
+  const withoutDailyQuote = await accredit(paymentId);
+  assert.equal(withoutDailyQuote.status, 409, JSON.stringify(withoutDailyQuote.body));
+  assert.equal(withoutDailyQuote.body.code, 'COTIZACION_AUSENTE');
+  assert.equal((await movementForPayment(paymentId)).length, 0);
+  assert.equal(await balance(company.accountId), '100.00');
+
   const quoteId = await insert(`
     INSERT INTO COTIZACION (tasa, fecha_referencia, fecha_carga, actor, valida)
     VALUES (?, ?, DATE_FORMAT(DATE_SUB(UTC_TIMESTAMP(), INTERVAL 3 HOUR), '%Y-%m-%d %H:%i:%s'), 'DEMO BNA', 1)
   `, [rate, reference]);
+
+  // Cotización cargada pero no verificada: tampoco es acreditable ni deja rastros.
+  const unverifiedQuote = await accredit(paymentId);
+  assert.equal(unverifiedQuote.status, 422, JSON.stringify(unverifiedQuote.body));
+  assert.equal(unverifiedQuote.body.code, 'COTIZACION_INVALIDA');
+  assert.equal((await movementForPayment(paymentId)).length, 0);
+  assert.equal(await balance(company.accountId), '100.00');
+
   await insert(`
     INSERT INTO FER17_COTIZACION_VERIFICACION
       (id_cotizacion, tasa_verificada, referencia_verificada, cargada_utc,
@@ -814,4 +879,166 @@ test('#333 pago en ARS: sin cotización verificada no acredita; con cotización 
   const [payment] = (await paymentsFor(company.accountId)).filter(row => row.id_pago === paymentId);
   assert.equal(payment.monto_usd, '1.00');
   assert.equal(Number(payment.id_cotizacion), quoteId);
+  assert.equal(payment.tasa_historica, rate);
+  assert.equal(payment.estado, 'ACREDITADO');
+});
+
+test('#333 cliente propio inactivo recibe 403 CLIENTE_INACTIVO y no un 404 ambiguo', async () => {
+  const company = await newCompany('cliente-inactivo', { charge: '20.00' });
+  const receiptId = await newReceipt(company);
+  await db.query('UPDATE CLIENTE SET activo = 0 WHERE id_cliente = ?', [company.clientId]);
+
+  const declaration = await declare(company, '5.00', { receiptId });
+  assert.equal(declaration.status, 403, JSON.stringify(declaration.body));
+  assert.equal(declaration.body.code, 'CLIENTE_INACTIVO');
+  assert.equal((await paymentsFor(company.accountId)).length, 0);
+
+  const list = await api('/cuenta-corriente/pagos', { token: company.token });
+  assert.equal(list.status, 403, JSON.stringify(list.body));
+  assert.equal(list.body.code, 'CLIENTE_INACTIVO');
+});
+
+test('#333 revalida el comprobante en revisión y acreditación antes de mover saldos', async () => {
+  const companyA = await newCompany('receipt-revalidation-a', { charge: '50.00' });
+  const companyB = await newCompany('receipt-revalidation-b', { charge: '50.00' });
+
+  // Comprobante eliminado antes de la revisión documental.
+  const first = await declare(companyA, '10.00');
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  await db.query('DELETE FROM COMPROBANTE_PAGO WHERE id_comprobante = ?', [first.receiptId]);
+  const missingReview = await review(first.body.data.id, 'APROBADO');
+  assert.equal(missingReview.status, 404, JSON.stringify(missingReview.body));
+  assert.equal(missingReview.body.code, 'COMPROBANTE_NO_ENCONTRADO');
+  const [firstRow] = (await paymentsFor(companyA.accountId)).filter(row => row.id_pago === first.body.data.id);
+  assert.equal(firstRow.estado, 'PENDIENTE');
+  assert.equal(firstRow.estado_documental, 'PENDIENTE');
+  assert.equal(firstRow.fecha_acreditacion_utc, null);
+
+  // Comprobante eliminado después de aprobar la revisión, antes de acreditar.
+  const second = await declare(companyA, '12.00');
+  assert.equal(second.status, 201, JSON.stringify(second.body));
+  assert.equal((await review(second.body.data.id, 'APROBADO')).status, 200);
+  await db.query('DELETE FROM COMPROBANTE_PAGO WHERE id_comprobante = ?', [second.receiptId]);
+  const before = await ledgerSnapshot(companyA.accountId);
+  const missingAccreditation = await accredit(second.body.data.id);
+  assert.equal(missingAccreditation.status, 404, JSON.stringify(missingAccreditation.body));
+  assert.equal(missingAccreditation.body.code, 'COMPROBANTE_NO_ENCONTRADO');
+  assert.deepEqual((await ledgerSnapshot(companyA.accountId)).movements, before.movements);
+  assert.equal((await movementForPayment(second.body.data.id)).length, 0);
+  const [secondRow] = (await paymentsFor(companyA.accountId)).filter(row => row.id_pago === second.body.data.id);
+  assert.equal(secondRow.estado, 'PENDIENTE');
+  assert.equal(secondRow.estado_documental, 'APROBADO');
+  assert.equal(secondRow.fecha_acreditacion_utc, null);
+
+  // Comprobante de otra empresa/cuenta vinculado a la declaración.
+  const foreignReceipt = await newReceipt(companyB);
+  const third = await declare(companyA, '7.00');
+  assert.equal(third.status, 201, JSON.stringify(third.body));
+  assert.equal((await review(third.body.data.id, 'APROBADO')).status, 200);
+  await db.query('UPDATE PAGO SET id_comprobante = ? WHERE id_pago = ?', [foreignReceipt, third.body.data.id]);
+  const beforeForeign = await ledgerSnapshot(companyA.accountId);
+  const foreign = await accredit(third.body.data.id);
+  assert.equal(foreign.status, 404, JSON.stringify(foreign.body));
+  assert.equal(foreign.body.code, 'COMPROBANTE_NO_ENCONTRADO');
+  assert.deepEqual((await ledgerSnapshot(companyA.accountId)).movements, beforeForeign.movements);
+  assert.equal((await movementForPayment(third.body.data.id)).length, 0);
+});
+
+test('#333 cabeceras privadas en /api/admin/pagos incluso ante rechazos tempranos', async () => {
+  for (const response of [
+    await api('/admin/pagos'),
+    await api('/admin/pagos?otro=1', { token: admin.token }),
+    await api('/admin/pagos/abc', { token: admin.token }),
+  ]) {
+    assert.ok([400, 401].includes(response.status), JSON.stringify(response));
+    assert.equal(response.headers.get('cache-control'), 'private, no-store');
+    assert.match(response.headers.get('vary') ?? '', /Cookie/i);
+  }
+});
+
+test('#333 filtra pagos DEMO_REGISTRADO y libros DEMO o mixtos también fuera de test', async () => {
+  const company = await newCompany('demo-filter-real', { charge: '20.00' });
+  const visible = await declare(company, '5.00');
+  assert.equal(visible.status, 201, JSON.stringify(visible.body));
+  const visibleId = visible.body.data.id;
+
+  const demoPaymentId = await insert(`
+    INSERT INTO PAGO (id_cuenta_corriente, fecha, monto, metodo_pago, estado, moneda)
+    VALUES (?, UTC_TIMESTAMP(), 1.00, 'DEMO_METODO', 'DEMO_REGISTRADO', 'USD')
+  `, [company.accountId]);
+
+  const mixed = await newCompany('demo-filter-mixed', { charge: '20.00' });
+  const hidden = await declare(mixed, '5.00');
+  assert.equal(hidden.status, 201, JSON.stringify(hidden.body));
+  const hiddenId = hidden.body.data.id;
+  const demoOrder = await insert(`
+    INSERT INTO PEDIDO (id_cliente, estado, modalidad_pago, subtotal, descuento, total,
+      moneda_total, evidencia_total_usd)
+    VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', 1.00, 0, 1.00, 'USD', 'DEMO total')
+  `, [mixed.clientId]);
+  await ledger.registrarCargoPorPedido({
+    id_cuenta_corriente: mixed.accountId,
+    id_pedido: demoOrder,
+    monto: '1.00',
+    moneda: 'USD',
+    origen: 'DEMO',
+  });
+  const blockedAfterMix = await declare(mixed, '1.00');
+  assert.equal(blockedAfterMix.status, 409, JSON.stringify(blockedAfterMix.body));
+  assert.equal(blockedAfterMix.body.code, 'CUENTA_RESTRINGIDA');
+
+  const adminList = await api('/admin/pagos', { token: admin.token });
+  assert.equal(adminList.status, 200, JSON.stringify(adminList.body));
+  const adminIds = adminList.body.data.items.map(item => item.id);
+  assert.ok(adminIds.includes(visibleId));
+  assert.equal(adminIds.includes(demoPaymentId), false);
+  assert.equal(adminIds.includes(hiddenId), false);
+
+  const demoDetail = await api(`/admin/pagos/${demoPaymentId}`, { token: admin.token });
+  assert.equal(demoDetail.status, 404);
+  assert.equal(demoDetail.body.code, 'PAGO_NO_ENCONTRADO');
+  const hiddenDetail = await api(`/admin/pagos/${hiddenId}`, { token: admin.token });
+  assert.equal(hiddenDetail.status, 404);
+  assert.equal(hiddenDetail.body.code, 'PAGO_NO_ENCONTRADO');
+
+  const clientList = await api('/cuenta-corriente/pagos', { token: mixed.token });
+  assert.equal(clientList.status, 200);
+  assert.equal(clientList.body.data.items.some(item => item.id === hiddenId), false);
+});
+
+test('#333 conversión ARS que redondea a USD 0.00 se rechaza sin escribir', async () => {
+  const company = await newCompany('ars-cero', { charge: '10.00' });
+  const declaration = await declare(company, '0.01', { currency: 'ARS' });
+  assert.equal(declaration.status, 201, JSON.stringify(declaration.body));
+  const paymentId = declaration.body.data.id;
+  assert.equal((await review(paymentId, 'APROBADO')).status, 200);
+  await verifiedQuote('1000.00000000');
+
+  const response = await accredit(paymentId);
+  assert.equal(response.status, 422, JSON.stringify(response.body));
+  assert.equal(response.body.code, 'MONTO_USD_INVALIDO');
+  assert.equal((await movementForPayment(paymentId)).length, 0);
+  assert.equal(await balance(company.accountId), '10.00');
+  const [row] = (await paymentsFor(company.accountId)).filter(item => item.id_pago === paymentId);
+  assert.equal(row.estado, 'PENDIENTE');
+  assert.equal(row.monto_usd, null);
+  assert.equal(row.id_cotizacion, null);
+  assert.equal(row.tasa_historica, null);
+});
+
+test('#333 claves de idempotencia son globales entre cuentas y flujos', async () => {
+  const companyA = await newCompany('global-key-a', { charge: '20.00' });
+  const companyB = await newCompany('global-key-b', { charge: '20.00' });
+  const receiptB = await newReceipt(companyB);
+  const key = idem();
+  const first = await declare(companyA, '5.00', { key });
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+
+  const reused = await api('/cuenta-corriente/pagos', {
+    method: 'POST', token: companyB.token, key,
+    body: { monto: '5.00', moneda: 'USD', comprobanteId: receiptB },
+  });
+  assert.equal(reused.status, 409, JSON.stringify(reused.body));
+  assert.equal(reused.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
+  assert.equal((await paymentsFor(companyB.accountId)).length, 0);
 });

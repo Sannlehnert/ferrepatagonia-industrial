@@ -7,14 +7,17 @@ import {
   normalizeReceiptId,
   parsePaymentAmount,
   parsePaymentListQuery,
+  parseUtcIsoTimestamp,
   type AccreditPayment,
   type DeclarePayment,
   type ReviewPayment,
 } from '../../dtos/payments/payment.dto';
 import { calcularEstadoCuenta, registrarAbonoPorPago } from '../../repositories/cuentaCorriente.repository';
+import { loadAccountQuote } from '../../repositories/cuentaCorriente.quote';
 import {
   findAccountIdForUser,
   findPaymentByAccreditationKey,
+  findPaymentByAnyKey,
   findPaymentByDeclarationKey,
   findPaymentByReceipt,
   findPaymentDestination,
@@ -23,6 +26,7 @@ import {
   lockAccount,
   lockClient,
   lockPayment,
+  lockPaymentReceipt,
   lockReceiptForDeclaration,
   lockUser,
   paymentDto,
@@ -30,15 +34,19 @@ import {
   updatePaymentReview,
 } from '../../repositories/payment.repository';
 import type { AuthContext } from '../../types/auth';
+import { PricingError } from '../pricing/money';
 import {
   clienteInactivo,
   claveIdempotenciaReutilizada,
   comprobanteNoEncontrado,
   comprobanteYaDeclarado,
   conflictoConcurrencia,
+  cotizacionAusente,
+  cotizacionInvalida,
   cuentaNoAcreditada,
   cuentaNoEncontrada,
   cuentaRestringida,
+  importeUsdInvalido,
   invalidPaymentRequest,
   noAutenticado,
   pagoNoAcreditable,
@@ -62,6 +70,62 @@ const isDuplicateEntry = (error: unknown): boolean => {
   };
   return candidate.code === 'ER_DUP_ENTRY' || candidate.driverError?.code === 'ER_DUP_ENTRY';
 };
+
+const sqlUtc = (date: Date): string =>
+  date.toISOString().slice(0, 23).replace('T', ' ');
+
+async function assertPaymentReceipt(
+  manager: EntityManager,
+  payment: { id_comprobante: string | null },
+  paymentId: number,
+  accountId: number,
+  clientId: number,
+): Promise<void> {
+  if (!payment.id_comprobante) throw comprobanteNoEncontrado();
+  const receipt = await lockPaymentReceipt(manager, paymentId);
+  if (!receipt || !receipt.id_comprobante) throw comprobanteNoEncontrado();
+  if (Number(receipt.id_cliente) !== Number(clientId)
+    || Number(receipt.id_cuenta_corriente) !== Number(accountId)) {
+    throw comprobanteNoEncontrado();
+  }
+  if (receipt.id_pedido !== null
+    && (receipt.pedido_id === null
+      || Number(receipt.pedido_cliente) !== Number(receipt.id_cliente)
+      || receipt.modalidad_pago !== 'CUENTA_CORRIENTE')) {
+    throw comprobanteNoEncontrado();
+  }
+}
+
+async function resolveAccreditation(
+  manager: EntityManager,
+  payment: { monto: string; moneda: string | null },
+  account: { origen_datos: string },
+  accreditedAt: Date,
+): Promise<{ montoUsd: string; idCotizacion: number | null; tasaHistorica: string | null }> {
+  const cents = parsePaymentAmount(payment.monto);
+  if (cents === null) throw importeUsdInvalido();
+  if (payment.moneda === 'USD') {
+    return { montoUsd: formatPaymentAmount(cents), idCotizacion: null, tasaHistorica: null };
+  }
+  if (payment.moneda !== 'ARS') throw pagoNoAcreditable('El pago no tiene una moneda acreditable.');
+
+  let quote: Awaited<ReturnType<typeof loadAccountQuote>>;
+  try {
+    quote = await loadAccountQuote(manager, accreditedAt);
+  } catch (error) {
+    mapAccreditationError(error);
+  }
+  if (quote.sintetica && account.origen_datos !== 'DEMO') throw cuentaRestringida();
+  const rate = BigInt(quote.valor.replace('.', ''));
+  if (rate <= 0n) throw cotizacionInvalida();
+  const usd = (cents * 100000000n + rate / 2n) / rate;
+  if (usd <= 0n) throw importeUsdInvalido();
+  return {
+    montoUsd: formatPaymentAmount(usd),
+    idCotizacion: Number(quote.id),
+    tasaHistorica: quote.valor,
+  };
+}
 
 function amountAndCurrency(input: DeclarePayment) {
   const cents = parsePaymentAmount(input.monto);
@@ -175,6 +239,14 @@ export async function declarePayment(
         return replayOrConflict(manager, client.id_cliente, Number(existing.id_pago), true);
       }
 
+      if (await findPaymentByAnyKey(manager, key, 0)) throw claveIdempotenciaReutilizada();
+
+      // Un libro mixto o sintético no puede generar pagos que luego quedarían
+      // invisibles en los listados restringidos.
+      const state = await calcularEstadoCuenta(account.id_cuenta_corriente, manager, { lock: true });
+      if (!state) throw cuentaNoEncontrada();
+      if (state.libro_mixto) throw cuentaRestringida();
+
       const receipt = await lockReceiptForDeclaration(
         manager, receiptId, client.id_cliente, account.id_cuenta_corriente,
       );
@@ -229,6 +301,7 @@ async function recoverDeclaration(
       if (existing.huella_declaracion !== hash) throw claveIdempotenciaReutilizada();
       return replayOrConflict(manager, client.id_cliente, Number(existing.id_pago), true);
     }
+    if (await findPaymentByAnyKey(manager, key, 0)) throw claveIdempotenciaReutilizada();
     const duplicate = await findPaymentByReceipt(manager, receiptId);
     if (duplicate) {
       if (duplicate.huella_declaracion === hash
@@ -274,11 +347,14 @@ export async function reviewPayment(
       }
       throw pagoYaRevisado();
     }
-    if (payment.estado_documental === 'APROBADO') {
-      if (decision === 'APROBADO') return replayOrConflict(manager, null, paymentId, true);
-      throw pagoYaRevisado();
+    if (payment.estado_documental === 'APROBADO' && decision === 'APROBADO') {
+      return replayOrConflict(manager, null, paymentId, true);
     }
     if (payment.estado !== 'PENDIENTE') throw pagoNoAcreditable();
+
+    await assertPaymentReceipt(
+      manager, payment, paymentId, account.id_cuenta_corriente, client.id_cliente,
+    );
 
     await updatePaymentReview(manager, {
       paymentId,
@@ -292,13 +368,30 @@ export async function reviewPayment(
 }
 
 function mapAccreditationError(error: unknown): never {
+  if (error instanceof PricingError) {
+    if (error.code === 'COTIZACION_AUSENTE') throw cotizacionAusente();
+    throw cotizacionInvalida();
+  }
   const message = error instanceof Error ? error.message : '';
+  // Prioridad: restricciones de libro antes que cualquier coincidencia textual
+  // con "cotización" o "DEMO".
+  if (/libro mixto|procedencia del libro|DEMO|sintétic/i.test(message)) throw cuentaRestringida();
   if (/cobertura histórica/i.test(message)) throw cuentaNoAcreditada();
-  if (/DEMO|sintétic/i.test(message)) throw cuentaRestringida();
-  if (/Cotización|CALENDARIO|tasa|moneda|acreditación|Importe USD/i.test(message)) {
+  if (/S704_PAGO_COTIZACION_NO_VERIFICADA|COTIZACION_AUSENTE|CALENDARIO_NO_VERIFICADO/i.test(message)) {
+    throw cotizacionAusente();
+  }
+  if (/COTIZACION_INVALIDA|Cotización|tasa_historica|tasa histórica/i.test(message)) {
+    throw cotizacionInvalida();
+  }
+  if (/S704_PAGO_ARS_REQUIERE_FER17/i.test(message)) throw cotizacionAusente();
+  if (/S704_PAGO_CONVERSION_INVALIDA|Importe USD distinto|no positivo|fuera de rango/i.test(message)) {
+    throw importeUsdInvalido();
+  }
+  if (/S704_PAGO_ACREDITACION_INCOMPLETA|moneda/i.test(message)) {
     throw pagoNoAcreditable('No se pudo validar el importe, la moneda o la cotización del pago.');
   }
   if (/reutilizado|Duplicate entry|uq_movimiento/i.test(message)) throw conflictoConcurrencia();
+  // Un error de infraestructura desconocido no se degrada a error funcional.
   throw error;
 }
 
@@ -310,9 +403,18 @@ export async function accreditPayment(
 ): Promise<PaymentResult> {
   const key = normalizePaymentIdempotencyKey(keyValue);
   if (!key) throw invalidPaymentRequest('La cabecera Idempotency-Key es obligatoria y debe ser un UUID v4.');
-  const evidence = typeof input.evidencia === 'string' ? input.evidencia.trim() : '';
+  const evidence = (typeof input.evidencia === 'string' ? input.evidencia : input.evidenciaAcreditacion ?? '').trim();
   if (!evidence || evidence.length > 1000) {
     throw invalidPaymentRequest('La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.');
+  }
+  const requestedAt = input.fechaAcreditacionUtc
+    ? parseUtcIsoTimestamp(input.fechaAcreditacionUtc) : null;
+  if (input.fechaAcreditacionUtc && !requestedAt) {
+    throw invalidPaymentRequest('La fecha de acreditación UTC es inválida.');
+  }
+  const accreditedAt = requestedAt ?? new Date();
+  if (accreditedAt.getTime() > Date.now()) {
+    throw invalidPaymentRequest('La fecha de acreditación UTC no puede estar en el futuro.');
   }
   const hash = digest(['ACREDITACION_PAGO', paymentId, auth.id, evidence]);
 
@@ -330,7 +432,7 @@ export async function accreditPayment(
       || payment.id_pedido !== null) throw pagoNoEncontrado();
 
     if (payment.estado === 'ACREDITADO') {
-      if (payment.clave_acreditacion === key) {
+      if (payment.clave_acreditacion === key || payment.clave_idempotencia_acreditacion === key) {
         if (payment.huella_acreditacion === hash) return replayOrConflict(manager, null, paymentId, true);
         throw claveIdempotenciaReutilizada();
       }
@@ -338,14 +440,16 @@ export async function accreditPayment(
     }
     if (payment.estado !== 'PENDIENTE') throw pagoNoAcreditable();
     if (payment.estado_documental !== 'APROBADO') throw pagoPendienteRevision();
-    if (payment.moneda !== 'USD' && payment.moneda !== 'ARS') {
-      throw pagoNoAcreditable('El pago no tiene una moneda acreditable.');
-    }
+
+    await assertPaymentReceipt(
+      manager, payment, paymentId, account.id_cuenta_corriente, client.id_cliente,
+    );
 
     const keyOwner = await findPaymentByAccreditationKey(
       manager, account.id_cuenta_corriente, key,
     );
     if (keyOwner && Number(keyOwner.id_pago) !== paymentId) throw claveIdempotenciaReutilizada();
+    if (await findPaymentByAnyKey(manager, key, paymentId)) throw claveIdempotenciaReutilizada();
 
     if (account.origen_datos === 'DEMO' && process.env.NODE_ENV !== 'test') throw cuentaRestringida();
     const state = await calcularEstadoCuenta(account.id_cuenta_corriente, manager, { lock: true });
@@ -353,20 +457,33 @@ export async function accreditPayment(
     if (state.libro_mixto) throw cuentaRestringida();
     if (state.cobertura !== 'COMPLETA') throw cuentaNoAcreditada();
 
-    await updatePaymentAccreditation(manager, {
-      paymentId,
-      adminId: admin.id_usuario,
-      key,
-      hash,
-      evidence,
-    });
+    // La conversión FER17-v1 se resuelve antes de tocar PAGO. Si falta o es
+    // inválida, la transacción no deja ni pago parcial ni movimiento.
+    const conversion = await resolveAccreditation(manager, payment, account, accreditedAt);
+
+    try {
+      await updatePaymentAccreditation(manager, {
+        paymentId,
+        adminId: admin.id_usuario,
+        key,
+        hash,
+        evidence,
+        montoUsd: conversion.montoUsd,
+        idCotizacion: conversion.idCotizacion,
+        tasaHistorica: conversion.tasaHistorica,
+        accreditedAt,
+      });
+    } catch (error) {
+      mapAccreditationError(error);
+    }
 
     try {
       await registrarAbonoPorPago({
         id_cuenta_corriente: account.id_cuenta_corriente,
         id_pago: paymentId,
+        monto: conversion.montoUsd,
         origen: 'PAGO',
-        observaciones: payment.observaciones ?? null,
+        observaciones: input.observaciones ?? payment.observaciones ?? null,
         autorizado_por: String(admin.id_usuario),
       }, manager);
     } catch (error) {
@@ -397,7 +514,7 @@ export async function listClientPayments(auth: AuthContext, url: string) {
 export async function getAdminPayment(auth: AuthContext, paymentId: number) {
   return inTransaction(async manager => {
     await readActiveAdmin(manager, auth);
-    const data = await paymentDto(manager, paymentId, null, process.env.NODE_ENV === 'test');
+    const data = await paymentDto(manager, paymentId, null);
     if (!data) throw pagoNoEncontrado();
     return data;
   }, { isolation: 'REPEATABLE READ' });
@@ -407,6 +524,6 @@ export async function listAdminPayments(auth: AuthContext, url: string) {
   const query = parsePaymentListQuery(url);
   return inTransaction(async manager => {
     await readActiveAdmin(manager, auth);
-    return listPayments(manager, null, query.pagina, process.env.NODE_ENV === 'test');
+    return listPayments(manager, null, query.pagina);
   }, { isolation: 'REPEATABLE READ' });
 }

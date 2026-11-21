@@ -234,6 +234,16 @@ export const registrarAbonoPorPago = async (dto: RegistrarAbonoDTO, externalMana
             usd = (usd * 100000000n + rate / 2n) / rate;
         }
         if (usd <= 0n || usd > MAX_CENTS || (declared !== null && usd !== declared)) throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        // El pago ya fue persistido atómicamente por el servicio de acreditación
+        // (#333) o por el servicio administrativo (#158). El repositorio sólo
+        // revalida; no vuelve a escribir PAGO bajo triggers de inmutabilidad.
+        if (p.monto_usd !== null && p.monto_usd !== undefined && toCents(p.monto_usd) !== usd) {
+            throw Error('Importe USD distinto del pago acreditado o fuera de rango.');
+        }
+        if (p.moneda === 'ARS' && p.id_cotizacion !== null && p.id_cotizacion !== undefined
+            && quote && Number(p.id_cotizacion) !== Number(quote.id)) {
+            throw Error('Cotización histórica del pago inconsistente con FER17-v1.');
+        }
         const hash = hashFor(usd);
         // La acreditación declarada por #333 no aporta importe: el replay se resuelve
         // con el importe ya persistido y el bloqueo previo del pago.
@@ -243,8 +253,6 @@ export const registrarAbonoPorPago = async (dto: RegistrarAbonoDTO, externalMana
         }
         const rows = await movements(manager, c.id_cuenta_corriente, true);
         if (!complete(c, rows)) throw Error('No se puede acreditar: cobertura histórica no acreditada.');
-        await manager.query(`UPDATE PAGO SET monto_usd=?,id_cotizacion=?,tasa_historica=? WHERE id_pago=?`,
-            [fromCents(usd), quote?.id ?? null, quote?.valor ?? null, dto.id_pago]);
         const result = await manager.query(`INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
             (id_cuenta_corriente,tipo_movimiento,origen,id_pago,monto,moneda,fecha_efectiva,huella_registro,
              evidencia_origen,monto_original,moneda_original,id_cotizacion,tasa_historica,observaciones,autorizado_por,fecha_incorporacion)

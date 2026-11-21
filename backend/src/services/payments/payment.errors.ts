@@ -84,6 +84,29 @@ export const cuentaRestringida = () =>
     'La cuenta corriente tiene un libro restringido o sintético y no admite acreditaciones.',
   );
 
+export const cotizacionAusente = () =>
+  new PaymentError(
+    'COTIZACION_AUSENTE',
+    409,
+    'No existe una cotización FER17-v1 verificada para la fecha de acreditación.',
+    { origen: 'FER17-v1' },
+  );
+
+export const cotizacionInvalida = () =>
+  new PaymentError(
+    'COTIZACION_INVALIDA',
+    422,
+    'La cotización FER17-v1 de la fecha de acreditación no es válida o no está verificada.',
+    { origen: 'FER17-v1' },
+  );
+
+export const importeUsdInvalido = () =>
+  new PaymentError(
+    'MONTO_USD_INVALIDO',
+    422,
+    'El importe convertido a USD resulta no positivo o fuera del rango permitido.',
+  );
+
 export const conflictoConcurrencia = () =>
   new PaymentError(
     'CONFLICTO_CONCURRENCIA',

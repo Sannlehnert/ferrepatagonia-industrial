@@ -205,9 +205,18 @@ CREATE TABLE PAGO (
     id_admin_acreditacion INT NULL,
     clave_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
     huella_acreditacion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    clave_idempotencia_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    clave_idempotencia_cierre CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    motivo_cierre VARCHAR(1000) NULL,
+    id_admin_actor INT NULL,
+    id_admin_cierre INT NULL,
+    fecha_cierre_utc DATETIME(3) NULL,
     PRIMARY KEY (id_pago),
     UNIQUE KEY uq_pago_idempotencia (id_cuenta_corriente, clave_idempotencia),
     UNIQUE KEY uq_pago_acreditacion (id_cuenta_corriente, clave_acreditacion),
+    UNIQUE KEY uq_pago_clave_idempotencia (clave_idempotencia),
+    UNIQUE KEY uq_pago_clave_acreditacion (clave_idempotencia_acreditacion),
+    UNIQUE KEY uq_pago_clave_cierre (clave_idempotencia_cierre),
     UNIQUE KEY uq_pago_comprobante (id_comprobante),
     KEY idx_pago_pedido (id_pedido),
     KEY idx_pago_cuenta (id_cuenta_corriente),
@@ -253,6 +262,12 @@ CREATE TABLE PAGO (
         (id_admin_acreditacion IS NULL AND clave_acreditacion IS NULL AND huella_acreditacion IS NULL)
         OR (id_admin_acreditacion IS NOT NULL AND clave_acreditacion IS NOT NULL
             AND huella_acreditacion IS NOT NULL)
+    ),
+    CONSTRAINT chk_pago_cierre CHECK (
+        (estado IN ('PENDIENTE', 'ACREDITADO', 'DEMO_REGISTRADO')
+            AND motivo_cierre IS NULL AND id_admin_cierre IS NULL AND fecha_cierre_utc IS NULL)
+        OR (estado IN ('RECHAZADO', 'ANULADO')
+            AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
     )
 )ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

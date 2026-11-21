@@ -24,6 +24,19 @@ export function formatPaymentAmount(cents: bigint): string {
   return `${cents < 0n ? '-' : ''}${absolute / 100n}.${String(absolute % 100n).padStart(2, '0')}`;
 }
 
+const UTC_ISO_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/;
+
+export function parseUtcIsoTimestamp(value: unknown): Date | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!UTC_ISO_PATTERN.test(trimmed)) return null;
+  const parsed = new Date(trimmed);
+  if (!Number.isFinite(parsed.getTime())) return null;
+  if (parsed.toISOString().slice(0, 10) !== trimmed.slice(0, 10)) return null;
+  return parsed;
+}
+
 export function normalizePaymentIdempotencyKey(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const normalized = value.trim().toLowerCase();
@@ -81,10 +94,29 @@ export class ReviewPayment {
 }
 
 export class AccreditPayment {
-  @Rule(value => typeof value === 'string' && value.length > 0 && value.length <= 1000
+  @Rule(value => value === undefined || value === null
+    || (typeof value === 'string' && value.length > 0 && value.length <= 1000)
     ? null
     : 'La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.')
-  evidencia!: string;
+  evidencia?: string;
+
+  @Rule(value => value === undefined || value === null
+    || (typeof value === 'string' && value.length > 0 && value.length <= 1000)
+    ? null
+    : 'La evidencia de acreditación es obligatoria y debe contener hasta 1000 caracteres.')
+  evidenciaAcreditacion?: string;
+
+  @Rule(value => value === undefined || value === null || parseUtcIsoTimestamp(value) !== null
+    ? null
+    : 'La fecha de acreditación debe ser un instante UTC válido en formato RFC 3339 (Z).')
+  fechaAcreditacionUtc?: string;
+
+  @Rule(value => value === undefined || value === null
+    ? null
+    : typeof value === 'string' && value.length > 0 && value.length <= 1000
+      ? null
+      : 'Las observaciones deben contener hasta 1000 caracteres.')
+  observaciones?: string | null;
 }
 
 export class PaymentIdParams {
@@ -131,11 +163,26 @@ export const reviewPaymentPolicy: DtoPolicy<ReviewPayment> = bodyPolicy(
   },
 );
 
-export const accreditPaymentPolicy: DtoPolicy<AccreditPayment> = bodyPolicy(
-  AccreditPayment,
-  ['evidencia'],
-  input => ({ evidencia: requiredText(input.evidencia) }),
-);
+export const accreditPaymentPolicy: DtoPolicy<AccreditPayment> = {
+  ...bodyPolicy(
+    AccreditPayment,
+    ['evidencia', 'evidenciaAcreditacion', 'fechaAcreditacionUtc', 'observaciones'],
+    input => ({
+      evidencia: requiredText(input.evidencia),
+      evidenciaAcreditacion: requiredText(input.evidenciaAcreditacion),
+      fechaAcreditacionUtc: requiredText(input.fechaAcreditacionUtc),
+      observaciones: input.observaciones === null ? null : optionalText(input.observaciones),
+    }),
+  ),
+  check: input => {
+    const evidence = typeof input.evidencia === 'string' && input.evidencia.trim().length > 0
+      ? input.evidencia.trim()
+      : typeof input.evidenciaAcreditacion === 'string' && input.evidenciaAcreditacion.trim().length > 0
+        ? input.evidenciaAcreditacion.trim()
+        : '';
+    return evidence ? null : 'La evidencia de acreditación es obligatoria.';
+  },
+};
 
 export const paymentIdPolicy: DtoPolicy<PaymentIdParams> = {
   type: PaymentIdParams,

@@ -80,12 +80,14 @@ const PAYMENT_SELECT = `
 `;
 
 export async function findAccountIdForUser(manager: EntityManager, userId: number): Promise<number | null> {
+  // La actividad del cliente se valida después del lock para poder distinguir
+  // CLIENTE_INACTIVO (403) de una cuenta inexistente (404).
   const [row] = await manager.query<{ accountId: number }[]>(`
     SELECT cc.id_cuenta_corriente AS accountId
     FROM USUARIO u
-    INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente AND c.activo = 1 AND c.tipo_cliente = 'EMPRESA'
+    INNER JOIN CLIENTE c ON c.id_cliente = u.id_cliente
     INNER JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = c.id_cliente
-    WHERE u.id_usuario = ? AND u.activo = 1 AND u.rol = 'CLIENTE'
+    WHERE u.id_usuario = ? AND u.rol = 'CLIENTE'
   `, [userId]);
   return row?.accountId ?? null;
 }
@@ -149,6 +151,25 @@ export async function findPaymentByReceipt(manager: EntityManager, receiptId: st
   return row ?? null;
 }
 
+export async function findPaymentByAnyKey(
+  manager: EntityManager, key: string, excludePaymentId: number,
+) {
+  const [row] = await manager.query(`
+    SELECT id_pago, clave_idempotencia, clave_acreditacion,
+           clave_idempotencia_acreditacion, clave_idempotencia_cierre
+    FROM PAGO
+    WHERE id_pago <> ?
+      AND (
+        clave_idempotencia = ?
+        OR clave_acreditacion = ?
+        OR clave_idempotencia_acreditacion = ?
+        OR clave_idempotencia_cierre = ?
+      )
+    LIMIT 1
+  `, [excludePaymentId, key, key, key, key]);
+  return row ?? null;
+}
+
 export async function findPaymentByAccreditationKey(
   manager: EntityManager, accountId: number, key: string,
 ) {
@@ -193,6 +214,21 @@ export async function lockPayment(manager: EntityManager, paymentId: number) {
   return row ?? null;
 }
 
+export async function lockPaymentReceipt(manager: EntityManager, paymentId: number) {
+  const [row] = await manager.query(`
+    SELECT r.id_comprobante, r.id_cliente, r.id_cuenta_corriente, r.id_pedido,
+           r.tipo_mime, r.bytes, r.sha256,
+           p.id_pedido AS pedido_id, p.id_cliente AS pedido_cliente,
+           p.modalidad_pago
+    FROM PAGO g
+    LEFT JOIN COMPROBANTE_PAGO r ON r.id_comprobante = g.id_comprobante
+    LEFT JOIN PEDIDO p ON p.id_pedido = r.id_pedido
+    WHERE g.id_pago = ?
+    FOR UPDATE
+  `, [paymentId]);
+  return row ?? null;
+}
+
 export async function updatePaymentReview(
   manager: EntityManager,
   input: {
@@ -200,11 +236,21 @@ export async function updatePaymentReview(
     adminId: number; reason: string | null;
   },
 ) {
+  const rejected = input.financialState === 'RECHAZADO';
   const result = await manager.query(`
     UPDATE PAGO SET estado = ?, estado_documental = ?, id_admin_revision = ?,
-      revision_utc = UTC_TIMESTAMP(3), motivo_revision = ?
+      revision_utc = UTC_TIMESTAMP(3), motivo_revision = ?,
+      motivo_cierre = ?, id_admin_cierre = ?,
+      fecha_cierre_utc = CASE WHEN ? THEN UTC_TIMESTAMP(3) ELSE NULL END
     WHERE id_pago = ?
-  `, [input.financialState, input.documentState, input.adminId, input.reason, input.paymentId]);
+  `, [
+    input.financialState, input.documentState, input.adminId,
+    rejected ? input.reason : null,
+    rejected ? input.reason : null,
+    rejected ? input.adminId : null,
+    rejected ? 1 : 0,
+    input.paymentId,
+  ]);
   if (result.affectedRows !== 1) throw new Error('PAGO_REVISION_NO_ACTUALIZADA');
 }
 
@@ -212,14 +258,26 @@ export async function updatePaymentAccreditation(
   manager: EntityManager,
   input: {
     paymentId: number; adminId: number; key: string; hash: string; evidence: string;
+    montoUsd: string; idCotizacion: number | null; tasaHistorica: string | null;
+    accreditedAt: Date;
   },
 ) {
+  // Un solo UPDATE deja satisfechos los triggers de #158 antes de que el pago
+  // cambie de estado: conversión, cotización, evidencia, actor e idempotencia
+  // se persisten atómicamente.
   const result = await manager.query(`
-    UPDATE PAGO SET estado = 'ACREDITADO', fecha_acreditacion_utc = UTC_TIMESTAMP(3),
-      evidencia_acreditacion = ?, id_admin_acreditacion = ?, clave_acreditacion = ?,
-      huella_acreditacion = ?
+    UPDATE PAGO SET estado = 'ACREDITADO', fecha_acreditacion_utc = ?,
+      evidencia_acreditacion = ?, id_admin_acreditacion = ?, id_admin_actor = ?,
+      clave_acreditacion = ?, huella_acreditacion = ?,
+      clave_idempotencia_acreditacion = ?,
+      monto_usd = ?, id_cotizacion = ?, tasa_historica = ?
     WHERE id_pago = ? AND estado = 'PENDIENTE'
-  `, [input.evidence, input.adminId, input.key, input.hash, input.paymentId]);
+  `, [
+    input.accreditedAt, input.evidence, input.adminId, input.adminId,
+    input.key, input.hash, input.key,
+    input.montoUsd, input.idCotizacion, input.tasaHistorica,
+    input.paymentId,
+  ]);
   if (result.affectedRows !== 1) throw new Error('PAGO_ACREDITACION_NO_ACTUALIZADA');
 }
 
@@ -264,27 +322,39 @@ function isoDate(value: string | null): string | null {
 }
 
 export async function findPayment(
-  manager: EntityManager, paymentId: number, clientId: number | null, includeDemo = true,
+  manager: EntityManager, paymentId: number, clientId: number | null,
 ): Promise<PaymentRow | null> {
   const [row] = await manager.query<PaymentRow[]>(`
     ${PAYMENT_SELECT}
     WHERE p.id_pedido IS NULL AND p.id_cuenta_corriente IS NOT NULL
+      AND p.estado <> 'DEMO_REGISTRADO'
+      AND cc.origen_datos <> 'DEMO'
+      AND NOT EXISTS (
+        SELECT 1 FROM MOVIMIENTO_CUENTA_CORRIENTE m
+        WHERE m.id_cuenta_corriente = cc.id_cuenta_corriente
+          AND UPPER(TRIM(m.origen)) = 'DEMO'
+      )
       ${clientId === null ? '' : 'AND c.id_cliente = ?'}
-      ${clientId === null && !includeDemo ? "AND cc.origen_datos <> 'DEMO'" : ''}
       AND p.id_pago = ?
   `, clientId === null ? [paymentId] : [clientId, paymentId]);
   return row ?? null;
 }
 
 export async function listPayments(
-  manager: EntityManager, clientId: number | null, page: number, includeDemo = true,
+  manager: EntityManager, clientId: number | null, page: number,
 ) {
   const pageSize = 50;
   const rows = await manager.query<PaymentRow[]>(`
     ${PAYMENT_SELECT}
     WHERE p.id_pedido IS NULL AND p.id_cuenta_corriente IS NOT NULL
+      AND p.estado <> 'DEMO_REGISTRADO'
+      AND cc.origen_datos <> 'DEMO'
+      AND NOT EXISTS (
+        SELECT 1 FROM MOVIMIENTO_CUENTA_CORRIENTE m
+        WHERE m.id_cuenta_corriente = cc.id_cuenta_corriente
+          AND UPPER(TRIM(m.origen)) = 'DEMO'
+      )
       ${clientId === null ? '' : 'AND c.id_cliente = ?'}
-      ${clientId === null && !includeDemo ? "AND cc.origen_datos <> 'DEMO'" : ''}
     ORDER BY p.fecha DESC, p.id_pago DESC
     LIMIT ? OFFSET ?
   `, clientId === null
@@ -297,8 +367,8 @@ export async function listPayments(
 }
 
 export async function paymentDto(
-  manager: EntityManager, paymentId: number, clientId: number | null, includeDemo = true,
+  manager: EntityManager, paymentId: number, clientId: number | null,
 ) {
-  const row = await findPayment(manager, paymentId, clientId, includeDemo);
+  const row = await findPayment(manager, paymentId, clientId);
   return row ? paymentView(row, clientId === null) : null;
 }

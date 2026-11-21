@@ -20,7 +20,15 @@ ALTER TABLE PAGO
     ADD COLUMN IF NOT EXISTS motivo_revision VARCHAR(1000) NULL,
     ADD COLUMN IF NOT EXISTS id_admin_acreditacion INT NULL,
     ADD COLUMN IF NOT EXISTS clave_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
-    ADD COLUMN IF NOT EXISTS huella_acreditacion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL;
+    ADD COLUMN IF NOT EXISTS huella_acreditacion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    -- Columnas compartidas con #158/S7-04.2. Se crean aquí de forma idempotente
+    -- para que ambos flujos escriban la misma evidencia de cierre e idempotencia.
+    ADD COLUMN IF NOT EXISTS clave_idempotencia_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN IF NOT EXISTS clave_idempotencia_cierre CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    ADD COLUMN IF NOT EXISTS motivo_cierre VARCHAR(1000) NULL,
+    ADD COLUMN IF NOT EXISTS id_admin_actor INT NULL,
+    ADD COLUMN IF NOT EXISTS id_admin_cierre INT NULL,
+    ADD COLUMN IF NOT EXISTS fecha_cierre_utc DATETIME(3) NULL;
 
 DELIMITER //
 BEGIN NOT ATOMIC
@@ -54,6 +62,31 @@ BEGIN NOT ATOMIC
           AND INDEX_NAME = 'idx_pago_cuenta_estado'
     ) THEN
         ALTER TABLE PAGO ADD KEY idx_pago_cuenta_estado (id_cuenta_corriente, estado, fecha);
+    END IF;
+
+    -- Unicidad global de claves compatible con PAGO_IDEMPOTENCIA de #158.
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO'
+          AND INDEX_NAME = 'uq_pago_clave_idempotencia'
+    ) THEN
+        ALTER TABLE PAGO ADD UNIQUE KEY uq_pago_clave_idempotencia (clave_idempotencia);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO'
+          AND INDEX_NAME = 'uq_pago_clave_acreditacion'
+    ) THEN
+        ALTER TABLE PAGO ADD UNIQUE KEY uq_pago_clave_acreditacion (clave_idempotencia_acreditacion);
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.STATISTICS
+        WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO'
+          AND INDEX_NAME = 'uq_pago_clave_cierre'
+    ) THEN
+        ALTER TABLE PAGO ADD UNIQUE KEY uq_pago_clave_cierre (clave_idempotencia_cierre);
     END IF;
 
     IF NOT EXISTS (
@@ -128,6 +161,19 @@ BEGIN NOT ATOMIC
             (id_admin_acreditacion IS NULL AND clave_acreditacion IS NULL AND huella_acreditacion IS NULL)
             OR (id_admin_acreditacion IS NOT NULL AND clave_acreditacion IS NOT NULL
                 AND huella_acreditacion IS NOT NULL)
+        );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO'
+          AND CONSTRAINT_NAME = 'chk_pago_cierre'
+    ) THEN
+        ALTER TABLE PAGO ADD CONSTRAINT chk_pago_cierre CHECK (
+            (estado IN ('PENDIENTE', 'ACREDITADO', 'DEMO_REGISTRADO')
+                AND motivo_cierre IS NULL AND id_admin_cierre IS NULL AND fecha_cierre_utc IS NULL)
+            OR (estado IN ('RECHAZADO', 'ANULADO')
+                AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
         );
     END IF;
 
