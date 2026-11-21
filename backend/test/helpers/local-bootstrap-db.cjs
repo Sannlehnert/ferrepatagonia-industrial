@@ -93,7 +93,10 @@ async function createDatabase(database, { fer20Only = false } = {}) {
         await waitReady(profile);
         applyFile(profile, path.join(backend, '../database/schema.sql'));
         applyFile(profile, path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
-        if (!fer20Only) applyFile(profile, path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
+        if (!fer20Only) {
+            applyFile(profile, path.join(backend, '../database/migrate-fer-17-price-verification.sql'));
+            applyFile(profile, path.join(backend, '../database/migrate-s7-04-2-state-consistency.sql'));
+        }
         return profile;
     } catch (error) {
         removeDatabase(profile);

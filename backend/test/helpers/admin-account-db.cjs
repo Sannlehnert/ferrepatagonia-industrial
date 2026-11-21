@@ -28,7 +28,7 @@ async function openDatabase(profile, runner, checkInterrupted) {
 
 async function prepareDatabase(session, checkInterrupted) {
   const { id, password, database } = session.profile;
-  for (const name of ['schema.sql', 'migrate-fer-20-account-movements.sql']) {
+  for (const name of ['schema.sql', 'migrate-fer-20-account-movements.sql', 'migrate-s7-04-2-state-consistency.sql']) {
     checkInterrupted();
     await assertOwned(session);
     execFileSync('docker', ['exec', '-i', id, 'mariadb', '-uroot', `-p${password}`, database], {

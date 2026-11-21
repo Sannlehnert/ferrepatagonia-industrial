@@ -74,6 +74,7 @@ async function run() {
         const migrations = [
             '../database/migrate-fer-20-account-movements.sql',
             '../database/migrate-fer-20-order-confirmation.sql',
+            '../database/migrate-s7-04-2-state-consistency.sql',
         ];
         for (const m of migrations) {
             const fullPath = path.join(backend, m);

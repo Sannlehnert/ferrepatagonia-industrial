@@ -1,0 +1,3246 @@
+=== EVIDENCIA VERIFICABLE T-S7-04.2 (#317 / HU-S7-04 #290) ===
+Fecha UTC: 2026-11-21T00:47:42Z
+Rama: feature/s7-04-2-order-payment-state-consistency
+HEAD: 3f40941acad13d2c631571413be173f29612f12f
+Merge-base exacto (origin/develop): 80287c259f13d9d20de58dca46c1ee9240bd8207
+Alcance: database/, backend/, frontend/ y docs/s7-04/evidence/ (cambios en árbol de trabajo sin operaciones Git de escritura)
+
+--- 1. Backend build (npm run build) ---
+> ferrepatagonia-backend@0.1.0 build
+> tsc
+Exit code: 0
+
+--- 2. Backend type-check (npm run type-check) ---
+> ferrepatagonia-backend@0.1.0 type-check
+> tsc --noEmit
+Exit code: 0
+
+--- 3. Backend DTO & Passport desde fuente (npm run test:dto-source) ---
+> ferrepatagonia-backend@0.1.0 test:dto-source
+> node --require ./test/helpers/test-env.cjs --import tsx --test test/dto-source.test.cjs test/auth.passport-source.test.cjs
+
+TAP version 13
+# Subtest: tsx source app: Passport actually protects me and nested admin methods with current identity
+ok 1 - tsx source app: Passport actually protects me and nested admin methods with current identity
+  ---
+  duration_ms: 98.9263
+  type: 'test'
+  ...
+# Subtest: tsx: decorated DTOs validate, transform and reject without emitted design metadata
+ok 2 - tsx: decorated DTOs validate, transform and reject without emitted design metadata
+  ---
+  duration_ms: 184.1705
+  type: 'test'
+  ...
+# Subtest: tsx: lista blanca exacta de orden en el DTO de query del catálogo
+ok 3 - tsx: lista blanca exacta de orden en el DTO de query del catálogo
+  ---
+  duration_ms: 37.1117
+  type: 'test'
+  ...
+# Subtest: tsx: updatePerfilPolicy conserva limpieza, rechaza controles y no acepta campos ajenos
+ok 4 - tsx: updatePerfilPolicy conserva limpieza, rechaza controles y no acepta campos ajenos
+  ---
+  duration_ms: 35.1298
+  type: 'test'
+  ...
+1..4
+# tests 4
+# suites 0
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2850.0739
+Exit code: 0
+
+--- 4. Backend suite unitaria completa (npm run test:unit) ---
+[... extracto inicial omitido (8338 líneas); extracto final completo ...]
+  ...
+# Subtest: EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+ok 1338 - EMPRESA: prepara CLIENTE y conserva el hash sin mezclar tipoCliente
+  ---
+  duration_ms: 501.5435
+  type: 'test'
+  ...
+# Subtest: EMPRESA: el helper no toma un rol inyectado
+ok 1339 - EMPRESA: el helper no toma un rol inyectado
+  ---
+  duration_ms: 244.585
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=ADMIN
+ok 1340 - EMPRESA: POST rechaza el campo rol=ADMIN
+  ---
+  duration_ms: 2.3024
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=CLIENTE
+ok 1341 - EMPRESA: POST rechaza el campo rol=CLIENTE
+  ---
+  duration_ms: 1.6363
+  type: 'test'
+  ...
+# Subtest: EMPRESA: POST rechaza el campo rol=null
+ok 1342 - EMPRESA: POST rechaza el campo rol=null
+  ---
+  duration_ms: 1.8703
+  type: 'test'
+  ...
+# Subtest: EMPRESA: responde 201 con data.user sin credenciales ni cookie
+ok 1343 - EMPRESA: responde 201 con data.user sin credenciales ni cookie
+  ---
+  duration_ms: 2.1507
+  type: 'test'
+  ...
+# Subtest: los comentarios SQL no contienen separadores que rompan split(";")
+ok 1344 - los comentarios SQL no contienen separadores que rompan split(";")
+  ---
+  duration_ms: 16.6915
+  type: 'test'
+  ...
+# Subtest: schema.sql se divide en un CREATE TABLE por tabla declarada
+ok 1345 - schema.sql se divide en un CREATE TABLE por tabla declarada
+  ---
+  duration_ms: 3.2172
+  type: 'test'
+  ...
+# ◇ injected env (10) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+# Subtest: Task \#317 (T-S7-04.2) — Consistencia de estados: proyección, DTOs e invariantes
+    # Subtest: §7.2 deriveOrderDocumentState agrega comprobantes con precedencia APROBADO > PENDIENTE > RECHAZADO > SIN_COMPROBANTE
+    ok 1 - §7.2 deriveOrderDocumentState agrega comprobantes con precedencia APROBADO > PENDIENTE > RECHAZADO > SIN_COMPROBANTE
+      ---
+      duration_ms: 1.1594
+      type: 'test'
+      ...
+    # Subtest: §7.1.1 TRANSFERENCIA nunca marca pagado sin fondos acreditados en USD y proyecta parcial/acreditado/no determinable
+    ok 2 - §7.1.1 TRANSFERENCIA nunca marca pagado sin fondos acreditados en USD y proyecta parcial/acreditado/no determinable
+      ---
+      duration_ms: 1.4589
+      type: 'test'
+      ...
+    # Subtest: §7.1.2 CUENTA_CORRIENTE proyecta cargo pendiente, imputado parcial, cancelado, anulado y no determinable
+    ok 3 - §7.1.2 CUENTA_CORRIENTE proyecta cargo pendiente, imputado parcial, cancelado, anulado y no determinable
+      ---
+      duration_ms: 0.5763
+      type: 'test'
+      ...
+    # Subtest: NEG-03: PEDIDO.estado rechaza PAGADO, ACREDITADO y campos financieros adicionales
+    ok 4 - NEG-03: PEDIDO.estado rechaza PAGADO, ACREDITADO y campos financieros adicionales
+      ---
+      duration_ms: 1.2628
+      type: 'test'
+      ...
+    # Subtest: NEG-08: revisión documental exige APROBADO o RECHAZADO con motivo obligatorio (1..1000) e Idempotency-Key UUID v4
+    ok 5 - NEG-08: revisión documental exige APROBADO o RECHAZADO con motivo obligatorio (1..1000) e Idempotency-Key UUID v4
+      ---
+      duration_ms: 1.522
+      type: 'test'
+      ...
+    # Subtest: INV-04 y NEG-10: DTOs de PAGO validan exclusividad de destino, monto > 0, moneda USD/ARS, evidencia y UTC
+    ok 6 - INV-04 y NEG-10: DTOs de PAGO validan exclusividad de destino, monto > 0, moneda USD/ARS, evidencia y UTC
+      ---
+      duration_ms: 15.4251
+      type: 'test'
+      ...
+    1..6
+ok 1346 - Task \#317 (T-S7-04.2) — Consistencia de estados: proyección, DTOs e invariantes
+  ---
+  duration_ms: 23.2243
+  type: 'suite'
+  ...
+# Subtest: T-S7-06.1 DTO: valida y normaliza clave UUID v4 para checkout por transferencia
+ok 1347 - T-S7-06.1 DTO: valida y normaliza clave UUID v4 para checkout por transferencia
+  ---
+  duration_ms: 12.4714
+  type: 'test'
+  ...
+# Subtest: T-S7-06.1 DTO: acepta únicamente { cotizacion } y rechaza campos extra o montos
+ok 1348 - T-S7-06.1 DTO: acepta únicamente { cotizacion } y rechaza campos extra o montos
+  ---
+  duration_ms: 0.6507
+  type: 'test'
+  ...
+# Subtest: T-S7-06.1 Recovery: presenta intentos PENDIENTE, CONFIRMADO y RECHAZADO y rechaza corruptos
+ok 1349 - T-S7-06.1 Recovery: presenta intentos PENDIENTE, CONFIRMADO y RECHAZADO y rechaza corruptos
+  ---
+  duration_ms: 2.6762
+  type: 'test'
+  ...
+1..1349
+# tests 1403
+# suites 3
+# pass 1400
+# fail 0
+# cancelled 0
+# skipped 3
+# todo 0
+# duration_ms 18101.9163
+Exit code: 0
+
+--- 5. Backend MariaDB aislada: consistencia de estados T-S7-04.2 (npm run test:state-consistency:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:state-consistency:isolated
+> node test/helpers/run-state-consistency-mariadb.cjs
+
+Upgrade aditivo #290 verificado: 26 tablas, 13 triggers (3 FER-20 + 4 FER-17 + 6 S7-04), backfill legado APROBADO y seed intacto.
+{"mode":"state-consistency","version":"11.4.13-MariaDB-ubu2404","database":"s704_test_6bd5faf6353f48bbbd025aba8153cf68","host":"127.0.0.1","port":62655,"container":"s704-state-test-6bd5faf6353f48bbbd025aba8153cf68","profile":"complete","tables":26,"triggers":13,"views":1}
+TAP version 13
+# Subtest: 1. INV-01 + NEG-05/06/07/08/09/13: comprobantes (PENDIENTE/APROBADO/RECHAZADO) dejan en 0 cambios financieros
+ok 1 - 1. INV-01 + NEG-05/06/07/08/09/13: comprobantes (PENDIENTE/APROBADO/RECHAZADO) dejan en 0 cambios financieros
+  ---
+  duration_ms: 2430.4439
+  type: 'test'
+  ...
+# Subtest: 2. INV-02 + NEG-01/02/03/04: ciclo comercial del pedido sin estado PAGADO y grafo acíclico estricto
+ok 2 - 2. INV-02 + NEG-01/02/03/04: ciclo comercial del pedido sin estado PAGADO y grafo acíclico estricto
+  ---
+  duration_ms: 100.899
+  type: 'test'
+  ...
+# Subtest: 3. INV-03 + Proyección coherente ADMIN y CLIENTE (TRANSFERENCIA USD/ARS FER17-v1, sin falsos pagados)
+ok 3 - 3. INV-03 + Proyección coherente ADMIN y CLIENTE (TRANSFERENCIA USD/ARS FER17-v1, sin falsos pagados)
+  ---
+  duration_ms: 831.9986
+  type: 'test'
+  ...
+# Subtest: 4. INV-03 + CUENTA_CORRIENTE: acreditación ARS/USD genera ABONO + FIFO y anulación recalcula FIFO y proyección
+ok 4 - 4. INV-03 + CUENTA_CORRIENTE: acreditación ARS/USD genera ABONO + FIFO y anulación recalcula FIFO y proyección
+  ---
+  duration_ms: 327.8258
+  type: 'test'
+  ...
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# Subtest: 5. NEG-10, NEG-11, NEG-12 (triggers SQL), NEG-13 y RBAC (401/403/404) en PAGO y MOVIMIENTO
+ok 5 - 5. NEG-10, NEG-11, NEG-12 (triggers SQL), NEG-13 y RBAC (401/403/404) en PAGO y MOVIMIENTO
+  ---
+  duration_ms: 741.3702
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: 6. TOCTOU-01 a TOCTOU-05: concurrencia real en MariaDB, orden de locks y revalidación transaccional
+ok 6 - 6. TOCTOU-01 a TOCTOU-05: concurrencia real en MariaDB, orden de locks y revalidación transaccional
+  ---
+  duration_ms: 2016.9801
+  type: 'test'
+  ...
+# Subtest: 7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actualizado.v1 y pago.acreditado.v1 post-COMMIT sin filtro canReceiveOrders
+ok 7 - 7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actualizado.v1 y pago.acreditado.v1 post-COMMIT sin filtro canReceiveOrders
+  ---
+  duration_ms: 693.9539
+  type: 'test'
+  ...
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# Subtest: 8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO
+ok 8 - 8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO
+  ---
+  duration_ms: 265.49
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 8
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 8991.7822
+Reaplicación idempotente #290 verificada: filas de las 26 tablas preservadas intactas.
+CLEANUP OK T-S7-04.2: contenedor eliminado, datos tmpfs, almacenamiento temporal eliminado.
+Exit code: 0
+
+--- 6. Backend MariaDB aislada: comprobantes (npm run test:receipts:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:receipts:isolated
+> node test/helpers/run-cuenta-corriente-mariadb.cjs receipts
+
+{"mode":"receipts","database":"cc260_test_352ad9f00a424c148fd6f59e071e7cfa","host":"127.0.0.1","port":62687,"container":"cc260-test-352ad9f00a424c148fd6f59e071e7cfa"}
+{"mode":"receipts","database":"cc260_test_352ad9f00a424c148fd6f59e071e7cfa","host":"127.0.0.1","port":62687,"container":"cc260-test-352ad9f00a424c148fd6f59e071e7cfa","version":"11.4.13-MariaDB-ubu2404","image":"sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6","migrationApplications":2}
+TAP version 13
+# Subtest: particular: carga, lista, descarga privada y revisión documental, sin cambios financieros
+ok 1 - particular: carga, lista, descarga privada y revisión documental, sin cambios financieros
+  ---
+  duration_ms: 2910.9403
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: empresa: saldo general sin pedido y abono con referencia propia, sin imputación
+ok 2 - empresa: saldo general sin pedido y abono con referencia propia, sin imputación
+  ---
+  duration_ms: 1628.9497
+  type: 'test'
+  ...
+# Subtest: rechaza archivos vacíos, grandes, truncados, activos o suplantados y rutas inválidas
+ok 3 - rechaza archivos vacíos, grandes, truncados, activos o suplantados y rutas inválidas
+  ---
+  duration_ms: 5084.9227
+  type: 'test'
+  ...
+# database.query.failed
+# database.query.failed
+# Subtest: un fallo SQL limpia el archivo y las cargas simultáneas idénticas se deduplican
+ok 4 - un fallo SQL limpia el archivo y las cargas simultáneas idénticas se deduplican
+  ---
+  duration_ms: 1214.7407
+  type: 'test'
+  ...
+# Subtest: el almacenamiento dentro del checkout se rechaza sin escribir archivos
+ok 5 - el almacenamiento dentro del checkout se rechaza sin escribir archivos
+  ---
+  duration_ms: 6.7366
+  type: 'test'
+  ...
+# Subtest: \#328 modalidades, separación TRANSFERENCIA vs CUENTA_CORRIENTE, anti-IDOR cruzado y permisos por rol
+ok 6 - \#328 modalidades, separación TRANSFERENCIA vs CUENTA_CORRIENTE, anti-IDOR cruzado y permisos por rol
+  ---
+  duration_ms: 1858.5095
+  type: 'test'
+  ...
+# Subtest: \#328 seguridad de sesión (401), cliente inactivo (404) y protección CSRF/Same-Origin (403)
+ok 7 - \#328 seguridad de sesión (401), cliente inactivo (404) y protección CSRF/Same-Origin (403)
+  ---
+  duration_ms: 702.6732
+  type: 'test'
+  ...
+# Subtest: \#328/\#290 revisión ADMIN: valida Idempotency-Key/body, 404 en inexistente, replay idempotente y bloqueo terminal
+ok 8 - \#328/\#290 revisión ADMIN: valida Idempotency-Key/body, 404 en inexistente, replay idempotente y bloqueo terminal
+  ---
+  duration_ms: 1269.8677
+  type: 'test'
+  ...
+# Subtest: \#328 frontera 5 MiB, MIME estricto, PDF >100 págs, paginación (50/pág) y concurrencia (503 Retry-After: 1)
+ok 9 - \#328 frontera 5 MiB, MIME estricto, PDF >100 págs, paginación (50/pág) y concurrencia (503 Retry-After: 1)
+  ---
+  duration_ms: 3256.469
+  type: 'test'
+  ...
+1..9
+# tests 9
+# suites 0
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 18645.9046
+CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.
+Exit code: 0
+
+--- 7. Backend MariaDB aislada: pedidos checkout/historial (npm run test:orders:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:orders:isolated
+> node test/helpers/run-cuenta-corriente-mariadb.cjs orders
+
+{"mode":"orders","database":"cc260_test_24a21ffba7ec47d2b856119a03d7ec19","host":"127.0.0.1","port":62718,"container":"cc260-test-24a21ffba7ec47d2b856119a03d7ec19"}
+{"mode":"orders","database":"cc260_test_24a21ffba7ec47d2b856119a03d7ec19","host":"127.0.0.1","port":62718,"container":"cc260-test-24a21ffba7ec47d2b856119a03d7ec19","version":"11.4.13-MariaDB-ubu2404","image":"sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6","migrationApplications":2}
+TAP version 13
+# Subtest: \#261: reserva un intento pendiente sin resultado ficticio
+ok 1 - \#261: reserva un intento pendiente sin resultado ficticio
+  ---
+  duration_ms: 1279.2864
+  type: 'test'
+  ...
+# Subtest: \#261: repetir una reserva conserva el mismo intento
+ok 2 - \#261: repetir una reserva conserva el mismo intento
+  ---
+  duration_ms: 84.8151
+  type: 'test'
+  ...
+# Subtest: \#261: una clave ajena no expone el intento de otro cliente
+ok 3 - \#261: una clave ajena no expone el intento de otro cliente
+  ---
+  duration_ms: 164.3541
+  type: 'test'
+  ...
+# Subtest: \#261: reservas simultáneas no duplican el intento
+ok 4 - \#261: reservas simultáneas no duplican el intento
+  ---
+  duration_ms: 84.2119
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza un bloqueo fuera de una transacción
+ok 5 - \#261: rechaza un bloqueo fuera de una transacción
+  ---
+  duration_ms: 76.8169
+  type: 'test'
+  ...
+# Subtest: \#261: consultar el carrito bloqueado no consume stock
+ok 6 - \#261: consultar el carrito bloqueado no consume stock
+  ---
+  duration_ms: 1292.1951
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza un carrito vacío
+ok 7 - \#261: rechaza un carrito vacío
+  ---
+  duration_ms: 83.4045
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza PRODUCTO_INACTIVO sin consumir el carrito
+ok 8 - \#261: rechaza PRODUCTO_INACTIVO sin consumir el carrito
+  ---
+  duration_ms: 89.4201
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza CATEGORIA_INACTIVA sin consumir el carrito
+ok 9 - \#261: rechaza CATEGORIA_INACTIVA sin consumir el carrito
+  ---
+  duration_ms: 86.6942
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza STOCK_INSUFICIENTE sin consumir el carrito
+ok 10 - \#261: rechaza STOCK_INSUFICIENTE sin consumir el carrito
+  ---
+  duration_ms: 86.9843
+  type: 'test'
+  ...
+# Subtest: \#261: rollback recupera stock y líneas; commit los consume
+ok 11 - \#261: rollback recupera stock y líneas; commit los consume
+  ---
+  duration_ms: 101.4217
+  type: 'test'
+  ...
+# Subtest: \#261: dos carritos no consumen la misma última unidad
+ok 12 - \#261: dos carritos no consumen la misma última unidad
+  ---
+  duration_ms: 175.7586
+  type: 'test'
+  ...
+# Subtest: \#286: el checkout normal rechaza evidencia académica aunque el cliente solicite ese modo
+ok 13 - \#286: el checkout normal rechaza evidencia académica aunque el cliente solicite ese modo
+  ---
+  duration_ms: 2553.5187
+  type: 'test'
+  ...
+# Subtest: \#263 A07/A08 HTTP: visitante, JWT inválido y ADMIN no operan pedidos
+ok 14 - \#263 A07/A08 HTTP: visitante, JWT inválido y ADMIN no operan pedidos
+  ---
+  duration_ms: 155.127
+  type: 'test'
+  ...
+# Subtest: \#263 A02 empresa pendiente: POST firmado sin escrituras comerciales
+ok 15 - \#263 A02 empresa pendiente: POST firmado sin escrituras comerciales
+  ---
+  duration_ms: 141.3337
+  type: 'test'
+  ...
+# Subtest: \#263 A03 empresa rechazada: POST firmado sin escrituras comerciales
+ok 16 - \#263 A03 empresa rechazada: POST firmado sin escrituras comerciales
+  ---
+  duration_ms: 144.5913
+  type: 'test'
+  ...
+# Subtest: \#263 A04 cuenta deshabilitada: POST firmado sin escrituras comerciales
+ok 17 - \#263 A04 cuenta deshabilitada: POST firmado sin escrituras comerciales
+  ---
+  duration_ms: 139.3298
+  type: 'test'
+  ...
+# Subtest: \#263 A05 cliente inactivo: POST firmado sin escrituras comerciales
+ok 18 - \#263 A05 cliente inactivo: POST firmado sin escrituras comerciales
+  ---
+  duration_ms: 122.7064
+  type: 'test'
+  ...
+# Subtest: \#263 A06 usuario inactivo: POST firmado sin escrituras comerciales
+ok 19 - \#263 A06 usuario inactivo: POST firmado sin escrituras comerciales
+  ---
+  duration_ms: 120.4901
+  type: 'test'
+  ...
+# Subtest: \#263 A10 saldo desconocido: POST firmado sin escrituras comerciales
+ok 20 - \#263 A10 saldo desconocido: POST firmado sin escrituras comerciales
+  ---
+  duration_ms: 136.9236
+  type: 'test'
+  ...
+# Subtest: \#262 HTTP: la prevalidación requiere cliente y no admite cuerpo ni consulta
+ok 21 - \#262 HTTP: la prevalidación requiere cliente y no admite cuerpo ni consulta
+  ---
+  duration_ms: 117.611
+  type: 'test'
+  ...
+# Subtest: \#261 HTTP: rechaza solicitudes inválidas antes de reservar el intento
+ok 22 - \#261 HTTP: rechaza solicitudes inválidas antes de reservar el intento
+  ---
+  duration_ms: 116.7113
+  type: 'test'
+  ...
+# Subtest: \#263 C01/A01/P01–P07 HTTP/SQL: acredita cargo, histórico, saldo, vencimiento y revisión
+ok 23 - \#263 C01/A01/P01–P07 HTTP/SQL: acredita cargo, histórico, saldo, vencimiento y revisión
+  ---
+  duration_ms: 302.5352
+  type: 'test'
+  ...
+# Subtest: \#262 H01 HTTP/SQL: rechaza una cotización vieja sin pedido, cargo ni descuento de stock
+ok 24 - \#262 H01 HTTP/SQL: rechaza una cotización vieja sin pedido, cargo ni descuento de stock
+  ---
+  duration_ms: 143.0429
+  type: 'test'
+  ...
+# Subtest: \#262 H01 HTTP/SQL: rechaza un cambio de precio posterior a la cotización
+ok 25 - \#262 H01 HTTP/SQL: rechaza un cambio de precio posterior a la cotización
+  ---
+  duration_ms: 145.7488
+  type: 'test'
+  ...
+# Subtest: \#263 A09 HTTP: una clave de otro cliente no expone su resultado
+ok 26 - \#263 A09 HTTP: una clave de otro cliente no expone su resultado
+  ---
+  duration_ms: 254.1725
+  type: 'test'
+  ...
+# Subtest: \#263 C03/I07 HTTP: exceder el disponible por un centavo conserva el rechazo
+ok 27 - \#263 C03/I07 HTTP: exceder el disponible por un centavo conserva el rechazo
+  ---
+  duration_ms: 198.0382
+  type: 'test'
+  ...
+# Subtest: \#261 HTTP: informa un intento pendiente con 202 y Retry-After
+ok 28 - \#261 HTTP: informa un intento pendiente con 202 y Retry-After
+  ---
+  duration_ms: 99.1995
+  type: 'test'
+  ...
+# Subtest: \#263 I01/I06 HTTP: POST concurrentes con la misma clave
+ok 29 - \#263 I01/I06 HTTP: POST concurrentes con la misma clave
+  ---
+  duration_ms: 355.5384
+  type: 'test'
+  ...
+# Subtest: \#263 I02 HTTP: POST concurrentes con claves distintas
+ok 30 - \#263 I02 HTTP: POST concurrentes con claves distintas
+  ---
+  duration_ms: 348.4079
+  type: 'test'
+  ...
+# Subtest: \#263 C04/I03 HTTP: un cargo concurrente reduce el crédito después de cotizar
+ok 31 - \#263 C04/I03 HTTP: un cargo concurrente reduce el crédito después de cotizar
+  ---
+  duration_ms: 323.788
+  type: 'test'
+  ...
+# Subtest: \#263 I04 HTTP: dos compradores esperan por la última unidad
+ok 32 - \#263 I04 HTTP: dos compradores esperan por la última unidad
+  ---
+  duration_ms: 420.8897
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: \#263 R01 HTTP: fallo antes de COMMIT en PEDIDO revierte y permite reintentar
+ok 33 - \#263 R01 HTTP: fallo antes de COMMIT en PEDIDO revierte y permite reintentar
+  ---
+  duration_ms: 325.0567
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: \#263 R02 HTTP: fallo antes de COMMIT en MOVIMIENTO_CUENTA_CORRIENTE revierte y permite reintentar
+ok 34 - \#263 R02 HTTP: fallo antes de COMMIT en MOVIMIENTO_CUENTA_CORRIENTE revierte y permite reintentar
+  ---
+  duration_ms: 357.3606
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: \#263 R03 HTTP: fallo antes de COMMIT en PRODUCTO revierte y permite reintentar
+ok 35 - \#263 R03 HTTP: fallo antes de COMMIT en PRODUCTO revierte y permite reintentar
+  ---
+  duration_ms: 351.1578
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: \#263 R04 HTTP: fallo antes de COMMIT en CONFIRMACION_PEDIDO_CC revierte y permite reintentar
+ok 36 - \#263 R04 HTTP: fallo antes de COMMIT en CONFIRMACION_PEDIDO_CC revierte y permite reintentar
+  ---
+  duration_ms: 351.3944
+  type: 'test'
+  ...
+# Subtest: \#261 HTTP: errores de origen y JSON también mantienen respuestas privadas
+ok 37 - \#261 HTTP: errores de origen y JSON también mantienen respuestas privadas
+  ---
+  duration_ms: 108.6573
+  type: 'test'
+  ...
+# Subtest: \#261: aplica la lista del cliente usando precios verificados
+ok 38 - \#261: aplica la lista del cliente usando precios verificados
+  ---
+  duration_ms: 1338.449
+  type: 'test'
+  ...
+# Subtest: \#261: no permite comprar con PRECIO_AUSENTE
+ok 39 - \#261: no permite comprar con PRECIO_AUSENTE
+  ---
+  duration_ms: 99.197
+  type: 'test'
+  ...
+# Subtest: \#261: no permite comprar con BASE_CERO
+ok 40 - \#261: no permite comprar con BASE_CERO
+  ---
+  duration_ms: 102.9494
+  type: 'test'
+  ...
+# Subtest: \#261: no permite comprar con BASE_NO_VERIFICADA
+ok 41 - \#261: no permite comprar con BASE_NO_VERIFICADA
+  ---
+  duration_ms: 90.863
+  type: 'test'
+  ...
+# Subtest: \#261: no permite comprar con PRECIO_SINTETICO
+ok 42 - \#261: no permite comprar con PRECIO_SINTETICO
+  ---
+  duration_ms: 92.8541
+  type: 'test'
+  ...
+# Subtest: \#261: no cotiza un carrito con la identidad de otro cliente
+ok 43 - \#261: no cotiza un carrito con la identidad de otro cliente
+  ---
+  duration_ms: 178.7271
+  type: 'test'
+  ...
+# Subtest: \#261: recupera en otro proceso una caída before-commit
+ok 44 - \#261: recupera en otro proceso una caída before-commit
+  ---
+  duration_ms: 4324.1409
+  type: 'test'
+  ...
+# Subtest: \#261: recupera en otro proceso una caída after-commit
+ok 45 - \#261: recupera en otro proceso una caída after-commit
+  ---
+  duration_ms: 4154.9569
+  type: 'test'
+  ...
+# Subtest: \#261: guarda y conserva el resultado original al reservar otra vez
+ok 46 - \#261: guarda y conserva el resultado original al reservar otra vez
+  ---
+  duration_ms: 1306.4023
+  type: 'test'
+  ...
+# Subtest: \#261: no confirma el pedido y cargo de otro cliente
+ok 47 - \#261: no confirma el pedido y cargo de otro cliente
+  ---
+  duration_ms: 165.8973
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza diferencias entre el total del pedido y su cargo
+ok 48 - \#261: rechaza diferencias entre el total del pedido y su cargo
+  ---
+  duration_ms: 85.8815
+  type: 'test'
+  ...
+# Subtest: \#261: un rollback revierte el guardado del resultado
+ok 49 - \#261: un rollback revierte el guardado del resultado
+  ---
+  duration_ms: 91.1605
+  type: 'test'
+  ...
+# Subtest: \#262: la prevalidación devuelve total y crédito del servidor sin iniciar una compra
+ok 50 - \#262: la prevalidación devuelve total y crédito del servidor sin iniciar una compra
+  ---
+  duration_ms: 1860.0625
+  type: 'test'
+  ...
+# Subtest: \#262: la prevalidación informa crédito insuficiente y no reserva intento
+ok 51 - \#262: la prevalidación informa crédito insuficiente y no reserva intento
+  ---
+  duration_ms: 107.4721
+  type: 'test'
+  ...
+# Subtest: \#262: la prevalidación rechaza una empresa no aprobada
+ok 52 - \#262: la prevalidación rechaza una empresa no aprobada
+  ---
+  duration_ms: 92.732
+  type: 'test'
+  ...
+# Subtest: \#261: repetir y consultar devuelve el mismo pedido histórico
+ok 53 - \#261: repetir y consultar devuelve el mismo pedido histórico
+  ---
+  duration_ms: 275.8268
+  type: 'test'
+  ...
+# Subtest: \#261: conserva el rechazo aunque después aumente el crédito
+ok 54 - \#261: conserva el rechazo aunque después aumente el crédito
+  ---
+  duration_ms: 164.7506
+  type: 'test'
+  ...
+# Subtest: \#261: dos solicitudes con la misma clave generan una sola compra
+ok 55 - \#261: dos solicitudes con la misma clave generan una sola compra
+  ---
+  duration_ms: 177.6427
+  type: 'test'
+  ...
+# Subtest: \#261: consulta pendiente devuelve 202 y permite recuperar el intento
+ok 56 - \#261: consulta pendiente devuelve 202 y permite recuperar el intento
+  ---
+  duration_ms: 164.8828
+  type: 'test'
+  ...
+# Subtest: \#261: COMMIT ejecutado con acuse perdido recupera el resultado real
+ok 57 - \#261: COMMIT ejecutado con acuse perdido recupera el resultado real
+  ---
+  duration_ms: 176.1944
+  type: 'test'
+  ...
+# Subtest: \#261: conserva importes y evidencia aunque cambie el catálogo
+ok 58 - \#261: conserva importes y evidencia aunque cambie el catálogo
+  ---
+  duration_ms: 1371.4695
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza un total que no coincide con sus detalles
+ok 59 - \#261: rechaza un total que no coincide con sus detalles
+  ---
+  duration_ms: 96.2146
+  type: 'test'
+  ...
+# Subtest: \#261: rollback revierte pedido, detalles y evidencia
+ok 60 - \#261: rollback revierte pedido, detalles y evidencia
+  ---
+  duration_ms: 99.6434
+  type: 'test'
+  ...
+# Subtest: \#263 C02/P05: confirma al límite exacto y registra vencimiento a 60 días
+ok 61 - \#263 C02/P05: confirma al límite exacto y registra vencimiento a 60 días
+  ---
+  duration_ms: 1927.0643
+  type: 'test'
+  ...
+# Subtest: \#261: crédito insuficiente no deja escrituras parciales
+ok 62 - \#261: crédito insuficiente no deja escrituras parciales
+  ---
+  duration_ms: 135.1432
+  type: 'test'
+  ...
+# Subtest: \#261: un saldo desconocido no se interpreta como cero
+ok 63 - \#261: un saldo desconocido no se interpreta como cero
+  ---
+  duration_ms: 122.6175
+  type: 'test'
+  ...
+# Subtest: \#261: empresa pendiente de aprobación no confirma
+ok 64 - \#261: empresa pendiente de aprobación no confirma
+  ---
+  duration_ms: 119.4571
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: \#261: un fallo tardío revierte también el cargo y FIFO
+ok 65 - \#261: un fallo tardío revierte también el cargo y FIFO
+  ---
+  duration_ms: 350.7139
+  type: 'test'
+  ...
+# Subtest: \#261: dos confirmaciones no compran dos veces el mismo carrito
+ok 66 - \#261: dos confirmaciones no compran dos veces el mismo carrito
+  ---
+  duration_ms: 184.9709
+  type: 'test'
+  ...
+# Subtest: \#261: schema y doble migración producen la misma tabla
+ok 67 - \#261: schema y doble migración producen la misma tabla
+  ---
+  duration_ms: 193.1419
+  type: 'test'
+  ...
+# Subtest: \#261: cliente y clave identifican un único intento
+ok 68 - \#261: cliente y clave identifican un único intento
+  ---
+  duration_ms: 7.5752
+  type: 'test'
+  ...
+# Subtest: \#261: rechaza resultados incompletos y JSON inválido
+ok 69 - \#261: rechaza resultados incompletos y JSON inválido
+  ---
+  duration_ms: 4.7284
+  type: 'test'
+  ...
+# Subtest: \#261: un pedido y cargo no pertenecen a dos resultados
+ok 70 - \#261: un pedido y cargo no pertenecen a dos resultados
+  ---
+  duration_ms: 5.3241
+  type: 'test'
+  ...
+# Subtest: \#261: rollback no conserva un resultado confirmado
+ok 71 - \#261: rollback no conserva un resultado confirmado
+  ---
+  duration_ms: 10.7559
+  type: 'test'
+  ...
+# Subtest: \#261: una conexión nueva recupera el resultado persistido
+ok 72 - \#261: una conexión nueva recupera el resultado persistido
+  ---
+  duration_ms: 162.6757
+  type: 'test'
+  ...
+# Subtest: Task \#273 (S6-24.1) — API protegida de historial y detalle de pedidos propios
+    # Subtest: Rechaza solicitudes sin autenticar con 401 en listado y detalle
+    ok 1 - Rechaza solicitudes sin autenticar con 401 en listado y detalle
+      ---
+      duration_ms: 40.0903
+      type: 'test'
+      ...
+    # Subtest: Rechaza rol ADMIN con 403 y cliente inhabilitado con 403
+    ok 2 - Rechaza rol ADMIN con 403 y cliente inhabilitado con 403
+      ---
+      duration_ms: 35.7992
+      type: 'test'
+      ...
+    # Subtest: Rechaza query params arbitrarios (como clienteId) e IDs inválidos con 400
+    ok 3 - Rechaza query params arbitrarios (como clienteId) e IDs inválidos con 400
+      ---
+      duration_ms: 42.1259
+      type: 'test'
+      ...
+    # Subtest: Devuelve lista vacía cuando el cliente no registra pedidos
+    ok 4 - Devuelve lista vacía cuando el cliente no registra pedidos
+      ---
+      duration_ms: 10.7798
+      type: 'test'
+      ...
+    # Subtest: Anti-IDOR e importes históricos: cada cliente ve solo sus pedidos y conserva precios históricos
+    ok 5 - Anti-IDOR e importes históricos: cada cliente ve solo sus pedidos y conserva precios históricos
+      ---
+      duration_ms: 32.5962
+      type: 'test'
+      ...
+    # Subtest: Pedidos históricos con moneda_total = NULL preservan moneda desconocida y totalUSD: null
+    ok 6 - Pedidos históricos con moneda_total = NULL preservan moneda desconocida y totalUSD: null
+      ---
+      duration_ms: 24.2996
+      type: 'test'
+      ...
+    1..6
+ok 73 - Task \#273 (S6-24.1) — API protegida de historial y detalle de pedidos propios
+  ---
+  duration_ms: 425.8321
+  type: 'suite'
+  ...
+# database.query.slow { milliseconds: 1501 }
+# database.query.slow { milliseconds: 1501 }
+# Subtest: ocho lecturas conservan capacidad SQL para elegibilidad y confirmación
+ok 74 - ocho lecturas conservan capacidad SQL para elegibilidad y confirmación
+  ---
+  duration_ms: 3982.1152
+  type: 'test'
+  ...
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# Subtest: un aborto en espera, un aborto con SQL activo y un error liberan capacidad
+ok 75 - un aborto en espera, un aborto con SQL activo y un error liberan capacidad
+  ---
+  duration_ms: 158.9541
+  type: 'test'
+  ...
+# Subtest: el instante nuevo y el histórico se leen correctamente con sesión -03:00
+ok 76 - el instante nuevo y el histórico se leen correctamente con sesión -03:00
+  ---
+  duration_ms: 238.8348
+  type: 'test'
+  ...
+# Subtest: \#322 Persistencia SQL: schema.sql, doble migración idempotente y restricciones CHECK/UNIQUE de CONFIRMACION_PEDIDO_TRANSFERENCIA
+ok 77 - \#322 Persistencia SQL: schema.sql, doble migración idempotente y restricciones CHECK/UNIQUE de CONFIRMACION_PEDIDO_TRANSFERENCIA
+  ---
+  duration_ms: 2480.9627
+  type: 'test'
+  ...
+# Subtest: \#322 Elegibilidad y seguridad: anónimo (401), JWT inválido (401), ADMIN (403), cliente inactivo (403) y usuario inactivo (401)
+ok 78 - \#322 Elegibilidad y seguridad: anónimo (401), JWT inválido (401), ADMIN (403), cliente inactivo (403) y usuario inactivo (401)
+  ---
+  duration_ms: 393.6923
+  type: 'test'
+  ...
+# Subtest: \#322 Elegibilidad y rechazo de EMPRESA PENDIENTE y RECHAZADA (403 EMPRESA_NO_HABILITADA)
+ok 79 - \#322 Elegibilidad y rechazo de EMPRESA PENDIENTE y RECHAZADA (403 EMPRESA_NO_HABILITADA)
+  ---
+  duration_ms: 479.9075
+  type: 'test'
+  ...
+# Subtest: \#322 Compra exitosa PARTICULAR y EMPRESA APROBADA (sin CC, con CC inhabilitada y con CC habilitada) + compatibilidad \#275
+ok 80 - \#322 Compra exitosa PARTICULAR y EMPRESA APROBADA (sin CC, con CC inhabilitada y con CC habilitada) + compatibilidad \#275
+  ---
+  duration_ms: 2822.1765
+  type: 'test'
+  ...
+# Subtest: \#322 Concurrencia TOCTOU: dos compradores compitiendo por la última unidad de stock (201 vs 409 STOCK_INSUFICIENTE)
+ok 81 - \#322 Concurrencia TOCTOU: dos compradores compitiendo por la última unidad de stock (201 vs 409 STOCK_INSUFICIENTE)
+  ---
+  duration_ms: 385.6457
+  type: 'test'
+  ...
+# Subtest: \#322 Concurrencia e Idempotencia: doble POST simultáneo con la misma Idempotency-Key y estado 202 en vuelo
+ok 82 - \#322 Concurrencia e Idempotencia: doble POST simultáneo con la misma Idempotency-Key y estado 202 en vuelo
+  ---
+  duration_ms: 290.5313
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: \#322 Validación de DTOs, anti-IDOR de clave, cotización desactualizada y rollback limpio ante fallos SQL
+ok 83 - \#322 Validación de DTOs, anti-IDOR de clave, cotización desactualizada y rollback limpio ante fallos SQL
+  ---
+  duration_ms: 349.5126
+  type: 'test'
+  ...
+# Subtest: \#322 Precios sintéticos (\#286) rechazados en elegibilidad y confirmación de transferencia
+ok 84 - \#322 Precios sintéticos (\#286) rechazados en elegibilidad y confirmación de transferencia
+  ---
+  duration_ms: 149.5194
+  type: 'test'
+  ...
+# Subtest: \#322 Notificaciones post-COMMIT: confirmTransferOrder emite notifyCommittedChange solo tras COMMIT exitoso
+ok 85 - \#322 Notificaciones post-COMMIT: confirmTransferOrder emite notifyCommittedChange solo tras COMMIT exitoso
+  ---
+  duration_ms: 130.3736
+  type: 'test'
+  ...
+# Subtest: \#322 Recuperación idempotente tras fallo incierto post-COMMIT (DatabaseOutcomeUnknownError)
+ok 86 - \#322 Recuperación idempotente tras fallo incierto post-COMMIT (DatabaseOutcomeUnknownError)
+  ---
+  duration_ms: 143.25
+  type: 'test'
+  ...
+1..86
+# tests 91
+# suites 1
+# pass 91
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 48700.9413
+CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.
+Exit code: 0
+
+--- 8. Backend MariaDB aislada: tiempo real Socket.IO (npm run test:orders:sockets) ---
+> ferrepatagonia-backend@0.1.0 test:orders:sockets
+> node test/helpers/run-cuenta-corriente-mariadb.cjs orders-sockets
+
+{"mode":"orders-sockets","database":"cc260_test_9e5e07044d3d447db2d7118ae0f89630","host":"127.0.0.1","port":62891,"container":"cc260-test-9e5e07044d3d447db2d7118ae0f89630"}
+{"mode":"orders-sockets","database":"cc260_test_9e5e07044d3d447db2d7118ae0f89630","host":"127.0.0.1","port":62891,"container":"cc260-test-9e5e07044d3d447db2d7118ae0f89630","version":"11.4.13-MariaDB-ubu2404","image":"sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6","migrationApplications":2}
+TAP version 13
+# Subtest: S01 S02 S04: conexión y rooms asignadas por el servidor
+ok 1 - S01 S02 S04: conexión y rooms asignadas por el servidor
+  ---
+  duration_ms: 2723.4647
+  type: 'test'
+  ...
+# Subtest: S03: credenciales ausentes, inválidas, expiradas o rol JWT obsoleto
+ok 2 - S03: credenciales ausentes, inválidas, expiradas o rol JWT obsoleto
+  ---
+  duration_ms: 113.8562
+  type: 'test'
+  ...
+# Subtest: S06: revocación de cliente conectado y rechazo en un nuevo handshake
+ok 3 - S06: revocación de cliente conectado y rechazo en un nuevo handshake
+  ---
+  duration_ms: 253.4311
+  type: 'test'
+  ...
+# Subtest: S06: cuenta comercial deshabilitada pierde acceso antes de entregar
+ok 4 - S06: cuenta comercial deshabilitada pierde acceso antes de entregar
+  ---
+  duration_ms: 189.1025
+  type: 'test'
+  ...
+# Subtest: error operativo de MariaDB diferenciado de sesión inválida
+ok 5 - error operativo de MariaDB diferenciado de sesión inválida
+  ---
+  duration_ms: 94.6088
+  type: 'test'
+  ...
+# Subtest: S05 S07 S10 S14: barrera COMMIT, aislamiento, recuperación e idempotencia REST
+ok 6 - S05 S07 S10 S14: barrera COMMIT, aislamiento, recuperación e idempotencia REST
+  ---
+  duration_ms: 375.2417
+  type: 'test'
+  ...
+# Subtest: S08: rollback después de escribir pedido y cargo no emite
+ok 7 - S08: rollback después de escribir pedido y cargo no emite
+  ---
+  duration_ms: 184.9082
+  type: 'test'
+  ...
+# Subtest: S09: crédito insuficiente no emite
+ok 8 - S09: crédito insuficiente no emite
+  ---
+  duration_ms: 149.7082
+  type: 'test'
+  ...
+# Subtest: S11: COMMIT con acuse perdido recupera el pedido sin emitir
+ok 9 - S11: COMMIT con acuse perdido recupera el pedido sin emitir
+  ---
+  duration_ms: 188.2661
+  type: 'test'
+  ...
+# Subtest: S11: COMMIT no acreditado deja un intento pendiente sin emitir
+ok 10 - S11: COMMIT no acreditado deja un intento pendiente sin emitir
+  ---
+  duration_ms: 185.3543
+  type: 'test'
+  ...
+# Subtest: S12: reconexión de transporte reautentica y no modifica el pedido ni el cargo
+ok 11 - S12: reconexión de transporte reautentica y no modifica el pedido ni el cargo
+  ---
+  duration_ms: 333.3447
+  type: 'test'
+  ...
+# No se pudo notificar a una conexión autorizada.
+# Subtest: S13: excepción al enviar conserva la compra recuperable por REST
+ok 12 - S13: excepción al enviar conserva la compra recuperable por REST
+  ---
+  duration_ms: 175.4103
+  type: 'test'
+  ...
+# Subtest: S15: origen ajeno o ausente se rechaza en polling y WebSocket
+ok 13 - S15: origen ajeno o ausente se rechaza en polling y WebSocket
+  ---
+  duration_ms: 147.2031
+  type: 'test'
+  ...
+# Subtest: Carrito: alta con barrera de COMMIT, cantidad y baja privadas sin cambios de inventario
+ok 14 - Carrito: alta con barrera de COMMIT, cantidad y baja privadas sin cambios de inventario
+  ---
+  duration_ms: 380.848
+  type: 'test'
+  ...
+# Error interno al procesar el carrito.
+# Subtest: Carrito: rechazo y rollback tras escribir mantienen inventario e ítems y no emiten
+ok 15 - Carrito: rechazo y rollback tras escribir mantienen inventario e ítems y no emiten
+  ---
+  duration_ms: 120.8856
+  type: 'test'
+  ...
+# Subtest: Stock ADMIN: PATCH, PUT, rechazo, no-op y contratos públicos de catálogo y categorías
+ok 16 - Stock ADMIN: PATCH, PUT, rechazo, no-op y contratos públicos de catálogo y categorías
+  ---
+  duration_ms: 170.1092
+  type: 'test'
+  ...
+# Subtest: Stock ADMIN: un producto fuera del catálogo no revela su identificador
+ok 17 - Stock ADMIN: un producto fuera del catálogo no revela su identificador
+  ---
+  duration_ms: 102.867
+  type: 'test'
+  ...
+# Subtest: Stock ADMIN: retiene el aviso hasta acreditar el COMMIT de la actualización
+ok 18 - Stock ADMIN: retiene el aviso hasta acreditar el COMMIT de la actualización
+  ---
+  duration_ms: 106.7193
+  type: 'test'
+  ...
+# No se pudo notificar a una conexión autorizada.
+# Subtest: Stock ADMIN: REST responde mientras el aviso espera autorización y tolera un fallo de envío
+ok 19 - Stock ADMIN: REST responde mientras el aviso espera autorización y tolera un fallo de envío
+  ---
+  duration_ms: 101.7227
+  type: 'test'
+  ...
+# Subtest: \#322 Transferencia Socket.IO: PARTICULAR y EMPRESA aprobada sin cuenta corriente reciben pedido.confirmado.v1, carrito.actualizado.v1 y stock.actualizado.v1 con aislamiento de salas
+ok 20 - \#322 Transferencia Socket.IO: PARTICULAR y EMPRESA aprobada sin cuenta corriente reciben pedido.confirmado.v1, carrito.actualizado.v1 y stock.actualizado.v1 con aislamiento de salas
+  ---
+  duration_ms: 604.4162
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7238.4238
+CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.
+Exit code: 0
+
+--- 9. Backend MariaDB aislada: cuenta corriente y migraciones FER-20 (npm run test:cuenta-corriente) ---
+> ferrepatagonia-backend@0.1.0 test:cuenta-corriente
+> node test/helpers/run-cuenta-corriente-mariadb.cjs
+
+{"mode":"all","database":"cc260_test_6827a3f6004744429200336a383a2b33","host":"127.0.0.1","port":64516,"container":"cc260-test-6827a3f6004744429200336a383a2b33"}
+{"mode":"all","database":"cc260_test_6827a3f6004744429200336a383a2b33","host":"127.0.0.1","port":64516,"container":"cc260-test-6827a3f6004744429200336a383a2b33","version":"11.4.13-MariaDB-ubu2404","image":"sha256:1292844148b311e4ed4300022a996d39083f415a963e970cf47cad1b3b18e3a6","migrationApplications":2}
+TAP version 13
+# Subtest: H07 esquema nuevo y doble migración: restricciones físicas verificadas
+ok 1 - H07 esquema nuevo y doble migración: restricciones físicas verificadas
+  ---
+  duration_ms: 972.7661
+  type: 'test'
+  ...
+# Subtest: H07 actualización desde a85a017 preserva movimientos sin inventar evidencia
+ok 2 - H07 actualización desde a85a017 preserva movimientos sin inventar evidencia
+  ---
+  duration_ms: 873.5096
+  type: 'test'
+  ...
+# Subtest: H07 actualización desde 713c3ca preserva movimientos sin inventar evidencia
+ok 3 - H07 actualización desde 713c3ca preserva movimientos sin inventar evidencia
+  ---
+  duration_ms: 870.4173
+  type: 'test'
+  ...
+# Subtest: H07 ARS heredados detienen migración antes del primer DDL y permanecen intactos
+ok 4 - H07 ARS heredados detienen migración antes del primer DDL y permanecen intactos
+  ---
+  duration_ms: 553.6088
+  type: 'test'
+  ...
+# Subtest: H07 referencias antiguas permisivas sin pago detienen migración sin borrar filas
+ok 5 - H07 referencias antiguas permisivas sin pago detienen migración sin borrar filas
+  ---
+  duration_ms: 540.1652
+  type: 'test'
+  ...
+# Subtest: H07 instalación con índices/ FK faltantes y CHECK permisivo se fortalece
+ok 6 - H07 instalación con índices/ FK faltantes y CHECK permisivo se fortalece
+  ---
+  duration_ms: 850.2233
+  type: 'test'
+  ...
+# Subtest: H07 instalación anterior sin tablas \#260 crea ambas tablas e idempotencia
+ok 7 - H07 instalación anterior sin tablas \#260 crea ambas tablas e idempotencia
+  ---
+  duration_ms: 921.3787
+  type: 'test'
+  ...
+# Subtest: H07 imputaciones anteriores incompatibles detienen sin perder registros
+ok 8 - H07 imputaciones anteriores incompatibles detienen sin perder registros
+  ---
+  duration_ms: 556.4073
+  type: 'test'
+  ...
+# Subtest: H01 pago PENDIENTE no produce abono ni revisión
+ok 9 - H01 pago PENDIENTE no produce abono ni revisión
+  ---
+  duration_ms: 1154.1368
+  type: 'test'
+  ...
+# Subtest: H01 pago RECHAZADO no produce abono ni revisión
+ok 10 - H01 pago RECHAZADO no produce abono ni revisión
+  ---
+  duration_ms: 14.8836
+  type: 'test'
+  ...
+# Subtest: H01 pago inexistente, directo, importe distinto y moneda/evidencia desconocidas se rechazan
+ok 11 - H01 pago inexistente, directo, importe distinto y moneda/evidencia desconocidas se rechazan
+  ---
+  duration_ms: 38.0656
+  type: 'test'
+  ...
+# Subtest: H01/H03 reintentos concurrentes del abono son idempotentes y cambios se rechazan
+ok 12 - H01/H03 reintentos concurrentes del abono son idempotentes y cambios se rechazan
+  ---
+  duration_ms: 75.596
+  type: 'test'
+  ...
+# Subtest: H03 FIFO 60/50 +75, anular primer cargo deja 50 imputados y 25 a favor; anular abono reabre deuda
+ok 13 - H03 FIFO 60/50 +75, anular primer cargo deja 50 imputados y 25 a favor; anular abono reabre deuda
+  ---
+  duration_ms: 111.5311
+  type: 'test'
+  ...
+# Subtest: H03 FIFO ordena por vencimiento y empate efectivo/ID, con cancelación completa y remanentes
+ok 14 - H03 FIFO ordena por vencimiento y empate efectivo/ID, con cancelación completa y remanentes
+  ---
+  duration_ms: 75.9721
+  type: 'test'
+  ...
+# Subtest: H03 abonos previos compiten por saldo libre sin duplicar imputaciones
+ok 15 - H03 abonos previos compiten por saldo libre sin duplicar imputaciones
+  ---
+  duration_ms: 64.8534
+  type: 'test'
+  ...
+# database.query.failed
+# (node:2416) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+# (Use `node --trace-warnings ...` to show where the warning was created)
+# Subtest: H03 rollback restaura movimiento, proyección y revisión, incluso si caller captura error
+ok 16 - H03 rollback restaura movimiento, proyección y revisión, incluso si caller captura error
+  ---
+  duration_ms: 39.6102
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2026-01-31T15:00:00Z +30 =2026-03-02
+ok 17 - H04/\#253 calendario BA 2026-01-31T15:00:00Z +30 =2026-03-02
+  ---
+  duration_ms: 44.3282
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2026-12-15T15:00:00Z +30 =2027-01-14
+ok 18 - H04/\#253 calendario BA 2026-12-15T15:00:00Z +30 =2027-01-14
+  ---
+  duration_ms: 39.9232
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2026-01-01T15:00:00Z +60 =2026-03-02
+ok 19 - H04/\#253 calendario BA 2026-01-01T15:00:00Z +60 =2026-03-02
+  ---
+  duration_ms: 38.2188
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2024-01-31T15:00:00Z +30 =2024-03-01
+ok 20 - H04/\#253 calendario BA 2024-01-31T15:00:00Z +30 =2024-03-01
+  ---
+  duration_ms: 36.6848
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2024-02-01T15:00:00Z +60 =2024-04-01
+ok 21 - H04/\#253 calendario BA 2024-02-01T15:00:00Z +60 =2024-04-01
+  ---
+  duration_ms: 35.3051
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2026-02-01T02:59:59Z +30 =2026-03-02
+ok 22 - H04/\#253 calendario BA 2026-02-01T02:59:59Z +30 =2026-03-02
+  ---
+  duration_ms: 35.2837
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2026-02-01T03:00:00Z +30 =2026-03-03
+ok 23 - H04/\#253 calendario BA 2026-02-01T03:00:00Z +30 =2026-03-03
+  ---
+  duration_ms: 34.5136
+  type: 'test'
+  ...
+# Subtest: H04/\#253 calendario BA 2026-01-01T02:59:59Z +60 =2026-03-01
+ok 24 - H04/\#253 calendario BA 2026-01-01T02:59:59Z +60 =2026-03-01
+  ---
+  duration_ms: 39.7642
+  type: 'test'
+  ...
+# Subtest: H04 plazo null no autoriza
+ok 25 - H04 plazo null no autoriza
+  ---
+  duration_ms: 16.6106
+  type: 'test'
+  ...
+# Subtest: H04 plazo 1 no autoriza
+ok 26 - H04 plazo 1 no autoriza
+  ---
+  duration_ms: 3.6196
+  type: 'test'
+  ...
+# Subtest: H04 plazo 31 no autoriza
+ok 27 - H04 plazo 31 no autoriza
+  ---
+  duration_ms: 3.9825
+  type: 'test'
+  ...
+# Subtest: H04 plazo 90 no autoriza
+ok 28 - H04 plazo 90 no autoriza
+  ---
+  duration_ms: 3.3253
+  type: 'test'
+  ...
+# Subtest: H05 saldo comprometido y elegibilidad actual prevalecen sobre snapshot
+ok 29 - H05 saldo comprometido y elegibilidad actual prevalecen sobre snapshot
+  ---
+  duration_ms: 136.5507
+  type: 'test'
+  ...
+# Subtest: H05 dos cargos compiten por el mismo crédito, uno solo confirma
+ok 30 - H05 dos cargos compiten por el mismo crédito, uno solo confirma
+  ---
+  duration_ms: 32.4254
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido 1e1
+ok 31 - H08 importe inválido 1e1
+  ---
+  duration_ms: 3.6363
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido 0x10
+ok 32 - H08 importe inválido 0x10
+  ---
+  duration_ms: 3.444
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido 0.001
+ok 33 - H08 importe inválido 0.001
+  ---
+  duration_ms: 3.5581
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido 9999999999.999
+ok 34 - H08 importe inválido 9999999999.999
+  ---
+  duration_ms: 3.5178
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido 10000000000.00
+ok 35 - H08 importe inválido 10000000000.00
+  ---
+  duration_ms: 12.4629
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido -1.00
+ok 36 - H08 importe inválido -1.00
+  ---
+  duration_ms: 3.2232
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido NaN
+ok 37 - H08 importe inválido NaN
+  ---
+  duration_ms: 3.6519
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido Infinity
+ok 38 - H08 importe inválido Infinity
+  ---
+  duration_ms: 3.9081
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido
+ok 39 - H08 importe inválido
+  ---
+  duration_ms: 3.5053
+  type: 'test'
+  ...
+# Subtest: H08 importe inválido null
+ok 40 - H08 importe inválido null
+  ---
+  duration_ms: 3.4951
+  type: 'test'
+  ...
+# Subtest: H08 PARCIAL conserva desconocidos y rechaza cargo
+ok 41 - H08 PARCIAL conserva desconocidos y rechaza cargo
+  ---
+  duration_ms: 16.2685
+  type: 'test'
+  ...
+# Subtest: H08 NO_ACREDITADA conserva desconocidos y rechaza cargo
+ok 42 - H08 NO_ACREDITADA conserva desconocidos y rechaza cargo
+  ---
+  duration_ms: 15.4991
+  type: 'test'
+  ...
+# Subtest: H08 faltantes de evidencia y bloqueos comprobados no autorizan crédito
+ok 43 - H08 faltantes de evidencia y bloqueos comprobados no autorizan crédito
+  ---
+  duration_ms: 121.0874
+  type: 'test'
+  ...
+# Subtest: H08 acumulados exactos superan DECIMAL individual, sin truncamiento ni Number
+ok 44 - H08 acumulados exactos superan DECIMAL individual, sin truncamiento ni Number
+  ---
+  duration_ms: 63.4527
+  type: 'test'
+  ...
+# Subtest: H08 revisión compartida cambia con configuración, identidad, movimientos e imputaciones
+ok 45 - H08 revisión compartida cambia con configuración, identidad, movimientos e imputaciones
+  ---
+  duration_ms: 59.8396
+  type: 'test'
+  ...
+# Subtest: H01 ARS usa FER17-v1, HALF_UP una vez y conserva evidencia histórica exacta
+ok 46 - H01 ARS usa FER17-v1, HALF_UP una vez y conserva evidencia histórica exacta
+  ---
+  duration_ms: 39.662
+  type: 'test'
+  ...
+# Subtest: H01 ARS sin tasa/evidencia aplicable se rechaza; datos DEMO no acreditan cuenta REAL
+ok 47 - H01 ARS sin tasa/evidencia aplicable se rechaza; datos DEMO no acreditan cuenta REAL
+  ---
+  duration_ms: 19.5267
+  type: 'test'
+  ...
+# Subtest: H03/H07 SQL rechaza imputación cruzada, tipo invertido, exceso, duplicado y mutación del historial
+ok 48 - H03/H07 SQL rechaza imputación cruzada, tipo invertido, exceso, duplicado y mutación del historial
+  ---
+  duration_ms: 53.1513
+  type: 'test'
+  ...
+# Subtest: H03 cargo idempotente devuelve mismo ID y rechaza reutilización diferente
+ok 49 - H03 cargo idempotente devuelve mismo ID y rechaza reutilización diferente
+  ---
+  duration_ms: 29.4291
+  type: 'test'
+  ...
+# Subtest: H03 anulación requiere ADMIN activo y rollback conserva proyección anterior
+ok 50 - H03 anulación requiere ADMIN activo y rollback conserva proyección anterior
+  ---
+  duration_ms: 44.6404
+  type: 'test'
+  ...
+# Subtest: H08 acumulados brutos de cargos y abonos conservan todos los centavos
+ok 51 - H08 acumulados brutos de cargos y abonos conservan todos los centavos
+  ---
+  duration_ms: 95.6405
+  type: 'test'
+  ...
+# Subtest: H04/H08 plazo sin evidencia y cobertura futura permanecen desconocidos
+ok 52 - H04/H08 plazo sin evidencia y cobertura futura permanecen desconocidos
+  ---
+  duration_ms: 32.8924
+  type: 'test'
+  ...
+# Subtest: H08 límite cero, particular y cuenta inhabilitada bloquean crédito sin ocultar desconocidos
+ok 53 - H08 límite cero, particular y cuenta inhabilitada bloquean crédito sin ocultar desconocidos
+  ---
+  duration_ms: 44.5469
+  type: 'test'
+  ...
+# Subtest: H01 rechaza pago pendiente sin escrituras
+ok 54 - H01 rechaza pago pendiente sin escrituras
+  ---
+  duration_ms: 8.9301
+  type: 'test'
+  ...
+# Subtest: H01 rechaza pago de otra cuenta
+ok 55 - H01 rechaza pago de otra cuenta
+  ---
+  duration_ms: 16.0261
+  type: 'test'
+  ...
+# Subtest: H02 cargos 100 y abonos 250 conservan saldo -150
+ok 56 - H02 cargos 100 y abonos 250 conservan saldo -150
+  ---
+  duration_ms: 35.5969
+  type: 'test'
+  ...
+# Subtest: H03 cargo posterior consume abono libre en FIFO
+ok 57 - H03 cargo posterior consume abono libre en FIFO
+  ---
+  duration_ms: 28.9596
+  type: 'test'
+  ...
+# Subtest: H04 persiste fecha civil, plazo histórico y fecha límite
+ok 58 - H04 persiste fecha civil, plazo histórico y fecha límite
+  ---
+  duration_ms: 20.179
+  type: 'test'
+  ...
+# Subtest: H05 externalManager usa límite comprometido 500 después de snapshot 1000
+ok 59 - H05 externalManager usa límite comprometido 500 después de snapshot 1000
+  ---
+  duration_ms: 20.0064
+  type: 'test'
+  ...
+# Subtest: Task \#260 — S5-20.1: Modelo y registro de movimientos de cuenta corriente
+    # Subtest: 1. Estado inicial: saldo en cero y disponible equivalente al límite total
+    ok 1 - 1. Estado inicial: saldo en cero y disponible equivalente al límite total
+      ---
+      duration_ms: 26.8829
+      type: 'test'
+      ...
+    # Subtest: 2. Registro de cargo por pedido: descuenta disponible y vincula trazabilidad
+    ok 2 - 2. Registro de cargo por pedido: descuenta disponible y vincula trazabilidad
+      ---
+      duration_ms: 50.2232
+      type: 'test'
+      ...
+    # Subtest: 3. H03/H04: Imputación de abono con PAGO acreditado reduce deuda y libera disponible
+    ok 3 - 3. H03/H04: Imputación de abono con PAGO acreditado reduce deuda y libera disponible
+      ---
+      duration_ms: 25.9284
+      type: 'test'
+      ...
+    # Subtest: 4. Movimientos anulados: conservan trazabilidad sin alterar balance
+    ok 4 - 4. Movimientos anulados: conservan trazabilidad sin alterar balance
+      ---
+      duration_ms: 10.5738
+      type: 'test'
+      ...
+    # Subtest: 5. Cuenta inhabilitada: deuda real visible pero crédito disponible bloqueado en 0.00
+    ok 5 - 5. Cuenta inhabilitada: deuda real visible pero crédito disponible bloqueado en 0.00
+      ---
+      duration_ms: 14.333
+      type: 'test'
+      ...
+    # Subtest: 6. Control de crédito: rechaza cargo si el importe supera el disponible
+    ok 6 - 6. Control de crédito: rechaza cargo si el importe supera el disponible
+      ---
+      duration_ms: 11.4043
+      type: 'test'
+      ...
+    # Subtest: 7. Garantía antiduplicidad: imposibilita registrar dos cargos para el mismo pedido
+    ok 7 - 7. Garantía antiduplicidad: imposibilita registrar dos cargos para el mismo pedido
+      ---
+      duration_ms: 3.6969
+      type: 'test'
+      ...
+    # Subtest: 8. Integración transaccional con rollback atómico con externalManager
+    ok 8 - 8. Integración transaccional con rollback atómico con externalManager
+      ---
+      duration_ms: 23.5634
+      type: 'test'
+      ...
+    # Subtest: 9. Concurrencia normal: pedidos paralelos que superan el disponible se serializan
+    ok 9 - 9. Concurrencia normal: pedidos paralelos que superan el disponible se serializan
+      ---
+      duration_ms: 35.7984
+      type: 'test'
+      ...
+    # Subtest: 10. H06: Validación estricta de valores no finitos (NaN, cadenas vacías)
+    ok 10 - 10. H06: Validación estricta de valores no finitos (NaN, cadenas vacías)
+      ---
+      duration_ms: 0.4628
+      type: 'test'
+      ...
+# database.query.failed
+# database.query.failed
+# database.query.failed
+    # Subtest: 11. Integridad DDL MariaDB: rechaza violaciones de restricciones CHECK
+    ok 11 - 11. Integridad DDL MariaDB: rechaza violaciones de restricciones CHECK
+      ---
+      duration_ms: 2.9361
+      type: 'test'
+      ...
+    # Subtest: 12. H01: Cuenta sin cobertura acreditada bloquea consumo y expone saldo null
+    ok 12 - 12. H01: Cuenta sin cobertura acreditada bloquea consumo y expone saldo null
+      ---
+      duration_ms: 21.9029
+      type: 'test'
+      ...
+    # Subtest: 13. H03: Titularidad protegida rechaza asociar pedido de cliente ajeno
+    ok 13 - 13. H03: Titularidad protegida rechaza asociar pedido de cliente ajeno
+      ---
+      duration_ms: 12.0248
+      type: 'test'
+      ...
+    # Subtest: 14. H08: externalManager con snapshot previo en REPEATABLE READ impide sobregiro
+    ok 14 - 14. H08: externalManager con snapshot previo en REPEATABLE READ impide sobregiro
+      ---
+      duration_ms: 55.161
+      type: 'test'
+      ...
+    1..14
+ok 60 - Task \#260 — S5-20.1: Modelo y registro de movimientos de cuenta corriente
+  ---
+  duration_ms: 533.5628
+  type: 'suite'
+  ...
+1..60
+# tests 73
+# suites 1
+# pass 73
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 11603.4665
+CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.
+Exit code: 0
+
+--- 10. Backend MariaDB aislada: pedidos admin (npm run test:admin-orders) ---
+> ferrepatagonia-backend@0.1.0 test:admin-orders
+> node test/helpers/run-admin-orders-mariadb.cjs
+
+TAP version 13
+# Subtest: Task \#277 — Integración MariaDB: Permisos, Transición y Preservación Financiera
+    # Subtest: Permisos HTTP: 401 anónimo, 403 CLIENTE y 200 ADMIN
+    ok 1 - Permisos HTTP: 401 anónimo, 403 CLIENTE y 200 ADMIN
+      ---
+      duration_ms: 60.1395
+      type: 'test'
+      ...
+    # Subtest: Transición autorizada CONFIRMADO -> EN_PREPARACION y preservación financiera estricta
+    ok 2 - Transición autorizada CONFIRMADO -> EN_PREPARACION y preservación financiera estricta
+      ---
+      duration_ms: 33.1621
+      type: 'test'
+      ...
+    # Subtest: Rechazo de transiciones prohibidas (409 Conflict)
+    ok 3 - Rechazo de transiciones prohibidas (409 Conflict)
+      ---
+      duration_ms: 10.1188
+      type: 'test'
+      ...
+    # Subtest: ADMIN y Mi Cuenta leen el mismo instante y el filtro usa el día de Buenos Aires
+    ok 4 - ADMIN y Mi Cuenta leen el mismo instante y el filtro usa el día de Buenos Aires
+      ---
+      duration_ms: 469.308
+      type: 'test'
+      ...
+    1..4
+ok 1 - Task \#277 — Integración MariaDB: Permisos, Transición y Preservación Financiera
+  ---
+  duration_ms: 818.0255
+  type: 'suite'
+  ...
+1..1
+# tests 4
+# suites 1
+# pass 4
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 2608.0234
+Exit code: 0
+
+--- 11. Backend MariaDB aislada: cuenta corriente admin (npm run test:account-admin:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:account-admin:isolated
+> node test/helpers/run-admin-account-mariadb.cjs
+
+TAP version 13
+# Subtest: listado vacío real y alta de los escenarios aislados
+ok 1 - listado vacío real y alta de los escenarios aislados
+  ---
+  duration_ms: 719.3934
+  type: 'test'
+  ...
+# Subtest: listado rechaza visitante
+ok 2 - listado rechaza visitante
+  ---
+  duration_ms: 4.7971
+  type: 'test'
+  ...
+# Subtest: listado rechaza CLIENTE
+ok 3 - listado rechaza CLIENTE
+  ---
+  duration_ms: 7.0422
+  type: 'test'
+  ...
+# Subtest: listado rechaza token inválido
+ok 4 - listado rechaza token inválido
+  ---
+  duration_ms: 2.4589
+  type: 'test'
+  ...
+# Subtest: listado rechaza token expirado
+ok 5 - listado rechaza token expirado
+  ---
+  duration_ms: 2.642
+  type: 'test'
+  ...
+# Subtest: listado rechaza ADMIN inactivo
+ok 6 - listado rechaza ADMIN inactivo
+  ---
+  duration_ms: 6.1262
+  type: 'test'
+  ...
+# Subtest: listado devuelve 200 a ADMIN activo con privacidad
+ok 7 - listado devuelve 200 a ADMIN activo con privacidad
+  ---
+  duration_ms: 104.4618
+  type: 'test'
+  ...
+# Subtest: resumen rechaza visitante
+ok 8 - resumen rechaza visitante
+  ---
+  duration_ms: 2.6641
+  type: 'test'
+  ...
+# Subtest: resumen rechaza CLIENTE
+ok 9 - resumen rechaza CLIENTE
+  ---
+  duration_ms: 6.8708
+  type: 'test'
+  ...
+# Subtest: resumen rechaza token inválido
+ok 10 - resumen rechaza token inválido
+  ---
+  duration_ms: 3.5633
+  type: 'test'
+  ...
+# Subtest: resumen rechaza token expirado
+ok 11 - resumen rechaza token expirado
+  ---
+  duration_ms: 3.2835
+  type: 'test'
+  ...
+# Subtest: resumen rechaza ADMIN inactivo
+ok 12 - resumen rechaza ADMIN inactivo
+  ---
+  duration_ms: 5.956
+  type: 'test'
+  ...
+# Subtest: resumen devuelve 200 a ADMIN activo con privacidad
+ok 13 - resumen devuelve 200 a ADMIN activo con privacidad
+  ---
+  duration_ms: 26.5821
+  type: 'test'
+  ...
+# Subtest: movimientos rechaza visitante
+ok 14 - movimientos rechaza visitante
+  ---
+  duration_ms: 2.5672
+  type: 'test'
+  ...
+# Subtest: movimientos rechaza CLIENTE
+ok 15 - movimientos rechaza CLIENTE
+  ---
+  duration_ms: 3.5085
+  type: 'test'
+  ...
+# Subtest: movimientos rechaza token inválido
+ok 16 - movimientos rechaza token inválido
+  ---
+  duration_ms: 1.3629
+  type: 'test'
+  ...
+# Subtest: movimientos rechaza token expirado
+ok 17 - movimientos rechaza token expirado
+  ---
+  duration_ms: 1.3327
+  type: 'test'
+  ...
+# Subtest: movimientos rechaza ADMIN inactivo
+ok 18 - movimientos rechaza ADMIN inactivo
+  ---
+  duration_ms: 4.5849
+  type: 'test'
+  ...
+# Subtest: movimientos devuelve 200 a ADMIN activo con privacidad
+ok 19 - movimientos devuelve 200 a ADMIN activo con privacidad
+  ---
+  duration_ms: 17.2004
+  type: 'test'
+  ...
+# Subtest: vencimientos rechaza visitante
+ok 20 - vencimientos rechaza visitante
+  ---
+  duration_ms: 2.1854
+  type: 'test'
+  ...
+# Subtest: vencimientos rechaza CLIENTE
+ok 21 - vencimientos rechaza CLIENTE
+  ---
+  duration_ms: 3.5051
+  type: 'test'
+  ...
+# Subtest: vencimientos rechaza token inválido
+ok 22 - vencimientos rechaza token inválido
+  ---
+  duration_ms: 1.5949
+  type: 'test'
+  ...
+# Subtest: vencimientos rechaza token expirado
+ok 23 - vencimientos rechaza token expirado
+  ---
+  duration_ms: 1.3063
+  type: 'test'
+  ...
+# Subtest: vencimientos rechaza ADMIN inactivo
+ok 24 - vencimientos rechaza ADMIN inactivo
+  ---
+  duration_ms: 4.2262
+  type: 'test'
+  ...
+# Subtest: vencimientos devuelve 200 a ADMIN activo con privacidad
+ok 25 - vencimientos devuelve 200 a ADMIN activo con privacidad
+  ---
+  duration_ms: 16.6031
+  type: 'test'
+  ...
+# Subtest: rol antes de ID y destino, ausencia de cliente y ausencia de cuenta
+ok 26 - rol antes de ID y destino, ausencia de cliente y ausencia de cuenta
+  ---
+  duration_ms: 73.4031
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: limite=0
+ok 27 - query inválida con privacidad: limite=0
+  ---
+  duration_ms: 3.0817
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: limite=101
+ok 28 - query inválida con privacidad: limite=101
+  ---
+  duration_ms: 2.9991
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: limite=25&limite=25
+ok 29 - query inválida con privacidad: limite=25&limite=25
+  ---
+  duration_ms: 2.7163
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: cursor=a&cursor=b
+ok 30 - query inválida con privacidad: cursor=a&cursor=b
+  ---
+  duration_ms: 3.1742
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: cursor=alterado
+ok 31 - query inválida con privacidad: cursor=alterado
+  ---
+  duration_ms: 2.7191
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: habilitada=0
+ok 32 - query inválida con privacidad: habilitada=0
+  ---
+  duration_ms: 3.7542
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: habilitada=true&habilitada=false
+ok 33 - query inválida con privacidad: habilitada=true&habilitada=false
+  ---
+  duration_ms: 3.464
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: clienteId=2147483648
+ok 34 - query inválida con privacidad: clienteId=2147483648
+  ---
+  duration_ms: 4.151
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: cuentaId=1
+ok 35 - query inválida con privacidad: cuentaId=1
+  ---
+  duration_ms: 4.2781
+  type: 'test'
+  ...
+# Subtest: query inválida con privacidad: rol=ADMIN
+ok 36 - query inválida con privacidad: rol=ADMIN
+  ---
+  duration_ms: 3.7139
+  type: 'test'
+  ...
+# Subtest: lista solo cuentas existentes y aplica filtros combinados exactos
+ok 37 - lista solo cuentas existentes y aplica filtros combinados exactos
+  ---
+  duration_ms: 219.2201
+  type: 'test'
+  ...
+# Subtest: fuera de test las cuentas DEMO quedan excluidas de listado y detalle
+ok 38 - fuera de test las cuentas DEMO quedan excluidas de listado y detalle
+  ---
+  duration_ms: 34.0538
+  type: 'test'
+  ...
+# Subtest: páginas del listado recorren claves únicas y mantienen corte y revisión
+ok 39 - páginas del listado recorren claves únicas y mantienen corte y revisión
+  ---
+  duration_ms: 126.5143
+  type: 'test'
+  ...
+# Subtest: cursor autentica identidad, rol, ámbito, cliente y filtros, y expira
+ok 40 - cursor autentica identidad, rol, ámbito, cliente y filtros, y expira
+  ---
+  duration_ms: 112.3259
+  type: 'test'
+  ...
+# Subtest: revisión detecta cambios financieros, alta y habilitación dentro del filtro
+ok 41 - revisión detecta cambios financieros, alta y habilitación dentro del filtro
+  ---
+  duration_ms: 205.8394
+  type: 'test'
+  ...
+# Subtest: resumen financiero debt
+ok 42 - resumen financiero debt
+  ---
+  duration_ms: 17.6782
+  type: 'test'
+  ...
+# Subtest: resumen financiero long
+ok 43 - resumen financiero long
+  ---
+  duration_ms: 17.8272
+  type: 'test'
+  ...
+# Subtest: resumen financiero favor
+ok 44 - resumen financiero favor
+  ---
+  duration_ms: 17.1597
+  type: 'test'
+  ...
+# Subtest: resumen financiero disabled
+ok 45 - resumen financiero disabled
+  ---
+  duration_ms: 18.2685
+  type: 'test'
+  ...
+# Subtest: resumen financiero empty
+ok 46 - resumen financiero empty
+  ---
+  duration_ms: 15.7248
+  type: 'test'
+  ...
+# Subtest: resumen financiero zero
+ok 47 - resumen financiero zero
+  ---
+  duration_ms: 22.296
+  type: 'test'
+  ...
+# Subtest: resumen financiero partial
+ok 48 - resumen financiero partial
+  ---
+  duration_ms: 15.9646
+  type: 'test'
+  ...
+# Subtest: resumen financiero unknown
+ok 49 - resumen financiero unknown
+  ---
+  duration_ms: 22.0063
+  type: 'test'
+  ...
+# Subtest: movimientos paginados, empate de fecha, anulación, saldo resultante y propiedad
+ok 50 - movimientos paginados, empate de fecha, anulación, saldo resultante y propiedad
+  ---
+  duration_ms: 129.2297
+  type: 'test'
+  ...
+# Subtest: vencimientos FIFO: fecha civil, vence hoy, remanente, plazo histórico y corte estable
+ok 51 - vencimientos FIFO: fecha civil, vence hoy, remanente, plazo histórico y corte estable
+  ---
+  duration_ms: 175.136
+  type: 'test'
+  ...
+# Subtest: lecturas dejan el ledger y sus revisiones intactos y cambios de \#260 invalidan cursores
+ok 52 - lecturas dejan el ledger y sus revisiones intactos y cambios de \#260 invalidan cursores
+  ---
+  duration_ms: 167.8726
+  type: 'test'
+  ...
+# Subtest: CLIENTE conserva su cuenta propia y no eleva permisos mediante headers
+ok 53 - CLIENTE conserva su cuenta propia y no eleva permisos mediante headers
+  ---
+  duration_ms: 87.4413
+  type: 'test'
+  ...
+# Subtest: error SQL real sanitizado y consulta posterior recuperada
+ok 54 - error SQL real sanitizado y consulta posterior recuperada
+  ---
+  duration_ms: 104.8285
+  type: 'test'
+  ...
+# Subtest: un bloqueo real de MariaDB provoca 503 y permite reintentar
+ok 55 - un bloqueo real de MariaDB provoca 503 y permite reintentar
+  ---
+  duration_ms: 5105.1018
+  type: 'test'
+  ...
+# Subtest: H04 protege todo el libro con el abono DEMO en página 2
+ok 56 - H04 protege todo el libro con el abono DEMO en página 2
+  ---
+  duration_ms: 895.4239
+  type: 'test'
+  ...
+# Subtest: H04 protege todo el libro con el abono DEMO primero
+ok 57 - H04 protege todo el libro con el abono DEMO primero
+  ---
+  duration_ms: 866.9214
+  type: 'test'
+  ...
+# Subtest: producción: el listado ADMIN omite libros restringidos y conserva cuentas REAL legítimas
+ok 58 - producción: el listado ADMIN omite libros restringidos y conserva cuentas REAL legítimas
+  ---
+  duration_ms: 207.3983
+  type: 'test'
+  ...
+1..58
+# tests 58
+# suites 0
+# pass 58
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 9742.2881
+Limpieza #258 confirmada: contenedor propio eliminado, datos tmpfs.
+
+(node:25508) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+database.query.failed
+database.query.slow { milliseconds: 5002 }
+database.query.failed
+Exit code: 0
+
+--- 12. Backend MariaDB aislada: flujo de crédito T-S7-09.1 (npm run test:credit-workflow:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:credit-workflow:isolated
+> node test/helpers/run-credit-workflow-mariadb.cjs
+
+Migración aditiva: filas de las 22 tablas previas preservadas en ambas ejecuciones.
+{"mode":"credit-workflow","version":"11.4.13-MariaDB-ubu2404","database":"credit_test_16ee8244947a405ca962ea3735a9bde6","host":"127.0.0.1","port":52680,"container":"credit-workflow-test-16ee8244947a405ca962ea3735a9bde6","profile":"complete","tables":26,"triggers":13,"views":1}
+TAP version 13
+# Subtest: S7-09.1 lista propia vacía y privacidad
+ok 1 - S7-09.1 lista propia vacía y privacidad
+  ---
+  duration_ms: 159.1417
+  type: 'test'
+  ...
+# Subtest: S7-09.1 solicitud válida, reintento idempotente y duplicado pendiente
+ok 2 - S7-09.1 solicitud válida, reintento idempotente y duplicado pendiente
+  ---
+  duration_ms: 84.104
+  type: 'test'
+  ...
+# Subtest: S7-09.1 PARTICULAR no puede solicitar ni elegir empresa
+ok 3 - S7-09.1 PARTICULAR no puede solicitar ni elegir empresa
+  ---
+  duration_ms: 14.8874
+  type: 'test'
+  ...
+# Subtest: S7-09.1 la clave de creación no revela una solicitud de la empresa anterior
+ok 4 - S7-09.1 la clave de creación no revela una solicitud de la empresa anterior
+  ---
+  duration_ms: 50.5796
+  type: 'test'
+  ...
+# Subtest: S7-09.1 consulta propia y rechazo IDOR
+ok 5 - S7-09.1 consulta propia y rechazo IDOR
+  ---
+  duration_ms: 37.808
+  type: 'test'
+  ...
+# Subtest: S7-09.1 permisos: CLIENTE no resuelve, ADMIN inactivo/degradado no opera
+ok 6 - S7-09.1 permisos: CLIENTE no resuelve, ADMIN inactivo/degradado no opera
+  ---
+  duration_ms: 28.8404
+  type: 'test'
+  ...
+# Subtest: S7-09.1 F-01/F-05 empresas pendientes o rechazadas no crean ni consultan solicitudes
+ok 7 - S7-09.1 F-01/F-05 empresas pendientes o rechazadas no crean ni consultan solicitudes
+  ---
+  duration_ms: 80.0042
+  type: 'test'
+  ...
+# Subtest: S7-09.1 F-01 revalida la empresa antes del replay y de la decisión administrativa
+ok 8 - S7-09.1 F-01 revalida la empresa antes del replay y de la decisión administrativa
+  ---
+  duration_ms: 127.4014
+  type: 'test'
+  ...
+# Subtest: S7-09.1 pasar a empresa APROBADA no habilita la cuenta por sí solo
+ok 9 - S7-09.1 pasar a empresa APROBADA no habilita la cuenta por sí solo
+  ---
+  duration_ms: 73.8662
+  type: 'test'
+  ...
+# Subtest: S7-09.1 F-02 DTO HTTP no convierte texto inválido en ausencia ni consume la clave
+ok 10 - S7-09.1 F-02 DTO HTTP no convierte texto inválido en ausencia ni consume la clave
+  ---
+  duration_ms: 37.3993
+  type: 'test'
+  ...
+# Subtest: S7-09.1 F-04 ADMIN no bloquea al solicitante histórico de otra empresa
+ok 11 - S7-09.1 F-04 ADMIN no bloquea al solicitante histórico de otra empresa
+  ---
+  duration_ms: 46.9948
+  type: 'test'
+  ...
+# Subtest: S7-09.1 aprobación crea cuenta inhabilitada con límite, plazo y evidencia
+ok 12 - S7-09.1 aprobación crea cuenta inhabilitada con límite, plazo y evidencia
+  ---
+  duration_ms: 57.7729
+  type: 'test'
+  ...
+# Subtest: S7-09.1 rechazo no crea cuenta y una rechazada no se aprueba después
+ok 13 - S7-09.1 rechazo no crea cuenta y una rechazada no se aprueba después
+  ---
+  duration_ms: 46.7974
+  type: 'test'
+  ...
+# Subtest: S7-09.1 rechazar con la misma clave y distinta evidencia devuelve 409
+ok 14 - S7-09.1 rechazar con la misma clave y distinta evidencia devuelve 409
+  ---
+  duration_ms: 53.5712
+  type: 'test'
+  ...
+# Subtest: S7-09.1 habilitación y deshabilitación inmediatas, idempotentes y auditadas
+ok 15 - S7-09.1 habilitación y deshabilitación inmediatas, idempotentes y auditadas
+  ---
+  duration_ms: 95.9765
+  type: 'test'
+  ...
+# Subtest: S7-09.1 compras y abonos respetan la habilitación y el límite
+ok 16 - S7-09.1 compras y abonos respetan la habilitación y el límite
+  ---
+  duration_ms: 135.0704
+  type: 'test'
+  ...
+# Subtest: S7-09.1 límites inválidos y reducción por debajo de la deuda se rechazan
+ok 17 - S7-09.1 límites inválidos y reducción por debajo de la deuda se rechazan
+  ---
+  duration_ms: 44.6568
+  type: 'test'
+  ...
+# Subtest: S7-09.1 F-03 el límite sin cambios registra la operación sin alterar cuenta ni libro
+ok 18 - S7-09.1 F-03 el límite sin cambios registra la operación sin alterar cuenta ni libro
+  ---
+  duration_ms: 62.935
+  type: 'test'
+  ...
+# Subtest: S7-09.1 decisiones concurrentes y modificación concurrente de límite
+ok 19 - S7-09.1 decisiones concurrentes y modificación concurrente de límite
+  ---
+  duration_ms: 121.1331
+  type: 'test'
+  ...
+# Subtest: S7-09.1 aprobación y rechazo concurrentes no dejan estados parciales
+ok 20 - S7-09.1 aprobación y rechazo concurrentes no dejan estados parciales
+  ---
+  duration_ms: 36.79
+  type: 'test'
+  ...
+# Subtest: S7-09.1 auditoría reconstruible y sin datos internos para el cliente
+ok 21 - S7-09.1 auditoría reconstruible y sin datos internos para el cliente
+  ---
+  duration_ms: 32.984
+  type: 'test'
+  ...
+# Subtest: S7-09.1 checkout exige cuenta habilitada, empresa aprobada y precio FER-17 verificado
+ok 22 - S7-09.1 checkout exige cuenta habilitada, empresa aprobada y precio FER-17 verificado
+  ---
+  duration_ms: 684.2094
+  type: 'test'
+  ...
+# Subtest: S7-09.1 persistencia tras reinicio del pool de datos
+ok 23 - S7-09.1 persistencia tras reinicio del pool de datos
+  ---
+  duration_ms: 14.5214
+  type: 'test'
+  ...
+1..23
+# tests 23
+# suites 0
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4170.3701
+Reaplicación verificada: filas de las 24 tablas preservadas, incluidos solicitudes, eventos y movimientos.
+CLEANUP OK T-S7-09.1: contenedor eliminado, datos tmpfs.
+Exit code: 0
+
+--- 13. Backend MariaDB aislada: bootstrap local e inventario (npm run test:local-bootstrap:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:local-bootstrap:isolated
+> node test/helpers/run-local-bootstrap-mariadb.cjs
+
+{"mode":"local-bootstrap","database":"cc260_test_b21a840315134624bb7b796c661e8296","host":"127.0.0.1","port":52815,"container":"cc260-test-b21a840315134624bb7b796c661e8296"}
+TAP version 13
+# Subtest: bootstrap rechaza un perfil parcial FER-20 sin crear usuarios ni credenciales
+ok 1 - bootstrap rechaza un perfil parcial FER-20 sin crear usuarios ni credenciales
+  ---
+  duration_ms: 6919.046
+  type: 'test'
+  ...
+# Subtest: bootstrap inicial crea cuatro perfiles y credenciales validas
+ok 2 - bootstrap inicial crea cuatro perfiles y credenciales validas
+  ---
+  duration_ms: 9095.0097
+  type: 'test'
+  ...
+# Subtest: recrear una base limpia con el mismo DB_NAME actualiza las contrasenas del JSON
+ok 3 - recrear una base limpia con el mismo DB_NAME actualiza las contrasenas del JSON
+  ---
+  duration_ms: 2218.1978
+  type: 'test'
+  ...
+# Subtest: reejecucion secuencial es idempotente y no reescribe credenciales
+ok 4 - reejecucion secuencial es idempotente y no reescribe credenciales
+  ---
+  duration_ms: 1884.0363
+  type: 'test'
+  ...
+# Subtest: login real de los cuatro perfiles, separacion ADMIN/CLIENTE y reinicio
+ok 5 - login real de los cuatro perfiles, separacion ADMIN/CLIENTE y reinicio
+  ---
+  duration_ms: 6012.6936
+  type: 'test'
+  ...
+# Subtest: dos bootstraps concurrentes sobre una base vacia no duplican ni corrompen
+ok 6 - dos bootstraps concurrentes sobre una base vacia no duplican ni corrompen
+  ---
+  duration_ms: 8154.1724
+  type: 'test'
+  ...
+# Subtest: un fallo al escribir credenciales no afirma rollback y conserva los usuarios
+ok 7 - un fallo al escribir credenciales no afirma rollback y conserva los usuarios # SKIP
+  ---
+  duration_ms: 0.2654
+  type: 'test'
+  ...
+# Subtest: si existen usuarios y falta el JSON solo advierte, sin restablecer contrasenas
+ok 8 - si existen usuarios y falta el JSON solo advierte, sin restablecer contrasenas
+  ---
+  duration_ms: 416.8168
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 36991.1376
+CLEANUP OK T-S7-01.2: contenedor eliminado, datos tmpfs, sin volumen persistente.
+Exit code: 0
+
+--- 14. Backend MariaDB aislada: aprobación empresarial (npm run test:company-approval:audit) ---
+> ferrepatagonia-backend@0.1.0 test:company-approval:audit
+> node test/helpers/run-company-approval-audit.cjs
+
+[T-S7-03.1] Creando MariaDB descartable aislada (s7-03-1-audit-2398b196779b4d2f8539d204d4ed8624)...
+[T-S7-03.1] MariaDB admin_products_test_2398b196779b4d2f8539d204d4ed8624 escuchando en 127.0.0.1:61238
+[T-S7-03.1] Instalación completa verificada: { profile: 'complete', tables: 26, triggers: 13, views: 1 }
+[T-S7-03.1] Ejecutando company-approval-audit.test.cjs...
+TAP version 13
+# Subtest: T-S7-03.1 — Registro empresarial y autorización comercial
+    # Subtest: A — Empresa recién registrada
+        # Subtest: A.1 Registro público EMPRESA crea PENDIENTE, sin cuenta corriente ni crédito
+        ok 1 - A.1 Registro público EMPRESA crea PENDIENTE, sin cuenta corriente ni crédito
+          ---
+          duration_ms: 305.0407
+          type: 'test'
+          ...
+        # Subtest: A.2 Registro público PARTICULAR deja estado_aprobacion_empresa en NULL
+        ok 2 - A.2 Registro público PARTICULAR deja estado_aprobacion_empresa en NULL
+          ---
+          duration_ms: 253.0722
+          type: 'test'
+          ...
+        # Subtest: A.3 La empresa pendiente inicia sesión y consulta SIN_CUENTA sin operaciones de crédito
+        ok 3 - A.3 La empresa pendiente inicia sesión y consulta SIN_CUENTA sin operaciones de crédito
+          ---
+          duration_ms: 532.9848
+          type: 'test'
+          ...
+        1..3
+    ok 1 - A — Empresa recién registrada
+      ---
+      duration_ms: 1091.8631
+      type: 'suite'
+      ...
+    # Subtest: B — Empresa pendiente con cuenta corriente habilitada
+        # Subtest: B.1 La elegibilidad se rechaza por aprobación, no por producto/stock/precio
+        ok 1 - B.1 La elegibilidad se rechaza por aprobación, no por producto/stock/precio
+          ---
+          duration_ms: 10.5104
+          type: 'test'
+          ...
+        # Subtest: B.2 Confirmar pedido a crédito devuelve 403 EMPRESA_NO_HABILITADA sin efectos persistentes
+        ok 2 - B.2 Confirmar pedido a crédito devuelve 403 EMPRESA_NO_HABILITADA sin efectos persistentes
+          ---
+          duration_ms: 28.8775
+          type: 'test'
+          ...
+        1..2
+    ok 2 - B — Empresa pendiente con cuenta corriente habilitada
+      ---
+      duration_ms: 508.3122
+      type: 'suite'
+      ...
+    # Subtest: C — Empresa aprobada sin crédito
+        # Subtest: C.1 El ADMIN aprueba la empresa y la aprobación NO habilita crédito
+        ok 1 - C.1 El ADMIN aprueba la empresa y la aprobación NO habilita crédito
+          ---
+          duration_ms: 19.2777
+          type: 'test'
+          ...
+        # Subtest: C.2 Empresa aprobada sin cuenta no es elegible (CUENTA_NO_HABILITADA)
+        ok 2 - C.2 Empresa aprobada sin cuenta no es elegible (CUENTA_NO_HABILITADA)
+          ---
+          duration_ms: 11.9146
+          type: 'test'
+          ...
+        # Subtest: C.3 Confirmar pedido a crédito devuelve 403 CUENTA_NO_HABILITADA y no crea pedido
+        ok 3 - C.3 Confirmar pedido a crédito devuelve 403 CUENTA_NO_HABILITADA y no crea pedido
+          ---
+          duration_ms: 23.3914
+          type: 'test'
+          ...
+        1..3
+    ok 3 - C — Empresa aprobada sin crédito
+      ---
+      duration_ms: 516.7331
+      type: 'suite'
+      ...
+    # Subtest: D — Empresa aprobada con crédito habilitado
+        # Subtest: D.1 La elegibilidad autorizada calcula total y crédito disponible
+        ok 1 - D.1 La elegibilidad autorizada calcula total y crédito disponible
+          ---
+          duration_ms: 35.6164
+          type: 'test'
+          ...
+        # Subtest: D.2 La confirmación autorizada persiste pedido, cargo, stock y saldo
+        ok 2 - D.2 La confirmación autorizada persiste pedido, cargo, stock y saldo
+          ---
+          duration_ms: 110.147
+          type: 'test'
+          ...
+        1..2
+    ok 4 - D — Empresa aprobada con crédito habilitado
+      ---
+      duration_ms: 617.1057
+      type: 'suite'
+      ...
+    # Subtest: E — Empresa rechazada
+        # Subtest: E.1 El ADMIN rechaza una empresa previamente aprobada
+        ok 1 - E.1 El ADMIN rechaza una empresa previamente aprobada
+          ---
+          duration_ms: 10.8394
+          type: 'test'
+          ...
+        # Subtest: E.2 Con cuenta y crédito vigentes, la empresa rechazada no puede comprar a crédito
+        ok 2 - E.2 Con cuenta y crédito vigentes, la empresa rechazada no puede comprar a crédito
+          ---
+          duration_ms: 35.5919
+          type: 'test'
+          ...
+        # Subtest: E.3 La empresa rechazada conserva acceso a su historial de pedidos
+        ok 3 - E.3 La empresa rechazada conserva acceso a su historial de pedidos
+          ---
+          duration_ms: 23.6343
+          type: 'test'
+          ...
+        1..3
+    ok 5 - E — Empresa rechazada
+      ---
+      duration_ms: 541.5571
+      type: 'suite'
+      ...
+    # Subtest: F — Permisos y manipulación
+        # Subtest: F.1 Sin sesión, los endpoints administrativos responden 401
+        ok 1 - F.1 Sin sesión, los endpoints administrativos responden 401
+          ---
+          duration_ms: 7.0791
+          type: 'test'
+          ...
+        # Subtest: F.2 Un CLIENTE no puede autoaprobarse (403) y su estado permanece PENDIENTE
+        ok 2 - F.2 Un CLIENTE no puede autoaprobarse (403) y su estado permanece PENDIENTE
+          ---
+          duration_ms: 6.7669
+          type: 'test'
+          ...
+        # Subtest: F.3 Un CLIENTE no puede modificar el estado de otra empresa (403)
+        ok 3 - F.3 Un CLIENTE no puede modificar el estado de otra empresa (403)
+          ---
+          duration_ms: 6.242
+          type: 'test'
+          ...
+        # Subtest: F.4 Un CLIENTE no puede habilitarse crédito por endpoints administrativos
+        ok 4 - F.4 Un CLIENTE no puede habilitarse crédito por endpoints administrativos
+          ---
+          duration_ms: 15.6413
+          type: 'test'
+          ...
+        # Subtest: F.5 El ADMIN recibe 400 ante IDs inválidos, estados inválidos o campos ajenos
+        ok 5 - F.5 El ADMIN recibe 400 ante IDs inválidos, estados inválidos o campos ajenos
+          ---
+          duration_ms: 13.7336
+          type: 'test'
+          ...
+        # Subtest: F.6 El ADMIN no puede aprobar una cuenta PARTICULAR (400)
+        ok 6 - F.6 El ADMIN no puede aprobar una cuenta PARTICULAR (400)
+          ---
+          duration_ms: 251.7669
+          type: 'test'
+          ...
+        # Subtest: F.7 El endpoint administrativo no expone una vía para habilitar crédito (ADMIN: 404)
+        ok 7 - F.7 El endpoint administrativo no expone una vía para habilitar crédito (ADMIN: 404)
+          ---
+          duration_ms: 5.2935
+          type: 'test'
+          ...
+        1..7
+    ok 6 - F — Permisos y manipulación
+      ---
+      duration_ms: 768.4274
+      type: 'suite'
+      ...
+    # Subtest: G — Condiciones de carrera entre cotización y confirmación
+        # Subtest: G.1 Una cotización emitida antes del rechazo administrativo no permite confirmar
+        ok 1 - G.1 Una cotización emitida antes del rechazo administrativo no permite confirmar
+          ---
+          duration_ms: 531.9897
+          type: 'test'
+          ...
+        # Subtest: G.2 Una cotización emitida antes de inhabilitar la cuenta no permite confirmar
+        ok 2 - G.2 Una cotización emitida antes de inhabilitar la cuenta no permite confirmar
+          ---
+          duration_ms: 513.6244
+          type: 'test'
+          ...
+        1..2
+    ok 7 - G — Condiciones de carrera entre cotización y confirmación
+      ---
+      duration_ms: 1045.9409
+      type: 'suite'
+      ...
+    1..7
+ok 1 - T-S7-03.1 — Registro empresarial y autorización comercial
+  ---
+  duration_ms: 5178.7067
+  type: 'suite'
+  ...
+1..1
+# tests 22
+# suites 8
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7238.6718
+[T-S7-03.1] Suite finalizada con código 0.
+[T-S7-03.1] Eliminando contenedor descartable s7-03-1-audit-2398b196779b4d2f8539d204d4ed8624...
+Exit code: 0
+
+--- 15. Backend MariaDB aislada: motor de precios FER-17 (npm run test:pricing:mariadb) ---
+> ferrepatagonia-backend@0.1.0 test:pricing:mariadb
+> node test/helpers/run-pricing-mariadb.cjs
+
+FER-17 migrations applied twice: legacy 173.12 preserved, no USD evidence fabricated.
+Full schema: { profile: 'complete', tables: 26, triggers: 13, views: 1 }
+TAP version 13
+# Subtest: H02 evidencia tabulación no acredita base legacy 173.12 por HTTP productivo
+ok 1 - H02 evidencia tabulación no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 1145.1605
+  type: 'test'
+  ...
+# Subtest: H02 evidencia salto de línea no acredita base legacy 173.12 por HTTP productivo
+ok 2 - H02 evidencia salto de línea no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 80.0621
+  type: 'test'
+  ...
+# Subtest: H02 evidencia CRLF no acredita base legacy 173.12 por HTTP productivo
+ok 3 - H02 evidencia CRLF no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 79.4764
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: H02 evidencia espacios no acredita base legacy 173.12 por HTTP productivo
+ok 4 - H02 evidencia espacios no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 57.9689
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: H02 evidencia vacía no acredita base legacy 173.12 por HTTP productivo
+ok 5 - H02 evidencia vacía no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 54.0431
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: H02 evidencia NULL no acredita base legacy 173.12 por HTTP productivo
+ok 6 - H02 evidencia NULL no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 56.8289
+  type: 'test'
+  ...
+# Subtest: H02 evidencia ausente no acredita base legacy 173.12 por HTTP productivo
+ok 7 - H02 evidencia ausente no acredita base legacy 173.12 por HTTP productivo
+  ---
+  duration_ms: 51.7511
+  type: 'test'
+  ...
+# Subtest: H02 evidencia documental con espacios exteriores conserva acreditación y cálculo
+ok 8 - H02 evidencia documental con espacios exteriores conserva acreditación y cálculo
+  ---
+  duration_ms: 40.6244
+  type: 'test'
+  ...
+# Subtest: F-02: HTTP personalizado publica evidencia documental real e importes exactos
+ok 9 - F-02: HTTP personalizado publica evidencia documental real e importes exactos
+  ---
+  duration_ms: 40.5818
+  type: 'test'
+  ...
+# Subtest: F-01: EMPRESA en los tres estados consulta su lista en SQL, sin ganar acceso al checkout CC
+ok 10 - F-01: EMPRESA en los tres estados consulta su lista en SQL, sin ganar acceso al checkout CC
+  ---
+  duration_ms: 233.2489
+  type: 'test'
+  ...
+# Subtest: HTTP productivo ARS: calendario y tasa de ocho decimales verificados en MariaDB
+ok 11 - HTTP productivo ARS: calendario y tasa de ocho decimales verificados en MariaDB
+  ---
+  duration_ms: 58.9288
+  type: 'test'
+  ...
+# Subtest: calendario SQL de fin de semana y feriado sintético selecciona cierre anterior
+ok 12 - calendario SQL de fin de semana y feriado sintético selecciona cierre anterior
+  ---
+  duration_ms: 45.9133
+  type: 'test'
+  ...
+# Subtest: HTTP real recorre fin de semana y secuencia de feriados sintéticos
+ok 13 - HTTP real recorre fin de semana y secuencia de feriados sintéticos
+  ---
+  duration_ms: 49.1952
+  type: 'test'
+  ...
+# Subtest: ARS suma líneas redondeadas, no convierte el total una sola vez
+ok 14 - ARS suma líneas redondeadas, no convierte el total una sola vez
+  ---
+  duration_ms: 64.4234
+  type: 'test'
+  ...
+# Subtest: cotización ausente no habilita ARS
+ok 15 - cotización ausente no habilita ARS
+  ---
+  duration_ms: 61.9589
+  type: 'test'
+  ...
+# Subtest: cotización invalidada no habilita ARS
+ok 16 - cotización invalidada no habilita ARS
+  ---
+  duration_ms: 56.2753
+  type: 'test'
+  ...
+# Subtest: cotización no-verificada no habilita ARS
+ok 17 - cotización no-verificada no habilita ARS
+  ---
+  duration_ms: 53.2197
+  type: 'test'
+  ...
+# Subtest: cotización tasa-editada no habilita ARS
+ok 18 - cotización tasa-editada no habilita ARS
+  ---
+  duration_ms: 55.358
+  type: 'test'
+  ...
+# Subtest: cotización desactualizada no habilita ARS
+ok 19 - cotización desactualizada no habilita ARS
+  ---
+  duration_ms: 50.1933
+  type: 'test'
+  ...
+# Subtest: cotización cronologia-imposible no habilita ARS
+ok 20 - cotización cronologia-imposible no habilita ARS
+  ---
+  duration_ms: 50.812
+  type: 'test'
+  ...
+# Subtest: cotización futura no habilita ARS
+ok 21 - cotización futura no habilita ARS
+  ---
+  duration_ms: 55.8707
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: auditoría hace rollback si falla cálculo; error de persistencia bloquea respuesta
+ok 22 - auditoría hace rollback si falla cálculo; error de persistencia bloquea respuesta
+  ---
+  duration_ms: 98.0923
+  type: 'test'
+  ...
+# Subtest: cambio de precio invalida evidencia; nuevo importe requiere revisión explícita
+ok 23 - cambio de precio invalida evidencia; nuevo importe requiere revisión explícita
+  ---
+  duration_ms: 40.3209
+  type: 'test'
+  ...
+# Subtest: calendario futuro o incompleto bloquea solo ARS, no USD
+ok 24 - calendario futuro o incompleto bloquea solo ARS, no USD
+  ---
+  duration_ms: 58.221
+  type: 'test'
+  ...
+# Subtest: evidencia de precio futura/invalidada o actor no ADMIN no habilita la base
+ok 25 - evidencia de precio futura/invalidada o actor no ADMIN no habilita la base
+  ---
+  duration_ms: 48.3712
+  type: 'test'
+  ...
+# Subtest: carga civil legacy y UTC de verificación deben concordar en Buenos Aires
+ok 26 - carga civil legacy y UTC de verificación deben concordar en Buenos Aires
+  ---
+  duration_ms: 55.295
+  type: 'test'
+  ...
+# Subtest: catálogo conserva precio nulo y FER-17 entrega el importe con su marca de procedencia
+ok 27 - catálogo conserva precio nulo y FER-17 entrega el importe con su marca de procedencia
+  ---
+  duration_ms: 43.845
+  type: 'test'
+  ...
+# Subtest: usuario 901 resuelve cliente 301 y lista activa real
+ok 28 - usuario 901 resuelve cliente 301 y lista activa real
+  ---
+  duration_ms: 35.7636
+  type: 'test'
+  ...
+# Subtest: cliente sin lista no obtiene descuento por fidelidad
+ok 29 - cliente sin lista no obtiene descuento por fidelidad
+  ---
+  duration_ms: 29.6031
+  type: 'test'
+  ...
+# Subtest: lista inactiva conserva promoción y persiste observación diaria deduplicada
+ok 30 - lista inactiva conserva promoción y persiste observación diaria deduplicada
+  ---
+  duration_ms: 66.255
+  type: 'test'
+  ...
+# Subtest: especial mayor gana; lista mayor gana; cambios se ven en la siguiente consulta
+ok 31 - especial mayor gana; lista mayor gana; cambios se ven en la siguiente consulta
+  ---
+  duration_ms: 58.6505
+  type: 'test'
+  ...
+# Subtest: asignar y cambiar lista actualiza solo el precio del cliente asignado
+ok 32 - asignar y cambiar lista actualiza solo el precio del cliente asignado
+  ---
+  duration_ms: 113.2305
+  type: 'test'
+  ...
+# Subtest: HTTP con JWT y lookup reales aísla clientes, público y caché
+ok 33 - HTTP con JWT y lookup reales aísla clientes, público y caché
+  ---
+  duration_ms: 63.3628
+  type: 'test'
+  ...
+# Subtest: HTTP rechaza lista/cliente/precio en body y query sin aplicar valores ajenos
+ok 34 - HTTP rechaza lista/cliente/precio en body y query sin aplicar valores ajenos
+  ---
+  duration_ms: 72.8533
+  type: 'test'
+  ...
+# Subtest: producto ausente/cero/final cero conserva estados y no fabrica total
+ok 35 - producto ausente/cero/final cero conserva estados y no fabrica total
+  ---
+  duration_ms: 43.8729
+  type: 'test'
+  ...
+# Subtest: productos o categorías inactivos no exponen precio
+ok 36 - productos o categorías inactivos no exponen precio
+  ---
+  duration_ms: 43.849
+  type: 'test'
+  ...
+# Subtest: redondeo HALF_UP después de lectura DECIMAL exacta
+ok 37 - redondeo HALF_UP después de lectura DECIMAL exacta
+  ---
+  duration_ms: 37.1407
+  type: 'test'
+  ...
+# Subtest: ARS con fila COTIZACION ausente permanece bloqueado por calendario/verificación ausentes
+ok 38 - ARS con fila COTIZACION ausente permanece bloqueado por calendario/verificación ausentes
+  ---
+  duration_ms: 35.8915
+  type: 'test'
+  ...
+# Subtest: ARS con fila COTIZACION valida permanece bloqueado por calendario/verificación ausentes
+ok 39 - ARS con fila COTIZACION valida permanece bloqueado por calendario/verificación ausentes
+  ---
+  duration_ms: 37.2532
+  type: 'test'
+  ...
+# Subtest: ARS con fila COTIZACION invalidada permanece bloqueado por calendario/verificación ausentes
+ok 40 - ARS con fila COTIZACION invalidada permanece bloqueado por calendario/verificación ausentes
+  ---
+  duration_ms: 39.7141
+  type: 'test'
+  ...
+# Subtest: sin sesión, ADMIN, usuario desactivado y cliente inactivo
+ok 41 - sin sesión, ADMIN, usuario desactivado y cliente inactivo
+  ---
+  duration_ms: 54.7144
+  type: 'test'
+  ...
+# Subtest: unidad legacy sin evidencia permanece visible con estado propio y sin importe USD
+ok 42 - unidad legacy sin evidencia permanece visible con estado propio y sin importe USD
+  ---
+  duration_ms: 42.2391
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: fallo SQL real se sanitiza y la siguiente solicitud puede resolver
+ok 43 - fallo SQL real se sanitiza y la siguiente solicitud puede resolver
+  ---
+  duration_ms: 94.0136
+  type: 'test'
+  ...
+# Subtest: snapshot REPEATABLE READ no mezcla lista anterior y producto posterior a commit concurrente
+ok 44 - snapshot REPEATABLE READ no mezcla lista anterior y producto posterior a commit concurrente
+  ---
+  duration_ms: 44.5309
+  type: 'test'
+  ...
+1..44
+# tests 44
+# suites 0
+# pass 44
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 4862.622
+Exit code: 0
+
+--- 16. Backend MariaDB aislada: verificación de precios T-S7-05.2 (npm run test:price-verification:isolated) ---
+> ferrepatagonia-backend@0.1.0 test:price-verification:isolated
+> node test/helpers/run-price-verification-mariadb.cjs
+
+{"database":"price_verification_test_e2fc072eeac14ac5a7011caeed156aa1","container":"price-verification-test-e2fc072eeac14ac5a7011caeed156aa1","port":64114,"version":"11.4.13-MariaDB-ubu2404","profile":"complete","tables":26,"triggers":13,"views":1}
+TAP version 13
+# Subtest: T-S7-05.2 — Flujo autorizado de verificación de precios
+    # Subtest: 1. Alta: precio exacto, sin evidencia comercial y FER17 no publica un importe
+    ok 1 - 1. Alta: precio exacto, sin evidencia comercial y FER17 no publica un importe
+      ---
+      duration_ms: 90.7111
+      type: 'test'
+      ...
+    # Subtest: 2. Verificación autorizada: DEFINIDO, precio público y descuento particular exactos
+    ok 2 - 2. Verificación autorizada: DEFINIDO, precio público y descuento particular exactos
+      ---
+      duration_ms: 46.8705
+      type: 'test'
+      ...
+    # Subtest: 7. Edición no monetaria: conserva la verificación vigente
+    ok 3 - 7. Edición no monetaria: conserva la verificación vigente
+      ---
+      duration_ms: 39.7603
+      type: 'test'
+      ...
+    # Subtest: 5. Edición del importe: invalida evidencia y auditoría en la misma transacción
+    ok 4 - 5. Edición del importe: invalida evidencia y auditoría en la misma transacción
+      ---
+      duration_ms: 24.4161
+      type: 'test'
+      ...
+    # Subtest: 6. USD 100.12 → 120.00 → 100.12: la evidencia original no se rehabilita
+    ok 5 - 6. USD 100.12 → 120.00 → 100.12: la evidencia original no se rehabilita
+      ---
+      duration_ms: 26.0813
+      type: 'test'
+      ...
+    # Subtest: 8. Nueva revisión posterior: evidencia nueva vuelve a DEFINIDO y conserva la anterior
+    ok 6 - 8. Nueva revisión posterior: evidencia nueva vuelve a DEFINIDO y conserva la anterior
+      ---
+      duration_ms: 18.0219
+      type: 'test'
+      ...
+    # Subtest: 9. Evidencia vacía, genérica o sintética: rechazo sin evidencia comercial
+    ok 7 - 9. Evidencia vacía, genérica o sintética: rechazo sin evidencia comercial
+      ---
+      duration_ms: 5.3267
+      type: 'test'
+      ...
+    # Subtest: 10. Actor no autorizado, inactivo o inexistente: rechazo
+    ok 8 - 10. Actor no autorizado, inactivo o inexistente: rechazo
+      ---
+      duration_ms: 19.8102
+      type: 'test'
+      ...
+    # Subtest: 11. Producto inexistente e importe esperado desactualizado: rechazo explícito
+    ok 9 - 11. Producto inexistente e importe esperado desactualizado: rechazo explícito
+      ---
+      duration_ms: 14.9318
+      type: 'test'
+      ...
+    # Subtest: 13. Dos verificaciones concurrentes del mismo importe: resultado consistente
+    ok 10 - 13. Dos verificaciones concurrentes del mismo importe: resultado consistente
+      ---
+      duration_ms: 29.7494
+      type: 'test'
+      ...
+    # Subtest: Checkout CC y verificación contienden por el mismo producto con el mismo operador de evidencia
+    ok 11 - Checkout CC y verificación contienden por el mismo producto con el mismo operador de evidencia
+      ---
+      duration_ms: 209.4644
+      type: 'test'
+      ...
+    # Subtest: El mismo ADMIN puede verificar dos productos todavía sin evidencia al mismo tiempo
+    ok 12 - El mismo ADMIN puede verificar dos productos todavía sin evidencia al mismo tiempo
+      ---
+      duration_ms: 83.0984
+      type: 'test'
+      ...
+    # Subtest: Revocar al ADMIN entre la consulta inicial y la revalidación impide cualquier escritura
+    ok 13 - Revocar al ADMIN entre la consulta inicial y la revalidación impide cualquier escritura
+      ---
+      duration_ms: 61.6779
+      type: 'test'
+      ...
+    # Subtest: 14. Concurrencia precio/verificación: no se aprueba un importe ya modificado
+    ok 14 - 14. Concurrencia precio/verificación: no se aprueba un importe ya modificado
+      ---
+      duration_ms: 50.915
+      type: 'test'
+      ...
+# database.query.failed
+    # Subtest: 15. Error de base durante la verificación: rollback sin escritura parcial
+    ok 15 - 15. Error de base durante la verificación: rollback sin escritura parcial
+      ---
+      duration_ms: 56.9077
+      type: 'test'
+      ...
+    # Subtest: Un snapshot antiguo no oculta la evidencia recién confirmada al trigger de precio
+    ok 16 - Un snapshot antiguo no oculta la evidencia recién confirmada al trigger de precio
+      ---
+      duration_ms: 44.1364
+      type: 'test'
+      ...
+# database.query.failed
+# database.query.failed
+    # Subtest: MariaDB rechaza UPDATE y DELETE del historial; permite INSERT y respeta ROLLBACK
+    ok 17 - MariaDB rechaza UPDATE y DELETE del historial; permite INSERT y respeta ROLLBACK
+      ---
+      duration_ms: 33.628
+      type: 'test'
+      ...
+    # Subtest: 16. Evidencia sintética: no se promociona sola; la revisión manual la reemplaza
+    ok 18 - 16. Evidencia sintética: no se promociona sola; la revisión manual la reemplaza
+      ---
+      duration_ms: 51.3249
+      type: 'test'
+      ...
+    # Subtest: 17. Importación administrativa: alta sin evidencia y con actor auditado
+    ok 19 - 17. Importación administrativa: alta sin evidencia y con actor auditado
+      ---
+      duration_ms: 14.7823
+      type: 'test'
+      ...
+    # Subtest: 18. Procedimiento local autorizado (CLI) e historial consultable
+    ok 20 - 18. Procedimiento local autorizado (CLI) e historial consultable
+      ---
+      duration_ms: 4608.1147
+      type: 'test'
+      ...
+    # Subtest: Un precio base cero nunca genera una verificación aplicada y su historial permanece legible
+    ok 21 - Un precio base cero nunca genera una verificación aplicada y su historial permanece legible
+      ---
+      duration_ms: 12.6096
+      type: 'test'
+      ...
+    # Subtest: 19. Historial completo y persistencia preparada para reinicio
+    ok 22 - 19. Historial completo y persistencia preparada para reinicio
+      ---
+      duration_ms: 28.5739
+      type: 'test'
+      ...
+    1..22
+ok 1 - T-S7-05.2 — Flujo autorizado de verificación de precios
+  ---
+  duration_ms: 6617.8347
+  type: 'suite'
+  ...
+1..1
+# tests 22
+# suites 1
+# pass 22
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7784.8901
+Migración FER-17 reaplicada con evidencia y eventos históricos intactos.
+T-S7-05.2: Docker reasignó el puerto publicado de MariaDB 64114 → 64163.
+TAP version 13
+# Subtest: T-S7-05.2: evidencia, auditoría y FER17 persisten tras reiniciar MariaDB
+ok 1 - T-S7-05.2: evidencia, auditoría y FER17 persisten tras reiniciar MariaDB
+  ---
+  duration_ms: 71.9018
+  type: 'test'
+  ...
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1116.7468
+T-S7-05.2: evidencia, auditoría y FER17 conservados tras reiniciar MariaDB.
+Exit code: 0
+
+--- 17. Frontend type-check (npm run type-check) ---
+> ferrepatagonia@0.0.0 type-check
+> vue-tsc --build
+Exit code: 0
+
+--- 18. Frontend build (npm run build) ---
+> ferrepatagonia@0.0.0 build
+> run-p type-check "build-only {@}" --
+
+
+> ferrepatagonia@0.0.0 type-check
+> vue-tsc --build
+
+
+> ferrepatagonia@0.0.0 build-only
+> vite build
+
+[36mvite v8.3.5 [32mbuilding client environment for production...[36m[39m
+transforming...
+✓ 320 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                     1.14 kB │ gzip:  0.48 kB
+dist/assets/contours-C0jJ3HPM.svg                  29.04 kB │ gzip: 12.31 kB
+dist/assets/ProductDetailView-DPmz58TH.css          0.07 kB │ gzip:  0.09 kB
+dist/assets/PublicBrand-ClofazIS.css                0.24 kB │ gzip:  0.18 kB
+dist/assets/LoginView-BRunavvR.css                  0.35 kB │ gzip:  0.21 kB
+dist/assets/PaymentReceipts-BHDN1sIk.css            0.63 kB │ gzip:  0.34 kB
+dist/assets/RegistroView-Bq3t8vVL.css               1.78 kB │ gzip:  0.63 kB
+dist/assets/AdminLayout-BNi8Zmli.css                1.81 kB │ gzip:  0.67 kB
+dist/assets/registro-BZMAvg7a.css                   2.77 kB │ gzip:  0.96 kB
+dist/assets/PublicLayout-C4Rdaybr.css               4.37 kB │ gzip:  1.18 kB
+dist/assets/AdminAccountsView-CIlAfe3x.css          5.67 kB │ gzip:  1.09 kB
+dist/assets/HomeView-Ptte2vf3.css                   6.17 kB │ gzip:  1.87 kB
+dist/assets/index-Cj_2s0Ry.css                     50.89 kB │ gzip: 10.42 kB
+dist/assets/contours-HrTIUw_J.js                    0.05 kB │ gzip:  0.07 kB
+dist/assets/_plugin-vue_export-helper-BDNMzG2s.js   0.08 kB │ gzip:  0.09 kB
+dist/assets/confirmationReset-BRgPQTYz.js           0.11 kB │ gzip:  0.11 kB
+dist/assets/accountFilters-D7C64gwf.js              0.11 kB │ gzip:  0.12 kB
+dist/assets/rolldown-runtime-DK3Fl9T5.js            0.15 kB │ gzip:  0.15 kB
+dist/assets/clientOrderService-xm8XILpy.js          0.21 kB │ gzip:  0.15 kB
+dist/assets/rutas-BAAo4CCL.js                       0.40 kB │ gzip:  0.27 kB
+dist/assets/useNavigationDisclosure--vgoh8Tj.js     0.42 kB │ gzip:  0.29 kB
+dist/assets/usePrivateAccountRead-CNbhLm5T.js       0.54 kB │ gzip:  0.35 kB
+dist/assets/AdminPaymentReceiptsView-Dpb9rxpT.js    0.56 kB │ gzip:  0.40 kB
+dist/assets/DemoNotice-BfLhOtUf.js                  0.67 kB │ gzip:  0.47 kB
+dist/assets/adminMutationError-Bzf0dTxh.js          0.69 kB │ gzip:  0.42 kB
+dist/assets/ProductThumbnail-BOyltEnc.js            0.80 kB │ gzip:  0.51 kB
+dist/assets/CartView-oJZJ9o9p.js                    0.87 kB │ gzip:  0.60 kB
+dist/assets/companyStatus-CEtmL0ND.js               0.87 kB │ gzip:  0.44 kB
+dist/assets/AccessDeniedView-Dz5PbkZW.js            1.00 kB │ gzip:  0.63 kB
+dist/assets/DatosClientes-BscvjhkX.js               1.16 kB │ gzip:  0.57 kB
+dist/assets/CommerceIcon-CK0a043q.js                1.49 kB │ gzip:  0.74 kB
+dist/assets/CatalogCartButton-BqOW75Tt.js           2.01 kB │ gzip:  1.12 kB
+dist/assets/illustrativeDemoImage-DdFcdbRs.js       2.19 kB │ gzip:  0.97 kB
+dist/assets/NavigationMenu-Dz2LCG7j.js              2.42 kB │ gzip:  1.14 kB
+dist/assets/AdminLayout-Xe32u1Iv.js                 2.92 kB │ gzip:  1.49 kB
+dist/assets/menu-rmPgwjVm.js                        2.99 kB │ gzip:  0.93 kB
+dist/assets/LoginView-BH4TFDeN.js                   3.06 kB │ gzip:  1.54 kB
+dist/assets/CompanyStatus-DFKI98t7.js               4.52 kB │ gzip:  1.93 kB
+dist/assets/registro-CHYFSlbS.js                    4.56 kB │ gzip:  2.06 kB
+dist/assets/AboutView-CRhjqsKR.js                   4.67 kB │ gzip:  1.84 kB
+dist/assets/FaqView-DGzQA59-.js                     5.04 kB │ gzip:  2.18 kB
+dist/assets/PublicBrand-CvQyPtAL.js                 5.13 kB │ gzip:  1.61 kB
+dist/assets/ProductDetailView-DcBKm96T.js           5.17 kB │ gzip:  2.34 kB
+dist/assets/cart-CkkP6H_i.js                        5.22 kB │ gzip:  2.51 kB
+dist/assets/MiCuentaDashboardView-CYZzpPTp.js       5.39 kB │ gzip:  1.99 kB
+dist/assets/AdminDashboardView-BF0-RwN6.js          6.20 kB │ gzip:  2.41 kB
+dist/assets/RegistroView-CrNXvime.js                6.27 kB │ gzip:  2.43 kB
+dist/assets/MiCuentaLayout-BfQAdDuY.js              6.49 kB │ gzip:  2.21 kB
+dist/assets/devtools-EWN81iOl-aga55kRu.js           6.94 kB │ gzip:  3.02 kB
+dist/assets/catalogService-CNuIyoC0.js              7.37 kB │ gzip:  3.13 kB
+dist/assets/auth-C1n_Pg3h.js                        8.19 kB │ gzip:  3.55 kB
+dist/assets/HomeView-BuicH4Nk.js                    9.21 kB │ gzip:  3.50 kB
+dist/assets/PaymentReceipts-mZSSQ_E4.js            10.54 kB │ gzip:  4.71 kB
+dist/assets/AdminProductImportView-B_tuWCSW.js     10.82 kB │ gzip:  4.21 kB
+dist/assets/PublicLayout-Deue9S8H.js               11.27 kB │ gzip:  4.56 kB
+dist/assets/CatalogoView-snf34o43.js               13.66 kB │ gzip:  5.12 kB
+dist/assets/CuentaCorrienteView-CgLX_nA2.js        14.97 kB │ gzip:  4.28 kB
+dist/assets/AdminClientsView-C2WaLSwq.js           15.10 kB │ gzip:  4.77 kB
+dist/assets/AdminOrdersView-WbvW4hzD.js            17.60 kB │ gzip:  6.01 kB
+dist/assets/HistorialPedidos-DOOomNWC.js           18.65 kB │ gzip:  5.82 kB
+dist/assets/vue-router-v6ls4-BL.js                 18.75 kB │ gzip:  7.55 kB
+dist/assets/AdminAccountsView-D5ONBijh.js          24.17 kB │ gzip:  7.75 kB
+dist/assets/AdminCategoriesView-Btf8XC4H.js        25.18 kB │ gzip:  6.76 kB
+dist/assets/AdminProductsListView-CwNg8sRF.js      34.03 kB │ gzip: 10.45 kB
+dist/assets/CartContents-DYR60tx4.js               41.56 kB │ gzip: 10.31 kB
+dist/assets/api-CFpNGpFT.js                        60.52 kB │ gzip: 22.51 kB
+dist/assets/index-BmcWn0qb.js                      63.27 kB │ gzip: 21.54 kB
+dist/assets/runtime-core.esm-bundler-Db9BHuE4.js   63.78 kB │ gzip: 24.97 kB
+
+[32m✓ built in 1.55s[39m
+Exit code: 0
+
+--- 19. Frontend unit tests (npm test) ---
+[... extracto inicial omitido (1698 líneas); extracto final completo ...]
+ok 241 - missing or duplicate response lines cannot grant eligibility
+  ---
+  duration_ms: 35.8449
+  type: 'test'
+  ...
+# Subtest: session verification error suppresses requests; explicit retry restores verified identity first
+ok 242 - session verification error suppresses requests; explicit retry restores verified identity first
+  ---
+  duration_ms: 22.8812
+  type: 'test'
+  ...
+# Subtest: visibilitychange and focus within 20 ms trigger one auto-refresh, manual retry still runs, and unmount cleans listeners
+ok 243 - visibilitychange and focus within 20 ms trigger one auto-refresh, manual retry still runs, and unmount cleans listeners
+  ---
+  duration_ms: 25.5004
+  type: 'test'
+  ...
+# Subtest: editar muestra la evidencia actual del precio base y crear no
+ok 244 - editar muestra la evidencia actual del precio base y crear no
+  ---
+  duration_ms: 28.3645
+  type: 'test'
+  ...
+# Subtest: error y reintento de categorías siguen visibles junto a la categoría actual
+ok 245 - error y reintento de categorías siguen visibles junto a la categoría actual
+  ---
+  duration_ms: 5.0774
+  type: 'test'
+  ...
+# Subtest: crear sin categorías muestra error y reintento sin habilitar el selector
+ok 246 - crear sin categorías muestra error y reintento sin habilitar el selector
+  ---
+  duration_ms: 5.0122
+  type: 'test'
+  ...
+# Subtest: alta sin categorías no asume la categoría 1 y adopta la primera válida tardía sin marcarse sucia
+ok 247 - alta sin categorías no asume la categoría 1 y adopta la primera válida tardía sin marcarse sucia
+  ---
+  duration_ms: 20.3635
+  type: 'test'
+  ...
+# Subtest: la categoría tardía no pisa una selección manual ni la de edición
+ok 248 - la categoría tardía no pisa una selección manual ni la de edición
+  ---
+  duration_ms: 8.5864
+  type: 'test'
+  ...
+# Subtest: el aviso de cierre se limpia al descartar errores y revertir los cambios
+ok 249 - el aviso de cierre se limpia al descartar errores y revertir los cambios
+  ---
+  duration_ms: 3.9428
+  type: 'test'
+  ...
+# Subtest: F02 PARTICULAR: Unicode code points and UTF-8 bounds
+ok 250 - F02 PARTICULAR: Unicode code points and UTF-8 bounds
+  ---
+  duration_ms: 2.653
+  type: 'test'
+  ...
+# Subtest: F02 EMPRESA: Unicode code points and UTF-8 bounds
+ok 251 - F02 EMPRESA: Unicode code points and UTF-8 bounds
+  ---
+  duration_ms: 10.4067
+  type: 'test'
+  ...
+# Subtest: 401 generation guard including import undefined
+ok 252 - 401 generation guard including import undefined
+  ---
+  duration_ms: 226.0486
+  type: 'test'
+  ...
+# Subtest: 401 generation guard including import auth
+ok 253 - 401 generation guard including import auth
+  ---
+  duration_ms: 38.1968
+  type: 'test'
+  ...
+# Subtest: 401 generation guard including import router
+ok 254 - 401 generation guard including import router
+  ---
+  duration_ms: 38.3524
+  type: 'test'
+  ...
+# Subtest: out of order old requests cannot clear a subsequent session or leak metadata
+ok 255 - out of order old requests cannot clear a subsequent session or leak metadata
+  ---
+  duration_ms: 30.4955
+  type: 'test'
+  ...
+# Subtest: 403 preserves current behavior and ignores import transition undefined
+ok 256 - 403 preserves current behavior and ignores import transition undefined
+  ---
+  duration_ms: 36.9169
+  type: 'test'
+  ...
+# Subtest: 403 preserves current behavior and ignores import transition router
+ok 257 - 403 preserves current behavior and ignores import transition router
+  ---
+  duration_ms: 46.2955
+  type: 'test'
+  ...
+# Subtest: concurrent current 401 responses clear and navigate only once
+ok 258 - concurrent current 401 responses clear and navigate only once
+  ---
+  duration_ms: 31.7897
+  type: 'test'
+  ...
+# Subtest: service uses the transfer endpoints, quote and idempotency key
+ok 259 - service uses the transfer endpoints, quote and idempotency key
+  ---
+  duration_ms: 403.8386
+  type: 'test'
+  ...
+# Subtest: keeps the same attempt key while the order result is pending
+ok 260 - keeps the same attempt key while the order result is pending
+  ---
+  duration_ms: 140.8765
+  type: 'test'
+  ...
+# Subtest: recovers a saved transfer attempt and reconciles the cart only when registered
+ok 261 - recovers a saved transfer attempt and reconciles the cart only when registered
+  ---
+  duration_ms: 73.9845
+  type: 'test'
+  ...
+# Subtest: clearConfirmation clears confirmed state without touching pending attempts
+ok 262 - clearConfirmation clears confirmed state without touching pending attempts
+  ---
+  duration_ms: 131.9275
+  type: 'test'
+  ...
+1..262
+# tests 291
+# suites 5
+# pass 291
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 6745.2205
+Exit code: 0
+
+--- 20. Frontend E2E real comprobantes (node backend/test/helpers/run-e2e.cjs --receipts) ---
+Base E2E preparada: e2e_test_f620f745e04a4d3593867fb1cbe731c4
+Frontend E2E: http://127.0.0.1:64190
+
+Running 10 tests using 1 worker
+
+  ok  1 [chromium] › e2e\account\payment-receipts.real.spec.ts:46:1 › particular, empresa y administración recorren los comprobantes reales en pantalla (10.0s)
+  ok  2 [chromium] › e2e\account\payment-receipts.real.spec.ts:98:1 › rechaza archivos inválidos antes de enviarlos (2.0s)
+  ok  3 [chromium] › e2e\account\payment-receipts.real.spec.ts:161:1 › permite reintentar la consulta y la carga después de un error (2.6s)
+  ok  4 [chromium] › e2e\account\payment-receipts.real.spec.ts:231:1 › muestra la carga y bloquea envíos repetidos a 360 px (2.2s)
+  ok  5 [chromium] › e2e\account\payment-receipts.real.spec.ts:285:1 › descarta una consulta de comprobantes de la sesión anterior (2.9s)
+  ok  6 [chromium] › e2e\account\payment-receipts.real.spec.ts:370:3 › listado y detalle comparten comprobantes persistidos a 1280 px (4.1s)
+  ok  7 [chromium] › e2e\account\payment-receipts.real.spec.ts:370:3 › listado y detalle comparten comprobantes persistidos a 360 px (3.9s)
+  ok  8 [chromium] › e2e\account\payment-receipts.real.spec.ts:475:1 › un error de consulta no se presenta como ausencia de comprobantes (1.5s)
+  ok  9 [chromium] › e2e\account\payment-receipts.real.spec.ts:498:3 › transferencia y comprobante privado en historial: cliente@e2e.test (5.7s)
+  ok 10 [chromium] › e2e\account\payment-receipts.real.spec.ts:498:3 › transferencia y comprobante privado en historial: empresa-cuenta@e2e.test (5.3s)
+
+  10 passed (41.6s)
+[2m09:47:40[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mplaywright-report/receipts/index.html[22m
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.
+
+database.query.failed
+database.query.failed
+Exit code: 0
+
+--- 21. Verificación de limpieza de contenedores y volúmenes residuales Docker ---
+ferrepatagonia.s704-test: 0 contenedores, 0 volúmenes
+ferrepatagonia.cc260-test: 0 contenedores, 0 volúmenes
+ferrepatagonia.credit-test: 0 contenedores, 0 volúmenes
+ferrepatagonia.account-test: 0 contenedores, 0 volúmenes
+ferrepatagonia.e2e-test: 0 contenedores, 0 volúmenes
+ferrepatagonia.cc258-test: 0 contenedores, 0 volúmenes
+ferrepatagonia.cc251-test: 0 contenedores, 0 volúmenes
+Contenedores descartables por nombre (*-test-* / ferrepatagonia-e2e-*): 0
+
+--- 22. Verificación de higiene de diff (git diff --check) ---
+git diff --check (working tree vs HEAD): Exit code 0 (salida vacía, sin trailing whitespace ni marcadores de conflicto)
+git diff --check origin/develop (working tree vs origin/develop): Exit code 0 (salida vacía, sin trailing whitespace ni marcadores de conflicto)
+Nota: git diff --check origin/develop...HEAD evalúa commits ya registrados; se mantiene HEAD sin nuevos commits por prohibición explícita de comandos Git de escritura.
+
+--- 23. Verificación Frontend CI (.github/workflows/ci.yml) y suites asociadas tras alineación de fixtures (HEAD base 36c12ac3) ---
+Fecha UTC: 2026-11-21T01:35:25Z
+Archivos de fixtures modificados:
+- database/fixtures/fer19-demo.cjs (demoPayment/seedDemo: motivo_cierre, id_admin_cierre, fecha_cierre_utc para estados RECHAZADO/ANULADO y monto_usd explícito para ACREDITADO USD)
+- backend/test/helpers/admin-account-fixture.cjs (monto_usd explícito en INSERT INTO PAGO ACREDITADO USD)
+
+Resultados exactos de los comandos ejecutados:
+1. backend: npm run build -> Exit code: 0
+2. frontend: npm run type-check -> Exit code: 0
+3. frontend: npm test -> Exit code: 0 (tests 291, suites 5, pass 291, fail 0, cancelled 0, skipped 0, todo 0)
+4. frontend: npm run build -> Exit code: 0 (vite build: 320 modules transformed, dist/ generada)
+5. node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+6. node backend/test/helpers/run-e2e.cjs --fer19-production -> Exit code: 0 (2 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+7. node backend/test/helpers/run-e2e.cjs -> Exit code: 0 (251 passed, 4 skipped [pruebas E2E_PRODUCTION_BUILD=1 cubiertas en pasos 6 y 11]; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+8. node --test data/demo-catalog/generar.test.cjs -> Exit code: 0 (tests 15, pass 15, fail 0, skipped 0)
+9. E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog -> Exit code: 0 (1 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+10. node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+11. E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs current-account.production.spec.ts -> Exit code: 0 (3 passed, 0 failed; Limpieza E2E confirmada: contenedor eliminado, datos tmpfs)
+12. backend: node test/helpers/run-account-mariadb.cjs all -> Exit code: 0 (persistence: 35 passed; contract: 32 passed; client: 38 passed; total 105 passed, 0 failed)
+13. backend: npm run test:account-admin:isolated -> Exit code: 0 (tests 58, pass 58, fail 0, skipped 0; Limpieza #258 confirmada: contenedor propio eliminado, datos tmpfs)
+
+Verificación de limpieza Docker tras todas las corridas:
+- ferrepatagonia.e2e-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.account-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.cc258-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.cc260-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.s704-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.cc251-test: 0 contenedores, 0 volúmenes
+- ferrepatagonia.credit-test: 0 contenedores, 0 volúmenes
+
+--- 24. Corrección de CI (TS2300) y hallazgos de auditoría PR #158 (R01, R02, R03) tras fusión con develop (PR #155 / #333) ---
+Fecha UTC: 2026-11-21T08:28:00Z
+Rama: feature/s7-04-2-order-payment-state-consistency
+HEAD base: d64dcee0ba12a49380ad5a1468e425c42fd0dcd7
+Merge-base (origin/develop): 51956113ce250668fa8e1d5e3e0ddd4e4c19c4c1
+Alcance: cambios en árbol de trabajo sin comandos Git de escritura; preservados intactos los 6 triggers s704_*, los 4 triggers FER-17 y los 3 triggers FER-20.
+
+Detalle de correcciones aplicadas:
+1. Reparación CI (error TS2300):
+   - backend/src/repositories/adminOrder.repository.ts: eliminadas propiedades duplicadas comprobantes_total/comprobantes_pendientes en RawOrderRow y subconsultas duplicadas receiptSummaryColumns; consolidado el alcance documental con titularidad (id_cliente + CUENTA_CORRIENTE) en cp_stat, preservando compatibilidad con order-state-projection.ts (#317), #333 y admin-orders.
+   - backend/src/routes/admin.routes.ts: eliminado el montaje duplicado de adminPaymentRouter sobre /pagos.
+2. R01 (clasificación estricta de errores en resolveUsdConversion):
+   - backend/src/services/payments/admin-payment.service.ts: eliminada la captura genérica error instanceof Error en resolveUsdConversion(); la traducción a HTTP 409/422 queda restringida exclusivamente a errores tipados FER17 (PricingError o CALENDARIO_NO_VERIFICADO sin metadatos SQL/infra). Endurecido también mapLedgerError() con isDatabaseOrInfrastructureError() para relanzar intactos ER_LOCK_DEADLOCK (1213), ER_LOCK_WAIT_TIMEOUT (1205), ECONNREFUSED, PROTOCOL_CONNECTION_LOST, QueryFailedError, TypeError y errores desconocidos, garantizando ROLLBACK.
+   - Pruebas de regresión agregadas en backend/test/state-consistency.test.cjs (test 7 unitario con inyección de 7 fallos infra/SQL vs errores FER17) y backend/test/state-consistency.mariadb.test.cjs (test 9 HTTP+MariaDB con inyección de ER_LOCK_DEADLOCK, ER_LOCK_WAIT_TIMEOUT y error SQL genérico sobre FER17_CALENDARIO).
+3. R03 (unificación /api/admin/pagos*, guardia documental, migraciones e idempotencia global):
+   - database/schema.sql, database/migrate-s7-04-2-state-consistency.sql y database/migrate-s7-10-2-payment-accreditation.sql: sincronizados chk_pago_declaracion y chk_pago_conversion para admitir alta directa ADMIN con clave_idempotencia (#317) y declaración de cliente (#333); ampliado chk_pago_idempotencia_operacion a ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR') y corregido literal 'RECHAZADO' -> 'RECHAZAR' en backfill de clave_idempotencia_cierre. Verificada idempotencia en ambos órdenes (s7-04-2 -> s7-10-2 y s7-10-2 -> s7-04-2) en MariaDB 11.4 descartable.
+   - backend/src/dtos/payments/admin-payment.dto.ts, backend/src/repositories/adminPayment.repository.ts, backend/src/services/payments/admin-payment.service.ts, backend/src/services/payments/admin-payment.errors.ts y backend/src/controllers/adminPayment.controller.ts: acreditación unificada en POST /api/admin/pagos/:pagoId/acreditar para pagos directos ADMIN y declarados por cliente (alias evidencia/evidenciaAcreditacion y fechaAcreditacionUtc opcional), guardia documental obligatoria 409 (PAGO_PENDIENTE_REVISION / PAGO_DOCUMENTALMENTE_RECHAZADO) con revalidación transaccional de COMPROBANTE_PAGO (existencia, cliente/cuenta y estado_revision <> RECHAZADO), cobertura/libro mixto, FER17-v1, ABONO+FIFO atómico con autorizado_por y emisión pago.acreditado.v1 post-COMMIT; listado/detalle ADMIN filtra DEMO_REGISTRADO y libros DEMO/mixtos y expone DTO superset (#317 + #333).
+   - backend/src/controllers/payment.controller.ts y backend/src/services/payments/payment.service.ts: registro y validación de Idempotency-Key en PAGO_IDEMPOTENCIA con SHA-256 canónico para DECLARAR, REVISAR_PAGO (si se envía cabecera) y ACREDITAR, previniendo colisiones cross-operación (409 CLAVE_IDEMPOTENCIA_REUTILIZADA).
+   - Pruebas cruzadas agregadas/verificadas en backend/test/state-consistency.mariadb.test.cjs (test 10), backend/test/helpers/run-state-consistency-mariadb.cjs (ambos órdenes de migración + backfill RECHAZAR) y backend/test/payment-accreditation.mariadb.test.cjs (actualizada llamada PATCH /admin/comprobantes/:id/revision al contrato #290).
+4. R02 (aclaración contractual sobre titulares inactivos):
+   - docs/s7-04/T-S7-04.1-contrato-estados-transiciones.md: agregada subsección §10.6 y precisión en TOCTOU-02 distinguiendo operaciones de CLIENTE (exigen USUARIO.activo = 1 y CLIENTE.activo = 1; 403 CLIENTE_INACTIVO alineado con #333; habilitada = 0 permitido para regularizar deuda si titular activo) frente a operaciones administrativas ADMIN de regularización/cierre (exigen ADMIN USUARIO.activo = 1 y rol ADMIN; CLIENTE.activo = 0 o cuenta inhabilitada no bloquean cierre/regularización y Socket.IO desconecta sesiones revocadas de cliente).
+
+Resultados exactos de las suites ejecutadas:
+1. backend: npm run type-check -> Exit code: 0
+2. backend: npm run build -> Exit code: 0
+3. backend: npm run test:dto-source -> Exit code: 0 (tests 4, pass 4, fail 0, skipped 0)
+4. backend: npm run test:unit -> Exit code: 0 (tests 1409, suites 3, pass 1406, fail 0, skipped 3; incluye payment-accreditation.unit.test.cjs y state-consistency.test.cjs 7/7 con R01/R03)
+5. backend: npm run test:state-consistency:isolated -> Exit code: 0 (tests 10, pass 10, fail 0; upgrade idempotente en ambos órdenes s7-04-2 <-> s7-10-2 con 26 tablas, 13 triggers y 1 vista; reaplicación idempotente sobre tablas pobladas OK; CLEANUP OK T-S7-04.2)
+6. backend: npm run test:payments:isolated -> Exit code: 0 (tests 23, pass 23, fail 0; CLEANUP OK #260)
+7. backend: npm run test:receipts:isolated -> Exit code: 0 (tests 9, pass 9, fail 0; CLEANUP OK #260)
+8. backend: npm run test:orders:isolated -> Exit code: 0 (tests 91, suites 1, pass 91, fail 0; CLEANUP OK #260)
+9. backend: npm run test:orders:sockets -> Exit code: 0 (tests 20, pass 20, fail 0; CLEANUP OK #260)
+10. backend: npm run test:cuenta-corriente -> Exit code: 0 (tests 73, pass 73, fail 0; CLEANUP OK #260)
+11. backend: npm run test:cuenta-corriente:client -> Exit code: 0 (cc251.h05: 31/31; MariaDB client: 14/14; total 45/45, fail 0)
+12. backend: npm run test:cuenta-corriente:safety -> Exit code: 0 (tests 20, pass 20, fail 0)
+13. backend: npm run test:admin-orders -> Exit code: 0 (tests 4, suites 1, pass 4, fail 0)
+14. frontend: npm run type-check -> Exit code: 0
+15. frontend: npm run build -> Exit code: 0 (vite build: 335 modules transformed)
+16. frontend: npm test -> Exit code: 0 (tests 294, suites 5, pass 294, fail 0)
+17. E2E raíz: node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada)
+18. E2E raíz: node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada)
+
+Verificación de higiene final:
+- Contenedores residuales de test Docker: 0 (preservado ferrepatagonia-dev-mariadb-1)
+- Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
+- BOM UTF-8 en archivos modificados: 0 archivos con BOM
+- git diff --check: Exit code: 0 (salida vacía)
+
+--- 25. Cierre de S7-317-R04 (PR #158) y verificación CI local completa ---
+Fecha UTC: 2026-11-21T14:57:00Z
+Rama: feature/s7-04-2-order-payment-state-consistency
+HEAD base: c1b1215
+Alcance: corrección de fixture E2E sin relajar chk_comprobante_revision ni triggers s704_* y sin comandos Git de escritura.
+
+Detalle de corrección y auditoría preventiva:
+1. S7-317-R04 en backend/test/helpers/admin-preview-orders.cjs (seedAdminPreviewReceipts):
+   - Actualizado INSERT INTO COMPROBANTE_PAGO para incluir explícitamente estado_revision = 'APROBADO' cuando i % 3 === 2 (con id_admin_revision y revision_utc) y estado_revision = 'PENDIENTE' con campos de revisión en NULL en el resto, preservando exactamente conteos, importes y el comportamiento esperado por frontend/e2e/admin/dashboard-orders.real.spec.ts.
+2. Auditoría preventiva de todas las ocurrencias de INSERT INTO COMPROBANTE_PAGO y UPDATE COMPROBANTE_PAGO en backend/test/, frontend/e2e/ y database/:
+   - Ningún otro fixture inserta o actualiza id_admin_revision / revision_utc con estado_revision inconsistente respecto de chk_comprobante_revision (backend/test/helpers/run-state-consistency-mariadb.cjs simula intencionalmente el esquema previo a #290 para validar el backfill de migración; backend/test/state-consistency.mariadb.test.cjs verifica explícitamente el rechazo del trigger S704_COMPROBANTE_ESTADO_TERMINAL_INMUTABLE).
+
+Resultados exactos de las suites ejecutadas:
+1. backend: npm run build -> Exit code: 0
+2. backend: npm run type-check -> Exit code: 0
+3. backend: npm run test:unit -> Exit code: 0 (tests 1409, suites 3, pass 1406, fail 0, skipped 3)
+4. backend: npm run test:state-consistency:isolated -> Exit code: 0 (tests 10, pass 10, fail 0; CLEANUP OK T-S7-04.2)
+5. backend: npm run test:payments:isolated -> Exit code: 0 (tests 23, pass 23, fail 0; CLEANUP OK #260)
+6. backend: npm run test:receipts:isolated -> Exit code: 0 (tests 9, pass 9, fail 0; CLEANUP OK #260)
+7. backend: npm run test:admin-orders -> Exit code: 0 (tests 4, suites 1, pass 4, fail 0)
+8. frontend: npm run type-check -> Exit code: 0
+9. frontend: npm run build -> Exit code: 0 (vite build: 335 modules transformed)
+10. frontend: npm test -> Exit code: 0 (tests 294, suites 5, pass 294, fail 0)
+11. E2E raíz: node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada)
+12. E2E raíz: node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada)
+13. E2E raíz: node backend/test/helpers/run-e2e.cjs -> Exit code: 0 (290 tests en suite: 286 passed, 4 skipped [solo E2E_PRODUCTION_BUILD=1], 0 failed; e2e/admin/dashboard-orders.real.spec.ts 3/3 passed; Limpieza E2E confirmada)
+14. E2E raíz (build producción CI):
+    - E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog -> Exit code: 0 (1 passed, 0 failed; Limpieza E2E confirmada)
+    - E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs current-account.production.spec.ts -> Exit code: 0 (3 passed, 0 failed; Limpieza E2E confirmada)
+    - node backend/test/helpers/run-e2e.cjs --fer19-production -> Exit code: 0 (2 passed, 0 failed; Limpieza E2E confirmada)
+
+Verificación de higiene final tras todas las corridas:
+- Contenedores residuales de test Docker: 0 (preservado ferrepatagonia-dev-mariadb-1)
+- Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
+- BOM UTF-8 en archivos modificados: 0 archivos con BOM
+- git diff --check: Exit code: 0 (salida vacía)

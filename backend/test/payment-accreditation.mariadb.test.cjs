@@ -319,9 +319,9 @@ test('#333 declaración inicial: PAGO PENDIENTE sin movimientos, imputaciones ni
   assert.equal(row.id_comprobante, receiptId);
   assert.ok(row.huella_declaracion);
 
-  // La revisión documental del comprobante (#275) tampoco acredita dinero.
+  // La revisión documental del comprobante (#275 / #290) tampoco acredita dinero.
   const receiptReview = await api(`/admin/comprobantes/${receiptId}/revision`, {
-    method: 'PATCH', token: admin.token,
+    method: 'PATCH', token: admin.token, key: idem(), body: { estado: 'APROBADO' },
   });
   assert.equal(receiptReview.status, 200, JSON.stringify(receiptReview.body));
   assert.equal((await paymentsFor(company.accountId))[0].estado, 'PENDIENTE');
