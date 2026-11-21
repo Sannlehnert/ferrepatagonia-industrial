@@ -129,7 +129,17 @@ BEGIN NOT ATOMIC
         ADD COLUMN IF NOT EXISTS monto_usd DECIMAL(12,2) NULL,
         ADD COLUMN IF NOT EXISTS id_cotizacion INT NULL,
         ADD COLUMN IF NOT EXISTS tasa_historica DECIMAL(20,8) NULL,
+        ADD COLUMN IF NOT EXISTS id_usuario_declarante INT NULL,
         ADD COLUMN IF NOT EXISTS clave_idempotencia CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+        ADD COLUMN IF NOT EXISTS huella_declaracion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+        ADD COLUMN IF NOT EXISTS id_comprobante CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+        ADD COLUMN IF NOT EXISTS estado_documental VARCHAR(20) COLLATE utf8mb4_bin NOT NULL DEFAULT 'PENDIENTE',
+        ADD COLUMN IF NOT EXISTS id_admin_revision INT NULL,
+        ADD COLUMN IF NOT EXISTS revision_utc DATETIME(3) NULL,
+        ADD COLUMN IF NOT EXISTS motivo_revision VARCHAR(1000) NULL,
+        ADD COLUMN IF NOT EXISTS id_admin_acreditacion INT NULL,
+        ADD COLUMN IF NOT EXISTS clave_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+        ADD COLUMN IF NOT EXISTS huella_acreditacion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
         ADD COLUMN IF NOT EXISTS clave_idempotencia_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
         ADD COLUMN IF NOT EXISTS clave_idempotencia_cierre CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
         ADD COLUMN IF NOT EXISTS motivo_cierre VARCHAR(1000) NULL,
@@ -297,6 +307,59 @@ BEGIN NOT ATOMIC
 
     IF EXISTS (
         SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO' AND CONSTRAINT_NAME = 'chk_pago_declaracion'
+    ) THEN
+        ALTER TABLE PAGO DROP CONSTRAINT chk_pago_declaracion,
+            ADD CONSTRAINT chk_pago_declaracion CHECK (
+                (id_usuario_declarante IS NULL AND huella_declaracion IS NULL AND id_comprobante IS NULL)
+                OR (id_usuario_declarante IS NOT NULL AND clave_idempotencia IS NOT NULL
+                    AND huella_declaracion IS NOT NULL AND id_comprobante IS NOT NULL)
+            );
+    ELSE
+        ALTER TABLE PAGO
+            ADD CONSTRAINT chk_pago_declaracion CHECK (
+                (id_usuario_declarante IS NULL AND huella_declaracion IS NULL AND id_comprobante IS NULL)
+                OR (id_usuario_declarante IS NOT NULL AND clave_idempotencia IS NOT NULL
+                    AND huella_declaracion IS NOT NULL AND id_comprobante IS NOT NULL)
+            );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO' AND CONSTRAINT_NAME = 'chk_pago_documental'
+    ) THEN
+        ALTER TABLE PAGO ADD CONSTRAINT chk_pago_documental
+            CHECK (estado_documental IN ('PENDIENTE', 'APROBADO', 'RECHAZADO'));
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO' AND CONSTRAINT_NAME = 'chk_pago_revision'
+    ) THEN
+        ALTER TABLE PAGO ADD CONSTRAINT chk_pago_revision CHECK (
+            (estado_documental = 'PENDIENTE'
+                AND id_admin_revision IS NULL AND revision_utc IS NULL AND motivo_revision IS NULL)
+            OR (estado_documental = 'APROBADO'
+                AND id_admin_revision IS NOT NULL AND revision_utc IS NOT NULL)
+            OR (estado_documental = 'RECHAZADO'
+                AND id_admin_revision IS NOT NULL AND revision_utc IS NOT NULL
+                AND motivo_revision IS NOT NULL)
+        );
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO' AND CONSTRAINT_NAME = 'chk_pago_acreditacion'
+    ) THEN
+        ALTER TABLE PAGO ADD CONSTRAINT chk_pago_acreditacion CHECK (
+            (id_admin_acreditacion IS NULL AND clave_acreditacion IS NULL AND huella_acreditacion IS NULL)
+            OR (id_admin_acreditacion IS NOT NULL AND clave_acreditacion IS NOT NULL
+                AND huella_acreditacion IS NOT NULL)
+        );
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
         WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'PAGO' AND CONSTRAINT_NAME = 'chk_pago_cierre'
     ) THEN
         ALTER TABLE PAGO DROP CONSTRAINT chk_pago_cierre,
@@ -327,12 +390,30 @@ BEGIN NOT ATOMIC
             clave_idempotencia REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
         ),
         CONSTRAINT chk_pago_idempotencia_operacion CHECK (
-            operacion IN ('CREAR', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+            operacion IN ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
         ),
         CONSTRAINT chk_pago_idempotencia_hash CHECK (
             payload_hash REGEXP '^[0-9a-f]{64}$'
         )
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    IF EXISTS (
+        SELECT 1 FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS
+        WHERE CONSTRAINT_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'PAGO_IDEMPOTENCIA'
+          AND CONSTRAINT_NAME = 'chk_pago_idempotencia_operacion'
+    ) THEN
+        ALTER TABLE PAGO_IDEMPOTENCIA
+            DROP CONSTRAINT chk_pago_idempotencia_operacion,
+            ADD CONSTRAINT chk_pago_idempotencia_operacion CHECK (
+                operacion IN ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+            );
+    ELSE
+        ALTER TABLE PAGO_IDEMPOTENCIA
+            ADD CONSTRAINT chk_pago_idempotencia_operacion CHECK (
+                operacion IN ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+            );
+    END IF;
 
     INSERT IGNORE INTO PAGO_IDEMPOTENCIA (
         clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc
@@ -340,8 +421,11 @@ BEGIN NOT ATOMIC
     SELECT
         p.clave_idempotencia,
         p.id_pago,
-        'CREAR',
-        SHA2(CONCAT('LEGACY_CREAR:', p.id_pago, ':', p.clave_idempotencia), 256),
+        CASE WHEN p.id_usuario_declarante IS NOT NULL THEN 'DECLARAR' ELSE 'CREAR' END,
+        CASE
+            WHEN p.id_usuario_declarante IS NOT NULL AND p.huella_declaracion IS NOT NULL THEN p.huella_declaracion
+            ELSE CONVERT(SHA2(CONCAT('LEGACY_CREAR:', p.id_pago, ':', p.clave_idempotencia), 256) USING ascii) COLLATE ascii_bin
+        END,
         UTC_TIMESTAMP(3)
     FROM PAGO p
     WHERE p.clave_idempotencia IS NOT NULL
@@ -353,15 +437,22 @@ BEGIN NOT ATOMIC
         clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc
     )
     SELECT
-        p.clave_idempotencia_acreditacion,
+        COALESCE(p.clave_idempotencia_acreditacion, p.clave_acreditacion),
         p.id_pago,
         'ACREDITAR',
-        SHA2(CONCAT('LEGACY_ACREDITAR:', p.id_pago, ':', p.clave_idempotencia_acreditacion), 256),
+        COALESCE(
+            p.huella_acreditacion,
+            CONVERT(
+                SHA2(CONCAT('LEGACY_ACREDITAR:', p.id_pago, ':', COALESCE(p.clave_idempotencia_acreditacion, p.clave_acreditacion)), 256)
+                USING ascii
+            ) COLLATE ascii_bin
+        ),
         UTC_TIMESTAMP(3)
     FROM PAGO p
-    WHERE p.clave_idempotencia_acreditacion IS NOT NULL
+    WHERE COALESCE(p.clave_idempotencia_acreditacion, p.clave_acreditacion) IS NOT NULL
       AND NOT EXISTS (
-          SELECT 1 FROM PAGO_IDEMPOTENCIA pi WHERE pi.clave_idempotencia = p.clave_idempotencia_acreditacion
+          SELECT 1 FROM PAGO_IDEMPOTENCIA pi
+          WHERE pi.clave_idempotencia = COALESCE(p.clave_idempotencia_acreditacion, p.clave_acreditacion)
       );
 
     INSERT IGNORE INTO PAGO_IDEMPOTENCIA (
@@ -370,8 +461,8 @@ BEGIN NOT ATOMIC
     SELECT
         p.clave_idempotencia_cierre,
         p.id_pago,
-        CASE WHEN p.estado = 'ANULADO' THEN 'ANULAR' ELSE 'RECHAZADO' END,
-        SHA2(CONCAT('LEGACY_CIERRE:', p.id_pago, ':', p.clave_idempotencia_cierre), 256),
+        CASE WHEN p.estado = 'ANULADO' THEN 'ANULAR' ELSE 'RECHAZAR' END,
+        CONVERT(SHA2(CONCAT('LEGACY_CIERRE:', p.id_pago, ':', p.clave_idempotencia_cierre), 256) USING ascii) COLLATE ascii_bin,
         UTC_TIMESTAMP(3)
     FROM PAGO p
     WHERE p.clave_idempotencia_cierre IS NOT NULL

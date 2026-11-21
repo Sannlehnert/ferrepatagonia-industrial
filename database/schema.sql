@@ -306,7 +306,7 @@ CREATE TABLE IF NOT EXISTS PAGO_IDEMPOTENCIA (
         clave_idempotencia REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
     ),
     CONSTRAINT chk_pago_idempotencia_operacion CHECK (
-        operacion IN ('CREAR', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+        operacion IN ('CREAR', 'DECLARAR', 'REVISAR_PAGO', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
     ),
     CONSTRAINT chk_pago_idempotencia_hash CHECK (
         payload_hash REGEXP '^[0-9a-f]{64}$'
