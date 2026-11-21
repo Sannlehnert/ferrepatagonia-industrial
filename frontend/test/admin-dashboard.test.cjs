@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const frontendRoot = path.resolve(__dirname, '..');
+const metricsPath = path.join(frontendRoot, 'src/components/AdminDashboardMetrics.vue');
+const ordersPath = path.join(frontendRoot, 'src/components/AdminDashboardOrders.vue');
 const viewPath = path.join(frontendRoot, 'src/views/admin/AdminDashboardView.vue');
 const servicePath = path.join(frontendRoot, 'src/services/adminDashboardService.ts');
 const typesPath = path.join(frontendRoot, 'src/types/adminDashboard.ts');
@@ -22,7 +24,7 @@ describe('Task #347 — Frontend AdminDashboardView y servicio de métricas real
   });
 
   it('AdminDashboardView elimina métricas hardcodeadas y textos de datos inventados', () => {
-    const viewSource = fs.readFileSync(viewPath, 'utf8');
+    const viewSource = [viewPath, metricsPath, ordersPath].map(file => fs.readFileSync(file, 'utf8')).join('\n');
 
     assert.doesNotMatch(
       viewSource,
@@ -42,22 +44,22 @@ describe('Task #347 — Frontend AdminDashboardView y servicio de métricas real
   });
 
   it('AdminDashboardView protege la lectura por sesión ADMIN, suprime flash en 403 y expone desglose por estado', () => {
-    const viewSource = fs.readFileSync(viewPath, 'utf8');
+    const viewSource = [viewPath, metricsPath, ordersPath].map(file => fs.readFileSync(file, 'utf8')).join('\n');
 
     assert.match(viewSource, /usePrivateAccountRead/);
     assert.match(viewSource, /getAdminDashboardMetrics/);
     assert.match(viewSource, /auth\.rol === 'ADMIN'/);
     assert.match(viewSource, /status === 403/);
-    assert.match(viewSource, /pedidosPorEstado\.CONFIRMADO/);
-    assert.match(viewSource, /pedidosPorEstado\.EN_PREPARACION/);
-    assert.match(viewSource, /pedidosPorEstado\.ENVIADO/);
-    assert.match(viewSource, /pedidosPorEstado\.ENTREGADO/);
-    assert.match(viewSource, /\/admin\/pedidos/);
-    assert.match(viewSource, /\/admin\/comprobantes/);
+    assert.match(viewSource, /counts\?\.CONFIRMADO/);
+    assert.match(viewSource, /counts\?\.EN_PREPARACION/);
+    assert.match(viewSource, /counts\?\.ENVIADO/);
+    assert.match(viewSource, /counts\?\.ENTREGADO/);
+    assert.match(viewSource, /name: 'admin-orders'/);
+    assert.match(viewSource, /AdminDashboardOrders/);
   });
 
   it('AdminDashboardView describe la métrica de cuenta corriente por modalidad y no como operaciones abonadas (H02)', () => {
-    const viewSource = fs.readFileSync(viewPath, 'utf8');
+    const viewSource = [viewPath, metricsPath, ordersPath].map(file => fs.readFileSync(file, 'utf8')).join('\n');
 
     assert.doesNotMatch(
       viewSource,
@@ -66,7 +68,7 @@ describe('Task #347 — Frontend AdminDashboardView y servicio de métricas real
     );
     assert.match(
       viewSource,
-      /modalidad de cuenta corriente/i,
+      /Pedidos con cuenta corriente/i,
       'La vista debe describir el indicador por modalidad de cuenta corriente',
     );
   });

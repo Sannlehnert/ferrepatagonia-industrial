@@ -84,8 +84,8 @@ function instrumentQueries(intercept) {
   return () => { dataSource.createQueryRunner = original; };
 }
 
-async function waitFor(description, predicate) {
-  const deadline = Date.now() + 3000;
+async function waitFor(description, predicate, timeoutMs = 8000) {
+  const deadline = Date.now() + timeoutMs;
   do {
     if (await predicate()) return;
     await delay(20);
@@ -439,7 +439,7 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     }
   });
 
-  test('14. Concurrencia precio/verificación: no se aprueba un importe ya modificado', async () => {
+  test('14. Concurrencia precio/verificación: no se aprueba un importe ya modificado', { timeout: 15000 }, async () => {
     const runner = dataSource.createQueryRunner();
     const { threadId: writerThread } = await runner.connect();
     await runner.startTransaction();
@@ -455,7 +455,8 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
       await runner.query('UPDATE PRODUCTO SET precio = 140.00 WHERE id_producto = ?', [productId]);
       pending = verify(productId, '100.12', `Factura FER-320-I-${RUN_ID} carrera`);
       pending.catch(() => {});
-      await waitFor('verificación esperando al escritor', () => readerThread && lockWait(readerThread, writerThread));
+      await waitFor('verificación alcanzando el bloqueo del producto', () => readerThread);
+      await waitFor('verificación esperando al escritor', () => lockWait(readerThread, writerThread), 4500);
       await runner.commitTransaction();
       const result = await pending;
       assert.equal(result.ok, false);

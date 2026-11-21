@@ -31,7 +31,7 @@ export interface AdminOrderListItem {
   estado: AdminOrderFilterStatus | string
   estadosPermitidos: AdminOrderOperationalStatus[]
   modalidadPago: string
-  moneda: string
+  moneda: string | null
   subtotal: string
   descuento: string
   total: string
@@ -41,6 +41,7 @@ export interface AdminOrderListItem {
   totalUnidades: number
   cargoCuentaCorrienteId: number | null
   origen: 'REAL' | 'DEMO'
+  comprobantes?: { total: number; pendientesRevision: number }
   cliente: AdminOrderClientSummary
 }
 
