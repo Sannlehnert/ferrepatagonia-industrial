@@ -10,13 +10,14 @@ const backend = path.resolve(__dirname, '../..');
 async function run(mode = process.argv[2] || 'all') {
   assert.ok([
     'all', 'baseline', 'cleanup-success',
-    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets', 'receipts', 'transfer-orders',
+    'cleanup-failure', 'migration', 'orders', 'orders-acceptance', 'orders-sockets', 'receipts', 'payments', 'transfer-orders',
   ].includes(mode));
   const acceptance = mode === 'orders-acceptance';
   const sockets = mode === 'orders-sockets';
   const transferOnly = mode === 'transfer-orders';
   const orders = sockets || acceptance || transferOnly || mode === 'orders';
   const receipts = mode === 'receipts';
+  const payments = mode === 'payments';
   const p = newProfile();
   let session, child, storage, interrupted = false;
   const signal = () => { interrupted = true; child?.kill('SIGTERM'); };
@@ -42,30 +43,32 @@ async function run(mode = process.argv[2] || 'all') {
       if (result.status !== 0) throw Error(`SQL ${path.basename(file)}: ${result.stderr}`);
     };
     apply(path.join(backend, '../database/schema.sql'));
-    if (receipts || orders) {
+    if (receipts || orders || payments) {
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-275-payment-receipts.sql'));
       storage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-test-'));
     }
     for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-fer-20-account-movements.sql'));
-    if (receipts || orders) {
+    if (receipts || orders || payments) {
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-s7-04-2-state-consistency.sql'));
+      for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-s7-10-2-payment-accreditation.sql'));
     }
-      if (orders) {
+    if (orders) {
       for (let i = 0; i < 2; i++) apply(path.join(backend, '../database/migrate-273-order-instant.sql'));
+      apply(path.join(
+        backend,
+        '../database/migrate-fer-20-order-confirmation.sql',
+      ));
+      for (let i = 0; i < 2; i++) {
         apply(path.join(
           backend,
-          '../database/migrate-fer-20-order-confirmation.sql',
+          '../database/migrate-s7-06-1-transfer-order-confirmation.sql',
         ));
-        for (let i = 0; i < 2; i++) {
-          apply(path.join(
-            backend,
-            '../database/migrate-s7-06-1-transfer-order-confirmation.sql',
-          ));
-        }
       }
+    }
     console.log(JSON.stringify({ mode, database: p.database, host: p.host, port: p.port, container: p.container,
       version: (await session.connection.query('SELECT VERSION() AS v'))[0].v, image: info.Image, migrationApplications: 2 }));
-    const files = receipts ? ['test/payment-receipts.test.cjs'] : sockets
+    const files = payments ? ['test/payment-accreditation.mariadb.test.cjs']
+      : receipts ? ['test/payment-receipts.test.cjs'] : sockets
       ? ['test/order-sockets.integration.test.cjs']
       : transferOnly
       ? ['test/transfer-order.mariadb.test.cjs']

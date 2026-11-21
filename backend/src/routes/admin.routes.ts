@@ -90,6 +90,10 @@ adminRouter.put(
     putCreditLimit,
 );
 
+// Declaraciones de pago: revisión documental y acreditación financiera son
+// operaciones distintas. Ninguna de las dos se dispara desde comprobantes.
+adminRouter.use('/pagos', adminPaymentRouter);
+
 adminRouter.get('/clientes', getClientes);
 adminRouter.patch(
   '/clientes/:id/estado-empresa',

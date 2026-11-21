@@ -14,6 +14,7 @@ database/
 ├── migrate-s7-09-1-credit-workflow.sql
 ├── migrate-s7-06-1-transfer-order-confirmation.sql
 ├── migrate-s7-04-2-state-consistency.sql
+├── migrate-s7-10-2-payment-accreditation.sql
 ├── seed.sql
 ├── verify-seed.sql
 ├── migrate-uq-producto-codigo.sql
@@ -82,6 +83,25 @@ Migración aditiva e idempotente de T-S7-06.1 (#322). Crea `CONFIRMACION_PEDIDO_
 
 Migración aditiva e idempotente de T-S7-04.2 (#317 / HU-S7-04 #290). Refuerza `COMPROBANTE_PAGO` (`estado_revision`, `motivo_rechazo`, `clave_idempotencia_revision`), `PAGO` (`monto_usd`, `id_cotizacion`, `tasa_historica`, claves de idempotencia y cierre) y `MOVIMIENTO_CUENTA_CORRIENTE`, crea `PAGO_IDEMPOTENCIA` para unicidad global cross-operación de `Idempotency-Key` en `PAGO`, e instala los 6 triggers de inmutabilidad y control de transiciones (`s704_pago_before_insert`, `s704_pago_before_update`, `s704_pago_before_delete`, `s704_movimiento_before_update`, `s704_movimiento_before_delete`, `s704_comprobante_before_update`), preservando intactos los 7 triggers de FER-20 y FER-17. Es segura de repetir sobre instalaciones nuevas o existentes.
 
+### `migrate-s7-10-2-payment-accreditation.sql`
+
+Migración aditiva e idempotente de T-S7-10.2 (#333). Extiende `PAGO` para la
+declaración de pagos con comprobante, la revisión administrativa y la
+acreditación financiera autorizada: `monto_usd`, cotización histórica,
+idempotencia de declaración y acreditación, vínculo lógico al comprobante y
+actores/instantes de revisión y acreditación. También crea de forma idempotente
+las columnas compartidas con #158/S7-04.2 (`clave_idempotencia_acreditacion`,
+`clave_idempotencia_cierre`, `motivo_cierre`, `id_admin_actor`,
+`id_admin_cierre`, `fecha_cierre_utc`), sus índices únicos globales y el check
+`chk_pago_cierre`, para que la acreditación de #333 persista en un único UPDATE
+compatible con los triggers `s704_pago_*`. No crea tablas, triggers ni
+movimientos, no convierte datos y no agrega FKs nuevas a `PAGO`. Depende de
+`migrate-275-payment-receipts.sql` para que exista `COMPROBANTE_PAGO`. En una
+base nueva, `schema.sql` ya incluye las columnas; la migración es segura de
+repetir y debe aplicarse después de FER-20 y de #275. Si #158 se integra
+primero, sus columnas e índices ya presentes hacen que esta migración no los
+duplique.
+
 ### `seed.sql`
 
 Carga datos ficticios para desarrollo y pruebas.
@@ -135,11 +155,12 @@ Sobre una base de datos nueva y vacía:
 4. migrate-s7-09-1-credit-workflow.sql
 5. migrate-s7-06-1-transfer-order-confirmation.sql
 6. migrate-s7-04-2-state-consistency.sql
-7. seed.sql (solo entorno de desarrollo/pruebas)
-8. verify-seed.sql (solo después de seed.sql)
+7. migrate-s7-10-2-payment-accreditation.sql
+8. seed.sql (solo entorno de desarrollo/pruebas)
+9. verify-seed.sql (solo después de seed.sql)
 ```
 
-`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. `migrate-fer-17-price-verification.sql` instala la auditoría y los cuatro triggers de precio. Las migraciones aditivas `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql` y `migrate-s7-04-2-state-consistency.sql` (que instala los 6 triggers de inmutabilidad y transiciones de `PAGO`, `MOVIMIENTO_CUENTA_CORRIENTE` y `COMPROBANTE_PAGO`) también se incluyen en la secuencia de instalación y en la actualización de bases existentes. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1–6 más la verificación SQL de tablas y triggers.
+`migrate-fer-20-account-movements.sql` es segura tanto sobre tablas vacías recién creadas por `schema.sql` como sobre una base válida, e instala los tres triggers antes de insertar datos. `migrate-fer-17-price-verification.sql` instala la auditoría y los cuatro triggers de precio. Las migraciones aditivas `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql`, `migrate-s7-04-2-state-consistency.sql` (que instala los 6 triggers de inmutabilidad y transiciones de `PAGO`, `MOVIMIENTO_CUENTA_CORRIENTE` y `COMPROBANTE_PAGO`) y `migrate-s7-10-2-payment-accreditation.sql` también se incluyen en la secuencia de instalación y en la actualización de bases existentes. Si se prepara una instalación limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, pero ejecutar siempre los pasos 1–7 más la verificación SQL de tablas y triggers.
 
 `verify-seed.sql` debe ejecutarse antes de modificar manualmente los datos cargados por el seed.
 
@@ -244,6 +265,12 @@ Aplicar la migración aditiva de T-S7-04.2 para consistencia de estados en `COMP
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-04-2-state-consistency.sql'
 ```
 
+Aplicar la migración aditiva de T-S7-10.2 para declaración, revisión y acreditación de pagos (idempotente, no instala triggers ni modifica saldos; requiere #275 y FER-20):
+
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-10-2-payment-accreditation.sql'
+```
+
 Cargar los datos ficticios de desarrollo:
 
 ```bash
@@ -337,7 +364,7 @@ Para reconstruir:
 docker compose up -d --wait --wait-timeout 180
 ```
 
-Después ejecutar nuevamente los comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `migrate-fer-17-price-verification.sql`, `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
+Después ejecutar nuevamente los comandos del paso 3 y la verificación SQL de tablas y triggers (`schema.sql`, `migrate-fer-20-account-movements.sql`, `migrate-fer-17-price-verification.sql`, `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql`, `migrate-s7-04-2-state-consistency.sql`, `migrate-s7-10-2-payment-accreditation.sql`, `seed.sql` y `verify-seed.sql`, en ese orden). No es necesario borrar la imagen descargada.
 
 ---
 

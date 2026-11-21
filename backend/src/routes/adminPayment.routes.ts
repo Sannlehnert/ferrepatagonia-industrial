@@ -7,14 +7,20 @@ import {
   postAnnulAdminPayment,
   postRejectAdminPayment,
 } from '../controllers/adminPayment.controller';
+import { patchReviewPayment } from '../controllers/payment.controller';
 import {
   accreditAdminPaymentPolicy,
   adminPaymentIdPolicy,
   closeAdminPaymentPolicy,
   createAdminPaymentPolicy,
 } from '../dtos/payments/admin-payment.dto';
+import {
+  paymentIdPolicy,
+  reviewPaymentPolicy,
+} from '../dtos/payments/payment.dto';
 import { validateDto } from '../middlewares/validate-dto.middleware';
 
+// Router único para /api/admin/pagos (#317 / #158 + #333).
 export const adminPaymentRouter = Router();
 
 adminPaymentRouter.use((_req, res, next) => {
@@ -34,6 +40,12 @@ adminPaymentRouter.post(
   '/',
   validateDto('body', createAdminPaymentPolicy),
   postAdminPayment,
+);
+adminPaymentRouter.patch(
+  '/:id/revision',
+  validateDto('params', paymentIdPolicy),
+  validateDto('body', reviewPaymentPolicy),
+  patchReviewPayment,
 );
 adminPaymentRouter.post(
   '/:pagoId/acreditar',

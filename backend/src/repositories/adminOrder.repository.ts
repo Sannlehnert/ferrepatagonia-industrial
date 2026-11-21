@@ -51,6 +51,7 @@ export interface AdminOrderListItem {
     totalUnidades: number;
     cargoCuentaCorrienteId: number | null;
     origen: 'REAL' | 'DEMO';
+    comprobantes: { total: number; pendientesRevision: number };
     cliente: AdminOrderClientSummary;
 }
 
@@ -116,7 +117,21 @@ interface RawOrderRow {
     estado_aprobacion_empresa: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' | null;
     es_fiel: number | boolean;
     cliente_activo: number | boolean;
+    comprobantes_total: number | string;
+    comprobantes_pendientes: number | string;
 }
+
+// Mismo alcance documental que el listado de comprobantes ADMIN. Consultas
+// por pedido indexado: no descargar ni recorrer todos los comprobantes en la UI.
+const receiptOwnerPredicate = `r.id_pedido = p.id_pedido AND r.id_cliente = p.id_cliente
+  AND (r.id_cuenta_corriente IS NULL OR EXISTS (
+    SELECT 1 FROM CUENTA_CORRIENTE rc
+    WHERE rc.id_cuenta_corriente = r.id_cuenta_corriente AND rc.id_cliente = r.id_cliente
+  ))`;
+const receiptSummaryColumns = `
+  (SELECT COUNT(*) FROM COMPROBANTE_PAGO r WHERE ${receiptOwnerPredicate}) AS comprobantes_total,
+  (SELECT COUNT(*) FROM COMPROBANTE_PAGO r WHERE ${receiptOwnerPredicate} AND r.revision_utc IS NULL) AS comprobantes_pendientes,
+`;
 
 interface RawOrderLineRow {
     id_detalle_pedido: number | string;
@@ -193,6 +208,10 @@ function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
             ? Number(row.id_cargo)
             : null,
         origen,
+        comprobantes: {
+            total: Number(row.comprobantes_total ?? 0),
+            pendientesRevision: Number(row.comprobantes_pendientes ?? 0),
+        },
         cliente: {
             idCliente: Number(row.id_cliente),
             tipoCliente: row.tipo_cliente,
@@ -341,6 +360,7 @@ export async function findAdminOrders(
                 p.descuento,
                 p.total,
                 p.observaciones,
+                ${receiptSummaryColumns}
                 COALESCE(agg.cantidad_items, 0) AS cantidad_items,
                 COALESCE(agg.total_unidades, 0) AS total_unidades,
                 COALESCE(cpcc.id_cargo, mcc.id_movimiento_cuenta) AS id_cargo,
@@ -404,6 +424,7 @@ export async function findAdminOrderById(
                 p.descuento,
                 p.total,
                 p.observaciones,
+                ${receiptSummaryColumns}
                 0 AS cantidad_items,
                 0 AS total_unidades,
                 COALESCE(cpcc.id_cargo, mcc.id_movimiento_cuenta) AS id_cargo,

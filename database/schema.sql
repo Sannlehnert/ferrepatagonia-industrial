@@ -194,7 +194,17 @@ CREATE TABLE PAGO (
     monto_usd DECIMAL(12,2) NULL,
     id_cotizacion INT NULL,
     tasa_historica DECIMAL(20,8) NULL,
+    id_usuario_declarante INT NULL,
     clave_idempotencia CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    huella_declaracion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    id_comprobante CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    estado_documental VARCHAR(20) COLLATE utf8mb4_bin NOT NULL DEFAULT 'PENDIENTE',
+    id_admin_revision INT NULL,
+    revision_utc DATETIME(3) NULL,
+    motivo_revision VARCHAR(1000) NULL,
+    id_admin_acreditacion INT NULL,
+    clave_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
+    huella_acreditacion CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NULL,
     clave_idempotencia_acreditacion CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
     clave_idempotencia_cierre CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NULL,
     motivo_cierre VARCHAR(1000) NULL,
@@ -202,11 +212,15 @@ CREATE TABLE PAGO (
     id_admin_cierre INT NULL,
     fecha_cierre_utc DATETIME(3) NULL,
     PRIMARY KEY (id_pago),
+    UNIQUE KEY uq_pago_idempotencia (id_cuenta_corriente, clave_idempotencia),
+    UNIQUE KEY uq_pago_acreditacion (id_cuenta_corriente, clave_acreditacion),
     UNIQUE KEY uq_pago_clave_idempotencia (clave_idempotencia),
     UNIQUE KEY uq_pago_clave_acreditacion (clave_idempotencia_acreditacion),
     UNIQUE KEY uq_pago_clave_cierre (clave_idempotencia_cierre),
+    UNIQUE KEY uq_pago_comprobante (id_comprobante),
     KEY idx_pago_pedido (id_pedido),
     KEY idx_pago_cuenta (id_cuenta_corriente),
+    KEY idx_pago_cuenta_estado (id_cuenta_corriente, estado, fecha),
     KEY idx_pago_cotizacion (id_cotizacion),
     KEY idx_pago_admin_actor (id_admin_actor),
     KEY idx_pago_admin_cierre (id_admin_cierre),
@@ -234,6 +248,7 @@ CREATE TABLE PAGO (
         )
         AND BINARY estado = BINARY UPPER(estado)
     ),
+    CONSTRAINT chk_pago_monto_usd CHECK (monto_usd IS NULL OR monto_usd > 0),
     CONSTRAINT chk_pago_conversion CHECK (
         (monto_usd IS NULL AND id_cotizacion IS NULL AND tasa_historica IS NULL)
         OR (
@@ -244,14 +259,36 @@ CREATE TABLE PAGO (
             )
         )
     ),
+    CONSTRAINT chk_pago_documental CHECK (estado_documental IN ('PENDIENTE', 'APROBADO', 'RECHAZADO')),
+    CONSTRAINT chk_pago_revision CHECK (
+        (estado_documental = 'PENDIENTE'
+            AND id_admin_revision IS NULL AND revision_utc IS NULL AND motivo_revision IS NULL)
+        OR (estado_documental = 'APROBADO'
+            AND id_admin_revision IS NOT NULL AND revision_utc IS NOT NULL)
+        OR (estado_documental = 'RECHAZADO'
+            AND id_admin_revision IS NOT NULL AND revision_utc IS NOT NULL
+            AND motivo_revision IS NOT NULL)
+    ),
+    CONSTRAINT chk_pago_declaracion CHECK (
+        (id_usuario_declarante IS NULL AND huella_declaracion IS NULL AND id_comprobante IS NULL)
+        OR (id_usuario_declarante IS NOT NULL AND clave_idempotencia IS NOT NULL
+            AND huella_declaracion IS NOT NULL AND id_comprobante IS NOT NULL)
+    ),
+    CONSTRAINT chk_pago_acreditacion CHECK (
+        (id_admin_acreditacion IS NULL AND clave_acreditacion IS NULL AND huella_acreditacion IS NULL)
+        OR (id_admin_acreditacion IS NOT NULL AND clave_acreditacion IS NOT NULL
+            AND huella_acreditacion IS NOT NULL)
+    ),
     CONSTRAINT chk_pago_claves CHECK (
         (clave_idempotencia IS NULL OR clave_idempotencia REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
         AND (clave_idempotencia_acreditacion IS NULL OR clave_idempotencia_acreditacion REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
         AND (clave_idempotencia_cierre IS NULL OR clave_idempotencia_cierre REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$')
     ),
     CONSTRAINT chk_pago_cierre CHECK (
-        (estado IN ('PENDIENTE', 'ACREDITADO', 'DEMO_REGISTRADO') AND motivo_cierre IS NULL AND id_admin_cierre IS NULL AND fecha_cierre_utc IS NULL)
-        OR (estado IN ('RECHAZADO', 'ANULADO') AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
+        (estado IN ('PENDIENTE', 'ACREDITADO', 'DEMO_REGISTRADO')
+            AND motivo_cierre IS NULL AND id_admin_cierre IS NULL AND fecha_cierre_utc IS NULL)
+        OR (estado IN ('RECHAZADO', 'ANULADO')
+            AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
     )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
