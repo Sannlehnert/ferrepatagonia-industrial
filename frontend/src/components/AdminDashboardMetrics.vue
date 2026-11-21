@@ -24,7 +24,7 @@ const formattedCutoff = computed(() => {
   }).format(date)
 })
 const cards = computed(() => [
-  { id: 'new-orders', label: 'Pedidos nuevos', value: indicators.value?.pedidosNuevos },
+  { id: 'new-orders', label: 'Pedidos nuevos', subtitle: 'En estado Confirmado', value: indicators.value?.pedidosNuevos },
   { id: 'credit-orders', label: 'Pedidos con cuenta corriente', value: indicators.value?.pedidosCuentaCorriente },
   { id: 'receipts', label: 'Comprobantes recibidos', value: indicators.value?.comprobantesTotales },
   { id: 'pending-receipts', label: 'Comprobantes sin evaluar', value: indicators.value?.comprobantesSinRevisar },
@@ -60,6 +60,7 @@ defineExpose({ reload, loading: metricsState.loading })
     <dl aria-label="Indicadores" class="m-0 mb-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
       <div v-for="card in cards" :key="card.id" class="min-w-0 rounded-xl border border-slate-200 border-t-4 border-t-[#145a8d] bg-white p-4">
         <dt :id="`metric-${card.id}`" class="text-sm font-semibold text-slate-600">{{ card.label }}</dt>
+        <span v-if="card.subtitle" class="block text-xs font-normal text-slate-500">{{ card.subtitle }}</span>
         <dd :aria-labelledby="`metric-${card.id}`" class="m-0 mt-3 text-3xl font-bold tabular-nums text-[#0b2438]">
           {{ card.value ?? '—' }}
           <span v-if="card.value === undefined" class="sr-only">No disponible</span>

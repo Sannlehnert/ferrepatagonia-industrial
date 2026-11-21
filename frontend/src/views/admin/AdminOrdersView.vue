@@ -418,7 +418,7 @@ onBeforeUnmount(() => {
 
         <label class="min-w-0">
           <span class="mb-1 block text-xs font-semibold text-slate-600">Modalidad de pago</span>
-          <select v-model="paymentModeInput" aria-label="Filtrar por modalidad de pago" class="w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700">
+          <select v-model="paymentModeInput" aria-label="Filtrar por modalidad de pago" class="h-10 w-full rounded-xl border border-[#E2E8F0] bg-white px-3 text-sm font-medium text-slate-700 focus:border-[#145A8D] focus:outline-none">
             <option value="">Todas las modalidades</option>
             <option value="TRANSFERENCIA">Transferencia bancaria</option>
             <option value="CUENTA_CORRIENTE">Cuenta corriente</option>
@@ -502,7 +502,7 @@ onBeforeUnmount(() => {
             <tr
               v-for="order in ordersPage.items"
               :key="order.idPedido"
-              class="transition-colors hover:bg-slate-50/70"
+              class="group transition-colors hover:bg-slate-50/70"
             >
               <td class="whitespace-nowrap py-3 pl-6 pr-4 font-semibold text-[#0B2438]">
                 #{{ String(order.idPedido).padStart(2, '0') }}
@@ -524,7 +524,7 @@ onBeforeUnmount(() => {
                 <AdminOrderStatusBadge :status="order.estado" />
               </td>
               <td class="px-4 py-3"><AdminOrderReceiptSummary :summary="order.comprobantes" /></td>
-              <td class="sticky right-0 bg-white whitespace-nowrap py-3 pl-4 pr-6 text-left">
+              <td class="sticky right-0 bg-white transition-colors group-hover:bg-slate-50 whitespace-nowrap py-3 pl-4 pr-6 text-left">
                 <button
                   type="button"
                   class="min-h-11 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-[#103A5C] hover:bg-slate-50"
