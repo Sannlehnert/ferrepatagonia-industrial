@@ -31,11 +31,13 @@ for (const width of [1280, 360]) {
         name: 'Confirmar pedido a cuenta corriente',
       })
 
+      await expect(option).toBeVisible()
+      await expect(confirm).toHaveCount(0)
       await option.check()
+
       await expect(summary).toContainText('Total del pedido')
       await expect(summary).toContainText('USD 80.00')
       await expect(summary).toContainText('USD 500.00')
-      await expect(option).toBeVisible()
       await expect(confirm).toBeEnabled()
       const postObserved = page.waitForRequest(request =>
         request.method() === 'POST' && request.url().includes('/pedidos/cuenta-corriente'))
@@ -67,7 +69,7 @@ for (const width of [1280, 360]) {
   })
 }
 
-test('mantiene transferencia disponible cuando el backend no habilita cuenta corriente', async ({
+test('no ofrece cuenta corriente cuando el backend confirma que no hay cuenta', async ({
   page,
 }) => {
   const state = await mockCart(page)
@@ -82,61 +84,7 @@ test('mantiene transferencia disponible cuando el backend no habilita cuenta cor
     name: 'Confirmar pedido por transferencia',
   })).toBeEnabled()
   expect(state.orderRequests).toEqual([])
-})
-
-test('permite reconsultar crédito fallido sin bloquear transferencia ni habilitar crédito prematuramente', async ({ page }) => {
-  const state = await mockCart(page)
-  state.eligibility = eligibleOrder
-  state.creditEligibilityFails = true
-  await page.goto('/carrito')
-
-  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
-  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
-  const transfer = summary.getByRole('button', { name: 'Confirmar pedido por transferencia' })
-  const credit = summary.getByRole('radio', { name: 'Cuenta corriente' })
-  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
-  await expect(transfer).toBeEnabled()
-  await expect(credit).toHaveCount(0)
-  const failedRetry = page.waitForResponse(response =>
-    response.url().endsWith('/pedidos/cuenta-corriente/eligibilidad') && response.status() === 500)
-  await retry.click()
-  await failedRetry
-  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
-  await expect(retry).toBeVisible()
-  await expect(credit).toHaveCount(0)
-
-  let release = () => {}
-  state.creditEligibilityFails = false
-  state.creditEligibilityGate = new Promise<void>(resolve => { release = resolve })
-  try {
-    await retry.click()
-    await expect(summary.getByRole('status').filter({ hasText: 'Verificando si este pedido' })).toBeVisible()
-    await expect(credit).toHaveCount(0)
-    await expect(transfer).toBeEnabled()
-    expect(state.orderRequests).toEqual([])
-    release()
-    await expect(credit).toBeVisible()
-    await expect(summary.getByRole('alert')).toHaveCount(0)
-    await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeChecked()
-    await credit.check()
-    await expect(summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' })).toBeEnabled()
-  } finally {
-    release()
-  }
-})
-
-test('un reintento de crédito no elegible conserva transferencia y no habilita crédito', async ({ page }) => {
-  const state = await mockCart(page)
-  state.creditEligibilityFails = true
-  await page.goto('/carrito')
-  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
-  await expect(summary.getByRole('alert')).toContainText('No se pudo consultar el crédito.')
-  state.creditEligibilityFails = false
-  await summary.getByRole('button', { name: 'Volver a consultar elegibilidad' }).click()
-  await expect(summary.getByRole('alert')).toHaveCount(0)
-  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
-  await expect(summary.getByRole('button', { name: 'Confirmar pedido por transferencia' })).toBeEnabled()
-  expect(state.orderRequests).toEqual([])
+  expect(state.transferRequests).toEqual([])
 })
 
 test('muestra el rechazo real de crédito insuficiente', async ({ page }) => {
@@ -154,12 +102,10 @@ test('muestra el rechazo real de crédito insuficiente', async ({ page }) => {
   await expect(summary.getByRole('alert')).toContainText(
     'El crédito disponible no alcanza para confirmar este pedido.',
   )
-  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
-  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   expect(state.orderRequests).toHaveLength(1)
 })
 
-test('oculta cuenta corriente cuando el backend rechaza elegibilidad y conserva transferencia', async ({
+test('oculta la modalidad y muestra el rechazo de elegibilidad del backend', async ({
   page,
 }) => {
   const state = await mockCart(page)
@@ -178,10 +124,129 @@ test('oculta cuenta corriente cuando el backend rechaza elegibilidad y conserva 
   await expect(summary.getByRole('radio', {
     name: 'Cuenta corriente',
   })).toHaveCount(0)
-  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
-  await expect(summary).toContainText('Total a transferir')
+  await expect(summary).toContainText('El crédito disponible no alcanza para confirmar el pedido.')
+  await expect(summary).toContainText('Total del pedido')
   await expect(summary).toContainText('USD 80.00')
+  await expect(summary).toContainText('USD 20.00')
+  await expect(summary).toContainText(
+    'El crédito disponible no alcanza para confirmar el pedido.',
+  )
   expect(state.orderRequests).toEqual([])
+})
+
+test('permite reconsultar elegibilidad después de una respuesta negativa', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: '80.00',
+    creditoDisponibleUSD: '20.00',
+    codigo: 'CREDITO_INSUFICIENTE',
+    mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: null,
+  }
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const recheck = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  await expect(recheck).toBeVisible()
+  await expect(recheck).toBeEnabled()
+
+  state.eligibility = eligibleOrder
+  await recheck.click()
+  await expect(summary.getByRole('status').filter({ hasText: 'Elegibilidad actualizada.' })).toBeVisible()
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
+  expect(state.orderRequests).toEqual([])
+})
+
+test('no anuncia elegibilidad actualizada para una respuesta del carrito anterior', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: '80.00',
+    creditoDisponibleUSD: '20.00',
+    codigo: 'CREDITO_INSUFICIENTE',
+    mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: null,
+  }
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const retry = page.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  await expect(retry).toBeVisible()
+
+  let release = () => {}
+  state.eligibilityGate = new Promise<void>(resolve => { release = resolve })
+  const retryRequest = page.waitForRequest(request =>
+    request.method() === 'GET' && request.url().includes('/pedidos/cuenta-corriente/eligibilidad'))
+  await retry.click()
+  await retryRequest
+
+  const quantity = page.getByRole('spinbutton', { name: 'Cantidad de Producto de prueba' })
+  await quantity.fill('2')
+  await quantity.press('Tab')
+
+  await expect(summary).toContainText('Verificando si este pedido puede confirmarse a crédito…')
+  await expect(summary.getByText('Elegibilidad actualizada.', { exact: true })).toHaveCount(0)
+  state.eligibility = eligibleOrder
+  release()
+  await expect(summary.getByText('Elegibilidad actualizada.', { exact: true })).toHaveCount(0)
+  const accountMethod = summary.getByRole('radio', { name: 'Cuenta corriente' })
+  await expect(accountMethod).toBeVisible()
+  await accountMethod.check()
+  await expect(summary).toContainText('USD 160.00')
+  await expect(summary).toContainText('USD 500.00')
+})
+
+test('cancela la reconsulta si el carrito pierde un total verificable', async ({ page }) => {
+  const state = await mockCart(page)
+  state.eligibility = {
+    elegible: false,
+    moneda: 'USD',
+    totalUSD: '80.00',
+    creditoDisponibleUSD: '20.00',
+    codigo: 'CREDITO_INSUFICIENTE',
+    mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+    cotizacion: null,
+  }
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(summary).toContainText('El crédito disponible no alcanza para confirmar el pedido.')
+
+  let eligibilityRequests = 0
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/pedidos/cuenta-corriente/eligibilidad') {
+      eligibilityRequests++
+    }
+  })
+  let release = () => {}
+  state.eligibilityGate = new Promise<void>(resolve => { release = resolve })
+  const retryRequest = page.waitForRequest(request =>
+    request.method() === 'GET' && request.url().includes('/pedidos/cuenta-corriente/eligibilidad'))
+  await summary.getByRole('button', { name: 'Volver a consultar elegibilidad' }).click()
+  const pendingRequest = await retryRequest
+  const requestFailed = page.waitForEvent('requestfailed', request => request === pendingRequest)
+
+  state.transform = snapshot => ({ ...snapshot, totalUSD: null })
+  const cartRefresh = page.waitForResponse(response =>
+    response.request().method() === 'GET' &&
+    new URL(response.url()).pathname === '/api/carrito')
+  const quantity = page.getByRole('spinbutton', { name: 'Cantidad de Producto de prueba' })
+  await quantity.fill('2')
+  await quantity.press('Tab')
+  const refreshedCart = await cartRefresh
+  expect((await refreshedCart.json()).totalUSD).toBeNull()
+  await expect(summary).toContainText('La confirmación requiere un total vigente y verificable del carrito.')
+  await requestFailed
+  expect(eligibilityRequests).toBe(1)
+
+  state.eligibility = eligibleOrder
+  release()
+  await expect(summary.getByText('Elegibilidad actualizada.', { exact: true })).toHaveCount(0)
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  expect(eligibilityRequests).toBe(1)
 })
 
 test('recupera un resultado pendiente con la misma clave idempotente', async ({

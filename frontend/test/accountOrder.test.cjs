@@ -69,7 +69,6 @@ function createRuntime(t, transport, savedKey = null) {
             currentSessionGeneration: () => generation,
         },
         '@/stores/auth': { useAuthStore: () => auth },
-        '@/services/confirmationReset': { registerConfirmationReset: () => () => {} },
         '@/services/realtime': { onRealtime() {} },
         '@/stores/cart': { useCartStore: () => ({ reconciliarPedidoConfirmado() {} }) },
     })
@@ -152,6 +151,59 @@ test('enables account orders only when the server confirms eligibility', async t
     })
     await tick()
     assert.equal(eligible.store.canUseCredit, true)
+})
+
+test('ignora una respuesta de elegibilidad de un carrito anterior', async t => {
+    let resolveOld
+    const oldResponse = new Promise(resolve => { resolveOld = resolve })
+    const calls = []
+    const { store } = createRuntime(t, {
+        getEligibility: async (_signal) => {
+            calls.push(calls.length)
+            if (calls.length === 2) return oldResponse
+            if (calls.length === 1) return eligibleOrder
+            return { ...eligibleOrder, totalUSD: '160.00' }
+        },
+        confirm: async () => assert.fail('No debe enviar la confirmación'),
+        recover: async () => assert.fail('No debe consultar un intento'),
+    })
+    await tick()
+
+    const oldRequest = store.loadEligibility('cart-80')
+    const currentRequest = store.loadEligibility('cart-160')
+    resolveOld({ ...eligibleOrder, totalUSD: '80.00' })
+    await oldRequest
+    await currentRequest
+
+    assert.equal(store.eligibilityUpdated, true)
+    assert.equal(store.eligibility.totalUSD, '160.00')
+    assert.equal(store.eligibilityLoading, false)
+})
+
+test('invalida y aborta una consulta cuando el carrito deja de ser verificable', async t => {
+    const response = deferred()
+    let requestSignal
+    const { store } = createRuntime(t, {
+        getEligibility: async signal => {
+            requestSignal = signal
+            return response.promise
+        },
+        confirm: async () => assert.fail('No debe enviar la confirmación'),
+        recover: async () => assert.fail('No debe consultar un intento'),
+    })
+    await tick()
+
+    const request = store.loadEligibility('cart-80')
+    store.invalidateEligibility()
+
+    assert.equal(requestSignal.aborted, true)
+    assert.equal(store.eligibility, null)
+    assert.equal(store.eligibilityLoading, false)
+    assert.equal(store.eligibilityUpdated, false)
+    response.resolve(eligibleOrder)
+    assert.equal(await request, false)
+    assert.equal(store.eligibility, null)
+    assert.equal(store.eligibilityUpdated, false)
 })
 
 test('ignora doble confirmación y mantiene el resultado incierto bajo la misma clave', async t => {

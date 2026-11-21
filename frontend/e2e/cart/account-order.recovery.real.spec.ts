@@ -87,6 +87,55 @@ async function signIn(page: Page, f: Awaited<ReturnType<typeof customer>>) {
   await expect(page).toHaveURL(/\/mi-cuenta$/)
 }
 
+recoveryTest('reconsulta elegibilidad contra el backend y no conserva el resultado ante un fallo de red', async ({
+  page, database,
+}) => {
+  const f = await customer(database)
+  let allowEligibility = false
+  let eligibilityRequests = 0
+  await page.route('**/api/pedidos/cuenta-corriente/eligibilidad', async route => {
+    eligibilityRequests++
+    if (!allowEligibility) return route.abort('failed')
+    return route.continue()
+  })
+
+  await signIn(page, f)
+  await page.goto('/catalogo?busqueda=' + encodeURIComponent(f.name))
+  const card = page.locator('li').filter({
+    has: page.getByRole('heading', { name: f.name, exact: true }),
+  })
+  const added = page.waitForResponse(response =>
+    response.url().endsWith(cartEndpoint + '/items') &&
+    response.request().method() === 'POST')
+  await card.getByRole('button', { name: 'Agregar', exact: true }).click()
+  expect((await added).status()).toBe(204)
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(summary.getByRole('alert')).toContainText('No pudimos verificar')
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  allowEligibility = true
+  const eligibilityResponse = page.waitForResponse(response =>
+    response.url().endsWith(endpoint + '/eligibilidad') && response.status() === 200)
+  await retry.click()
+  const response = await eligibilityResponse
+  const cartResponse = await page.request.get(cartEndpoint)
+  expect(cartResponse.status()).toBe(200)
+  const cart = await cartResponse.json()
+  expect((await response.json()).data).toMatchObject({
+    elegible: true,
+    moneda: 'USD',
+    totalUSD: cart.totalUSD,
+  })
+  await expect(summary.getByRole('status').filter({
+    hasText: 'Elegibilidad actualizada.',
+  })).toBeVisible()
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
+  expect(eligibilityRequests).toBeGreaterThan(0)
+  expect(await sql(database, f)).toMatchObject({ orders: [], charges: [], attempts: [] })
+})
+
 async function attemptInTab(page: Page, userId: number, key: string, quoteToken?: string) {
   await page.evaluate(([id, key, quoteToken]) => {
     sessionStorage.setItem('account-order:' + id, JSON.stringify({ key, quoteToken }))
