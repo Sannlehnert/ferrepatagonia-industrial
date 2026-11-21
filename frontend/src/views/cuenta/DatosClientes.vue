@@ -28,9 +28,17 @@ const sessionKey = () => auth.user && auth.rol === 'CLIENTE' && !auth.loggingIn 
   : null
 const editable = computed(() => profile.value !== null && !loading.value && !saving.value)
 const dirty = computed(() => !!profile.value && (
-  telefono.value !== (profile.value.telefono ?? '') ||
-  direccion.value !== (profile.value.direccion ?? '')
+  telefono.value.trim() !== (profile.value.telefono ?? '').trim() ||
+  direccion.value.trim() !== (profile.value.direccion ?? '').trim()
 ))
+const approvalLabel = computed(() => {
+  switch (profile.value?.estadoAprobacionEmpresa) {
+    case 'APROBADA': return 'Aprobada'
+    case 'PENDIENTE': return 'Pendiente'
+    case 'RECHAZADA': return 'Rechazada'
+    default: return 'No determinable'
+  }
+})
 
 function isCurrent(sequence: number, key: string, signal: AbortSignal) {
   return sequence === requestSequence && !signal.aborted && sessionKey() === key
@@ -89,8 +97,8 @@ function validate(): AccountProfileChanges | null {
   if (Object.keys(errors).length) return null
 
   const changes: AccountProfileChanges = {}
-  if (phone !== (profile.value?.telefono ?? '')) changes.telefono = phone || null
-  if (address !== (profile.value?.direccion ?? '')) changes.direccion = address || null
+  if (phone !== (profile.value?.telefono ?? '').trim()) changes.telefono = phone || null
+  if (address !== (profile.value?.direccion ?? '').trim()) changes.direccion = address || null
   return Object.keys(changes).length ? changes : null
 }
 
@@ -149,7 +157,7 @@ onScopeDispose(() => {
         v-if="auth.user"
         class="grid grid-cols-1 w-full max-w-full min-w-0 gap-y-3 text-base box-border sm:grid-cols-[140px_minmax(0,1fr)] sm:gap-x-4 sm:text-sm"
       >
-        <dt class="w-full max-w-full min-w-0 box-border font-semibold text-slate-700">Nombre</dt>
+        <dt class="w-full max-w-full min-w-0 box-border font-semibold text-slate-700">{{ auth.user.tipo_cliente === 'EMPRESA' ? 'Razón social' : 'Nombre' }}</dt>
         <dd class="m-0 w-full max-w-full min-w-0 box-border break-words font-medium text-[#0B2438]">{{ auth.user.nombre }}</dd>
         <dt class="w-full max-w-full min-w-0 box-border font-semibold text-slate-700">Email</dt>
         <dd class="m-0 w-full max-w-full min-w-0 box-border break-words font-medium text-[#0B2438]">{{ auth.user.email }}</dd>
@@ -161,12 +169,12 @@ onScopeDispose(() => {
         Consultá tus datos registrados. Podés actualizar tu teléfono y dirección.
       </p>
 
-      <p v-if="loading" role="status" class="text-sm text-slate-600">Cargando tus datos…</p>
+      <p v-if="loading" role="status" class="wrap-anywhere text-sm text-slate-600">Cargando tus datos…</p>
       <div v-else-if="loadError" class="space-y-3">
-        <p role="alert" class="m-0 text-sm text-red-800">{{ loadError }}</p>
+        <p role="alert" class="m-0 wrap-anywhere text-sm text-red-800">{{ loadError }}</p>
         <button
           type="button"
-          class="min-h-[44px] rounded-md border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+          class="box-border min-h-[44px] cursor-pointer rounded-md border border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           @click="loadProfile"
         >
           Reintentar carga
@@ -186,7 +194,7 @@ onScopeDispose(() => {
           <dd v-if="profile.tipoCliente === 'EMPRESA'" class="m-0 break-words text-[#0B2438]">{{ profile.cuit || 'No informado' }}</dd>
           <template v-if="profile.tipoCliente === 'EMPRESA'">
             <dt class="font-semibold text-slate-700">Aprobación de empresa</dt>
-            <dd class="m-0 break-words text-[#0B2438]">{{ profile.estadoAprobacionEmpresa || 'No determinable' }}</dd>
+            <dd class="m-0 break-words text-[#0B2438]">{{ approvalLabel }}</dd>
             <dt class="font-semibold text-slate-700">Cuenta corriente</dt>
             <dd class="m-0 break-words text-[#0B2438]">
               {{ profile.cuentaCorrienteHabilitada === null
@@ -207,9 +215,9 @@ onScopeDispose(() => {
               :disabled="!editable"
               :aria-invalid="!!validation.telefono"
               :aria-describedby="validation.telefono ? 'profile-phone-error' : undefined"
-              class="box-border min-h-[44px] w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+              class="box-border min-h-[44px] w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 font-[inherit] text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             />
-            <p v-if="validation.telefono" id="profile-phone-error" role="alert" class="mb-0 mt-1 text-sm text-red-800">
+            <p v-if="validation.telefono" id="profile-phone-error" role="alert" class="mb-0 mt-1 wrap-anywhere text-sm text-red-800">
               {{ validation.telefono }}
             </p>
           </div>
@@ -222,22 +230,22 @@ onScopeDispose(() => {
               :disabled="!editable"
               :aria-invalid="!!validation.direccion"
               :aria-describedby="validation.direccion ? 'profile-address-error' : undefined"
-              class="box-border min-h-24 w-full min-w-0 resize-y rounded-md border border-slate-300 bg-white px-3 py-2 text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+              class="box-border min-h-24 w-full min-w-0 resize-y rounded-md border border-slate-300 bg-white px-3 py-2 font-[inherit] text-base text-[#0B2438] disabled:bg-slate-50 sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             />
-            <p v-if="validation.direccion" id="profile-address-error" role="alert" class="mb-0 mt-1 text-sm text-red-800">
+            <p v-if="validation.direccion" id="profile-address-error" role="alert" class="mb-0 mt-1 wrap-anywhere text-sm text-red-800">
               {{ validation.direccion }}
             </p>
           </div>
 
-          <p v-if="feedback" role="status" aria-live="polite" class="m-0 text-sm font-semibold text-emerald-800">
+          <p v-if="feedback" role="status" aria-live="polite" class="m-0 wrap-anywhere text-sm font-semibold text-emerald-800">
             {{ feedback }}
           </p>
-          <p v-if="saveError" role="alert" class="m-0 text-sm text-red-800">{{ saveError }}</p>
+          <p v-if="saveError" role="alert" class="m-0 wrap-anywhere text-sm text-red-800">{{ saveError }}</p>
 
           <button
             type="submit"
             :disabled="!editable || !dirty"
-            class="min-h-[44px] rounded-md border-0 bg-[#103A5C] px-5 text-sm font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+            class="box-border min-h-[44px] cursor-pointer rounded-md border-0 bg-[#103A5C] px-5 font-[inherit] text-sm font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           >
             {{ saving ? 'Guardando…' : 'Guardar cambios' }}
           </button>
