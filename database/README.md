@@ -24,7 +24,7 @@ database/
 
 ### `schema.sql`
 
-Crea las **25 tablas** base, incluidas `SOLICITUD_CREDITO`,
+Crea las **26 tablas** base, incluidas `PAGO_IDEMPOTENCIA`, `SOLICITUD_CREDITO`,
 `EVENTO_CREDITO`, `FER17_PRECIO_EVENTO` y `CONFIRMACION_PEDIDO_TRANSFERENCIA`, con sus:
 
 - tablas;
@@ -80,7 +80,7 @@ Migración aditiva e idempotente de T-S7-06.1 (#322). Crea `CONFIRMACION_PEDIDO_
 
 ### `migrate-s7-04-2-state-consistency.sql`
 
-Migración aditiva e idempotente de T-S7-04.2 (#317 / HU-S7-04 #290). Refuerza `COMPROBANTE_PAGO` (`estado_revision`, `motivo_rechazo`, `clave_idempotencia_revision`), `PAGO` (`monto_usd`, `id_cotizacion`, `tasa_historica`, claves de idempotencia y cierre) y `MOVIMIENTO_CUENTA_CORRIENTE`, e instala los 6 triggers de inmutabilidad y control de transiciones (`s704_pago_before_insert`, `s704_pago_before_update`, `s704_pago_before_delete`, `s704_movimiento_before_update`, `s704_movimiento_before_delete`, `s704_comprobante_before_update`), preservando intactos los 7 triggers de FER-20 y FER-17. Es segura de repetir sobre instalaciones nuevas o existentes.
+Migración aditiva e idempotente de T-S7-04.2 (#317 / HU-S7-04 #290). Refuerza `COMPROBANTE_PAGO` (`estado_revision`, `motivo_rechazo`, `clave_idempotencia_revision`), `PAGO` (`monto_usd`, `id_cotizacion`, `tasa_historica`, claves de idempotencia y cierre) y `MOVIMIENTO_CUENTA_CORRIENTE`, crea `PAGO_IDEMPOTENCIA` para unicidad global cross-operación de `Idempotency-Key` en `PAGO`, e instala los 6 triggers de inmutabilidad y control de transiciones (`s704_pago_before_insert`, `s704_pago_before_update`, `s704_pago_before_delete`, `s704_movimiento_before_update`, `s704_movimiento_before_delete`, `s704_comprobante_before_update`), preservando intactos los 7 triggers de FER-20 y FER-17. Es segura de repetir sobre instalaciones nuevas o existentes.
 
 ### `seed.sql`
 
@@ -208,7 +208,7 @@ Si queda en `unhealthy`, revisar los logs. Si aparece un error de conexión con 
 
 Sobre la base recién creada y vacía, ejecutar cada comando por separado. Si alguno falla, detenerse y revisar el error antes de seguir.
 
-Crear las 25 tablas base:
+Crear las 26 tablas base:
 
 ```bash
 docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
@@ -262,13 +262,13 @@ La redirección `<` se realiza dentro del contenedor, por eso los mismos comando
 PASS: conteos, relaciones, importes y destinos de pago
 ```
 
-`verify-seed.sql` valida únicamente conteos, relaciones e importes del seed; **no detecta si faltan triggers**. Comprobar explícitamente las 25 tablas, los trece triggers y la vista de auditoría:
+`verify-seed.sql` valida únicamente conteos, relaciones e importes del seed; **no detecta si faltan triggers**. Comprobar explícitamente las 26 tablas, los trece triggers y la vista de auditoría:
 
 ```bash
 docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'; SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME; SELECT TABLE_NAME FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'FER17_AUDITORIA_TRIGGERS';"
 ```
 
-La consulta debe informar `25` tablas base y los trece triggers: `fer17_precio_evento_no_delete`, `fer17_precio_evento_no_update`, `fer17_producto_alta_evento` (`AFTER INSERT` en `PRODUCTO`), `fer17_producto_precio_evento` (`AFTER UPDATE` en `PRODUCTO`), `fer260_cuenta_revision` (`BEFORE UPDATE` en `CUENTA_CORRIENTE`), `fer260_imputacion_insert` (`BEFORE INSERT` en `IMPUTACION_MOVIMIENTO_CUENTA`), `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`), `s704_comprobante_before_update` (`BEFORE UPDATE` en `COMPROBANTE_PAGO`), `s704_movimiento_before_delete` (`BEFORE DELETE` en `MOVIMIENTO_CUENTA_CORRIENTE`), `s704_movimiento_before_update` (`BEFORE UPDATE` en `MOVIMIENTO_CUENTA_CORRIENTE`), `s704_pago_before_delete` (`BEFORE DELETE` en `PAGO`), `s704_pago_before_insert` (`BEFORE INSERT` en `PAGO`) y `s704_pago_before_update` (`BEFORE UPDATE` en `PAGO`).
+La consulta debe informar `26` tablas base y los trece triggers: `fer17_precio_evento_no_delete`, `fer17_precio_evento_no_update`, `fer17_producto_alta_evento` (`AFTER INSERT` en `PRODUCTO`), `fer17_producto_precio_evento` (`AFTER UPDATE` en `PRODUCTO`), `fer260_cuenta_revision` (`BEFORE UPDATE` en `CUENTA_CORRIENTE`), `fer260_imputacion_insert` (`BEFORE INSERT` en `IMPUTACION_MOVIMIENTO_CUENTA`), `fer260_imputacion_update` (`BEFORE UPDATE` en `IMPUTACION_MOVIMIENTO_CUENTA`), `s704_comprobante_before_update` (`BEFORE UPDATE` en `COMPROBANTE_PAGO`), `s704_movimiento_before_delete` (`BEFORE DELETE` en `MOVIMIENTO_CUENTA_CORRIENTE`), `s704_movimiento_before_update` (`BEFORE UPDATE` en `MOVIMIENTO_CUENTA_CORRIENTE`), `s704_pago_before_delete` (`BEFORE DELETE` en `PAGO`), `s704_pago_before_insert` (`BEFORE INSERT` en `PAGO`) y `s704_pago_before_update` (`BEFORE UPDATE` en `PAGO`).
 
 `schema.sql` requiere una base vacía y `seed.sql` requiere tablas vacías: no deben repetirse sobre una base ya cargada. Detener o reiniciar el contenedor no vacía la base. Para reconstruirla desde cero, usar el procedimiento de eliminación de datos indicado más abajo.
 

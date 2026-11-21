@@ -255,6 +255,27 @@ CREATE TABLE PAGO (
     )
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS PAGO_IDEMPOTENCIA (
+    clave_idempotencia CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    id_pago INT NOT NULL,
+    operacion VARCHAR(20) COLLATE utf8mb4_bin NOT NULL,
+    payload_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+    creado_en_utc DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    PRIMARY KEY (clave_idempotencia),
+    KEY idx_pago_idempotencia_pago (id_pago),
+    CONSTRAINT fk_pago_idempotencia_pago FOREIGN KEY (id_pago)
+        REFERENCES PAGO (id_pago) ON DELETE RESTRICT ON UPDATE RESTRICT,
+    CONSTRAINT chk_pago_idempotencia_clave CHECK (
+        clave_idempotencia REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    ),
+    CONSTRAINT chk_pago_idempotencia_operacion CHECK (
+        operacion IN ('CREAR', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+    ),
+    CONSTRAINT chk_pago_idempotencia_hash CHECK (
+        payload_hash REGEXP '^[0-9a-f]{64}$'
+    )
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE MOVIMIENTO_CUENTA_CORRIENTE (
     id_movimiento_cuenta INT NOT NULL AUTO_INCREMENT,
     id_cuenta_corriente INT NOT NULL,

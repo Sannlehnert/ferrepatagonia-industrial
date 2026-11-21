@@ -311,6 +311,73 @@ BEGIN NOT ATOMIC
                 OR (estado IN ('RECHAZADO', 'ANULADO') AND (motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(motivo_cierre)) > 0))
             );
     END IF;
+
+    -- 2b. Unicidad global cross-operacion de Idempotency-Key y payload hash en PAGO
+    CREATE TABLE IF NOT EXISTS PAGO_IDEMPOTENCIA (
+        clave_idempotencia CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+        id_pago INT NOT NULL,
+        operacion VARCHAR(20) COLLATE utf8mb4_bin NOT NULL,
+        payload_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+        creado_en_utc DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+        PRIMARY KEY (clave_idempotencia),
+        KEY idx_pago_idempotencia_pago (id_pago),
+        CONSTRAINT fk_pago_idempotencia_pago FOREIGN KEY (id_pago)
+            REFERENCES PAGO (id_pago) ON DELETE RESTRICT ON UPDATE RESTRICT,
+        CONSTRAINT chk_pago_idempotencia_clave CHECK (
+            clave_idempotencia REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+        ),
+        CONSTRAINT chk_pago_idempotencia_operacion CHECK (
+            operacion IN ('CREAR', 'ACREDITAR', 'RECHAZAR', 'ANULAR')
+        ),
+        CONSTRAINT chk_pago_idempotencia_hash CHECK (
+            payload_hash REGEXP '^[0-9a-f]{64}$'
+        )
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+    INSERT IGNORE INTO PAGO_IDEMPOTENCIA (
+        clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc
+    )
+    SELECT
+        p.clave_idempotencia,
+        p.id_pago,
+        'CREAR',
+        SHA2(CONCAT('LEGACY_CREAR:', p.id_pago, ':', p.clave_idempotencia), 256),
+        UTC_TIMESTAMP(3)
+    FROM PAGO p
+    WHERE p.clave_idempotencia IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM PAGO_IDEMPOTENCIA pi WHERE pi.clave_idempotencia = p.clave_idempotencia
+      );
+
+    INSERT IGNORE INTO PAGO_IDEMPOTENCIA (
+        clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc
+    )
+    SELECT
+        p.clave_idempotencia_acreditacion,
+        p.id_pago,
+        'ACREDITAR',
+        SHA2(CONCAT('LEGACY_ACREDITAR:', p.id_pago, ':', p.clave_idempotencia_acreditacion), 256),
+        UTC_TIMESTAMP(3)
+    FROM PAGO p
+    WHERE p.clave_idempotencia_acreditacion IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM PAGO_IDEMPOTENCIA pi WHERE pi.clave_idempotencia = p.clave_idempotencia_acreditacion
+      );
+
+    INSERT IGNORE INTO PAGO_IDEMPOTENCIA (
+        clave_idempotencia, id_pago, operacion, payload_hash, creado_en_utc
+    )
+    SELECT
+        p.clave_idempotencia_cierre,
+        p.id_pago,
+        CASE WHEN p.estado = 'ANULADO' THEN 'ANULAR' ELSE 'RECHAZADO' END,
+        SHA2(CONCAT('LEGACY_CIERRE:', p.id_pago, ':', p.clave_idempotencia_cierre), 256),
+        UTC_TIMESTAMP(3)
+    FROM PAGO p
+    WHERE p.clave_idempotencia_cierre IS NOT NULL
+      AND NOT EXISTS (
+          SELECT 1 FROM PAGO_IDEMPOTENCIA pi WHERE pi.clave_idempotencia = p.clave_idempotencia_cierre
+      );
 END//
 
 -- 3. Triggers de inmutabilidad e integridad de transiciones (S7-04.2)
@@ -346,6 +413,26 @@ BEGIN
                OR NEW.tasa_historica IS NULL OR NEW.tasa_historica <= 0 THEN
                 SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_ARS_REQUIERE_FER17';
             END IF;
+            IF NOT EXISTS (
+                SELECT 1
+                FROM COTIZACION c
+                INNER JOIN FER17_COTIZACION_VERIFICACION v
+                    ON v.id_cotizacion = c.id_cotizacion
+                WHERE c.id_cotizacion = NEW.id_cotizacion
+                  AND c.valida = 1
+                  AND v.valida = 1
+                  AND c.tasa = NEW.tasa_historica
+                  AND v.tasa_verificada = NEW.tasa_historica
+                  AND v.referencia_verificada = c.fecha_referencia
+                  AND BINARY v.actor_carga_verificado = BINARY c.actor
+                  AND v.banco = 'BNA'
+                  AND v.tipo = 'VENDEDOR'
+            ) THEN
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_COTIZACION_NO_VERIFICADA';
+            END IF;
+            IF NEW.monto_usd <> ROUND(NEW.monto / NEW.tasa_historica, 2) THEN
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_CONVERSION_INVALIDA';
+            END IF;
         END IF;
     ELSEIF NEW.estado IN ('RECHAZADO', 'ANULADO') THEN
         IF NEW.motivo_cierre IS NULL OR CHAR_LENGTH(TRIM(NEW.motivo_cierre)) = 0 THEN
@@ -373,7 +460,15 @@ BEGIN
         IF NEW.estado NOT IN ('PENDIENTE', 'ACREDITADO', 'RECHAZADO') THEN
             SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_TRANSICION_INVALIDA';
         END IF;
-        IF NEW.estado = 'ACREDITADO' THEN
+        IF NEW.estado = 'PENDIENTE' THEN
+            IF NEW.monto_usd IS NOT NULL
+               OR NEW.id_cotizacion IS NOT NULL
+               OR NEW.tasa_historica IS NOT NULL
+               OR NEW.fecha_acreditacion_utc IS NOT NULL
+               OR NEW.evidencia_acreditacion IS NOT NULL THEN
+                SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_PENDIENTE_SIN_ACREDITACION';
+            END IF;
+        ELSEIF NEW.estado = 'ACREDITADO' THEN
             IF NEW.moneda IS NULL OR NEW.moneda NOT IN ('USD', 'ARS')
                OR NEW.evidencia_acreditacion IS NULL OR CHAR_LENGTH(TRIM(NEW.evidencia_acreditacion)) = 0
                OR NEW.fecha_acreditacion_utc IS NULL THEN
@@ -391,6 +486,26 @@ BEGIN
                    OR NEW.id_cotizacion IS NULL
                    OR NEW.tasa_historica IS NULL OR NEW.tasa_historica <= 0 THEN
                     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_ARS_REQUIERE_FER17';
+                END IF;
+                IF NOT EXISTS (
+                    SELECT 1
+                    FROM COTIZACION c
+                    INNER JOIN FER17_COTIZACION_VERIFICACION v
+                        ON v.id_cotizacion = c.id_cotizacion
+                    WHERE c.id_cotizacion = NEW.id_cotizacion
+                      AND c.valida = 1
+                      AND v.valida = 1
+                      AND c.tasa = NEW.tasa_historica
+                      AND v.tasa_verificada = NEW.tasa_historica
+                      AND v.referencia_verificada = c.fecha_referencia
+                      AND BINARY v.actor_carga_verificado = BINARY c.actor
+                      AND v.banco = 'BNA'
+                      AND v.tipo = 'VENDEDOR'
+                ) THEN
+                    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_COTIZACION_NO_VERIFICADA';
+                END IF;
+                IF NEW.monto_usd <> ROUND(NEW.monto / NEW.tasa_historica, 2) THEN
+                    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'S704_PAGO_CONVERSION_INVALIDA';
                 END IF;
             END IF;
         ELSEIF NEW.estado = 'RECHAZADO' THEN
