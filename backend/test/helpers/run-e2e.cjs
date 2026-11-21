@@ -131,7 +131,13 @@ async function main() {
     includeCatalogProducts: !demoCatalog,
     accountOrigin: payments ? 'REAL' : 'DEMO',
   });
-  if (receipts || payments || demoInteractive) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+  // Almacenamiento temporal para los E2E de comprobantes,
+  // pagos, checkout normal y demo interactiva.
+  if (receipts || payments || demoInteractive || (!fer19 && !demoCatalog)) {
+    receiptStorage = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ferre-receipts-e2e-')
+    );
+  }
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
