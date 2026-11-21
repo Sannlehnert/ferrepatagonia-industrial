@@ -3244,3 +3244,40 @@ Verificación de higiene final tras todas las corridas:
 - Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
 - BOM UTF-8 en archivos modificados: 0 archivos con BOM
 - git diff --check: Exit code: 0 (salida vacía)
+
+--- 26. Cierre de S7-317-R05 (PR #158) — Compatibilidad estricta con huellas históricas #333 en acreditación ---
+Fecha UTC: 2026-11-21T16:41:00Z
+Rama: feature/s7-04-2-order-payment-state-consistency
+HEAD base: 5eadddc29541210c614b921b79e7361fec937edb
+Alcance: cierre acotado a #317 en árbol de trabajo sin comandos Git de escritura, preservando intactos la unicidad global de PAGO_IDEMPOTENCIA, los 6 triggers s704_* (más 4 FER-17 y 3 FER-20) y las validaciones estrictas de actor, evidencia y campos del contrato nuevo.
+
+Detalle de correcciones aplicadas:
+1. Compatibilidad dual en admin-payment.service.ts y payment.service.ts:
+   - backend/src/services/payments/admin-payment.service.ts: exportadas accreditPaymentPayloadHash(), legacyAccreditPaymentPayloadHash() y matchesAccreditIdempotencyPayload(). En replay de ACREDITAR con registro en PAGO_IDEMPOTENCIA (operacion === 'ACREDITAR', id_pago === pagoId) o fallback sobre PAGO, se mantiene intacta la validación estricta del formato nuevo SHA256(JSON.stringify({ operacion: 'ACREDITAR', pagoId, evidenciaAcreditacion, fechaAcreditacionUtc, observaciones })) y, si no coincide, se valida compatibilidad estricta con la huella histórica #333 SHA256(JSON.stringify(['ACREDITACION_PAGO', paymentId, auth.id, evidence])) exigiendo mismo actor (auth.id coincidente con el hash y con locked.id_admin_acreditacion === null || Number(locked.id_admin_acreditacion) === auth.id), misma evidencia, ausencia de observaciones definidas/no nulas y ausencia de fechaAcreditacionUtc explícita distinta de locked.fecha_acreditacion_iso. Ante replay válido devuelve 200 OK (replay: true) sin duplicar ABONO, sin modificar PAGO ni saldo/imputaciones y sin emitir eventos Socket.IO; ante cualquier diferencia responde 409 CLAVE_IDEMPOTENCIA_REUTILIZADA.
+   - backend/src/services/payments/payment.service.ts: unificado accreditPayment() reutilizando accreditPaymentPayloadHash() y matchesAccreditIdempotencyPayload() desde admin-payment.service.ts sin lógica duplicada ni incompatible.
+2. Pruebas de regresión unitarias y de migración real MariaDB:
+   - backend/test/state-consistency.test.cjs: agregada prueba unitaria R05 de cálculo y validación dual (formato nuevo + huella histórica #333), cubriendo aceptación válida y rechazos estrictos por actor distinto, id_admin_acreditacion distinto, evidencia distinta, observaciones adicionales, fechaAcreditacionUtc distinta y pago distinto.
+   - backend/test/state-consistency.mariadb.test.cjs: agregada prueba integral R05 que construye una base previa a #317 (#333) con empresa REAL (cobertura = 'COMPLETA'), comprobante válido, cargo, pago acreditado de #333 con clave_acreditacion y huella_acreditacion legacy, ABONO e imputación FIFO; ejecuta database/migrate-s7-04-2-state-consistency.sql real verificando preservación de la huella histórica en PAGO_IDEMPOTENCIA; verifica replay 200 OK con {"evidencia"} y {"evidenciaAcreditacion"} del mismo admin con exactamente 1 ABONO, deuda_vigente/imputaciones FIFO idénticas y 0 eventos Socket.IO; y verifica 409 CLAVE_IDEMPOTENCIA_REUTILIZADA ante otro ADMIN, evidencia distinta, observaciones nuevas, fechaAcreditacionUtc distinta, otro pago y otra operación (ANULAR).
+
+Resultados exactos de las suites ejecutadas:
+1. backend: npm run build -> Exit code: 0
+2. backend: npm run type-check -> Exit code: 0
+3. backend: npm run test:dto-source -> Exit code: 0 (tests 4, suites 0, pass 4, fail 0, skipped 0)
+4. backend: npm run test:unit -> Exit code: 0 (tests 1410, suites 3, pass 1407, fail 0, skipped 3)
+5. backend: npm run test:state-consistency:isolated -> Exit code: 0 (tests 11, suites 0, pass 11, fail 0, skipped 0; upgrade s7-04-2 <-> s7-10-2 + reaplicación idempotente OK; CLEANUP OK T-S7-04.2)
+6. backend: npm run test:payments:isolated -> Exit code: 0 (tests 23, suites 0, pass 23, fail 0, skipped 0; CLEANUP OK #260)
+7. backend: npm run test:receipts:isolated -> Exit code: 0 (tests 9, suites 0, pass 9, fail 0, skipped 0; CLEANUP OK #260)
+8. backend: npm run test:orders:isolated -> Exit code: 0 (tests 91, suites 1, pass 91, fail 0, skipped 0; CLEANUP OK #260)
+9. backend: npm run test:orders:sockets -> Exit code: 0 (tests 20, suites 0, pass 20, fail 0, skipped 0; CLEANUP OK #260)
+10. backend: npm run test:cuenta-corriente -> Exit code: 0 (tests 73, suites 1, pass 73, fail 0, skipped 0; CLEANUP OK #260)
+11. frontend: npm run type-check -> Exit code: 0
+12. frontend: npm run build -> Exit code: 0 (vite build: 335 modules transformed)
+13. frontend: npm test -> Exit code: 0 (tests 294, suites 5, pass 294, fail 0, skipped 0)
+14. E2E raíz: node backend/test/helpers/run-e2e.cjs --receipts -> Exit code: 0 (10 passed, 0 failed; Limpieza E2E confirmada)
+15. E2E raíz: node backend/test/helpers/run-e2e.cjs --fer19 -> Exit code: 0 (15 passed, 0 failed; Limpieza E2E confirmada)
+
+Verificación de higiene final tras todas las corridas:
+- Contenedores residuales de test Docker: 0 (preservado ferrepatagonia-dev-mariadb-1)
+- Volúmenes residuales de test Docker: 0 (preservado ferrepatagonia-dev_mariadb_data)
+- BOM UTF-8 en archivos modificados: 0 archivos con BOM
+- git --no-pager diff --check: Exit code: 0 (salida vacía)

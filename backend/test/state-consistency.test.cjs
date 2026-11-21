@@ -13,6 +13,7 @@ Object.assign(process.env, {
 require('./helpers/test-env.cjs');
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const { after, describe, test } = require('node:test');
 const { destroyDatabase } = require('../dist/config/database.config');
 
@@ -35,7 +36,12 @@ const {
   parseUtcIsoTimestamp,
 } = require('../dist/dtos/payments/admin-payment.dto');
 const { validateDtoSync } = require('../dist/dtos/validation');
-const { resolveUsdConversion } = require('../dist/services/payments/admin-payment.service');
+const {
+  accreditPaymentPayloadHash,
+  legacyAccreditPaymentPayloadHash,
+  matchesAccreditIdempotencyPayload,
+  resolveUsdConversion,
+} = require('../dist/services/payments/admin-payment.service');
 const { AdminPaymentError } = require('../dist/services/payments/admin-payment.errors');
 const { PricingError } = require('../dist/services/pricing/money');
 
@@ -397,6 +403,176 @@ describe('Task #317 (T-S7-04.2) — Consistencia de estados: proyección, DTOs e
         quoteLoader: async () => { throw new Error('CALENDARIO_NO_VERIFICADO'); },
       }),
       err => err instanceof AdminPaymentError && err.status === 422 && err.code === 'COTIZACION_FER17_NO_VERIFICADA',
+    );
+  });
+
+  test('R05: validación dual de idempotencia en acreditación (formato nuevo #317 y huella histórica #333)', () => {
+    const pagoId = 42;
+    const actorId = 7;
+    const evidence = 'EXT-BNA-333';
+    const expectedLegacy = createHash('sha256')
+      .update(JSON.stringify(['ACREDITACION_PAGO', pagoId, actorId, evidence]))
+      .digest('hex');
+
+    const legacyHash = legacyAccreditPaymentPayloadHash(pagoId, actorId, evidence);
+    assert.equal(legacyHash, expectedLegacy);
+
+    const newHash = accreditPaymentPayloadHash(pagoId, evidence, '2026-10-02T15:00:00.000Z', 'Obs nueva');
+    assert.notEqual(newHash, legacyHash);
+
+    // Formato nuevo coincide solo con payload exacto del contrato nuevo
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: newHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: '2026-10-02T15:00:00.000Z',
+        observaciones: 'Obs nueva',
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      true,
+    );
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: newHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: '2026-10-02T15:00:00.000Z',
+        observaciones: 'Obs distinta',
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
+    );
+
+    // Huella histórica #333: acepta replay del mismo admin con misma evidencia y sin parámetros nuevos incompatibles
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: null,
+        observaciones: undefined,
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+        lockedEvidenciaAcreditacion: evidence,
+      }),
+      true,
+    );
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: null,
+        observaciones: null,
+        lockedAdminAccreditationId: null,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      true,
+    );
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: '2026-10-02T15:00:00.000Z',
+        observaciones: undefined,
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      true,
+    );
+
+    // Rechazos estrictos sobre huella histórica #333
+    // 1. Actor distinto (por hash histórico y por id_admin_acreditacion)
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId: actorId + 1,
+        evidence,
+        normalizedRequestedDateIso: null,
+        observaciones: undefined,
+        lockedAdminAccreditationId: null,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
+    );
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: null,
+        observaciones: undefined,
+        lockedAdminAccreditationId: actorId + 1,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
+    );
+    // 2. Evidencia distinta
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence: 'EXT-DISTINTA',
+        normalizedRequestedDateIso: null,
+        observaciones: undefined,
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
+    );
+    // 3. Observaciones nuevas adicionales
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: null,
+        observaciones: 'Observación adicional',
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
+    );
+    // 4. fechaAcreditacionUtc explícita distinta
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: '2026-10-02T16:00:00.000Z',
+        observaciones: undefined,
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
+    );
+    // 5. Pago distinto
+    assert.equal(
+      matchesAccreditIdempotencyPayload({
+        storedHash: legacyHash,
+        pagoId: pagoId + 1,
+        actorId,
+        evidence,
+        normalizedRequestedDateIso: null,
+        observaciones: undefined,
+        lockedAdminAccreditationId: actorId,
+        lockedFechaAcreditacionIso: '2026-10-02T15:00:00.000Z',
+      }),
+      false,
     );
   });
 });

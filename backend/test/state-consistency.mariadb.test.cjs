@@ -1,8 +1,12 @@
 const assert = require('node:assert/strict');
-const { randomUUID } = require('node:crypto');
+const { spawn } = require('node:child_process');
+const { createHash, randomUUID } = require('node:crypto');
 const { once } = require('node:events');
+const fs = require('node:fs');
 const { readdir } = require('node:fs/promises');
+const path = require('node:path');
 const { after, before, test } = require('node:test');
+const mariadb = require('mariadb');
 const { PDFDocument } = require('pdf-lib');
 const sharp = require('sharp');
 const { io } = require('socket.io-client');
@@ -38,14 +42,14 @@ function cookie(auth) {
   return `jwt_token=${signToken(auth)}`;
 }
 
-async function api(path, { method = 'GET', auth, key, body, headers = {} } = {}) {
+async function api(path, { method = 'GET', auth, key, body, headers = {}, baseUrl = base } = {}) {
   const reqHeaders = {
     ...(auth ? { Cookie: cookie(auth) } : {}),
     ...(key ? { 'Idempotency-Key': key } : {}),
     ...(body !== undefined && !Buffer.isBuffer(body) ? { 'Content-Type': 'application/json' } : {}),
     ...headers,
   };
-  const response = await fetchFromBrowser(`${base}/api${path}`, {
+  const response = await fetchFromBrowser(`${baseUrl}/api${path}`, {
     method,
     headers: reqHeaders,
     ...(body !== undefined ? { body: Buffer.isBuffer(body) ? body : JSON.stringify(body) } : {}),
@@ -174,8 +178,8 @@ async function seedVerifiedBnaQuote(adminId) {
   return qid;
 }
 
-async function connectSocket(t, auth) {
-  const socket = io(base, {
+async function connectSocket(t, auth, targetBase = base) {
+  const socket = io(targetBase, {
     autoConnect: false,
     forceNew: true,
     transports: ['websocket'],
@@ -1735,4 +1739,503 @@ test('10. R03: contrato unificado /api/admin/pagos* (#317 + #333), guardia docum
   assert.equal(sClient.events.payment[0].estadoPago, 'ACREDITADO');
   assert.equal(sClient.events.payment[0].montoUSD, '50.00');
   assert.ok(sClient.events.payment[0].revisionCuenta !== null);
+});
+
+async function applySqlFileOnConnection(conn, filePath) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  let delimiter = ';';
+  let buffer = '';
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    const delimMatch = /^DELIMITER\s+(\S+)$/i.exec(trimmed);
+    if (delimMatch) {
+      if (buffer.trim()) {
+        await conn.query(buffer.trim());
+        buffer = '';
+      }
+      delimiter = delimMatch[1];
+      continue;
+    }
+    if (trimmed.startsWith('--') || trimmed === '') {
+      continue;
+    }
+    buffer += `${line}\n`;
+    const trimmedEnd = buffer.trimEnd();
+    if (trimmedEnd.endsWith(delimiter)) {
+      const stmt = trimmedEnd.slice(0, -delimiter.length).trim();
+      buffer = '';
+      if (stmt) {
+        await conn.query(stmt);
+      }
+    }
+  }
+  if (buffer.trim()) {
+    await conn.query(buffer.trim());
+  }
+}
+
+async function stripToPre317Schema(conn) {
+  await conn.query(`
+    ALTER TABLE COMPROBANTE_PAGO
+      ADD KEY fk_comprobante_admin (id_admin_revision),
+      DROP CONSTRAINT chk_comprobante_revision,
+      DROP CONSTRAINT chk_comprobante_estado_revision,
+      DROP CONSTRAINT chk_comprobante_clave_revision,
+      DROP INDEX uq_comprobante_clave_revision,
+      DROP COLUMN estado_revision,
+      DROP COLUMN motivo_rechazo,
+      DROP COLUMN clave_idempotencia_revision
+  `);
+  await conn.query(
+    'ALTER TABLE COMPROBANTE_PAGO ADD CONSTRAINT chk_comprobante_revision CHECK ((id_admin_revision IS NULL) = (revision_utc IS NULL))',
+  );
+  await conn.query('DROP TABLE IF EXISTS PAGO_IDEMPOTENCIA');
+  await conn.query(`
+    ALTER TABLE PAGO
+      DROP FOREIGN KEY fk_pago_cotizacion,
+      DROP FOREIGN KEY fk_pago_admin_actor,
+      DROP FOREIGN KEY fk_pago_admin_cierre,
+      DROP CONSTRAINT chk_pago_estado,
+      DROP CONSTRAINT chk_pago_monto_usd,
+      DROP CONSTRAINT chk_pago_conversion,
+      DROP CONSTRAINT chk_pago_documental,
+      DROP CONSTRAINT chk_pago_revision,
+      DROP CONSTRAINT chk_pago_declaracion,
+      DROP CONSTRAINT chk_pago_acreditacion,
+      DROP CONSTRAINT chk_pago_claves,
+      DROP CONSTRAINT chk_pago_cierre,
+      DROP INDEX uq_pago_idempotencia,
+      DROP INDEX uq_pago_acreditacion,
+      DROP INDEX uq_pago_clave_idempotencia,
+      DROP INDEX uq_pago_clave_acreditacion,
+      DROP INDEX uq_pago_clave_cierre,
+      DROP INDEX uq_pago_comprobante,
+      DROP INDEX idx_pago_cuenta_estado,
+      DROP INDEX idx_pago_cotizacion,
+      DROP INDEX idx_pago_admin_actor,
+      DROP INDEX idx_pago_admin_cierre,
+      DROP COLUMN monto_usd,
+      DROP COLUMN id_cotizacion,
+      DROP COLUMN tasa_historica,
+      DROP COLUMN id_usuario_declarante,
+      DROP COLUMN clave_idempotencia,
+      DROP COLUMN huella_declaracion,
+      DROP COLUMN id_comprobante,
+      DROP COLUMN estado_documental,
+      DROP COLUMN id_admin_revision,
+      DROP COLUMN revision_utc,
+      DROP COLUMN motivo_revision,
+      DROP COLUMN id_admin_acreditacion,
+      DROP COLUMN clave_acreditacion,
+      DROP COLUMN huella_acreditacion,
+      DROP COLUMN clave_idempotencia_acreditacion,
+      DROP COLUMN clave_idempotencia_cierre,
+      DROP COLUMN motivo_cierre,
+      DROP COLUMN id_admin_actor,
+      DROP COLUMN id_admin_cierre,
+      DROP COLUMN fecha_cierre_utc
+  `);
+}
+
+async function startIsolatedBackendForDb(dbName) {
+  const backendRoot = path.resolve(__dirname, '..');
+  const serverScript = `
+    const { once } = require('node:events');
+    const db = require('./dist/config/database.config');
+    const { createBackendServer } = require('./dist/http-server');
+    (async () => {
+      await db.initializeDatabase();
+      const srv = createBackendServer();
+      srv.io.on('connection', socket => {
+        socket.on('test:flush-req', async () => {
+          await srv.waitForNotifications();
+          socket.emit('test:flush');
+        });
+      });
+      srv.server.listen(0, '127.0.0.1');
+      await once(srv.server, 'listening');
+      process.stdout.write(JSON.stringify({ port: srv.server.address().port }) + '\\n');
+      const shutdown = async () => {
+        try { await srv.close(); } finally { await db.destroyDatabase(); }
+        process.exit(0);
+      };
+      process.stdin.on('end', shutdown);
+      process.on('SIGTERM', shutdown);
+    })().catch(err => {
+      console.error(err);
+      process.exit(1);
+    });
+  `;
+
+  const child = spawn(
+    process.execPath,
+    ['--require', './test/helpers/test-env.cjs', '-e', serverScript],
+    {
+      cwd: backendRoot,
+      env: { ...process.env, DB_NAME: dbName },
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  );
+
+  let stderr = '';
+  child.stderr.on('data', chunk => { stderr += chunk.toString(); });
+
+  const port = await new Promise((resolve, reject) => {
+    let stdout = '';
+    const timer = setTimeout(() => reject(new Error(`Timeout iniciando backend R05: ${stderr}`)), 15000);
+    child.stdout.on('data', chunk => {
+      stdout += chunk.toString();
+      const nl = stdout.indexOf('\n');
+      if (nl >= 0) {
+        clearTimeout(timer);
+        try {
+          resolve(JSON.parse(stdout.slice(0, nl)).port);
+        } catch (err) {
+          reject(err);
+        }
+      }
+    });
+    child.on('exit', code => {
+      clearTimeout(timer);
+      reject(new Error(`Backend R05 terminó prematuramente (${code}): ${stderr}`));
+    });
+  });
+
+  return {
+    baseUrl: `http://127.0.0.1:${port}`,
+    async stop() {
+      if (child.exitCode !== null) return;
+      await new Promise(resolve => {
+        const killTimer = setTimeout(() => {
+          child.kill('SIGTERM');
+          resolve();
+        }, 5000);
+        child.once('exit', () => {
+          clearTimeout(killTimer);
+          resolve();
+        });
+        child.stdin.end();
+      });
+    },
+  };
+}
+
+test('11. R05: migración real sobre base previa a #317 conserva huella histórica #333 y valida replay estricto sin duplicar ABONO ni Socket.IO', async t => {
+  const r05Db = `r05_legacy_${randomUUID().replaceAll('-', '')}`;
+  const dbDir = path.resolve(__dirname, '../../database');
+  const conn = await mariadb.createConnection({
+    host: process.env.DB_HOST || '127.0.0.1',
+    port: Number(process.env.DB_PORT || 3306),
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    timezone: 'Z',
+    dateStrings: true,
+    bigIntAsNumber: true,
+    insertIdAsNumber: true,
+  });
+
+  let r05Server;
+  try {
+    await conn.query(`CREATE DATABASE \`${r05Db}\``);
+    await conn.query(`USE \`${r05Db}\``);
+
+    for (const file of [
+      'schema.sql',
+      'migrate-fer-20-account-movements.sql',
+      'migrate-fer-17-price-verification.sql',
+      'migrate-s7-09-1-credit-workflow.sql',
+      'migrate-s7-06-1-transfer-order-confirmation.sql',
+    ]) {
+      await applySqlFileOnConnection(conn, path.join(dbDir, file));
+    }
+
+    await stripToPre317Schema(conn);
+    await applySqlFileOnConnection(conn, path.join(dbDir, 'migrate-s7-10-2-payment-accreditation.sql'));
+
+    // Base previa a #317 (#333): empresa REAL (cobertura COMPLETA), comprobante válido, cargo, pago acreditado con huella #333, ABONO e imputación FIFO
+    const legacyAdmin1Id = Number((await conn.query(
+      "INSERT INTO USUARIO (email, password_hash, rol, activo) VALUES ('r05-admin1@s704.test', 'test-only', 'ADMIN', 1)",
+    )).insertId);
+    const legacyAdmin2Id = Number((await conn.query(
+      "INSERT INTO USUARIO (email, password_hash, rol, activo) VALUES ('r05-admin2@s704.test', 'test-only', 'ADMIN', 1)",
+    )).insertId);
+    const legacyAdmin1 = { id: legacyAdmin1Id, rol: 'ADMIN' };
+    const legacyAdmin2 = { id: legacyAdmin2Id, rol: 'ADMIN' };
+
+    const clientId = Number((await conn.query(
+      "INSERT INTO CLIENTE (tipo_cliente, nombre_razon_social, email, estado_aprobacion_empresa, es_fiel, activo) VALUES ('EMPRESA', 'Empresa Legacy #333 R05', 'r05-empresa@s704.test', 'APROBADA', 0, 1)",
+    )).insertId);
+    const clientUserId = Number((await conn.query(
+      "INSERT INTO USUARIO (id_cliente, email, password_hash, rol, activo) VALUES (?, 'r05-user@s704.test', 'test-only', 'CLIENTE', 1)",
+      [clientId],
+    )).insertId);
+    const clientAuth = { id: clientUserId, rol: 'CLIENTE' };
+
+    const accountId = Number((await conn.query(
+      `INSERT INTO CUENTA_CORRIENTE (
+        id_cliente, limite_credito, habilitada, cobertura, plazo_dias,
+        moneda_limite, evidencia_limite, evidencia_plazo, evidencia_cobertura,
+        cobertura_desde_utc, origen_datos
+      ) VALUES (?, 5000.00, 1, 'COMPLETA', 30, 'USD', 'ACTA-R05', 'PLAZO-R05', 'ALTA-R05', '2020-01-01 00:00:00.000', 'REAL')`,
+      [clientId],
+    )).insertId);
+
+    const orderId = Number((await conn.query(
+      `INSERT INTO PEDIDO (
+        id_cliente, estado, modalidad_pago, subtotal, descuento, total,
+        moneda_total, evidencia_total_usd, fecha_utc
+      ) VALUES (?, 'CONFIRMADO', 'CUENTA_CORRIENTE', 200.00, 0.00, 200.00, 'USD', 'FER17-v1:R05', UTC_TIMESTAMP(3))`,
+      [clientId],
+    )).insertId);
+
+    const cargoId = Number((await conn.query(
+      `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE (
+        id_cuenta_corriente, tipo_movimiento, origen, id_pedido, monto, moneda,
+        fecha_efectiva, fecha_incorporacion, estado, autorizado_por,
+        fecha_base_civil, plazo_aplicado, vence_el, huella_registro, evidencia_origen,
+        monto_original, moneda_original
+      ) VALUES (?, 'CARGO', 'PEDIDO', ?, 200.00, 'USD', '2026-10-01 10:00:00', '2026-10-01 10:00:00', 'ACREDITADO', ?, '2026-10-01', 30, '2026-10-31', SHA2('r05-cargo', 256), '{"source":"r05-cargo"}', 200.00, 'USD')`,
+      [accountId, orderId, String(legacyAdmin1Id)],
+    )).insertId);
+
+    const receiptId = randomUUID();
+    await conn.query(
+      `INSERT INTO COMPROBANTE_PAGO (
+        id_comprobante, id_cliente, id_usuario_carga, id_pedido, id_cuenta_corriente,
+        tipo_mime, bytes, sha256, fecha_utc, id_admin_revision, revision_utc
+      ) VALUES (?, ?, ?, ?, ?, 'application/pdf', 128, UNHEX(REPEAT('cd', 32)), '2026-10-01 11:00:00.000', ?, '2026-10-01 12:00:00.000')`,
+      [receiptId, clientId, clientUserId, orderId, accountId, legacyAdmin1Id],
+    );
+
+    const declKey = randomUUID();
+    const declHash = createHash('sha256').update(JSON.stringify({
+      operacion: 'DECLARAR',
+      cuentaCorrienteId: accountId,
+      usuarioId: clientUserId,
+      monto: '50.00',
+      moneda: 'USD',
+      comprobanteId: receiptId,
+      observaciones: null,
+    })).digest('hex');
+    const legacyEvidence = 'EXTRACTO-BNA-LEGACY-333';
+    const legacyAccKey = randomUUID();
+    const placeholderHash = '0'.repeat(64);
+
+    const paymentId = Number((await conn.query(
+      `INSERT INTO PAGO (
+        id_cuenta_corriente, fecha, monto, moneda, monto_usd, metodo_pago, estado,
+        comprobante, id_usuario_declarante, clave_idempotencia, huella_declaracion,
+        id_comprobante, estado_documental, id_admin_revision, revision_utc,
+        id_admin_acreditacion, clave_acreditacion, huella_acreditacion,
+        fecha_acreditacion_utc, evidencia_acreditacion
+      ) VALUES (
+        ?, '2026-10-01 11:05:00', 50.00, 'USD', 50.00, 'TRANSFERENCIA', 'ACREDITADO',
+        ?, ?, ?, ?, ?, 'APROBADO', ?, '2026-10-01 12:05:00.000',
+        ?, ?, ?, '2026-10-02 15:00:00.000', ?
+      )`,
+      [
+        accountId, receiptId, clientUserId, declKey, declHash, receiptId,
+        legacyAdmin1Id, legacyAdmin1Id, legacyAccKey, placeholderHash, legacyEvidence,
+      ],
+    )).insertId);
+
+    const legacyHash = createHash('sha256')
+      .update(JSON.stringify(['ACREDITACION_PAGO', paymentId, legacyAdmin1Id, legacyEvidence]))
+      .digest('hex');
+    await conn.query('UPDATE PAGO SET huella_acreditacion = ? WHERE id_pago = ?', [legacyHash, paymentId]);
+
+    const abonoId = Number((await conn.query(
+      `INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE (
+        id_cuenta_corriente, tipo_movimiento, origen, id_pago, monto, moneda,
+        fecha_efectiva, fecha_incorporacion, estado, autorizado_por,
+        huella_registro, evidencia_origen, monto_original, moneda_original
+      ) VALUES (?, 'ABONO', 'PAGO', ?, 50.00, 'USD', '2026-10-02 15:00:00', '2026-10-02 15:00:00', 'ACREDITADO', ?, SHA2('r05-abono', 256), '{"source":"r05-abono"}', 50.00, 'USD')`,
+      [accountId, paymentId, String(legacyAdmin1Id)],
+    )).insertId);
+
+    await conn.query(
+      `INSERT INTO IMPUTACION_MOVIMIENTO_CUENTA (
+        id_cuenta_corriente, id_cargo, id_abono, monto_imputado,
+        fecha_imputacion, estado, revision, evento
+      ) VALUES (?, ?, ?, 50.00, '2026-10-02 15:00:00', 'VIGENTE', 1, ?)`,
+      [accountId, cargoId, abonoId, `PAGO_ACREDITADO:${legacyAccKey}`],
+    );
+
+    // Segundo pago PENDIENTE para validar rechazo por reutilización de clave en otro pago
+    const otherPaymentId = Number((await conn.query(
+      `INSERT INTO PAGO (
+        id_cuenta_corriente, fecha, monto, moneda, metodo_pago, estado,
+        estado_documental
+      ) VALUES (?, '2026-10-03 10:00:00', 25.00, 'USD', 'TRANSFERENCIA', 'PENDIENTE', 'PENDIENTE')`,
+      [accountId],
+    )).insertId);
+
+    // Ejecutar migración real #317 sobre la base previa a #317
+    await applySqlFileOnConnection(conn, path.join(dbDir, 'migrate-s7-04-2-state-consistency.sql'));
+
+    // Comprobar que PAGO_IDEMPOTENCIA conserva exactamente la huella histórica de #333
+    const [idemRow] = await conn.query(
+      'SELECT clave_idempotencia, id_pago, operacion, payload_hash FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+      [legacyAccKey],
+    );
+    assert.ok(idemRow, 'PAGO_IDEMPOTENCIA debe contener la clave histórica de #333 tras la migración');
+    assert.equal(Number(idemRow.id_pago), paymentId);
+    assert.equal(idemRow.operacion, 'ACREDITAR');
+    assert.equal(idemRow.payload_hash, legacyHash);
+
+    const [migratedReceipt] = await conn.query(
+      'SELECT estado_revision FROM COMPROBANTE_PAGO WHERE id_comprobante = ?',
+      [receiptId],
+    );
+    assert.equal(migratedReceipt.estado_revision, 'APROBADO');
+
+    const readCuentaState = async () => {
+      await conn.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+      await conn.beginTransaction();
+      try {
+        const state = await ledger.calcularEstadoCuenta(accountId, {
+          query: (sql, params) => conn.query(sql, params),
+          queryRunner: { isTransactionActive: true },
+        });
+        await conn.commit();
+        return state;
+      } catch (err) {
+        await conn.rollback();
+        throw err;
+      }
+    };
+
+    const fifoBefore = await conn.query(
+      'SELECT id_imputacion, id_cargo, id_abono, monto_imputado, estado, revision, evento FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_cuenta_corriente = ? ORDER BY id_imputacion',
+      [accountId],
+    );
+    const ccBefore = await readCuentaState();
+    assert.equal(ccBefore.deuda_vigente, '150.00');
+
+    // Levantar backend HTTP + Socket.IO real apuntando a la base migrada r05Db
+    r05Server = await startIsolatedBackendForDb(r05Db);
+    const sClient = await connectSocket(t, clientAuth, r05Server.baseUrl);
+    const sAdmin = await connectSocket(t, legacyAdmin1, r05Server.baseUrl);
+
+    // Replay idempotente con el MISMO admin y {"evidencia": "<misma-evidencia>"} -> 200 OK
+    const replayAlias = await api(`/admin/pagos/${paymentId}/acreditar`, {
+      baseUrl: r05Server.baseUrl,
+      method: 'POST',
+      auth: legacyAdmin1,
+      key: legacyAccKey,
+      body: { evidencia: legacyEvidence },
+    });
+    assert.equal(replayAlias.status, 200, JSON.stringify(replayAlias.body));
+    assert.equal(replayAlias.body.meta.replay, true);
+    assert.equal(replayAlias.body.data.idPago, paymentId);
+    assert.equal(replayAlias.body.data.estado, 'ACREDITADO');
+    assert.equal(replayAlias.body.data.montoUSD, '50.00');
+
+    // Replay idempotente con el MISMO admin y {"evidenciaAcreditacion": "<misma-evidencia>"} -> 200 OK
+    const replayPrimary = await api(`/admin/pagos/${paymentId}/acreditar`, {
+      baseUrl: r05Server.baseUrl,
+      method: 'POST',
+      auth: legacyAdmin1,
+      key: legacyAccKey,
+      body: { evidenciaAcreditacion: legacyEvidence },
+    });
+    assert.equal(replayPrimary.status, 200, JSON.stringify(replayPrimary.body));
+    assert.equal(replayPrimary.body.meta.replay, true);
+    assert.equal(replayPrimary.body.data.idPago, paymentId);
+
+    // Verificar exactamente 1 ABONO, deuda_vigente e imputaciones FIFO idénticas, y cero eventos Socket.IO duplicados
+    const [abonoCountAfterReplay] = await conn.query(
+      "SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ? AND tipo_movimiento = 'ABONO'",
+      [paymentId],
+    );
+    assert.equal(Number(abonoCountAfterReplay.n), 1);
+    assert.equal((await readCuentaState()).deuda_vigente, '150.00');
+    assert.deepEqual(
+      await conn.query(
+        'SELECT id_imputacion, id_cargo, id_abono, monto_imputado, estado, revision, evento FROM IMPUTACION_MOVIMIENTO_CUENTA WHERE id_cuenta_corriente = ? ORDER BY id_imputacion',
+        [accountId],
+      ),
+      fifoBefore,
+    );
+
+    await Promise.all([sClient, sAdmin].map(async connSock => {
+      const flushed = waitFor(connSock.socket, 'test:flush');
+      connSock.socket.emit('test:flush-req');
+      await flushed;
+    }));
+    assert.equal(sClient.events.payment.length, 0);
+    assert.equal(sAdmin.events.payment.length, 0);
+
+    // Reintentos inválidos -> 409 CLAVE_IDEMPOTENCIA_REUTILIZADA
+    const invalidReplays = [
+      {
+        label: 'Otro ADMIN con misma clave y misma evidencia',
+        path: `/admin/pagos/${paymentId}/acreditar`,
+        auth: legacyAdmin2,
+        body: { evidencia: legacyEvidence },
+      },
+      {
+        label: 'Mismo admin con evidencia distinta',
+        path: `/admin/pagos/${paymentId}/acreditar`,
+        auth: legacyAdmin1,
+        body: { evidencia: 'EVIDENCIA-ALTERADA' },
+      },
+      {
+        label: 'Mismo admin con observaciones nuevas',
+        path: `/admin/pagos/${paymentId}/acreditar`,
+        auth: legacyAdmin1,
+        body: { evidencia: legacyEvidence, observaciones: 'Observación agregada post-migración' },
+      },
+      {
+        label: 'Mismo admin con fechaAcreditacionUtc distinta',
+        path: `/admin/pagos/${paymentId}/acreditar`,
+        auth: legacyAdmin1,
+        body: { evidencia: legacyEvidence, fechaAcreditacionUtc: '2026-10-02T16:00:00Z' },
+      },
+      {
+        label: 'Reutilización de clave en otro pago',
+        path: `/admin/pagos/${otherPaymentId}/acreditar`,
+        auth: legacyAdmin1,
+        body: { evidencia: legacyEvidence },
+      },
+      {
+        label: 'Reutilización de clave en otra operación (ANULAR)',
+        path: `/admin/pagos/${paymentId}/anular`,
+        auth: legacyAdmin1,
+        body: { motivo: 'Reuso prohibido de clave histórica' },
+      },
+    ];
+
+    for (const attempt of invalidReplays) {
+      const res = await api(attempt.path, {
+        baseUrl: r05Server.baseUrl,
+        method: 'POST',
+        auth: attempt.auth,
+        key: legacyAccKey,
+        body: attempt.body,
+      });
+      assert.equal(res.status, 409, `${attempt.label}: ${JSON.stringify(res.body)}`);
+      assert.equal(res.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA', attempt.label);
+    }
+
+    // Confirmar integridad intacta tras los 409
+    const [abonoCountFinal] = await conn.query(
+      "SELECT COUNT(*) AS n FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pago = ? AND tipo_movimiento = 'ABONO'",
+      [paymentId],
+    );
+    assert.equal(Number(abonoCountFinal.n), 1);
+    assert.equal((await readCuentaState()).deuda_vigente, '150.00');
+    const [idemAfter] = await conn.query(
+      'SELECT payload_hash FROM PAGO_IDEMPOTENCIA WHERE clave_idempotencia = ?',
+      [legacyAccKey],
+    );
+    assert.equal(idemAfter.payload_hash, legacyHash);
+    assert.equal(sClient.events.payment.length, 0);
+    assert.equal(sAdmin.events.payment.length, 0);
+  } finally {
+    try { await r05Server?.stop(); } catch {}
+    try { await conn.query(`DROP DATABASE IF EXISTS \`${r05Db}\``); } catch {}
+    await conn.end();
+  }
 });

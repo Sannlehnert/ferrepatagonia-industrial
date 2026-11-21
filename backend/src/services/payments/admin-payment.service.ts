@@ -331,7 +331,7 @@ function createPaymentPayloadHash(
   });
 }
 
-function accreditPaymentPayloadHash(
+export function accreditPaymentPayloadHash(
   pagoId: number,
   evidenciaAcreditacion: string,
   normalizedRequestedDateIso: string | null,
@@ -344,6 +344,75 @@ function accreditPaymentPayloadHash(
     fechaAcreditacionUtc: normalizedRequestedDateIso,
     observaciones,
   });
+}
+
+export function legacyAccreditPaymentPayloadHash(
+  pagoId: number,
+  actorId: number,
+  evidence: string,
+): string {
+  return createHash('sha256')
+    .update(JSON.stringify(['ACREDITACION_PAGO', pagoId, actorId, evidence]))
+    .digest('hex');
+}
+
+export interface AccreditIdempotencyReplayCheck {
+  storedHash: string;
+  pagoId: number;
+  actorId: number;
+  evidence: string;
+  normalizedRequestedDateIso: string | null;
+  observaciones: string | null | undefined;
+  lockedAdminAccreditationId: number | null;
+  lockedFechaAcreditacionIso: string | null;
+  lockedEvidenciaAcreditacion?: string | null;
+}
+
+export function matchesAccreditIdempotencyPayload(
+  check: AccreditIdempotencyReplayCheck,
+): boolean {
+  const normalizedObs = check.observaciones ?? null;
+  const newHash = accreditPaymentPayloadHash(
+    check.pagoId,
+    check.evidence,
+    check.normalizedRequestedDateIso,
+    normalizedObs,
+  );
+  if (check.storedHash === newHash) {
+    return true;
+  }
+
+  // Compatibilidad estricta con huellas históricas de #333:
+  // SHA256(JSON.stringify(['ACREDITACION_PAGO', paymentId, actorId, evidence]))
+  if (
+    check.lockedAdminAccreditationId !== null &&
+    Number(check.lockedAdminAccreditationId) !== check.actorId
+  ) {
+    return false;
+  }
+  if (check.observaciones !== undefined && check.observaciones !== null) {
+    return false;
+  }
+  if (
+    check.normalizedRequestedDateIso !== null &&
+    check.lockedFechaAcreditacionIso !== check.normalizedRequestedDateIso
+  ) {
+    return false;
+  }
+  if (
+    check.lockedEvidenciaAcreditacion !== undefined &&
+    check.lockedEvidenciaAcreditacion !== null &&
+    check.lockedEvidenciaAcreditacion !== check.evidence
+  ) {
+    return false;
+  }
+
+  const legacyHash = legacyAccreditPaymentPayloadHash(
+    check.pagoId,
+    check.actorId,
+    check.evidence,
+  );
+  return check.storedHash === legacyHash;
 }
 
 function closePaymentPayloadHash(
@@ -741,7 +810,17 @@ export async function accreditAdminPaymentService(
         if (
           idempotency.operacion !== 'ACREDITAR' ||
           idempotency.id_pago !== pagoId ||
-          idempotency.payload_hash !== payloadHash
+          !matchesAccreditIdempotencyPayload({
+            storedHash: idempotency.payload_hash,
+            pagoId,
+            actorId: auth.id,
+            evidence,
+            normalizedRequestedDateIso,
+            observaciones: input.observaciones,
+            lockedAdminAccreditationId: locked.id_admin_acreditacion,
+            lockedFechaAcreditacionIso: locked.fecha_acreditacion_iso,
+            lockedEvidenciaAcreditacion: locked.evidencia_acreditacion,
+          })
         ) {
           throw claveIdempotenciaReutilizada();
         }
@@ -763,9 +842,23 @@ export async function accreditAdminPaymentService(
         (locked.clave_idempotencia_acreditacion === key || locked.clave_acreditacion === key)
       ) {
         const samePayload =
-          locked.evidencia_acreditacion === evidence &&
-          (normalizedRequestedDateIso === null || locked.fecha_acreditacion_iso === normalizedRequestedDateIso) &&
-          (locked.observaciones ?? null) === normalizedObs;
+          locked.huella_acreditacion !== null
+            ? matchesAccreditIdempotencyPayload({
+                storedHash: locked.huella_acreditacion,
+                pagoId,
+                actorId: auth.id,
+                evidence,
+                normalizedRequestedDateIso,
+                observaciones: input.observaciones,
+                lockedAdminAccreditationId: locked.id_admin_acreditacion,
+                lockedFechaAcreditacionIso: locked.fecha_acreditacion_iso,
+                lockedEvidenciaAcreditacion: locked.evidencia_acreditacion,
+              })
+            : (
+                locked.evidencia_acreditacion === evidence &&
+                (normalizedRequestedDateIso === null || locked.fecha_acreditacion_iso === normalizedRequestedDateIso) &&
+                (locked.observaciones ?? null) === normalizedObs
+              );
         if (!samePayload) throw claveIdempotenciaReutilizada();
         const existing = await findPaymentById(manager, pagoId);
         if (!existing) throw pagoNoEncontrado();

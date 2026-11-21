@@ -19,6 +19,10 @@ import {
   insertPaymentIdempotency,
 } from '../../repositories/adminPayment.repository';
 import {
+  accreditPaymentPayloadHash,
+  matchesAccreditIdempotencyPayload,
+} from './admin-payment.service';
+import {
   findAccountIdForUser,
   findPaymentByAccreditationKey,
   findPaymentByAnyKey,
@@ -514,13 +518,12 @@ export async function accreditPayment(
     throw invalidPaymentRequest('La fecha de acreditación UTC no puede estar en el futuro.');
   }
   const normalizedRequestedDateIso = requestedAt ? requestedAt.toISOString() : null;
-  const hash = digest({
-    operacion: 'ACREDITAR',
-    pagoId: paymentId,
-    evidenciaAcreditacion: evidence,
-    fechaAcreditacionUtc: normalizedRequestedDateIso,
-    observaciones: input.observaciones ?? null,
-  });
+  const hash = accreditPaymentPayloadHash(
+    paymentId,
+    evidence,
+    normalizedRequestedDateIso,
+    input.observaciones ?? null,
+  );
 
   try {
     return await inTransaction(async manager => {
@@ -536,12 +539,35 @@ export async function accreditPayment(
         || Number(payment.id_cuenta_corriente) !== Number(destination.accountId)
         || payment.id_pedido !== null) throw pagoNoEncontrado();
 
+      const lockedAdminAccreditationId =
+        payment.id_admin_acreditacion !== null && payment.id_admin_acreditacion !== undefined
+          ? Number(payment.id_admin_acreditacion)
+          : null;
+      const lockedFechaAcreditacionIso =
+        payment.acreditacion_iso !== null && payment.acreditacion_iso !== undefined
+          ? new Date(String(payment.acreditacion_iso)).toISOString()
+          : null;
+      const lockedEvidenciaAcreditacion =
+        payment.evidencia_acreditacion !== null && payment.evidencia_acreditacion !== undefined
+          ? String(payment.evidencia_acreditacion)
+          : null;
+
       const idempotency = await findPaymentIdempotency(manager, key);
       if (idempotency) {
         if (
           idempotency.operacion !== 'ACREDITAR'
           || idempotency.id_pago !== paymentId
-          || idempotency.payload_hash !== hash
+          || !matchesAccreditIdempotencyPayload({
+            storedHash: idempotency.payload_hash,
+            pagoId: paymentId,
+            actorId: Number(admin.id_usuario),
+            evidence,
+            normalizedRequestedDateIso,
+            observaciones: input.observaciones,
+            lockedAdminAccreditationId,
+            lockedFechaAcreditacionIso,
+            lockedEvidenciaAcreditacion,
+          })
         ) {
           throw claveIdempotenciaReutilizada();
         }
@@ -550,7 +576,22 @@ export async function accreditPayment(
 
       if (payment.estado === 'ACREDITADO') {
         if (payment.clave_acreditacion === key || payment.clave_idempotencia_acreditacion === key) {
-          if (payment.huella_acreditacion === hash) return replayOrConflict(manager, null, paymentId, true);
+          if (
+            typeof payment.huella_acreditacion === 'string' &&
+            matchesAccreditIdempotencyPayload({
+              storedHash: payment.huella_acreditacion,
+              pagoId: paymentId,
+              actorId: Number(admin.id_usuario),
+              evidence,
+              normalizedRequestedDateIso,
+              observaciones: input.observaciones,
+              lockedAdminAccreditationId,
+              lockedFechaAcreditacionIso,
+              lockedEvidenciaAcreditacion,
+            })
+          ) {
+            return replayOrConflict(manager, null, paymentId, true);
+          }
           throw claveIdempotenciaReutilizada();
         }
         throw pagoYaAcreditado();
