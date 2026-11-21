@@ -129,7 +129,7 @@ async function main() {
     includeReceiptFixture: receipts,
     includeCatalogProducts: !demoCatalog,
   });
-  if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+  if (receipts || demoInteractive) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
@@ -239,9 +239,16 @@ async function main() {
   });
 
   if (demoInteractive && result === 0 && !interrupted) {
+    const { seedAdminPreviewOrders, seedAdminPreviewReceipts } = require('./admin-preview-orders.cjs');
+    const previewOrders = await seedAdminPreviewOrders(profile);
+    const previewReceipts = await seedAdminPreviewReceipts(profile, receiptStorage);
+    console.log(`Vista previa ADMIN: ${previewOrders} pedidos temporales en cuatro estados operativos.`);
+    console.log(`Comprobantes temporales: ${previewReceipts}, con archivos PDF y distintos estados de revisión.`);
     const { account } = require('./e2e-fixtures.cjs').credentials;
     console.log(`Demo académica local: ${baseURL}\nUsuario de prueba: ${account.email}\nClave de prueba: ${account.password}`);
     console.log('Buscá FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM. Abrí la ficha en dos sesiones con el mismo usuario de prueba.');
+    const { admin } = require('./e2e-fixtures.cjs').credentials;
+    console.log(`Panel ADMIN: ${baseURL}/admin/dashboard\nEmail: ${admin.email}\nClave de prueba: ${admin.password}`);
     demoPrompt = require('node:readline').createInterface({ input: process.stdin, output: process.stdout });
     await new Promise(resolve => {
       demoPrompt.once('close', resolve);
