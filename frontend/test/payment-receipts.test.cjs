@@ -161,6 +161,20 @@ test('useOrderReceiptSummaries agrega estados con precedencia APROBADO > PENDIEN
   assert.equal(summary.status(orders[3]), 'APROBADO')
 })
 
+test('receiptReviewStatusLabel cubre los tres estados de revisión de comprobantes', () => {
+  const { receiptReviewStatusLabel } = loadTypeScript('utils/payment.ts')
+
+  assert.equal(receiptReviewStatusLabel('PENDIENTE'), 'Pendiente de revisión documental')
+  assert.equal(receiptReviewStatusLabel('APROBADO'), 'Documento aprobado')
+  assert.equal(receiptReviewStatusLabel('RECHAZADO'), 'Documento rechazado')
+
+  const declarationForm = readFileSync(
+    resolve(__dirname, '../src/components/PaymentDeclarationForm.vue'),
+    'utf8',
+  )
+  assert.match(declarationForm, /receiptReviewStatusLabel\(receipt\.estadoRevision\)/)
+})
+
 test('componentes y vistas de comprobantes usan APROBADO / RECHAZADO sin referencias a REVISADO', async () => {
   const { parse, compileScript } = require('@vue/compiler-sfc')
   const { createSSRApp } = require('vue')
@@ -168,6 +182,7 @@ test('componentes y vistas de comprobantes usan APROBADO / RECHAZADO sin referen
 
   const files = [
     'services/paymentReceiptService.ts',
+    'components/PaymentDeclarationForm.vue',
     'components/PaymentReceipts.vue',
     'components/OrderReceiptActions.vue',
     'composables/useOrderReceiptSummaries.ts',
