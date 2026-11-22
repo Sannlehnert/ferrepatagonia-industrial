@@ -5,6 +5,8 @@ type Approval = 'PENDIENTE' | 'APROBADA' | 'RECHAZADA'
 type AccountState = 'SIN_CUENTA' | 'HABILITADA' | 'INHABILITADA'
 type CreditState = 'DISPONIBLE' | 'BLOQUEADO' | 'NO_DETERMINABLE'
 
+type ReceiptReviewStatus = 'PENDIENTE' | 'APROBADO' | 'RECHAZADO'
+
 type Receipt = {
   id: string
   pedidoId: number | null
@@ -12,7 +14,7 @@ type Receipt = {
   tipoMime: 'application/pdf' | 'image/jpeg' | 'image/png'
   bytes: number
   fecha: string
-  estadoRevision: 'PENDIENTE' | 'REVISADO'
+  estadoRevision: ReceiptReviewStatus
   revisadoEn: string | null
 }
 
@@ -57,7 +59,7 @@ function orderFor(tipo: ClientType) {
   }
 }
 
-function receipt(id: string, estadoRevision: 'PENDIENTE' | 'REVISADO'): Receipt {
+function receipt(id: string, estadoRevision: ReceiptReviewStatus): Receipt {
   return {
     id,
     pedidoId: 1,
@@ -66,7 +68,7 @@ function receipt(id: string, estadoRevision: 'PENDIENTE' | 'REVISADO'): Receipt 
     bytes: 12,
     fecha: '2026-11-16T12:00:00.000Z',
     estadoRevision,
-    revisadoEn: estadoRevision === 'REVISADO' ? '2026-11-16T13:00:00.000Z' : null,
+    revisadoEn: estadoRevision === 'PENDIENTE' ? null : '2026-11-16T13:00:00.000Z',
   }
 }
 
@@ -477,14 +479,15 @@ test('EMPRESA: badges de estado comercial y alertas cumplen contraste WCAG AA', 
 test('Comprobantes: badges, avisos y errores cumplen contraste WCAG AA', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 900 })
   const state = createState('EMPRESA')
-  state.receipts = [receipt('r1', 'PENDIENTE'), receipt('r2', 'REVISADO')]
+  state.receipts = [receipt('r1', 'PENDIENTE'), receipt('r2', 'APROBADO'), receipt('r3', 'RECHAZADO')]
   await mockAccountApi(page, 'EMPRESA', state)
   await page.goto('/mi-cuenta/pedidos')
 
   await page.getByRole('button', { name: 'Ver comprobantes de PED-000001' }).click()
   const dialog = page.getByRole('dialog')
-  await expectContrast(dialog.getByText('Pendiente de revisión', { exact: true }))
-  await expectContrast(dialog.getByText('Revisado', { exact: true }))
+  await expectContrast(dialog.getByText('Pendiente de revisión', { exact: true }).first())
+  await expectContrast(dialog.getByText('Aprobado', { exact: true }).first())
+  await expectContrast(dialog.getByText('Rechazado', { exact: true }).first())
 
   state.receiptsError = true
   await dialog.getByRole('button', { name: 'Cerrar comprobantes' }).click()
