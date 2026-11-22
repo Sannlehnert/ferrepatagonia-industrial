@@ -16,7 +16,7 @@ const credentials = {
   },
 };
 
-async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false, includeCatalogProducts = true, persistentProfile } = {}) {
+async function seedFixtures(connection, { includeAccountOrderFixture = true, includeReceiptFixture = false, includeCatalogProducts = true, persistentProfile, accountOrigin = 'DEMO' } = {}) {
   const [current] = await connection.query("SELECT DATABASE() AS databaseName");
 
   if (persistentProfile) {
@@ -114,9 +114,9 @@ async function seedFixtures(connection, { includeAccountOrderFixture = true, inc
         ) VALUES (
           4, 1000.00, 1, 'COMPLETA', 30, 'USD',
           'TEST-ONLY E2E', 'TEST-ONLY E2E', 'TEST-ONLY E2E',
-          UTC_TIMESTAMP(3) - INTERVAL 1 DAY, 'DEMO'
+          UTC_TIMESTAMP(3) - INTERVAL 1 DAY, ?
         )
-      `);
+      `, [accountOrigin]);
     }
 
     const hash = await bcrypt.hash(persistentProfile?.accountPassword ?? credentials.admin.password, 10);

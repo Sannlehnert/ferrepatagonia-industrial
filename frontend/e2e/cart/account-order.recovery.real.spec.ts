@@ -260,8 +260,8 @@ for (const width of [360, 1280]) {
       expect(read.status()).toBe(200)
       const { data: balance } = await read.json()
       expect(balance).toMatchObject({ saldo: '10.00', disponible: '5.00', moneda: 'USD' })
-      const accountSummary = page.getByRole('region', { name: 'Resumen de la cuenta' })
-      await expect(accountSummary.getByRole('article').filter({ hasText: 'Saldo actual (USD)' })).toContainText('10,00')
+      const accountSummary = page.getByRole('region', { name: 'Resumen financiero' })
+      await expect(accountSummary.getByRole('article').filter({ hasText: 'Saldo actual / deuda vigente (USD)' })).toContainText('10,00')
 
       const denied = await addFromCatalog()
       expect(denied).toMatchObject({
