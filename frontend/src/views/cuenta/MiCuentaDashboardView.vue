@@ -5,6 +5,7 @@ import CompanyStatus from '@/components/CompanyStatus.vue'
 import DatosClientes from '@/views/cuenta/DatosClientes.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
+import { supportsOrderReceipts } from '@/services/paymentReceiptService'
 import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderSummary } from '@/types/clientOrder'
@@ -27,7 +28,7 @@ watch([identity, allowed], () => {
 }, { immediate: true })
 
 onRealtime(change => {
-  if (change.reconnect || change.orders.size > 0) {
+  if (change.reconnect || change.orders.size > 0 || change.receipts || change.payments) {
     void load(listClientOrders, { keepData: true })
   }
 })
@@ -39,7 +40,12 @@ const creditOrdersCount = computed(() =>
 )
 const pendingReceiptOrdersCount = computed(() =>
   orders.value?.filter(o =>
-    o.modalidadPago === 'TRANSFERENCIA' && o.estado === 'PENDIENTE',
+    supportsOrderReceipts(
+      auth.user?.tipo_cliente,
+      o.modalidadPago,
+      auth.user?.estadoAprobacionEmpresa,
+      auth.user?.cuentaCorrienteHabilitada,
+    ) && o.estadoDocumental === 'SIN_COMPROBANTE',
   ).length ?? 0,
 )
 const ultimoPedidoFecha = computed(() => {
@@ -73,7 +79,7 @@ const isParticular = computed(() => {
       <p role="alert" class="text-red-700 m-0">No se pudieron cargar las métricas de tus pedidos.</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] cursor-pointer"
         @click="loadOrders()"
       >
         Reintentar
@@ -98,7 +104,7 @@ const isParticular = computed(() => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
           </svg>
         </div>
-        <div class="text-4xl font-bold text-[#10B981] my-2">
+        <div class="text-4xl font-bold text-[#047857] my-2">
           {{ error || (loading && !orders) ? '-' : totalOrdersCount }}
         </div>
         <p class="text-xs text-slate-500 m-0">
@@ -120,7 +126,7 @@ const isParticular = computed(() => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
           </svg>
         </div>
-        <div class="text-4xl font-bold text-[#0EA5E9] my-2">
+        <div class="text-4xl font-bold text-[#0369A1] my-2">
           {{ error || (loading && !orders) ? '-' : creditOrdersCount }}
         </div>
         <p class="text-xs text-slate-500 m-0">
@@ -141,11 +147,11 @@ const isParticular = computed(() => {
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
         </div>
-        <div class="text-4xl font-bold text-[#10B981] my-2">
+        <div class="text-4xl font-bold text-[#047857] my-2">
           {{ error || (loading && !orders) ? '-' : pendingReceiptOrdersCount }}
         </div>
         <p class="text-xs text-slate-500 m-0">
-          Transferencias pendientes
+          Sin comprobante adjunto
         </p>
       </RouterLink>
     </div>

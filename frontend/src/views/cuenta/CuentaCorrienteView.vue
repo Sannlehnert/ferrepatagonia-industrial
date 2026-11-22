@@ -7,6 +7,7 @@ import PaymentDeclarationForm from '@/components/PaymentDeclarationForm.vue'
 import PaymentHistory from '@/components/PaymentHistory.vue'
 import PaymentReceipts from '@/components/PaymentReceipts.vue'
 import { accountReceiptsPath } from '@/services/paymentReceiptService'
+import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import { useCuentaCorrienteStore } from '@/stores/cuentaCorriente'
 import type { CuentaCorrienteResumen, CuentaCorrienteVencimiento } from '@/types/cuentaCorriente'
@@ -17,7 +18,7 @@ import {
     formatInstant,
     formatUsd,
 } from '@/utils/cuentaCorriente'
-import { sumExactDecimals } from '@/utils/payment'
+import { STATE_BADGE_TONES, sumExactDecimals } from '@/utils/payment'
 
 const auth = useAuthStore()
 const cuenta = useCuentaCorrienteStore()
@@ -124,6 +125,16 @@ function coverageLabel(cobertura: CuentaCorrienteResumen['cobertura']): string {
 }
 
 onMounted(() => void cuenta.load())
+onRealtime(change => {
+    if (auth.loggingOut || !auth.user) return
+    if (change.reconnect || change.payments || change.account) {
+        paymentHistoryVersion.value += 1
+        void cuenta.load()
+    }
+    if (change.reconnect || change.receipts) {
+        receiptRefreshVersion.value += 1
+    }
+})
 watch(() => auth.sessionVersion, () => {
     // Durante el cierre de sesión o sin usuario, consultar solo provoca un 401 y un redirect superpuesto.
     if (auth.loggingOut || !auth.user) return
@@ -154,7 +165,7 @@ onBeforeRouteLeave(() => cuenta.clear())
         </p>
         <div v-else-if="cuenta.consultaError" class="rounded-md border border-red-200 bg-red-50 p-4">
             <p role="alert" class="m-0 mb-3">{{ cuenta.consultaError }}</p>
-            <button type="button" class="min-h-11 rounded-md border border-red-300 px-4 py-2"
+            <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-solid border-red-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                 @click="cuenta.load()">Reintentar</button>
         </div>
         <p v-else-if="cuenta.consulta?.estado === 'SIN_CUENTA'" role="status"
@@ -167,7 +178,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                 No se pudieron verificar todos los datos financieros de la cuenta. No mostraremos cifras hasta completar la consulta.
                 {{ cuenta.movimientosError }} {{ cuenta.vencimientosError }}
             </p>
-            <button type="button" class="min-h-11 rounded-md border border-red-300 px-4 py-2"
+            <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-solid border-red-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                 @click="cuenta.load()">Actualizar cuenta</button>
         </div>
         <p v-else-if="demoDataBlocked" role="alert"
@@ -257,7 +268,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                 <p v-if="cuenta.vencimientosCargando" role="status">Cargando vencimientos…</p>
                 <div v-else-if="cuenta.vencimientosError" class="mb-3 rounded-md border border-red-200 bg-red-50 p-4">
                     <p role="alert" class="m-0 mb-2">{{ cuenta.vencimientosError }}</p>
-                    <button type="button" class="min-h-11 rounded-md border border-red-300 px-3 py-2"
+                    <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         @click="cuenta.load()">Actualizar vencimientos</button>
                 </div>
                 <template v-else-if="cuenta.vencimientos && 'items' in cuenta.vencimientos">
@@ -288,7 +299,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                         </li>
                     </ul>
                     <button v-if="cuenta.vencimientos.siguienteCursor" type="button"
-                        class="mt-3 min-h-11 rounded-md border border-slate-300 px-4 py-2 disabled:opacity-60"
+                        class="box-border mt-3 min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :disabled="cuenta.vencimientosMasCargando" @click="cuenta.loadMoreVencimientos()">
                         {{ cuenta.vencimientosMasCargando ? 'Cargando…' : 'Ver más vencimientos' }}
                     </button>
@@ -300,7 +311,7 @@ onBeforeRouteLeave(() => cuenta.clear())
                 <p v-if="cuenta.movimientosCargando" role="status">Cargando movimientos…</p>
                 <div v-else-if="cuenta.movimientosError" class="mb-3 rounded-md border border-red-200 bg-red-50 p-4">
                     <p role="alert" class="m-0 mb-2">{{ cuenta.movimientosError }}</p>
-                    <button type="button" class="min-h-11 rounded-md border border-red-300 px-3 py-2"
+                    <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-solid border-red-300 bg-white px-3 py-2 font-[inherit] text-sm font-semibold text-red-900 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         @click="cuenta.load()">Actualizar movimientos</button>
                 </div>
                 <template v-else-if="cuenta.movimientos && 'items' in cuenta.movimientos">
@@ -341,13 +352,29 @@ onBeforeRouteLeave(() => cuenta.clear())
                                         <span v-if="movement.plazoDias" class="block text-xs">Plazo {{ movement.plazoDias }} días</span>
                                     </td>
                                     <td class="border-t border-slate-200 p-3">{{ formatUsd(movement.saldoResultante) }}</td>
-                                    <td class="border-t border-slate-200 p-3">{{ movement.estado === 'VIGENTE' ? 'Vigente' : 'Anulado' }}</td>
+                                    <td class="border-t border-slate-200 p-3">
+                                        <span
+                                            class="box-border inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                            :class="movement.estado === 'VIGENTE'
+                                                ? STATE_BADGE_TONES.positive.badgeClasses
+                                                : STATE_BADGE_TONES.danger.badgeClasses"
+                                        >
+                                            <span
+                                                aria-hidden="true"
+                                                class="h-1.5 w-1.5 shrink-0 rounded-full"
+                                                :class="movement.estado === 'VIGENTE'
+                                                    ? STATE_BADGE_TONES.positive.dotClasses
+                                                    : STATE_BADGE_TONES.danger.dotClasses"
+                                            />
+                                            {{ movement.estado === 'VIGENTE' ? 'Vigente' : 'Anulado' }}
+                                        </span>
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                     <button v-if="cuenta.movimientos.siguienteCursor" type="button"
-                        class="mt-3 min-h-11 rounded-md border border-slate-300 px-4 py-2 disabled:opacity-60"
+                        class="box-border mt-3 min-h-[44px] min-w-[44px] cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         :disabled="cuenta.movimientosMasCargando" @click="cuenta.loadMoreMovimientos()">
                         {{ cuenta.movimientosMasCargando ? 'Cargando…' : 'Ver más movimientos' }}
                     </button>
