@@ -35,18 +35,46 @@ function startService(file, cwd, env) {
   const child = fork(file, [], {
     cwd,
     env,
-    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+    stdio: ['ignore', 'inherit', 'pipe', 'ipc'],
     windowsHide: true,
   });
 
   services.push(child);
 
   return new Promise((resolve, reject) => {
+    const MAX_STDERR_CHARS = 32_768;
+    let stderrBuffer = '';
+    let settled = false;
+
+    const stderrEnded = new Promise(done => {
+      if (!child.stderr) return done();
+      child.stderr.once('end', done);
+      child.stderr.once('close', done);
+    });
+
+    function onStderrData(chunk) {
+      process.stderr.write(chunk);
+      if (settled) return;
+      stderrBuffer += chunk.toString('utf8');
+      if (stderrBuffer.length > MAX_STDERR_CHARS) {
+        stderrBuffer = stderrBuffer.slice(-MAX_STDERR_CHARS);
+      }
+    }
+
+    child.stderr?.on('data', onStderrData);
+
     const timer = setTimeout(() => {
-      finish(new Error(`Tiempo agotado al iniciar ${path.basename(file)}`));
+      const details = stderrBuffer.trim();
+      finish(new Error(
+        details
+          ? `Tiempo agotado al iniciar ${path.basename(file)}\n${details}`
+          : `Tiempo agotado al iniciar ${path.basename(file)}`,
+      ));
     }, 60_000);
 
     function finish(error, ready) {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       child.off('message', onMessage);
       child.off('exit', onExit);
@@ -66,8 +94,15 @@ function startService(file, cwd, env) {
       }
     }
 
-    function onExit() {
-      finish(new Error(`Se cerró ${path.basename(file)} antes de iniciar`));
+    async function onExit(code, signal) {
+      await Promise.race([
+        stderrEnded,
+        new Promise(done => setTimeout(done, 250)),
+      ]);
+      const details = stderrBuffer.trim();
+      const status = signal ? `signal ${signal}` : `code ${code}`;
+      const base = `Se cerró ${path.basename(file)} antes de iniciar (${status})`;
+      finish(new Error(details ? `${base}\n${details}` : base));
     }
 
     function onError(error) {
@@ -144,52 +179,65 @@ async function main() {
   console.log(`Base E2E preparada: ${profile.database}`);
   checkInterrupted();
 
-  // Elegir el origen antes de iniciar la API; strictPort falla si se ocupa.
+  // Elegir y retener el puerto web mientras inicia la API para evitar colisiones con strictPort.
   const candidate = require('node:net').createServer();
   await new Promise((resolve, reject) => {
     candidate.once('error', reject);
     candidate.listen(0, '127.0.0.1', resolve);
   });
   const plannedWebPort = candidate.address().port;
-  await new Promise(resolve => candidate.close(resolve));
-  const apiEnv = {
-    ...process.env,
-    NODE_ENV: 'test',
-    TZ: 'UTC',
-    APP_PUBLIC_ORIGIN: 'http://127.0.0.1:' + plannedWebPort,
-    TRUSTED_PROXY_CIDRS: 'none',
-    HTTPS_TERMINATION: 'trusted-proxy',
-    AUTH_RATE_STORE: 'memory',
-    API_PROCESS_COUNT: '1',
-    AUTH_LOGIN_LIMIT: '100',
-    AUTH_REGISTER_LIMIT: '100',
-    AUTH_LOGIN_WINDOW_MS: '60000',
-    AUTH_REGISTER_WINDOW_MS: '60000',
-    DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
-    E2E_ISOLATED: '1',
-    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
-    JWT_SECRET: randomUUID(),
-    E2E_FER19: fer19,
-    E2E_RECEIPTS: receipts ? '1' : '',
-    E2E_PAYMENTS: payments ? '1' : '',
-    RECEIPT_STORAGE_DIR: receiptStorage ?? '',
-    PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
-    DB_HOST: profile.host,
-    DB_PORT: String(profile.port),
-    DB_NAME: profile.database,
-    DB_USER: 'root',
-    DB_PASSWORD: profile.password,
-    CCE2E_TEST_PROFILE: JSON.stringify(profile),
-    PORT: '3000',
-  };
-
-  const { port: apiPort, adminAccounts, fer19Fixture } = await startService(
-    path.join(__dirname, 'e2e-server.cjs'),
-    backend,
-    apiEnv,
+  const releaseCandidatePort = () => (
+    candidate.listening
+      ? new Promise(resolve => candidate.close(resolve))
+      : Promise.resolve()
   );
 
-  checkInterrupted();
+  const jwtSecret = randomUUID();
+  let apiReady;
+  try {
+    const apiEnv = {
+      ...process.env,
+      NODE_ENV: 'test',
+      TZ: 'UTC',
+      APP_PUBLIC_ORIGIN: 'http://127.0.0.1:' + plannedWebPort,
+      TRUSTED_PROXY_CIDRS: 'none',
+      HTTPS_TERMINATION: 'trusted-proxy',
+      AUTH_RATE_STORE: 'memory',
+      API_PROCESS_COUNT: '1',
+      AUTH_LOGIN_LIMIT: '100',
+      AUTH_REGISTER_LIMIT: '100',
+      AUTH_LOGIN_WINDOW_MS: '60000',
+      AUTH_REGISTER_WINDOW_MS: '60000',
+      DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
+      E2E_ISOLATED: '1',
+      E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
+      JWT_SECRET: jwtSecret,
+      E2E_FER19: fer19,
+      E2E_RECEIPTS: receipts ? '1' : '',
+      E2E_PAYMENTS: payments ? '1' : '',
+      RECEIPT_STORAGE_DIR: receiptStorage ?? '',
+      PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
+      DB_HOST: profile.host,
+      DB_PORT: String(profile.port),
+      DB_NAME: profile.database,
+      DB_USER: 'root',
+      DB_PASSWORD: profile.password,
+      CCE2E_TEST_PROFILE: JSON.stringify(profile),
+      PORT: '3000',
+    };
+
+    apiReady = await startService(
+      path.join(__dirname, 'e2e-server.cjs'),
+      backend,
+      apiEnv,
+    );
+
+    checkInterrupted();
+  } finally {
+    await releaseCandidatePort();
+  }
+
+  const { port: apiPort, adminAccounts, fer19Fixture } = apiReady;
 
   const browserEnv = {
     ...process.env,
@@ -237,7 +285,7 @@ async function main() {
         ...(fer19 ? {
           FER19_E2E_FIXTURE: JSON.stringify(fer19Fixture),
           FER19_E2E_PROFILE: JSON.stringify(profile),
-          FER19_E2E_CURSOR_KEY: apiEnv.JWT_SECRET,
+          FER19_E2E_CURSOR_KEY: jwtSecret,
         } : { CCE2E_TEST_PROFILE: JSON.stringify(profile) }),
       },
       stdio: 'inherit',
