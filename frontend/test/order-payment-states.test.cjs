@@ -62,6 +62,9 @@ async function settle() {
 
 const paymentUtils = loadTypeScript('utils/payment.ts')
 const cuentaUtils = loadTypeScript('utils/cuentaCorriente.ts')
+const deferredRealtime = loadTypeScript('composables/useDeferredRealtimeReconcile.ts')
+const privateAccountRead = loadTypeScript('composables/usePrivateAccountRead.ts')
+const accountFilters = loadTypeScript('utils/accountFilters.ts')
 const receiptService = loadTypeScript('services/paymentReceiptService.ts', {
   './api': { __esModule: true, default: {} },
 })
@@ -250,6 +253,7 @@ describe('Task #318 (T-S7-04.3) — Renderizado SSR de badges y separación de d
         '@/components/AdminOrderStatusBadge.vue': { __esModule: true, default: AdminOrderStatusBadge },
         '@/components/OrderFinancialStatusBadge.vue': { __esModule: true, default: OrderFinancialStatusBadge },
         '@/components/OrderPaymentReceipts.vue': { __esModule: true, default: { render: () => h('div', { 'data-receipts': '' }) } },
+        '@/composables/useDeferredRealtimeReconcile': deferredRealtime,
         '@/composables/usePrivateAccountRead': {
           usePrivateAccountRead: () => ({
             data: ref(orderDetail),
@@ -434,6 +438,7 @@ describe('Task #318 (T-S7-04.3) — Comprobantes: pendiente, aprobado, rechazado
     for (const mode of ['pedido', 'admin']) {
       const Component = loadSfc('components/PaymentReceipts.vue', {
         axios: { isAxiosError: () => false },
+        '@/composables/useDeferredRealtimeReconcile': deferredRealtime,
         '@/composables/usePrivateAccountRead': {
           usePrivateAccountRead: () => ({
             data: ref({ items: sampleReceipts, paginaSiguiente: null }),
@@ -496,6 +501,7 @@ describe('Task #318 (T-S7-04.3) — Comprobantes: pendiente, aprobado, rechazado
 
     const Component = loadSfc('components/PaymentReceipts.vue', {
       axios: { isAxiosError: () => false },
+      '@/composables/useDeferredRealtimeReconcile': deferredRealtime,
       '@/composables/usePrivateAccountRead': {
         usePrivateAccountRead: () => {
           const data = ref(null)
@@ -679,5 +685,380 @@ describe('Task #318 (T-S7-04.3) — Coherencia estructural de vistas y eventos S
     assert.equal(received[0].receipts, true)
     assert.equal(received[0].payments, true)
     assert.equal(received[0].account, true)
+  })
+})
+
+describe('Task #318 (S7-318-R02) — Reconciliación diferida en ventana de supresión Socket.IO', () => {
+  const emptyChange = (overrides = {}) => ({
+    cart: false,
+    products: new Set(),
+    orders: new Set(),
+    receipts: false,
+    payments: false,
+    account: false,
+    reconnect: false,
+    ...overrides,
+  })
+
+  test('PaymentReceipts reconcilia automáticamente un evento dentro de los 800 ms sin requerir un segundo evento (escenario Bruno)', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 1_000_000 })
+    t.after(() => t.mock.timers.reset())
+
+    const receiptA = {
+      id: 'aaaa1111-1111-4111-8111-111111111111',
+      clienteId: 10,
+      cliente: 'Constructora Patagónica S.A.',
+      pedidoId: 5,
+      cuentaCorrienteId: null,
+      tipoMime: 'application/pdf',
+      bytes: 1024,
+      fecha: '2026-11-20T12:00:00.000Z',
+      estadoRevision: 'PENDIENTE',
+      revisadoEn: null,
+      motivoRechazo: null,
+    }
+    const receiptB = {
+      id: 'bbbb2222-2222-4222-8222-222222222222',
+      clienteId: 10,
+      cliente: 'Constructora Patagónica S.A.',
+      pedidoId: 6,
+      cuentaCorrienteId: null,
+      tipoMime: 'image/png',
+      bytes: 2048,
+      fecha: '2026-11-20T13:00:00.000Z',
+      estadoRevision: 'PENDIENTE',
+      revisadoEn: null,
+      motivoRechazo: null,
+    }
+
+    let serverReceipts = [
+      { ...receiptA },
+      { ...receiptB },
+    ]
+    let listCalls = 0
+    let realtimeHandler
+
+    const Component = loadSfc('components/PaymentReceipts.vue', {
+      axios: { isAxiosError: () => false },
+      '@/composables/useDeferredRealtimeReconcile': deferredRealtime,
+      '@/composables/usePrivateAccountRead': privateAccountRead,
+      '@/services/paymentReceiptService': {
+        ...receiptService,
+        listPaymentReceipts: async () => {
+          listCalls++
+          return { items: serverReceipts.map(item => ({ ...item })), paginaSiguiente: null }
+        },
+        markPaymentReceiptReviewed: async (_path, id) => {
+          assert.equal(id, receiptA.id)
+          serverReceipts = [
+            { ...receiptA, estadoRevision: 'APROBADO', revisadoEn: '2026-11-20T14:00:00.000Z' },
+            { ...serverReceipts[1] },
+          ]
+        },
+      },
+      '@/services/realtime': { onRealtime: handler => { realtimeHandler = handler } },
+      '@/stores/auth': {
+        useAuthStore: () => reactive({
+          isAuthenticated: true,
+          rol: 'ADMIN',
+          loggingIn: false,
+          loggingOut: false,
+          sessionVersion: 1,
+          user: { id: 1 },
+        }),
+      },
+      '@/utils/cuentaCorriente': cuentaUtils,
+      '@/utils/payment': paymentUtils,
+    }, false)
+
+    Component.render = () => null
+    const app = renderer.createApp(Component, { path: '/admin/comprobantes', mode: 'admin' })
+    app.mount({})
+    t.after(() => app.unmount())
+    await settle()
+
+    const state = app._instance.setupState
+    assert.equal(listCalls, 1)
+    assert.equal(state.data.items[0].estadoRevision, 'PENDIENTE')
+    assert.equal(state.data.items[1].estadoRevision, 'PENDIENTE')
+
+    // Paso 1: ADMIN aprueba comprobante A y finaliza la recarga local (ventana de supresión de 800 ms)
+    state.review(receiptA.id)
+    await settle()
+    assert.equal(listCalls, 2)
+    assert.equal(state.data.items[0].estadoRevision, 'APROBADO')
+    assert.equal(state.data.items[1].estadoRevision, 'PENDIENTE')
+    assert.equal(state.busy, false)
+
+    // Paso 2: +200 ms (dentro de 800 ms), B pasa a RECHAZADO en servidor y llega invalidación receipts: true
+    t.mock.timers.tick(200)
+    serverReceipts = [
+      { ...serverReceipts[0] },
+      {
+        ...receiptB,
+        estadoRevision: 'RECHAZADO',
+        revisadoEn: '2026-11-20T14:05:00.000Z',
+        motivoRechazo: 'Importe no coincide con el pedido',
+      },
+    ]
+    realtimeHandler(emptyChange({ receipts: true, orders: new Set([6]) }))
+    await settle()
+
+    // Dentro de la ventana no dispara recarga prematura, pero no descarta el evento
+    assert.equal(listCalls, 2)
+    assert.equal(state.data.items[1].estadoRevision, 'PENDIENTE')
+
+    // Paso 3: avanzar fuera de los 800 ms SIN emitir ningún otro evento
+    t.mock.timers.tick(650)
+    await settle()
+
+    assert.equal(listCalls, 3)
+    assert.equal(state.data.items[1].estadoRevision, 'RECHAZADO')
+    assert.equal(state.data.items[1].motivoRechazo, 'Importe no coincide con el pedido')
+
+    // Reconnect cancela cualquier timer pendiente y reconcilia de inmediato sin duplicados
+    state.review(receiptA.id)
+    await settle()
+    assert.equal(listCalls, 4)
+    t.mock.timers.tick(200)
+    realtimeHandler(emptyChange({ receipts: true }))
+    await settle()
+    assert.equal(listCalls, 4)
+    t.mock.timers.tick(100)
+    serverReceipts = [
+      { ...serverReceipts[0] },
+      { ...serverReceipts[1], motivoRechazo: 'Actualizado tras reconexión' },
+    ]
+    realtimeHandler(emptyChange({ reconnect: true }))
+    await settle()
+    assert.equal(listCalls, 5)
+    assert.equal(state.data.items[1].motivoRechazo, 'Actualizado tras reconexión')
+    t.mock.timers.tick(700)
+    await settle()
+    assert.equal(listCalls, 5)
+
+    // Desmontar limpia timers diferidos pendientes
+    state.review(receiptA.id)
+    await settle()
+    assert.equal(listCalls, 6)
+    t.mock.timers.tick(200)
+    realtimeHandler(emptyChange({ receipts: true }))
+    app.unmount()
+    t.mock.timers.tick(2000)
+    await settle()
+    assert.equal(listCalls, 6)
+  })
+
+  test('ClientOrderDetail reconcilia automáticamente una invalidación recibida dentro de la ventana de 800 ms', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 2_000_000 })
+    t.after(() => t.mock.timers.reset())
+
+    let serverDetail = {
+      pedidoId: 42,
+      numero: 'PED-000042',
+      fecha: '2026-11-20T12:00:00.000Z',
+      estado: 'CONFIRMADO',
+      estadoPedido: 'CONFIRMADO',
+      estadoDocumental: 'PENDIENTE',
+      estadoFinanciero: 'SIN_PAGO_ACREDITADO',
+      montoAcreditadoUSD: '0.00',
+      modalidadPago: 'TRANSFERENCIA',
+      moneda: 'USD',
+      subtotal: '100.00',
+      descuento: '0.00',
+      total: '100.00',
+      totalUSD: '100.00',
+      cantidadLineas: 1,
+      cantidadUnidades: 1,
+      items: [],
+    }
+    let detailCalls = 0
+    let realtimeHandler
+
+    const ClientOrderDetail = loadSfc('components/ClientOrderDetail.vue', {
+      '@/components/AdminOrderStatusBadge.vue': { __esModule: true, default: {} },
+      '@/components/OrderFinancialStatusBadge.vue': { __esModule: true, default: {} },
+      '@/components/OrderPaymentReceipts.vue': { __esModule: true, default: {} },
+      '@/composables/useDeferredRealtimeReconcile': deferredRealtime,
+      '@/composables/usePrivateAccountRead': privateAccountRead,
+      '@/services/clientOrderService': {
+        getClientOrderDetail: async () => {
+          detailCalls++
+          return { ...serverDetail }
+        },
+      },
+      '@/services/paymentReceiptService': receiptService,
+      '@/services/realtime': { onRealtime: handler => { realtimeHandler = handler } },
+      '@/stores/auth': {
+        useAuthStore: () => reactive({
+          rol: 'CLIENTE',
+          loggingIn: false,
+          loggingOut: false,
+          sessionVersion: 1,
+          user: {
+            id: 7,
+            tipo_cliente: 'EMPRESA',
+            estadoAprobacionEmpresa: 'APROBADA',
+            cuentaCorrienteHabilitada: true,
+          },
+        }),
+      },
+      '@/utils/cuentaCorriente': cuentaUtils,
+      '@/utils/payment': paymentUtils,
+    }, false)
+
+    ClientOrderDetail.render = () => null
+    const app = renderer.createApp(ClientOrderDetail, { orderId: 42 })
+    app.mount({})
+    t.after(() => app.unmount())
+    await settle()
+
+    const state = app._instance.setupState
+    assert.equal(detailCalls, 1)
+    assert.equal(state.detail.estadoDocumental, 'PENDIENTE')
+
+    await state.handleReceiptUpdated()
+    await settle()
+    assert.equal(detailCalls, 2)
+
+    // Invalidación dentro de la ventana de 800 ms
+    t.mock.timers.tick(200)
+    serverDetail = {
+      ...serverDetail,
+      estado: 'EN_PREPARACION',
+      estadoPedido: 'EN_PREPARACION',
+      estadoDocumental: 'RECHAZADO',
+    }
+    realtimeHandler(emptyChange({ orders: new Set([42]), receipts: true }))
+    await settle()
+    assert.equal(detailCalls, 2)
+    assert.equal(state.detail.estadoDocumental, 'PENDIENTE')
+
+    // Al vencer los 800 ms, reconcilia sin segundo evento
+    t.mock.timers.tick(650)
+    await settle()
+    assert.equal(detailCalls, 3)
+    assert.equal(state.detail.estadoDocumental, 'RECHAZADO')
+    assert.equal(state.detail.estado, 'EN_PREPARACION')
+  })
+
+  test('HistorialPedidos reconcilia automáticamente una invalidación dentro de la ventana de 800 ms y limpia timers al desmontar', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: 3_000_000 })
+    const previousWindow = globalThis.window
+    globalThis.window = {
+      innerWidth: 1280,
+      addEventListener() {},
+      removeEventListener() {},
+      matchMedia: () => ({ addEventListener() {}, removeEventListener() {} }),
+    }
+    t.after(() => {
+      globalThis.window = previousWindow
+      t.mock.timers.reset()
+    })
+
+    let serverOrders = [
+      {
+        pedidoId: 42,
+        numero: 'PED-000042',
+        fecha: '2026-11-20T12:00:00.000Z',
+        estado: 'CONFIRMADO',
+        estadoPedido: 'CONFIRMADO',
+        estadoDocumental: 'PENDIENTE',
+        estadoFinanciero: 'SIN_PAGO_ACREDITADO',
+        montoAcreditadoUSD: '0.00',
+        modalidadPago: 'TRANSFERENCIA',
+        moneda: 'USD',
+        total: '100.00',
+      },
+    ]
+    let listCalls = 0
+    let realtimeHandler
+
+    const HistorialPedidos = loadSfc('views/cuenta/HistorialPedidos.vue', {
+      'vue-router': {
+        useRoute: () => ({ query: {} }),
+        useRouter: () => ({ replace: async () => {} }),
+      },
+      '@/components/AdminOrderStatusBadge.vue': { __esModule: true, default: {} },
+      '@/components/ClientOrderDetail.vue': { __esModule: true, default: {} },
+      '@/components/OrderFinancialStatusBadge.vue': { __esModule: true, default: {} },
+      '@/components/OrderReceiptActions.vue': { __esModule: true, default: {} },
+      '@/components/OrderReceiptDialog.vue': { __esModule: true, default: {} },
+      '@/composables/useDeferredRealtimeReconcile': deferredRealtime,
+      '@/composables/useOrderReceiptSummaries': {
+        useOrderReceiptSummaries: () => ({
+          loading: ref(false),
+          status: () => 'PENDIENTE',
+          refresh: () => {},
+        }),
+      },
+      '@/composables/usePrivateAccountRead': privateAccountRead,
+      '@/services/clientOrderService': {
+        listClientOrders: async () => {
+          listCalls++
+          return serverOrders.map(order => ({ ...order }))
+        },
+      },
+      '@/services/realtime': { onRealtime: handler => { realtimeHandler = handler } },
+      '@/stores/auth': {
+        useAuthStore: () => reactive({
+          rol: 'CLIENTE',
+          loggingIn: false,
+          loggingOut: false,
+          sessionVersion: 1,
+          user: { id: 7 },
+        }),
+      },
+      '@/utils/accountFilters': accountFilters,
+      '@/utils/payment': paymentUtils,
+    }, false)
+
+    HistorialPedidos.render = () => null
+    const app = renderer.createApp(HistorialPedidos)
+    app.mount({})
+    t.after(() => app.unmount())
+    await settle()
+
+    const state = app._instance.setupState
+    assert.equal(listCalls, 1)
+    assert.equal(state.orders[0].estado, 'CONFIRMADO')
+
+    state.refreshOrderStates()
+    await settle()
+    assert.equal(listCalls, 2)
+
+    // Invalidación dentro de los 800 ms
+    t.mock.timers.tick(200)
+    serverOrders = [
+      {
+        ...serverOrders[0],
+        estado: 'EN_PREPARACION',
+        estadoPedido: 'EN_PREPARACION',
+        estadoFinanciero: 'ACREDITADO',
+        montoAcreditadoUSD: '100.00',
+      },
+    ]
+    realtimeHandler(emptyChange({ orders: new Set([42]), payments: true }))
+    await settle()
+    assert.equal(listCalls, 2)
+    assert.equal(state.orders[0].estado, 'CONFIRMADO')
+
+    // Vence el timer diferido sin un segundo evento
+    t.mock.timers.tick(650)
+    await settle()
+    assert.equal(listCalls, 3)
+    assert.equal(state.orders[0].estado, 'EN_PREPARACION')
+    assert.equal(state.orders[0].estadoFinanciero, 'ACREDITADO')
+
+    // Nueva ventana con evento pendiente cancelada al desmontar
+    state.refreshOrderStates()
+    await settle()
+    assert.equal(listCalls, 4)
+    t.mock.timers.tick(100)
+    realtimeHandler(emptyChange({ orders: new Set([42]) }))
+    app.unmount()
+    t.mock.timers.tick(1000)
+    await settle()
+    assert.equal(listCalls, 4)
   })
 })

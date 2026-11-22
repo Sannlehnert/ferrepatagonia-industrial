@@ -114,10 +114,13 @@ test('CompanyStatus usa badges con contraste AA y no depende solo del color', ()
 
 test('PaymentReceipts usa tonos AA para estados, avisos y errores', () => {
   const markup = source('src/components/PaymentReceipts.vue')
+  const paymentUtils = source('src/utils/payment.ts')
   assert.doesNotMatch(markup, /text-\[#16A34A\]|text-\[#D97706\]|text-\[#DC2626\]/)
-  for (const color of ['text-green-800', 'text-amber-900', 'text-red-800']) {
+  for (const color of ['text-green-800', 'text-red-800']) {
     assert.ok(markup.includes(color), `Falta ${color}`)
   }
+  assert.match(markup, /receiptBadge\(receipt\.estadoRevision\)/)
+  assert.match(paymentUtils, /export const STATE_BADGE_TONES = \{[\s\S]*?#166534[\s\S]*?#92400E[\s\S]*?#B91C1C[\s\S]*?#475569/)
   assert.match(markup, /role="status"/)
   assert.match(markup, /role="alert"/)
 })
@@ -142,6 +145,10 @@ test('las combinaciones de badge y alerta alcanzan 4.5:1 según WCAG 2.1 AA', ()
     ['#166534', '#FFFFFF', 'Aviso exitoso'],
     ['#78350F', '#FFFBEB', 'Comprobante pendiente'],
     ['#065F46', '#ECFDF5', 'Comprobante revisado'],
+    ['#166534', '#DCFCE7', 'Badge centralizado positive'],
+    ['#92400E', '#FEF3C7', 'Badge centralizado warning'],
+    ['#B91C1C', '#FEE2E2', 'Badge centralizado danger'],
+    ['#475569', '#F1F5F9', 'Badge centralizado neutral'],
   ]
   for (const [foreground, background, label] of pairs) {
     const ratio = contrast(foreground, background)
