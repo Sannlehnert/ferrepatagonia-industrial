@@ -205,7 +205,7 @@ test('compra real actualiza stock, historial y comprobante con un solo cargo', a
       has: history.getByRole('heading', { name: /^PED-\d+$/ }),
     })
     await expect(entry).toHaveCount(1)
-    await expect(entry).toContainText('CONFIRMADO')
+    await expect(entry).toContainText('Confirmado')
     await entry.getByRole('button', { name: /^Ver detalle/ }).click()
     await expect(entry.getByText(f.name, { exact: true })).toBeVisible()
     expect(socket.events.some(event => event.includes('pedido.confirmado.v1'))).toBe(true)

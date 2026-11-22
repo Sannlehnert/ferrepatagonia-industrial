@@ -57,7 +57,6 @@ const modalDialogRef = ref<HTMLElement | null>(null)
 let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
 let disposed = false
 let queuedListRefresh: string | undefined
-let suppressRealtimeUntil = 0
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
@@ -315,7 +314,6 @@ async function submitStatusChange() {
 
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
-    suppressRealtimeUntil = Date.now() + 800
     reconcileList(session)
     if (!isCurrentModal()) return
 
@@ -363,14 +361,11 @@ async function refreshOpenOrderDetail(orderId: number) {
 
 onRealtime(change => {
   if (!allowed()) return
-  if (!change.reconnect && Date.now() < suppressRealtimeUntil) return
-  if (change.reconnect || change.orders.size > 0 || change.receipts || change.payments) {
+  if (change.receipts || change.payments) {
     reconcileList(identity())
     const currentId = selectedOrderId.value
     if (showModal.value && currentId !== null && !isSaving.value) {
-      if (change.reconnect || change.orders.has(currentId) || change.receipts || change.payments) {
-        void refreshOpenOrderDetail(currentId)
-      }
+      void refreshOpenOrderDetail(currentId)
     }
   }
 })
