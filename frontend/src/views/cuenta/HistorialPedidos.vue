@@ -45,18 +45,18 @@ function toggleOrder(orderId: number) {
   expandedOrderId.value = expandedOrderId.value === orderId ? null : orderId
 }
 
-const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 1280 : false)
 
 function updateIsMobile() {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 768
+    isMobile.value = window.innerWidth < 1280
   }
 }
 
 onMounted(() => {
   updateIsMobile()
   window.addEventListener('resize', updateIsMobile)
-  const mql = window.matchMedia('(max-width: 767px)')
+  const mql = window.matchMedia('(max-width: 1279px)')
   const handler = (e: MediaQueryListEvent) => {
     isMobile.value = e.matches
   }
@@ -132,11 +132,11 @@ const filteredOrders = computed(() => {
 
 function getOrderStatusBadgeClasses(status: string) {
   const s = status.toUpperCase().replaceAll(' ', '_')
-  if (s === 'PENDIENTE') return 'bg-[#FEF3C7] text-[#D97706]'
+  if (s === 'PENDIENTE') return 'bg-amber-100 text-amber-900'
   if (s === 'ENVIADO') return 'bg-emerald-50 text-emerald-700'
-  if (s === 'ENTREGADO') return 'bg-[#DCFCE7] text-[#16A34A]'
-  if (s === 'CONFIRMADO') return 'bg-sky-50 text-[#0EA5E9]'
-  if (s === 'CANCELADO' || s === 'RECHAZADO') return 'bg-[#FEE2E2] text-[#DC2626]'
+  if (s === 'ENTREGADO') return 'bg-green-100 text-green-800'
+  if (s === 'CONFIRMADO') return 'bg-sky-50 text-sky-800'
+  if (s === 'CANCELADO' || s === 'RECHAZADO') return 'bg-red-100 text-red-800'
   return 'bg-slate-100 text-slate-700'
 }
 
@@ -157,7 +157,7 @@ function getOrderStatusBadgeClasses(status: string) {
             v-model="filtroFecha"
             type="date"
             aria-label="Filtrar por fecha"
-            class="box-border min-h-[44px] w-full min-w-0 rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           />
         </div>
 
@@ -167,7 +167,7 @@ function getOrderStatusBadgeClasses(status: string) {
             id="filtro-comprobante"
             v-model="filtroComprobante"
             aria-label="Estado del Comprobante"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Comprobante (Todos)</option>
             <option value="PENDIENTE">Pendiente de revisión</option>
@@ -183,7 +183,7 @@ function getOrderStatusBadgeClasses(status: string) {
             id="filtro-estado"
             v-model="filtroEstado"
             aria-label="Estado del Pedido"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Pedido (Todos)</option>
             <option value="PENDIENTE">Pendiente</option>
@@ -198,7 +198,7 @@ function getOrderStatusBadgeClasses(status: string) {
       <button
         v-if="filtroFecha || filtroComprobante || filtroEstado || filtroModalidad"
         type="button"
-        class="text-xs text-[#145A8D] hover:underline font-semibold min-h-[44px] px-2 py-1 cursor-pointer"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-2 py-1 font-[inherit] text-xs font-semibold text-[#145A8D] hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="limpiarFiltros"
       >
         Limpiar filtros
@@ -210,7 +210,7 @@ function getOrderStatusBadgeClasses(status: string) {
     </p>
     <div v-else-if="orders?.some(order => receipts.status(order) === 'ERROR')" class="space-y-2">
       <p role="alert" class="text-sm text-red-700">No se pudieron consultar todos los estados de comprobantes.</p>
-      <button type="button" class="min-h-[44px] px-3 text-sm underline" @click="receipts.refresh()">
+      <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-3 py-1 font-[inherit] text-sm text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]" @click="receipts.refresh()">
         Reintentar estados de comprobantes
       </button>
     </div>
@@ -226,7 +226,7 @@ function getOrderStatusBadgeClasses(status: string) {
       <p role="alert" class="text-red-700 m-0">No se pudieron cargar tus pedidos.</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadOrders()"
       >
         Reintentar
@@ -248,7 +248,7 @@ function getOrderStatusBadgeClasses(status: string) {
 
     <!-- Content with Orders -->
     <div v-else class="space-y-6">
-      <!-- Desktop Table (>= 768px) -->
+      <!-- Desktop Table -->
       <div v-if="!isMobile" class="rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm" role="list">
         <table class="w-full min-w-[640px] border-collapse text-left">
           <thead class="bg-slate-50 border-b border-[#E2E8F0]">
@@ -288,7 +288,7 @@ function getOrderStatusBadgeClasses(status: string) {
               <td class="py-4 px-6 text-sm">
                 <span
                   :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                    ? 'text-[#0EA5E9] font-medium'
+                    ? 'text-sky-800 font-medium'
                     : 'text-slate-700'"
                 >
                   {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
@@ -319,7 +319,7 @@ function getOrderStatusBadgeClasses(status: string) {
               <td class="py-4 px-6 text-sm text-right">
                 <button
                   type="button"
-                  class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+                  class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                   :aria-expanded="expandedOrderId === order.pedidoId"
                   :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
                   @click="toggleOrder(order.pedidoId)"
@@ -343,16 +343,16 @@ function getOrderStatusBadgeClasses(status: string) {
         </table>
       </div>
 
-      <!-- Mobile Order Cards (< 768px) -->
+      <!-- Order Cards -->
       <div v-else role="list" class="space-y-4">
         <div
           v-for="order in filteredOrders"
           :key="order.pedidoId"
           role="listitem"
-          class="rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
+          class="min-w-0 rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
         >
-          <div class="flex items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
-            <div>
+          <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
+            <div class="min-w-0">
               <h3 role="heading" class="m-0 font-bold text-[#0B2438] text-base">
                 {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
               </h3>
@@ -370,17 +370,17 @@ function getOrderStatusBadgeClasses(status: string) {
           </div>
 
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Monto Total:</span>
               <span class="font-bold text-[#0B2438] text-base">
                 {{ order.total }} {{ order.moneda || 'USD' }}
               </span>
             </div>
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Método de Pago:</span>
               <span
                 :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                  ? 'text-[#0EA5E9] font-medium'
+                  ? 'text-sky-800 font-medium'
                   : 'text-slate-700'"
               >
                 {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
@@ -397,7 +397,7 @@ function getOrderStatusBadgeClasses(status: string) {
 
           <button
             type="button"
-            class="w-full inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+            class="box-border w-full inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             :aria-expanded="expandedOrderId === order.pedidoId"
             :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
             @click="toggleOrder(order.pedidoId)"

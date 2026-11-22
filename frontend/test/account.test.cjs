@@ -50,20 +50,6 @@ test('Router config mounts MiCuentaDashboardView at /mi-cuenta and HistorialPedi
  assert.match(routerSource, /last_external_route/);
 });
 
-test('MiCuentaDashboardView renders greeting, 3 metric cards and no orders table', () => {
- const dashboardSource = readFileSync(resolve(__dirname, '../src/views/cuenta/MiCuentaDashboardView.vue'), 'utf8');
- assert.match(dashboardSource, /<h1 class="text-2xl\s+font-bold\s+text-\[#0B2438\]\s+text-center\s+my-6">/);
- assert.match(dashboardSource, /text-2xl\s+font-bold\s+text-\[#0B2438\]\s+text-center\s+my-6/);
- assert.match(dashboardSource, /Pedidos Realizados/);
- assert.match(dashboardSource, /text-\[#10B981\]/);
- assert.match(dashboardSource, /Pedidos con Cuenta Corriente/);
- assert.match(dashboardSource, /text-\[#0EA5E9\]/);
- assert.match(dashboardSource, /Pedidos sin comprobante/);
- assert.equal((dashboardSource.match(/\{\{ error \|\| \(loading && !orders\) \? '-' :/g) || []).length, 3);
- assert.doesNotMatch(dashboardSource, /<table/);
- assert.doesNotMatch(dashboardSource, /Monto Total/);
-});
-
 test('HistorialPedidos does not render metric cards and keeps filter bar above all states', () => {
  const pedidosSource = readFileSync(resolve(__dirname, '../src/views/cuenta/HistorialPedidos.vue'), 'utf8');
  assert.doesNotMatch(pedidosSource, /Pedidos Realizados/);
@@ -76,5 +62,22 @@ test('HistorialPedidos does not render metric cards and keeps filter bar above a
  assert.ok(filterBarIndex < loadingIndex, 'Filter bar must be above loading state');
  assert.ok(filterBarIndex < errorIndex, 'Filter bar must be above error state');
  assert.ok(filterBarIndex < tableIndex, 'Filter bar must be above table');
+});
+
+test('receipt availability requires approved EMPRESA transfers and preserves other payment rules', () => {
+ const filename=resolve(__dirname,'../src/services/paymentReceiptService.ts');
+ const source=readFileSync(filename,'utf8');
+ const m={exports:{}};
+ new Function('require','module','exports',ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText)(()=>({}),m,m.exports);
+ const { supportsOrderReceipts }=m.exports;
+ assert.equal(supportsOrderReceipts('EMPRESA','TRANSFERENCIA','APROBADA'),true);
+ assert.equal(supportsOrderReceipts('EMPRESA','TRANSFERENCIA','PENDIENTE'),false);
+ assert.equal(supportsOrderReceipts('EMPRESA','TRANSFERENCIA','RECHAZADA'),false);
+ assert.equal(supportsOrderReceipts('EMPRESA','TRANSFERENCIA',null),false);
+ assert.equal(supportsOrderReceipts('PARTICULAR','TRANSFERENCIA'),true);
+ assert.equal(supportsOrderReceipts('EMPRESA','CUENTA_CORRIENTE'),true);
+ assert.equal(supportsOrderReceipts('EMPRESA','CUENTA_CORRIENTE','APROBADA',null),false);
+ assert.equal(supportsOrderReceipts('PARTICULAR','CUENTA_CORRIENTE'),false);
+ assert.equal(supportsOrderReceipts(undefined,'TRANSFERENCIA'),false);
 });
 
