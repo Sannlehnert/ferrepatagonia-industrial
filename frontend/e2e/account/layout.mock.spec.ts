@@ -1,9 +1,14 @@
 import { expect, test, type Page } from '@playwright/test'
 
-async function mockApi(page: Page, tipo: 'PARTICULAR' | 'EMPRESA', authenticated = true) {
+async function mockApi(
+  page: Page,
+  tipo: 'PARTICULAR' | 'EMPRESA',
+  authenticated = true,
+  approval: 'PENDIENTE' | 'APROBADA' | 'RECHAZADA' = 'APROBADA',
+) {
   const user = {
     id: 1, nombre: 'Cliente de prueba', email: 'cliente@example.test', rol: 'CLIENTE',
-    tipo_cliente: tipo, estadoAprobacionEmpresa: tipo === 'EMPRESA' ? 'APROBADA' : null,
+    tipo_cliente: tipo, estadoAprobacionEmpresa: tipo === 'EMPRESA' ? approval : null,
     cuentaCorrienteHabilitada: tipo === 'EMPRESA',
   }
   await page.route('**/api/**', async route => {
@@ -129,7 +134,7 @@ test('volver a tienda conserva el origen y usa catálogo ante acceso directo', a
   await expect(page).toHaveURL('/catalogo')
 })
 
-for (const width of [320, 360]) {
+for (const width of [320, 360, 390, 768, 1280]) {
   test(`detalle de pedido de empresa sin desborde a ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 })
     await mockApi(page, 'EMPRESA')
@@ -146,7 +151,7 @@ for (const width of [320, 360]) {
       }
       if (path === '/api/pedidos/1') {
         return route.fulfill({ json: { data: { ...order, items: [{
-          detalleId: 1, productoId: 1, codigo: 'E2E-01',
+          detalleId: 1, productoId: 1, codigo: 'CODIGO'.repeat(20),
           nombre: 'Llave industrial para taller ' + 'EXTRALARGA'.repeat(8),
           cantidad: 2, precioUnitario: '10.00', descuento: '0.00', subtotal: '20.00',
         }] } } })
@@ -160,6 +165,16 @@ for (const width of [320, 360]) {
     const toggle = page.getByRole('button', { name: 'Ver detalle de PED-000001' })
     await toggle.click()
     await expect(page.getByText('EXTRALARGA'.repeat(8), { exact: false })).toBeVisible()
+    await expect(page.getByText('CODIGO'.repeat(20), { exact: false })).toBeVisible()
+    await expect(page.getByText('Cantidad: 2', { exact: true })).toBeVisible()
+    await expect(page.getByText('Precio unitario: 10.00 USD', { exact: true })).toBeVisible()
+    await expect(page.getByText('Subtotal de la línea: 20.00 USD', { exact: true })).toBeVisible()
+    if (width === 768) await expect(page.getByRole('table')).toHaveCount(0)
+    if (width === 1280) {
+      expect(await page.getByRole('table').evaluate(table =>
+        table.parentElement!.scrollWidth <= table.parentElement!.clientWidth,
+      )).toBe(true)
+    }
     const dimensions = await page.locator('html').evaluate(html => ({
       scrollWidth: html.scrollWidth,
       width: html.clientWidth,
@@ -178,6 +193,179 @@ for (const width of [320, 360]) {
   })
 }
 
+for (const width of [320, 360, 390, 768, 1280]) {
+  for (const tipo of ['PARTICULAR', 'EMPRESA'] as const) {
+    test(`${tipo} ${width}px: resumen verificado, detalle y cierre de sesión`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 800 })
+      await mockApi(page, tipo, true, tipo === 'EMPRESA' ? 'PENDIENTE' : 'APROBADA')
+      const method = tipo === 'EMPRESA' ? 'CUENTA_CORRIENTE' : 'TRANSFERENCIA'
+      const otherMethod = tipo === 'EMPRESA' ? 'TRANSFERENCIA' : 'CUENTA_CORRIENTE'
+      const makeOrder = (pedidoId: number, modalidadPago: string, estado: string) => ({
+        pedidoId, numero: `PED-${String(pedidoId).padStart(6, '0')}`,
+        fecha: '2026-11-16T12:00:00.000Z', estado, modalidadPago, moneda: 'USD',
+        subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+        cantidadLineas: 1, cantidadUnidades: 2,
+      })
+      const orders = [
+        makeOrder(1, method, 'CONFIRMADO'),
+        makeOrder(2, method, 'PENDIENTE'),
+        makeOrder(3, otherMethod, 'PENDIENTE'),
+      ]
+      await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+        const path = new URL(route.request().url()).pathname
+        if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: orders } } })
+        if (/\/comprobantes$/.test(path)) {
+          const items = path === '/api/pedidos/2/comprobantes' ? [{ estadoRevision: 'PENDIENTE' }] : []
+          return route.fulfill({ json: { data: { items, paginaSiguiente: null } } })
+        }
+        return route.continue()
+      })
+
+      await page.goto('/mi-cuenta')
+      await expect(page.getByRole('heading', { name: 'Mi cuenta', exact: true, level: 1 })).toBeVisible()
+      const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+      await expect(summary.getByRole('link', { name: /Pedidos Realizados/ })).toContainText('3')
+      const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+      await expect(summary.getByRole('link', { name: /Pedidos con Cuenta Corriente/ }))
+        .toHaveCount(tipo === 'EMPRESA' ? 1 : 0)
+      await expect(missing).toContainText('1')
+      if (tipo === 'PARTICULAR') {
+        await missing.click()
+        await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+        await expect(page.getByRole('heading', { name: 'PED-000001' })).toBeVisible()
+        await expect(page.getByRole('heading', { name: 'PED-000002' })).toHaveCount(0)
+        await expect(page.getByRole('heading', { name: 'PED-000003' })).toHaveCount(0)
+      }
+      expect(await page.evaluate<boolean>('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+      if (width < 768) await page.getByRole('button', { name: 'Menú de navegación de cuenta' }).click()
+      const logout = page.getByRole('button', { name: 'Cerrar sesión', exact: true })
+      await expect(logout).toBeVisible()
+      expect((await logout.boundingBox())!.height).toBeGreaterThanOrEqual(44)
+      await logout.click()
+      await expect(page).toHaveURL('/login')
+    })
+  }
+}
+
+for (const approval of ['PENDIENTE', 'RECHAZADA'] as const) {
+  test(`EMPRESA ${approval}: transferencia no permite comprobante ni contador inválido`, async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await mockApi(page, 'EMPRESA', true, approval)
+    const order = {
+      pedidoId: 1, numero: 'PED-000001', fecha: '2026-11-16T12:00:00.000Z',
+      estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', moneda: 'USD',
+      subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+      cantidadLineas: 1, cantidadUnidades: 2,
+    }
+    await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+      const path = new URL(route.request().url()).pathname
+      if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: [order] } } })
+      if (path === '/api/pedidos/1/comprobantes') {
+        return route.fulfill({
+          status: 404,
+          json: { code: 'OPERACION_NO_ENCONTRADA', message: 'Operación no habilitada.' },
+        })
+      }
+      if (path === '/api/pedidos/1') {
+        return route.fulfill({ json: { data: { ...order, items: [] } } })
+      }
+      return route.continue()
+    })
+
+    await page.goto('/mi-cuenta')
+    const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+    await expect(summary.getByRole('link', { name: /Pedidos sin comprobante/ })).toContainText('0')
+
+    await page.goto('/mi-cuenta/pedidos')
+    await expect(page.getByRole('heading', { name: 'PED-000001' })).toBeVisible()
+    await expect(page.getByText('No disponible para esta modalidad', { exact: true })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Ver comprobantes de PED-000001' })).toHaveCount(0)
+  })
+}
+
+test('EMPRESA: transferencia sin comprobante aparece en resumen, historial y permite adjuntarlo', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await mockApi(page, 'EMPRESA')
+  const order = {
+    pedidoId: 1, numero: 'PED-000001', fecha: '2026-11-16T12:00:00.000Z',
+    estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', moneda: 'USD',
+    subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+    cantidadLineas: 1, cantidadUnidades: 2,
+  }
+  let uploads = 0
+  await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: [order] } } })
+    if (path === '/api/pedidos/1/comprobantes') {
+      if (route.request().method() === 'POST') {
+        uploads++
+        return route.fulfill({ status: 201, json: {} })
+      }
+      return route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
+    }
+    return route.continue()
+  })
+
+  await page.goto('/mi-cuenta')
+  const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+  const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+  await expect(missing).toContainText('1')
+  await missing.click()
+  await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+  await expect(page.getByRole('heading', { name: 'PED-000001' })).toBeVisible()
+  await expect(page.getByRole('table').getByText('No adjunto', { exact: true })).toBeVisible()
+
+  await page.getByRole('button', { name: 'Ver comprobantes de PED-000001' }).click()
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByText('Todavía no hay comprobantes.')).toBeVisible()
+  await dialog.getByLabel('Archivo (PDF, JPG o PNG, hasta 5 MB)').setInputFiles({
+    name: 'transferencia.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('%PDF-1.4'),
+  })
+  await dialog.getByRole('button', { name: 'Adjuntar comprobante' }).click()
+  await expect(dialog.getByText('Comprobante recibido. La acreditación del pago se gestiona por separado.')).toBeVisible()
+  expect(uploads).toBe(1)
+})
+
+test('el resumen no muestra cifras parciales de comprobantes y permite reintentar', async ({ page }) => {
+  await mockApi(page, 'PARTICULAR')
+  let fails = true
+  let release = () => {}
+  const held = new Promise<void>(resolve => { release = resolve })
+  await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: [{
+      pedidoId: 1, numero: 'PED-000001', fecha: '2026-11-16T12:00:00.000Z',
+      estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', moneda: 'USD',
+      subtotal: '20.00', descuento: '0.00', total: '20.00', totalUSD: '20.00',
+      cantidadLineas: 1, cantidadUnidades: 2,
+    }] } } })
+    if (path === '/api/pedidos/1/comprobantes') {
+      await held
+      return fails
+        ? route.fulfill({ status: 500, json: { message: 'No disponible' } })
+        : route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
+    }
+    return route.continue()
+  })
+  try {
+    await page.goto('/mi-cuenta')
+    const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+    const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+    await expect(missing).toContainText('Cargando…')
+    release()
+    await expect(summary.getByRole('alert')).toContainText('No se pudo consultar')
+    await expect(missing).toContainText('No disponible')
+    fails = false
+    await summary.getByRole('button', { name: 'Reintentar comprobantes' }).click()
+    await expect(summary.getByRole('alert')).toHaveCount(0)
+    await expect(missing).toContainText('1')
+  } finally {
+    release()
+  }
+})
+
 test('login respeta contexto público, protegido y destino inválido', async ({ page }) => {
   await mockApi(page, 'PARTICULAR', false)
   await page.goto('/catalogo?busqueda=hierro')
@@ -195,4 +383,45 @@ test('login respeta contexto público, protegido y destino inválido', async ({ 
   await page.goto('/login?redirect=%2F%2Fexample.com')
   await signIn(page)
   await expect(page).toHaveURL('/mi-cuenta')
+})
+
+test('EMPRESA habilitada: contador coincide con pedidos sin comprobante del historial', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 })
+  await mockApi(page, 'EMPRESA', true, 'APROBADA')
+  const makeOrder = (pedidoId: number, modalidadPago: string) => ({
+    pedidoId, numero: `PED-${String(pedidoId).padStart(6, '0')}`,
+    fecha: '2026-11-16T12:00:00.000Z', estado: 'CONFIRMADO', modalidadPago,
+    moneda: 'USD', subtotal: '20.00', descuento: '0.00', total: '20.00',
+    totalUSD: '20.00', cantidadLineas: 1, cantidadUnidades: 2,
+  })
+  const orders = [
+    makeOrder(1, 'CUENTA_CORRIENTE'),
+    makeOrder(2, 'CUENTA_CORRIENTE'),
+    makeOrder(3, 'TRANSFERENCIA'),
+    makeOrder(4, 'TRANSFERENCIA'),
+  ]
+  await page.route(/\/api\/pedidos(?:\/|$)/, async route => {
+    const path = new URL(route.request().url()).pathname
+    if (path === '/api/pedidos') return route.fulfill({ json: { data: { items: orders } } })
+    const receiptPath = path.match(/^\/api\/pedidos\/(\d+)\/comprobantes$/)
+    if (receiptPath) {
+      const orderId = Number(receiptPath[1])
+      const items = [2, 4].includes(orderId) ? [{ estadoRevision: 'PENDIENTE' }] : []
+      return route.fulfill({ json: { data: { items, paginaSiguiente: null } } })
+    }
+    return route.continue()
+  })
+
+  await page.goto('/mi-cuenta')
+  const summary = page.getByRole('region', { name: 'Resumen de pedidos' })
+  const missing = summary.getByRole('link', { name: /Pedidos sin comprobante/ })
+  await expect(missing.getByText('2', { exact: true })).toBeVisible()
+  await missing.click()
+  await expect(page).toHaveURL('/mi-cuenta/pedidos?filtro=sin-comprobante')
+  for (const id of [1, 3]) {
+    await expect(page.getByRole('heading', { name: `PED-${String(id).padStart(6, '0')}` })).toBeVisible()
+  }
+  for (const id of [2, 4]) {
+    await expect(page.getByRole('heading', { name: `PED-${String(id).padStart(6, '0')}` })).toHaveCount(0)
+  }
 })

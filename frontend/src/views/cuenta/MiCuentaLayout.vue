@@ -62,7 +62,7 @@ async function logout() {
         type="button"
         aria-label="Volver a tienda"
         title="Volver a tienda"
-        class="justify-self-start min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-[8px] text-white bg-transparent border-0 cursor-pointer hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        class="box-border justify-self-start min-h-[44px] min-w-[44px] inline-flex cursor-pointer items-center justify-center rounded-[8px] border-0 border-solid bg-transparent font-[inherit] text-white hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-white"
         @click="handleGoBack"
       >
         <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
@@ -76,7 +76,7 @@ async function logout() {
       >Mi Cuenta</RouterLink>
       <button
         type="button"
-        class="justify-self-end min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-[8px] text-white bg-transparent border-0 cursor-pointer hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        class="box-border justify-self-end min-h-[44px] min-w-[44px] inline-flex cursor-pointer items-center justify-center rounded-[8px] border-0 border-solid bg-transparent font-[inherit] text-white hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-white"
         aria-label="Menú de navegación de cuenta"
         aria-controls="account-mobile-menu"
         :aria-expanded="isMobileMenuOpen"
@@ -102,10 +102,15 @@ async function logout() {
       <div class="mt-4 pt-3 border-t border-[#35556F]">
         <button
           type="button"
-          class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          class="box-border inline-flex min-h-[44px] w-full cursor-pointer items-center gap-2 rounded-[8px] border border-solid border-[#7595AD] bg-transparent px-3 text-left font-[inherit] text-sm font-semibold text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-white"
           :disabled="isLoggingOut"
           @click="logout"
-        >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
+        >
+          <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 17v2H5V5h5v2m4 1 4 4-4 4m4-4H9" />
+          </svg>
+          {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
+        </button>
       </div>
     </div>
 
@@ -114,7 +119,7 @@ async function logout() {
         <div class="mb-4 pb-4 border-b border-[#35556F]">
           <button
             type="button"
-            class="min-h-[44px] w-full inline-flex items-center gap-2 rounded-[8px] px-2 text-left text-sm text-[#A7B6C4] bg-transparent border-0 cursor-pointer hover:text-white hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            class="box-border min-h-[44px] w-full inline-flex cursor-pointer items-center gap-2 rounded-[8px] border-0 border-solid bg-transparent px-2 text-left font-[inherit] text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-white"
             @click="handleGoBack"
           >
             <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -134,10 +139,15 @@ async function logout() {
           <p v-if="logoutError" role="alert" class="text-red-400 text-xs mb-2">{{ logoutError }}</p>
           <button
             type="button"
-            class="min-h-[44px] w-full rounded-[8px] border border-[#35556F] bg-transparent px-3 text-left text-sm text-[#A7B6C4] hover:text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            class="box-border inline-flex min-h-[44px] w-full cursor-pointer items-center gap-2 rounded-[8px] border border-solid border-[#7595AD] bg-transparent px-3 text-left font-[inherit] text-sm font-semibold text-white hover:bg-[#103A5C] transition-colors disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-white"
             :disabled="isLoggingOut"
             @click="logout"
-          >{{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}</button>
+          >
+            <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M10 17v2H5V5h5v2m4 1 4 4-4 4m4-4H9" />
+            </svg>
+            {{ isLoggingOut ? 'Saliendo...' : 'Cerrar sesión' }}
+          </button>
         </div>
       </aside>
       <main class="min-w-0 flex-1 p-4 sm:p-6 md:p-8">

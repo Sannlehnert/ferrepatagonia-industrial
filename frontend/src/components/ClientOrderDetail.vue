@@ -92,7 +92,7 @@ onRealtime(change => {
       <p role="alert" class="text-sm text-red-700">No se pudo cargar el detalle del pedido.</p>
       <button
         type="button"
-        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md border border-[#103a5c] bg-white px-4 font-[inherit] text-sm font-medium text-[#103a5c] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-medium text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadDetail()"
       >
         Reintentar detalle
@@ -103,7 +103,7 @@ onRealtime(change => {
       <!-- Separación de los tres dominios de estado (§2 y §7) -->
       <section
         aria-label="Estados del pedido"
-        class="grid grid-cols-1 gap-3 rounded-lg border border-[#E2E8F0] bg-white p-3.5 lg:grid-cols-3"
+        class="grid grid-cols-1 gap-3 rounded-lg border border-solid border-[#E2E8F0] bg-white p-3.5 lg:grid-cols-3"
       >
         <div class="min-w-0 space-y-1.5">
           <p class="m-0 text-xs font-semibold text-slate-600">Estado del pedido (logístico)</p>
@@ -147,17 +147,17 @@ onRealtime(change => {
       </section>
 
       <div>
-        <h5 class="m-0 mb-3 font-semibold text-[#0B2438]">Productos del pedido</h5>
+        <h4 class="m-0 mb-3 font-semibold text-[#0B2438]">Productos del pedido</h4>
         <p v-if="!detail.items.length" class="text-sm text-slate-600">Este pedido no tiene productos registrados.</p>
         <ul v-else class="m-0 list-none divide-y divide-slate-200 p-0">
           <li v-for="item in detail.items" :key="item.detalleId" class="py-3 text-sm">
-            <p class="m-0 break-words font-semibold text-[#0B2438]">{{ item.nombre }}</p>
-            <p class="m-0 break-words text-slate-500">Código {{ item.codigo }}</p>
-            <p class="m-0 mt-1">
-              Cantidad {{ item.cantidad }} · Precio unitario {{ item.precioUnitario }}
-              {{ detail.moneda ?? '' }}
-            </p>
-            <p class="m-0 mt-0.5 font-medium">Subtotal de la línea {{ item.subtotal }} {{ detail.moneda ?? '' }}</p>
+            <p class="m-0 font-semibold text-[#0B2438] [overflow-wrap:anywhere]">{{ item.nombre }}</p>
+            <p class="m-0 text-slate-600 [overflow-wrap:anywhere]">Código {{ item.codigo }}</p>
+            <dl class="mb-0 mt-2 grid grid-cols-1 gap-1 text-slate-700 sm:grid-cols-2">
+              <div><dt class="inline">Cantidad: </dt><dd class="m-0 inline font-medium">{{ item.cantidad }}</dd></div>
+              <div class="[overflow-wrap:anywhere]"><dt class="inline">Precio unitario: </dt><dd class="m-0 inline font-medium">{{ item.precioUnitario }} {{ detail.moneda ?? '' }}</dd></div>
+              <div class="[overflow-wrap:anywhere]"><dt class="inline">Subtotal de la línea: </dt><dd class="m-0 inline font-semibold">{{ item.subtotal }} {{ detail.moneda ?? '' }}</dd></div>
+            </dl>
           </li>
         </ul>
       </div>

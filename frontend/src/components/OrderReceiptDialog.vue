@@ -24,16 +24,22 @@ onBeforeUnmount(() => {
   <dialog
     ref="dialog"
     :aria-labelledby="titleId"
-    class="box-border m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl overflow-y-auto rounded-xl border border-slate-200 bg-white p-4 backdrop:bg-[#0B2438]/60 sm:p-6"
+    class="box-border m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl overflow-y-auto rounded-xl border border-solid border-slate-200 bg-white p-4 backdrop:bg-[#0B2438]/60 sm:p-6"
     @cancel.prevent="emit('close')"
   >
     <header class="flex items-center justify-between gap-3">
       <h3 :id="titleId" class="m-0 text-lg font-bold text-[#0B2438]">
         Comprobantes · {{ order.numero }}
       </h3>
-      <button type="button" autofocus aria-label="Cerrar comprobantes"
-        class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded border border-slate-300 bg-white px-3 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-        @click="emit('close')">Cerrar</button>
+      <button
+        type="button"
+        autofocus
+        aria-label="Cerrar comprobantes"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded border border-solid border-slate-300 bg-white px-3 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        @click="emit('close')"
+      >
+        Cerrar
+      </button>
     </header>
     <OrderPaymentReceipts :order="order" @updated="emit('updated')" />
   </dialog>

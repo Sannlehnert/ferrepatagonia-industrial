@@ -168,7 +168,7 @@ const filteredOrders = computed(() => {
     </div>
 
     <!-- Filter Bar -->
-    <div class="box-border max-w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
+    <div class="box-border max-w-full bg-[#F8FAFC] border border-solid border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
       <div class="flex flex-wrap items-center gap-3 min-w-0 max-w-full">
         <div class="flex w-full min-w-0 max-w-full flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label for="filtro-fecha" class="text-xs font-semibold text-slate-600">Fecha:</label>
@@ -177,7 +177,7 @@ const filteredOrders = computed(() => {
             v-model="filtroFecha"
             type="date"
             aria-label="Filtrar por fecha"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           />
         </div>
 
@@ -187,7 +187,7 @@ const filteredOrders = computed(() => {
             id="filtro-comprobante"
             v-model="filtroComprobante"
             aria-label="Estado del Comprobante"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Comprobante (Todos)</option>
             <option value="NO_ADJUNTO">No adjunto</option>
@@ -203,7 +203,7 @@ const filteredOrders = computed(() => {
             id="filtro-estado"
             v-model="filtroEstado"
             aria-label="Estado del Pedido"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Pedido (Todos)</option>
             <option value="CONFIRMADO">Confirmado</option>
@@ -220,7 +220,7 @@ const filteredOrders = computed(() => {
             id="filtro-financiero"
             v-model="filtroFinanciero"
             aria-label="Estado financiero del pago"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:max-w-[260px]"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:max-w-[260px]"
           >
             <option value="">Estado Financiero (Todos)</option>
             <option value="SIN_PAGO_ACREDITADO">Sin pago acreditado</option>
@@ -238,7 +238,7 @@ const filteredOrders = computed(() => {
       <button
         v-if="filtroFecha || filtroComprobante || filtroEstado || filtroFinanciero || filtroModalidad"
         type="button"
-        class="box-border min-h-[44px] cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 font-[inherit] text-xs font-semibold text-[#145A8D] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 font-[inherit] text-xs font-semibold text-[#145A8D] hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="limpiarFiltros"
       >
         Limpiar filtros
@@ -252,7 +252,7 @@ const filteredOrders = computed(() => {
       <p role="alert" class="text-sm text-red-700">No se pudieron consultar todos los estados de comprobantes.</p>
       <button
         type="button"
-        class="box-border min-h-[44px] cursor-pointer border-0 bg-transparent px-3 font-[inherit] text-sm font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-3 py-1 font-[inherit] text-sm font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="receipts.refresh()"
       >
         Reintentar estados de comprobantes
@@ -261,16 +261,16 @@ const filteredOrders = computed(() => {
 
     <!-- Table States & Content -->
     <!-- Loading State -->
-    <div v-if="loading && !orders" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+    <div v-if="loading && !orders" class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
       <p role="status" class="text-slate-500 m-0">Cargando tus pedidos…</p>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm space-y-3">
+    <div v-else-if="error" class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-8 text-center shadow-sm space-y-3">
       <p role="alert" class="text-red-700 m-0">No se pudieron cargar tus pedidos.</p>
       <button
         type="button"
-        class="box-border inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] cursor-pointer"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadOrders()"
       >
         Reintentar
@@ -278,14 +278,14 @@ const filteredOrders = computed(() => {
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="orders?.length === 0" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+    <div v-else-if="orders?.length === 0" class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
       <p role="status" class="text-slate-600 m-0">Todavía no tenés pedidos.</p>
     </div>
 
     <!-- Filter empty message -->
     <p
       v-else-if="filteredOrders.length === 0 && !receipts.loading.value"
-      class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 text-center text-slate-500 shadow-sm"
+      class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-6 text-center text-slate-500 shadow-sm"
     >
       No se encontraron pedidos con los filtros seleccionados.
     </p>
@@ -297,7 +297,7 @@ const filteredOrders = computed(() => {
         v-if="!isMobile"
         tabindex="0"
         aria-label="Tabla de mis pedidos; desplazamiento horizontal disponible"
-        class="max-w-full rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        class="max-w-full rounded-[10px] border border-solid border-[#E2E8F0] overflow-x-auto bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         role="list"
       >
         <table class="w-full min-w-[820px] border-collapse text-left">
@@ -374,7 +374,7 @@ const filteredOrders = computed(() => {
               <td class="py-4 px-5 text-sm text-right whitespace-nowrap">
                 <button
                   type="button"
-                  class="box-border inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] cursor-pointer"
+                  class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                   :aria-expanded="expandedOrderId === order.pedidoId"
                   :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
                   @click="toggleOrder(order.pedidoId)"
@@ -398,16 +398,16 @@ const filteredOrders = computed(() => {
         </table>
       </div>
 
-      <!-- Mobile Order Cards (< 768px) -->
+      <!-- Order Cards -->
       <div v-else role="list" class="space-y-4">
         <div
           v-for="order in filteredOrders"
           :key="order.pedidoId"
           role="listitem"
-          class="rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
+          class="min-w-0 rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
         >
           <div class="flex flex-wrap items-start justify-between gap-2 border-b border-[#E2E8F0] pb-2">
-            <div>
+            <div class="min-w-0">
               <h3 role="heading" class="m-0 font-bold text-[#0B2438] text-base">
                 {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
               </h3>
@@ -420,13 +420,13 @@ const filteredOrders = computed(() => {
           </div>
 
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Monto Total:</span>
               <span class="font-bold text-[#0B2438] text-base tabular-nums">
                 {{ order.total }} {{ order.moneda ?? '' }}
               </span>
             </div>
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Modalidad de Pago:</span>
               <span
                 :class="order.modalidadPago === 'CUENTA_CORRIENTE'
@@ -459,7 +459,7 @@ const filteredOrders = computed(() => {
 
           <button
             type="button"
-            class="box-border w-full inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] cursor-pointer"
+            class="box-border w-full inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             :aria-expanded="expandedOrderId === order.pedidoId"
             :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
             @click="toggleOrder(order.pedidoId)"

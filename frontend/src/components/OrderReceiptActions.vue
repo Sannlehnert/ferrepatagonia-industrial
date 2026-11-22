@@ -41,7 +41,7 @@ const badge = computed(() => {
     <button
       v-if="status !== 'NO_DISPONIBLE'"
       type="button"
-      class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded border border-[#103A5C] bg-white px-3 font-[inherit] text-xs font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+      class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded border border-solid border-[#103A5C] bg-white px-3 font-[inherit] text-xs font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
       :aria-label="`Ver comprobantes de ${orderNumber}`"
       @click="emit('open')"
     >
@@ -50,7 +50,7 @@ const badge = computed(() => {
     <button
       v-if="status === 'ERROR'"
       type="button"
-      class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center border-0 bg-transparent px-2 font-[inherit] text-xs font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+      class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center border-0 bg-transparent px-2 py-1 font-[inherit] text-xs font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
       :aria-label="`Reintentar estado de comprobantes de ${orderNumber}`"
       @click="emit('retry')"
     >

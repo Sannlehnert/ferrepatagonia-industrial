@@ -38,9 +38,9 @@ const scopedOrderId = computed(() => {
 })
 
 const actionButtonClass =
-  'box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-3.5 py-2 font-[inherit] text-sm font-semibold text-[#103A5C] no-underline transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50'
+  'box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-3.5 py-2 font-[inherit] text-sm font-semibold text-[#103A5C] no-underline transition-colors hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50'
 const rejectButtonClass =
-  'box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-[#DC2626] bg-white px-3.5 py-2 font-[inherit] text-sm font-semibold text-[#B91C1C] transition-colors hover:bg-[#FEE2E2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50'
+  'box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#DC2626] bg-white px-3.5 py-2 font-[inherit] text-sm font-semibold text-[#B91C1C] transition-colors hover:bg-[#FEE2E2] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50'
 
 const typeLabels = { 'application/pdf': 'PDF', 'image/jpeg': 'JPG', 'image/png': 'PNG' }
 const mutationErrors = {
@@ -209,16 +209,16 @@ function operation(receipt: PaymentReceipt) {
 </script>
 
 <template>
-  <section aria-label="Comprobantes de pago" class="mt-5 space-y-4 rounded-[10px] border border-[#E2E8F0] bg-white p-4 sm:p-6 shadow-sm">
+  <section aria-label="Comprobantes de pago" class="mt-5 space-y-4 rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-4 sm:p-6 shadow-sm">
     <h3 v-if="mode !== 'admin'" class="m-0 text-lg font-bold text-[#0B2438]">Comprobantes de pago</h3>
     <p v-if="mode === 'cuenta'" class="m-0 text-sm text-slate-600">
       Cargá aquí transferencias para el saldo general. Si la transferencia corresponde a un pedido,
-      adjuntala desde su detalle en <RouterLink :to="{ name: 'cuenta-pedidos' }" class="text-[#145A8D] font-semibold underline focus-visible:outline-2 focus-visible:outline-[#145A8D]">Mis pedidos</RouterLink>.
+      adjuntala desde su detalle en <RouterLink :to="{ name: 'cuenta-pedidos' }" class="text-[#145A8D] font-semibold underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">Mis pedidos</RouterLink>.
     </p>
 
     <div
       v-if="mode === 'admin'"
-      class="flex flex-col gap-3 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] p-3 sm:flex-row sm:items-center sm:justify-between"
+      class="flex flex-col gap-3 rounded-lg border border-solid border-[#E2E8F0] bg-[#F8FAFC] p-3 sm:flex-row sm:items-center sm:justify-between"
     >
       <p class="m-0 text-xs text-slate-600">
         La aprobación o rechazo es únicamente documental: no acredita pagos ni modifica el estado comercial del pedido ni el saldo de cuenta corriente.
@@ -228,7 +228,7 @@ function operation(receipt: PaymentReceipt) {
         <select
           v-model="statusFilter"
           aria-label="Filtrar comprobantes por estado documental"
-          class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm font-medium text-[#0B2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
+          class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm font-medium text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
         >
           <option value="">Todos</option>
           <option value="PENDIENTE">Pendiente de revisión</option>
@@ -268,7 +268,7 @@ function operation(receipt: PaymentReceipt) {
         <button
           v-if="selectedFile"
           type="button"
-          class="box-border border-0 font-[inherit] bg-[#475569] hover:bg-[#334155] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition cursor-pointer focus-visible:outline-2 focus-visible:outline-[#145A8D]"
+          class="box-border cursor-pointer border-0 border-solid bg-[#475569] px-6 py-2 font-[inherit] text-sm font-semibold text-white transition hover:bg-[#334155] min-h-[44px] min-w-[100px] rounded-[8px] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           :disabled="busy"
           @click="clearFile"
         >
@@ -276,7 +276,7 @@ function operation(receipt: PaymentReceipt) {
         </button>
         <button
           type="submit"
-          class="box-border border-0 font-[inherit] bg-[#15803D] hover:bg-[#166534] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition shadow-sm disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#145A8D]"
+          class="box-border cursor-pointer border-0 border-solid bg-[#15803D] px-6 py-2 font-[inherit] text-sm font-semibold text-white shadow-sm transition hover:bg-[#166534] disabled:cursor-not-allowed disabled:opacity-50 min-h-[44px] min-w-[100px] rounded-[8px] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           :disabled="!selectedFile || busy"
           :aria-label="busy ? 'Subiendo…' : 'Adjuntar comprobante'"
         >
@@ -286,10 +286,10 @@ function operation(receipt: PaymentReceipt) {
     </form>
 
     <p v-if="notice" role="status" class="m-0 text-sm font-medium text-[#15803D]">{{ notice }}</p>
-    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-[#DC2626]">{{ failure }}</p>
-    <p v-if="loading && !data" role="status" class="m-0 text-sm text-slate-500">Cargando comprobantes…</p>
+    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-[#B91C1C]">{{ failure }}</p>
+    <p v-if="loading && !data" role="status" class="m-0 text-sm text-slate-600">Cargando comprobantes…</p>
     <div v-else-if="error" class="space-y-2">
-      <p role="alert" class="m-0 text-sm text-[#DC2626]">No se pudieron cargar los comprobantes.</p>
+      <p role="alert" class="m-0 text-sm font-medium text-[#B91C1C]">No se pudieron cargar los comprobantes.</p>
       <button type="button" :class="actionButtonClass" @click="reload(page)">Reintentar comprobantes</button>
     </div>
     <template v-else-if="data">
@@ -335,7 +335,7 @@ function operation(receipt: PaymentReceipt) {
               </p>
               <div
                 v-if="receipt.estadoRevision === 'RECHAZADO'"
-                class="rounded-md border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-xs text-[#B91C1C]"
+                class="rounded-md border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-xs text-[#B91C1C]"
               >
                 <p v-if="receipt.motivoRechazo" class="m-0 whitespace-pre-wrap [overflow-wrap:anywhere]">
                   <strong class="font-semibold">Motivo de rechazo:</strong> {{ receipt.motivoRechazo }}
@@ -374,7 +374,7 @@ function operation(receipt: PaymentReceipt) {
 
           <form
             v-if="mode === 'admin' && receipt.estadoRevision === 'PENDIENTE' && rejectingReceiptId === receipt.id"
-            class="space-y-3 rounded-lg border border-[#FECACA] bg-[#FEE2E2]/30 p-3"
+            class="space-y-3 rounded-lg border border-solid border-[#FECACA] bg-[#FEE2E2]/30 p-3"
             @submit.prevent="confirmReject(receipt.id)"
           >
             <label class="grid gap-1 text-xs font-semibold text-[#0B2438]">
@@ -385,24 +385,24 @@ function operation(receipt: PaymentReceipt) {
                 maxlength="1000"
                 :disabled="busy"
                 placeholder="Indicá el motivo (ej. archivo ilegible, importe no coincidente o corresponde a otra operación)"
-                class="box-border min-h-[44px] w-full min-w-0 rounded-md border border-[#CBD5E1] bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60"
+                class="box-border min-h-[44px] w-full min-w-0 rounded-md border border-solid border-[#CBD5E1] bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-60"
               />
               <span class="font-normal text-slate-600">{{ rejectReason.trim().length }} / 1000 caracteres</span>
             </label>
-            <p v-if="rejectValidationError" role="alert" class="m-0 text-xs font-semibold text-[#DC2626]">
+            <p v-if="rejectValidationError" role="alert" class="m-0 text-xs font-semibold text-[#B91C1C]">
               {{ rejectValidationError }}
             </p>
             <div class="flex flex-wrap items-center gap-2">
               <button
                 type="submit"
-                class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-transparent bg-[#DC2626] px-4 py-2 font-[inherit] text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+                class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-transparent bg-[#DC2626] px-4 py-2 font-[inherit] text-sm font-semibold text-white transition-colors hover:bg-[#B91C1C] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="busy || rejectReason.trim().length === 0"
               >
                 Confirmar rechazo
               </button>
               <button
                 type="button"
-                class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+                class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                 :disabled="busy"
                 @click="closeRejectForm"
               >

@@ -148,12 +148,14 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await expect(order.getByRole('alert')).toContainText('No se pudo cargar el detalle del pedido.')
   await order.getByRole('button', { name: 'Reintentar detalle', exact: true }).click()
   await expect(order.getByText('Producto E2E 24', { exact: true })).toBeVisible()
-  await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
+  await expect(order.getByText('Cantidad: 1', { exact: true })).toBeVisible()
+  await expect(order.getByText('Precio unitario: 124.00 USD', { exact: true })).toBeVisible()
 
   await page.reload()
   await expect(order.getByRole('heading', { name: orderNumber, exact: true })).toBeVisible()
   await order.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
-  await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
+  await expect(order.getByText('Cantidad: 1', { exact: true })).toBeVisible()
+  await expect(order.getByText('Precio unitario: 124.00 USD', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
