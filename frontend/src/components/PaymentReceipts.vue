@@ -161,7 +161,7 @@ function operation(receipt: PaymentReceipt) {
         <button
           v-if="selectedFile"
           type="button"
-          class="box-border border-0 font-[inherit] bg-[#94A3B8] hover:bg-[#64748B] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition cursor-pointer focus-visible:outline-2 focus-visible:outline-[#145A8D]"
+          class="box-border cursor-pointer border-0 border-solid bg-[#94A3B8] px-6 py-2 font-[inherit] text-sm font-semibold text-white transition hover:bg-[#64748B] min-h-[44px] min-w-[100px] rounded-[8px] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           :disabled="busy"
           @click="clearFile"
         >
@@ -169,7 +169,7 @@ function operation(receipt: PaymentReceipt) {
         </button>
         <button
           type="submit"
-          class="box-border border-0 font-[inherit] bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition shadow-sm disabled:opacity-50 cursor-pointer focus-visible:outline-2 focus-visible:outline-[#145A8D]"
+          class="box-border cursor-pointer border-0 border-solid bg-[#16A34A] px-6 py-2 font-[inherit] text-sm font-semibold text-white shadow-sm transition hover:bg-[#15803D] disabled:opacity-50 min-h-[44px] min-w-[100px] rounded-[8px] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           :disabled="!selectedFile || busy"
           :aria-label="busy ? 'Subiendo…' : 'Adjuntar comprobante'"
         >
@@ -178,11 +178,11 @@ function operation(receipt: PaymentReceipt) {
       </div>
     </form>
 
-    <p v-if="notice" role="status" class="m-0 text-sm font-medium text-[#16A34A]">{{ notice }}</p>
-    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-[#DC2626]">{{ failure }}</p>
-    <p v-if="loading" role="status" class="m-0 text-sm text-slate-500">Cargando comprobantes…</p>
+    <p v-if="notice" role="status" class="m-0 text-sm font-medium text-green-800">{{ notice }}</p>
+    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-red-800">{{ failure }}</p>
+    <p v-if="loading" role="status" class="m-0 text-sm text-slate-600">Cargando comprobantes…</p>
     <div v-else-if="error" class="space-y-2">
-      <p role="alert" class="m-0 text-sm text-[#DC2626]">No se pudieron cargar los comprobantes.</p>
+      <p role="alert" class="m-0 text-sm font-medium text-red-800">No se pudieron cargar los comprobantes.</p>
       <button type="button" class="receipt-action" @click="reload(page)">Reintentar comprobantes</button>
     </div>
     <template v-else-if="data">
@@ -202,8 +202,8 @@ function operation(receipt: PaymentReceipt) {
               <span
                 class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
                 :class="receipt.estadoRevision === 'REVISADO'
-                  ? 'bg-[#DCFCE7] text-[#16A34A] border border-emerald-200'
-                  : 'bg-[#FEF3C7] text-[#D97706] border border-amber-200'"
+                  ? 'bg-[#DCFCE7] text-green-800 border border-solid border-emerald-200'
+                  : 'bg-[#FEF3C7] text-amber-900 border border-solid border-amber-200'"
               >
                 {{ receipt.estadoRevision === 'REVISADO' ? 'Revisado' : 'Pendiente de revisión' }}
               </span>
@@ -243,8 +243,9 @@ function operation(receipt: PaymentReceipt) {
   justify-content: center;
   padding: .5rem .875rem;
   border: 1px solid #103A5C;
+  border-style: solid;
   border-radius: 8px;
-  background-color: transparent;
+  background-color: #fff;
   color: #103A5C;
   font: inherit;
   font-size: 0.875rem;

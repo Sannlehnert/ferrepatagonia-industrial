@@ -41,7 +41,7 @@ onRealtime(change => {
       <p role="alert" class="text-sm text-red-700">No se pudo cargar el detalle del pedido.</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-md border border-[#103a5c] px-4 text-sm font-medium text-[#103a5c] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145a8d]"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-md border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-medium text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadDetail()"
       >
         Reintentar detalle

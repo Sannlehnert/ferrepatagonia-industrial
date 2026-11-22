@@ -157,7 +157,7 @@ function getOrderStatusBadgeClasses(status: string) {
             v-model="filtroFecha"
             type="date"
             aria-label="Filtrar por fecha"
-            class="box-border min-h-[44px] w-full min-w-0 rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           />
         </div>
 
@@ -167,7 +167,7 @@ function getOrderStatusBadgeClasses(status: string) {
             id="filtro-comprobante"
             v-model="filtroComprobante"
             aria-label="Estado del Comprobante"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Comprobante (Todos)</option>
             <option value="PENDIENTE">Pendiente de revisión</option>
@@ -182,7 +182,7 @@ function getOrderStatusBadgeClasses(status: string) {
             id="filtro-estado"
             v-model="filtroEstado"
             aria-label="Estado del Pedido"
-            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-[#CBD5E1] bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:border-[#145A8D] sm:w-auto"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Pedido (Todos)</option>
             <option value="PENDIENTE">Pendiente</option>
@@ -197,7 +197,7 @@ function getOrderStatusBadgeClasses(status: string) {
       <button
         v-if="filtroFecha || filtroComprobante || filtroEstado || filtroModalidad"
         type="button"
-        class="text-xs text-[#145A8D] hover:underline font-semibold min-h-[44px] px-2 py-1 cursor-pointer"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-2 py-1 font-[inherit] text-xs font-semibold text-[#145A8D] hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="limpiarFiltros"
       >
         Limpiar filtros
@@ -209,7 +209,7 @@ function getOrderStatusBadgeClasses(status: string) {
     </p>
     <div v-else-if="orders?.some(order => receipts.status(order) === 'ERROR')" class="space-y-2">
       <p role="alert" class="text-sm text-red-700">No se pudieron consultar todos los estados de comprobantes.</p>
-      <button type="button" class="min-h-[44px] px-3 text-sm underline" @click="receipts.refresh()">
+      <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-3 py-1 font-[inherit] text-sm text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]" @click="receipts.refresh()">
         Reintentar estados de comprobantes
       </button>
     </div>
@@ -225,7 +225,7 @@ function getOrderStatusBadgeClasses(status: string) {
       <p role="alert" class="text-red-700 m-0">No se pudieron cargar tus pedidos.</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadOrders()"
       >
         Reintentar
@@ -318,7 +318,7 @@ function getOrderStatusBadgeClasses(status: string) {
               <td class="py-4 px-6 text-sm text-right">
                 <button
                   type="button"
-                  class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+                  class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                   :aria-expanded="expandedOrderId === order.pedidoId"
                   :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
                   @click="toggleOrder(order.pedidoId)"
@@ -396,7 +396,7 @@ function getOrderStatusBadgeClasses(status: string) {
 
           <button
             type="button"
-            class="w-full inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+            class="box-border w-full inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             :aria-expanded="expandedOrderId === order.pedidoId"
             :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
             @click="toggleOrder(order.pedidoId)"

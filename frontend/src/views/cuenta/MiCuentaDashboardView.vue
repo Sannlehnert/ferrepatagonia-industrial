@@ -70,7 +70,7 @@ const isCompany = computed(() => auth.user?.tipo_cliente === 'EMPRESA')
       <p role="alert" class="text-red-700 m-0">No se pudieron cargar las métricas de tus pedidos.</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadOrders()"
       >
         Reintentar
@@ -84,7 +84,7 @@ const isCompany = computed(() => auth.user?.tipo_cliente === 'EMPRESA')
       </p>
       <div v-if="receiptError && !error" class="mb-3 rounded-lg border border-amber-400 bg-amber-50 p-3">
         <p role="alert" class="m-0 text-sm text-amber-950">No se pudo consultar el estado de todos los comprobantes.</p>
-        <button type="button" class="min-h-[44px] text-sm font-semibold text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-[#145A8D]" @click="receipts.refresh()">
+        <button type="button" class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-2 py-1 font-[inherit] text-sm font-semibold text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]" @click="receipts.refresh()">
           Reintentar comprobantes
         </button>
       </div>

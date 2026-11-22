@@ -19,10 +19,10 @@ const refreshing = ref(false)
 const sessionError = ref('')
 
 const BADGE_CLASSES = {
-  positive: 'bg-[#DCFCE7] text-[#16A34A] border-[#BBF7D0]',
-  warning: 'bg-[#FEF3C7] text-[#D97706] border-[#FDE68A]',
-  danger: 'bg-[#FEE2E2] text-[#DC2626] border-[#FECACA]',
-  neutral: 'bg-[#F1F5F9] text-[#64748B] border-[#E2E8F0]',
+  positive: 'bg-[#DCFCE7] text-green-800 border-[#BBF7D0]',
+  warning: 'bg-[#FEF3C7] text-amber-900 border-[#FDE68A]',
+  danger: 'bg-[#FEE2E2] text-red-800 border-[#FECACA]',
+  neutral: 'bg-[#F1F5F9] text-slate-700 border-[#E2E8F0]',
 } as const
 
 const approvalBadge = computed(() => {
@@ -94,11 +94,11 @@ async function refresh() {
         </span>
         <p class="m-0 text-sm text-[#0B2438]">{{ approvalMessage(auth.user?.estadoAprobacionEmpresa) }}</p>
       </div>
-      <p v-if="loading" role="status" class="m-0 text-sm text-[#64748B]">Consultando el estado de la cuenta corriente…</p>
-      <p v-else-if="error" role="alert" class="m-0 rounded-[8px] border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm text-[#DC2626]">
+      <p v-if="loading" role="status" class="m-0 text-sm text-slate-600">Consultando el estado de la cuenta corriente…</p>
+      <p v-else-if="error" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
         No se pudo consultar el estado de la cuenta corriente.
       </p>
-      <p v-else-if="demoDataBlocked" role="alert" class="m-0 rounded-[8px] border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm text-[#DC2626]">
+      <p v-else-if="demoDataBlocked" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
         Se recibió información de demostración y no se mostrará fuera del entorno de pruebas.
       </p>
       <div v-else-if="data" class="flex flex-wrap items-center gap-2">
@@ -107,13 +107,13 @@ async function refresh() {
         </span>
         <p class="m-0 text-sm text-[#0B2438]">{{ creditMessage(data.summary) }}</p>
       </div>
-      <p v-if="sessionError" role="alert" class="m-0 rounded-[8px] border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm text-[#DC2626]">
+      <p v-if="sessionError" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
         {{ sessionError }}
       </p>
     </div>
     <button
       type="button"
-      class="min-h-[44px] rounded-[8px] border border-[#CBD5E1] bg-white px-4 py-2 text-sm font-semibold text-[#0B2438] hover:bg-[#F8FAFC] cursor-pointer disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] transition-colors"
+      class="box-border min-h-[44px] cursor-pointer rounded-[8px] border border-solid border-[#CBD5E1] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] transition-colors"
       :disabled="refreshing"
       @click="refresh"
     >
