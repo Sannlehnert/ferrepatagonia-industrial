@@ -4,7 +4,7 @@ import type { CartItem, CartSnapshot, CartTransport } from '@/types/cart'
 
 export function precioCarritoComprable(precio: CartItem['precio'] | undefined): boolean {
   return precio?.estadoPrecio === 'DEFINIDO' && precio.precioComprable === true &&
-    (precio.datosSinteticos === false || (precio.datosSinteticos === true && precio.compraAcademica === true))
+    (precio.datosSinteticos === false || (precio.datosSinteticos === true && (precio.compraAcademica === true || precio.referenciaCatalogo === true)))
 }
 
 export const cartService: CartTransport = {

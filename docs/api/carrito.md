@@ -142,3 +142,8 @@ escritura ambigua, GET permite mostrar la situación actual antes de corregir.
 En `backend/`, ejecutar `npm run build` y `npm run test:cart:isolated`. El runner
 usa un contenedor MariaDB 11.4 descartable con puerto dinámico en loopback y
 ejecuta las suites de #245 y #246. `npm run test:integration` incluye ambas.
+
+
+## Referencias del catálogo normal (#313)
+
+La publicación operativa de los 100 SKU de #309 puede emitir `referenciaCatalogo: true` en cada línea o precio de carrito. Es una salida del backend, nunca un dato aceptado del navegador. El servidor contrasta SKU, importe, huella versionada y evidencia válida del ADMIN. Se conserva `datosSinteticos: true` (y `evidenciaBaseUSD.synthetic: true` en precios) para expresar su procedencia representativa. Esta marca permite consumir las referencias publicadas mediante los descuentos y totales existentes, sin el checkout académico de la demo. Otra evidencia sintética sigue bloqueada en el cliente. No equivale a evidencia comercial real. Procedimiento y límites: [#313](../313/README.md).
