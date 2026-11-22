@@ -1,0 +1,409 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vue = require('vue');
+const { parse, compileScript } = require('@vue/compiler-sfc');
+const ts = require('typescript');
+
+const root = path.resolve(__dirname, '../src');
+
+const settle = async () => {
+  for (let i = 0; i < 6; i++) {
+    await new Promise(r => setImmediate(r));
+    await vue.nextTick();
+  }
+};
+
+function load(file, mocks = {}) {
+  const filename = path.resolve(root, file);
+  let source = fs.readFileSync(filename, 'utf8');
+  if (file.endsWith('.vue')) {
+    source = compileScript(parse(source, { filename }).descriptor, { id: 'clients-filters-test' }).content;
+  }
+  const code = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2022,
+      esModuleInterop: true,
+    },
+  }).outputText;
+  const mod = { exports: {} };
+  new Function('require', 'module', 'exports', code)(
+    name => (name in mocks ? mocks[name] : require(name)),
+    mod,
+    mod.exports,
+  );
+  return mod.exports;
+}
+
+function makeRoute(query = {}) {
+  const route = vue.reactive({ query: { ...query }, hash: '' });
+  const router = {
+    async replace(location) {
+      await Promise.resolve();
+      route.query = { ...(location?.query ?? {}) };
+    },
+    async push(location) {
+      await Promise.resolve();
+      route.query = { ...(location?.query ?? {}) };
+    },
+  };
+  return { route, router };
+}
+
+const clients = Array.from({ length: 25 }, (_value, index) => ({
+  id: index + 1,
+  nombreRazonSocial: `Cliente ${String(index + 1).padStart(2, '0')}`,
+  email: `cliente${index + 1}@example.test`,
+  fechaRegistro: '2026-11-01T12:00:00.000Z',
+  ...(index % 5 === 0 ? {
+    tipoCliente: 'EMPRESA',
+    estadoAprobacionEmpresa: 'PENDIENTE',
+  } : {}),
+}));
+
+const page = (overrides = {}) => ({
+  clientes: clients.slice(0, 20),
+  page: 1,
+  limit: 20,
+  total: 45,
+  totalPages: 3,
+  ...overrides,
+});
+
+const defaultService = overrides => ({
+  getAdminClientPage: async filters => page({ page: filters?.page ?? 1 }),
+  getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
+  saveAdminClientPriceList: async () => null,
+  updateAdminCompanyApproval: async client => client,
+  ...overrides,
+});
+
+const mutationError = {
+  isMutationResultUncertain: error => {
+    const status = error?.response?.status;
+    return !status || ![400, 401, 403, 404, 409, 422].includes(status);
+  },
+};
+
+async function mountView(t, { service = defaultService(), route = makeRoute(), query } = {}) {
+  if (query) route.route.query = { ...query };
+  const auth = vue.reactive({
+    user: { id: 1 },
+    rol: 'ADMIN',
+    sessionVersion: 1,
+    isAuthenticated: true,
+  });
+  const calls = [];
+  const wrapped = {
+    ...service,
+    getAdminClientPage: (filters, signal) => {
+      calls.push({ filters, signal });
+      return service.getAdminClientPage(filters, signal);
+    },
+  };
+  const component = load('views/admin/AdminClientsView.vue', {
+    '@/services/adminClientService': wrapped,
+    '@/services/adminMutationError': mutationError,
+    '@/stores/auth': { useAuthStore: () => auth },
+    'vue-router': {
+      useRoute: () => route.route,
+      useRouter: () => route.router,
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  }).default;
+  component.render = () => null;
+  const app = vue.createRenderer({
+    createElement: () => ({}),
+    createText: () => ({}),
+    createComment: () => ({}),
+    insert() {},
+    remove() {},
+    setText() {},
+    setElementText() {},
+    patchProp() {},
+    parentNode: () => null,
+    nextSibling: () => null,
+  }).createApp(component);
+  app.mount({});
+  t.after(() => app.unmount());
+  await settle();
+  return { state: app._instance.setupState, route, auth, calls, service: wrapped };
+}
+
+function axiosError(status, message = 'error') {
+  return Object.assign(new Error(message), {
+    isAxiosError: true,
+    response: status ? { status, data: { message } } : undefined,
+  });
+}
+
+test('getAdminClientPage envía filtros, límites y señal de cancelación', async () => {
+  const calls = [];
+  const api = {
+    get: async (...args) => {
+      calls.push(args);
+      return {
+        data: {
+          message: 'ok',
+          data: {
+            clientes: clients.slice(0, 2),
+            paginacion: { page: 2, limit: 20, total: 45, totalPages: 3 },
+          },
+        },
+      };
+    },
+  };
+  const service = load('services/adminClientService.ts', {
+    '@/services/api': { __esModule: true, default: api },
+  });
+  const controller = new AbortController();
+  const result = await service.getAdminClientPage({
+    page: 2,
+    limit: 20,
+    busqueda: '  Constructora  ',
+    tipo: 'EMPRESA',
+    estadoEmpresa: 'APROBADA',
+  }, controller.signal);
+
+  assert.deepEqual(calls, [[
+    '/admin/clientes',
+    {
+      params: {
+        page: 2,
+        limit: 20,
+        busqueda: '  Constructora  ',
+        tipo: 'EMPRESA',
+        estadoEmpresa: 'APROBADA',
+      },
+      signal: controller.signal,
+    },
+  ]]);
+  assert.equal(result.page, 2);
+  assert.equal(result.total, 45);
+  assert.equal(result.totalPages, 3);
+  assert.equal(result.clientes.length, 2);
+});
+
+test('la vista pagina desde backend, expone el resumen y conserva búsqueda y filtros', async t => {
+  const { state, route } = await mountView(t, {
+    query: { busqueda: 'Cliente', tipo: 'EMPRESA', page: '2' },
+  });
+
+  assert.equal(state.clients.length, 20);
+  assert.equal(state.total, 45);
+  assert.equal(state.totalPages, 3);
+  assert.equal(state.from, 21);
+  assert.equal(state.to, 40);
+  assert.equal(route.route.query.busqueda, 'Cliente');
+  assert.equal(route.route.query.tipo, 'EMPRESA');
+
+  state.changePage(-1);
+  await settle();
+  assert.equal(route.route.query.page, undefined);
+  assert.equal(route.route.query.busqueda, 'Cliente');
+  assert.equal(route.route.query.tipo, 'EMPRESA');
+
+  state.changeTipo({ target: { value: 'PARTICULAR' } });
+  await settle();
+  assert.equal(route.route.query.page, undefined);
+  assert.equal(route.route.query.tipo, 'PARTICULAR');
+  assert.equal(route.route.query.estadoEmpresa, undefined);
+  assert.equal(route.route.query.busqueda, 'Cliente');
+});
+
+test('seleccionar estado de empresa fuerza tipo Empresa y quitarlo limpia ambos', async t => {
+  const { state, route } = await mountView(t, { query: { page: '3' } });
+
+  state.changeEstado({ target: { value: 'APROBADA' } });
+  await settle();
+  assert.equal(route.route.query.tipo, 'EMPRESA');
+  assert.equal(route.route.query.estadoEmpresa, 'APROBADA');
+  assert.equal(route.route.query.page, undefined);
+
+  state.changeEstado({ target: { value: '' } });
+  await settle();
+  assert.equal(route.route.query.tipo, undefined);
+  assert.equal(route.route.query.estadoEmpresa, undefined);
+});
+
+test('una respuesta anterior no sobrescribe la búsqueda vigente', async t => {
+  const requests = [];
+  const service = defaultService({
+    getAdminClientPage: (filters, signal) => new Promise((resolve, reject) => {
+      requests.push({ filters, signal, resolve, reject });
+    }),
+  });
+  const { state, route, calls } = await mountView(t, { service });
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].filters.page, 1);
+
+  await route.router.replace({ query: { busqueda: 'Constructora', page: '1' } });
+  await settle();
+  assert.equal(requests.length, 2);
+  assert.equal(requests[0].signal.aborted, true);
+  assert.equal(requests[1].filters.busqueda, 'Constructora');
+
+  requests[1].resolve(page({
+    clientes: [clients[1]],
+    page: 1,
+    total: 1,
+    totalPages: 1,
+  }));
+  await settle();
+  assert.deepEqual(state.clients.map(client => client.id), [2]);
+
+  requests[0].resolve(page());
+  await settle();
+  assert.deepEqual(state.clients.map(client => client.id), [2]);
+  assert.equal(state.isLoading, false);
+});
+
+test('distingue sin clientes, sin resultados y error de consulta', async t => {
+  const empty = await mountView(t, {
+    service: defaultService({
+      getAdminClientPage: async () => page({ clientes: [], total: 0, totalPages: 0 }),
+    }),
+  });
+  assert.equal(empty.state.pageData.total, 0);
+  assert.equal(empty.state.hasActiveFilters, false);
+
+  const emptyFiltered = await mountView(t, {
+    query: { busqueda: 'sin-coincidencias' },
+    service: defaultService({
+      getAdminClientPage: async () => page({ clientes: [], total: 0, totalPages: 0 }),
+    }),
+  });
+  assert.equal(emptyFiltered.state.pageData.total, 0);
+  assert.equal(emptyFiltered.state.hasActiveFilters, true);
+
+  const failed = await mountView(t, {
+    service: defaultService({
+      getAdminClientPage: async () => {
+        throw axiosError(500, 'Listado temporalmente inaccesible.');
+      },
+    }),
+  });
+  assert.equal(failed.state.pageData, null);
+  assert.equal(failed.state.loadError, 'Listado temporalmente inaccesible.');
+  assert.equal(failed.state.isLoading, false);
+});
+
+test('al cambiar de sesión se descartan datos y respuestas pendientes', async t => {
+  let resolveOld;
+  const { state, auth } = await mountView(t, {
+    service: defaultService({
+      getAdminClientPage: () => new Promise(resolve => { resolveOld = resolve; }),
+    }),
+    query: { busqueda: 'Cliente' },
+  });
+
+  auth.user = null;
+  auth.sessionVersion = 2;
+  await settle();
+  assert.equal(state.clients.length, 0);
+  assert.equal(state.priceLists.length, 0);
+  assert.equal(state.pageData, null);
+
+  resolveOld?.(page());
+  await settle();
+  assert.equal(state.clients.length, 0);
+});
+
+test('resultado incierto de lista se reconcilia con el servidor antes de habilitar otra escritura', async t => {
+  let reads = 0;
+  const list = (id, nombre) => ({
+    idListaPrecio: id,
+    nombre,
+    activa: true,
+    idCliente: 1,
+  });
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      return {
+        listas: [
+          { id: 1, nombre: 'Lista uno', porcentajeDescuento: '10.00' },
+          { id: 2, nombre: 'Lista dos', porcentajeDescuento: '20.00' },
+        ],
+        asignaciones: [reads === 1 ? list(1, 'Lista uno') : list(2, 'Lista dos')],
+      };
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'timeout');
+    },
+  });
+  const { state } = await mountView(t, { service });
+  assert.equal(state.assignments[1].idListaPrecio, 1);
+  state.selections[1] = 2;
+
+  await state.savePriceList(1);
+  await settle();
+
+  assert.equal(reads, 2);
+  assert.equal(state.savingClientId, null);
+  assert.equal(state.assignments[1].idListaPrecio, 2);
+  assert.equal(state.selections[1], 2);
+  assert.deepEqual(state.feedback[1], {
+    text: 'Cambio confirmado con el servidor.',
+    error: false,
+  });
+  assert.equal(state.priceListsError, null);
+  assert.equal(state.uncertainPriceListClientIds[1], undefined);
+});
+
+test('una recarga de listas por edición no descarta una asignación todavía no guardada', async t => {
+  const service = defaultService({
+    getAdminClientPriceLists: async () => ({
+      listas: [
+        { id: 1, nombre: 'Lista uno', porcentajeDescuento: '10.00' },
+        { id: 2, nombre: 'Lista dos', porcentajeDescuento: '20.00' },
+      ],
+      asignaciones: [{ idListaPrecio: 1, nombre: 'Lista uno', activa: true, idCliente: 1 }],
+    }),
+  });
+  const { state } = await mountView(t, { service });
+  state.selections[1] = 2;
+
+  await state.loadPriceLists(true);
+  await settle();
+  assert.equal(state.selections[1], 2);
+
+  await state.loadPriceLists(false);
+  await settle();
+  assert.equal(state.selections[1], 1);
+});
+
+test('si la reconciliación de lista falla, bloquea la asignación sin mostrar éxito', async t => {
+  let reads = 0;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      if (reads > 1) throw axiosError(undefined, 'offline');
+      return {
+        listas: [
+          { id: 1, nombre: 'Lista uno', porcentajeDescuento: '10.00' },
+          { id: 2, nombre: 'Lista dos', porcentajeDescuento: '20.00' },
+        ],
+        asignaciones: [{ idListaPrecio: 1, nombre: 'Lista uno', activa: true, idCliente: 1 }],
+      };
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(500, 'detalle interno');
+    },
+  });
+  const { state } = await mountView(t, { service });
+  state.selections[1] = 2;
+
+  await state.savePriceList(1);
+  await settle();
+
+  assert.equal(state.savingClientId, null);
+  assert.equal(state.assignments[1].idListaPrecio, 1);
+  assert.equal(state.uncertainPriceListClientIds[1], true);
+  assert.match(state.priceListsError, /No pudimos verificar las asignaciones/);
+  assert.equal(state.feedback[1].error, true);
+  assert.match(state.feedback[1].text, /No pudimos verificar el resultado/);
+  assert.equal(state.canSavePriceList(1), false);
+});

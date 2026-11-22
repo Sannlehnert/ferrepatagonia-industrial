@@ -9,7 +9,26 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '../src');
 
 function createTestRenderer() {
-  const node = (tag, text = '') => ({ tag, text, props: {}, children: [], parent: null });
+  const node = (tag, text = '') => ({
+    tag,
+    text,
+    props: {},
+    children: [],
+    parent: null,
+    addEventListener() {},
+    removeEventListener() {},
+    focus() {},
+    matches() { return false; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    getClientRects() { return []; },
+    contains() { return false; },
+    get isConnected() {
+      let current = this;
+      while (current.parent) current = current.parent;
+      return current.tag === 'root';
+    },
+  });
   return {
     createRoot: () => node('root'),
     serialize(n) {
@@ -126,6 +145,53 @@ const sampleClients = () => [
   },
 ];
 
+function clientPage(clients = sampleClients(), overrides = {}) {
+  const total = overrides.total ?? clients.length;
+  const limit = overrides.limit ?? 20;
+  return {
+    clientes: clients,
+    page: overrides.page ?? 1,
+    limit,
+    total,
+    totalPages: overrides.totalPages ?? (total === 0 ? 0 : Math.ceil(total / limit)),
+  };
+}
+
+function createRoute(query = {}) {
+  const route = vue.reactive({ query: { ...query }, hash: '' });
+  const replace = async location => {
+    route.query = { ...(location?.query ?? {}) };
+    route.hash = location?.hash ?? '';
+  };
+  const push = async location => { await replace(location); };
+  return { route, router: { push, replace } };
+}
+
+const mutationError = {
+  isMutationResultUncertain: error => {
+    const status = error?.response?.status;
+    return !status || ![400, 401, 403, 404, 409, 422].includes(status);
+  },
+};
+
+function clientViewMocks(service, routeState, auth = {
+  user: { id: 1 },
+  rol: 'ADMIN',
+  sessionVersion: 1,
+  isAuthenticated: true,
+}) {
+  return {
+    '@/services/adminClientService': service,
+    '@/services/adminMutationError': mutationError,
+    '@/stores/auth': { useAuthStore: () => auth },
+    'vue-router': {
+      useRoute: () => routeState.route,
+      useRouter: () => routeState.router,
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  };
+}
+
 test('adminClientService usa PATCH /admin/clientes/:id/estado-empresa y retorna el cliente actualizado', async () => {
   const calls = [];
   const api = {
@@ -171,18 +237,16 @@ test('adminClientService usa PATCH /admin/clientes/:id/estado-empresa y retorna 
 
 test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y acciones Aprobar/Rechazar', async t => {
   const service = {
-    getAdminClients: async () => sampleClients(),
+    getAdminClientPage: async () => clientPage(),
     getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     saveAdminClientPriceList: async () => null,
     updateAdminCompanyApproval: async () => sampleClients()[1],
   };
+  const routeState = createRoute();
 
   const component = load(
     'views/admin/AdminClientsView.vue',
-    {
-      '@/services/adminClientService': service,
-      './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
-    },
+    clientViewMocks(service, routeState),
     true,
   ).default;
 
@@ -202,6 +266,7 @@ test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y ac
   assert.match(tableHtml, /Rechazada/);
   assert.match(tableHtml, /Aprobar cuenta empresa de Constructora Sur SRL/);
   assert.match(tableHtml, /Rechazar cuenta empresa de Constructora Sur SRL/);
+  assert.match(tableHtml, /Página 1 de 1/);
 });
 
 function findNode(n, pred) {
@@ -215,20 +280,18 @@ function findNode(n, pred) {
 
 test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea acciones ante resultado incierto', async t => {
   const service = {
-    getAdminClients: async () => sampleClients(),
+    getAdminClientPage: async () => clientPage(),
     getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     saveAdminClientPriceList: async () => null,
     updateAdminCompanyApproval: async () => {
       throw Object.assign(new Error('timeout'), { isAxiosError: true, response: undefined });
     },
   };
+  const routeState = createRoute();
 
   const component = load(
     'views/admin/AdminClientsView.vue',
-    {
-      '@/services/adminClientService': service,
-      './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
-    },
+    clientViewMocks(service, routeState),
     true,
   ).default;
 
@@ -240,7 +303,7 @@ test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea
   await settle();
 
   // Reconciliación automática también falla simulando caída total de red/servidor
-  service.getAdminClients = async () => {
+  service.getAdminClientPage = async () => {
     throw Object.assign(new Error('unreachable'), { isAxiosError: true, response: undefined });
   };
 
@@ -266,7 +329,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   let resolvePending;
 
   const service = {
-    getAdminClients: async () => sampleClients(),
+    getAdminClientPage: async () => clientPage(),
     getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     saveAdminClientPriceList: async () => null,
     updateAdminCompanyApproval: (id, status) => {
@@ -291,11 +354,9 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
       });
     },
   };
+  const routeState = createRoute();
 
-  const component = load('views/admin/AdminClientsView.vue', {
-    '@/services/adminClientService': service,
-    './AdminPriceListsPanel.vue': { default: { render: () => null } },
-  }).default;
+  const component = load('views/admin/AdminClientsView.vue', clientViewMocks(service, routeState)).default;
   component.render = () => null;
 
   const dom = createTestRenderer();
@@ -372,12 +433,12 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
       response: { status: 500, data: { message: 'detalle interno SQL' } },
     });
   };
-  service.getAdminClients = async () => [
+  service.getAdminClientPage = async () => clientPage([
     sampleClients()[0],
     { ...sampleClients()[1], estadoAprobacionEmpresa: 'APROBADA' },
     sampleClients()[2],
     sampleClients()[3],
-  ];
+  ]);
 
   await state.setCompanyApproval(empresaPendiente, 'APROBADA');
   assert.equal(state.updatingApprovalClientId, null);
@@ -395,7 +456,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
       response: undefined,
     });
   };
-  service.getAdminClients = async () => {
+  service.getAdminClientPage = async () => {
     throw Object.assign(new Error('server unreachable'), {
       isAxiosError: true,
       response: undefined,
@@ -417,12 +478,12 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   assert.equal(calls.length, callsBeforeBlindAttempt);
 
   // Reintento explícito de verificación reconcilia y desbloquea cuando el servidor vuelve a responder
-  service.getAdminClients = async () => [
+  service.getAdminClientPage = async () => clientPage([
     sampleClients()[0],
     { ...sampleClients()[1], estadoAprobacionEmpresa: 'RECHAZADA' },
     sampleClients()[2],
     sampleClients()[3],
-  ];
+  ]);
   await state.reconcileCompanyApproval(20);
   assert.equal(state.uncertainApprovalClientIds[20], undefined);
   assert.equal(empresaPendiente.estadoAprobacionEmpresa, 'RECHAZADA');
