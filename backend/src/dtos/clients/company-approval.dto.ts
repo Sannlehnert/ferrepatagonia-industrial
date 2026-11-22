@@ -12,11 +12,18 @@ export class CompanyApprovalInput {
       : "El estado debe ser 'APROBADA', 'RECHAZADA' o 'PENDIENTE'.",
   )
   estado!: EstadoAprobacionEmpresa;
+
+  @Rule((value: unknown) =>
+    value === undefined || (typeof value === 'string' && VALID_STATUSES.has(value))
+      ? null
+      : "El estado esperado debe ser APROBADA, RECHAZADA o PENDIENTE.",
+  )
+  estadoEsperado?: EstadoAprobacionEmpresa;
 }
 
 export const companyApprovalPolicy: DtoPolicy<CompanyApprovalInput> = {
   type: CompanyApprovalInput,
-  fields: ['estado', 'estadoAprobacionEmpresa'],
+  fields: ['estado', 'estadoAprobacionEmpresa', 'estadoEsperado'],
   check: (input: Record<string, unknown>) => {
     if (
       'estado' in input &&
@@ -31,6 +38,11 @@ export const companyApprovalPolicy: DtoPolicy<CompanyApprovalInput> = {
     const raw = 'estado' in input ? input.estado : input?.estadoAprobacionEmpresa;
     return {
       estado: typeof raw === 'string' ? raw.trim().toUpperCase() : raw,
+      ...('estadoEsperado' in input ? {
+        estadoEsperado: typeof input.estadoEsperado === 'string'
+          ? input.estadoEsperado.trim().toUpperCase()
+          : input.estadoEsperado,
+      } : {}),
     };
   },
   unknownError: 'La solicitud contiene campos no permitidos.',

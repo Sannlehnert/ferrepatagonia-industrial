@@ -239,7 +239,29 @@ describe('T-S7-03.1 — Registro empresarial y autorización comercial', () => {
     // ESCENARIO A — Empresa recién registrada
     // =========================================================================
     describe('A — Empresa recién registrada', () => {
-        test('A.1 Registro público EMPRESA crea PENDIENTE, sin cuenta corriente ni crédito', async () => {
+        test('345: estadoEsperado opcional compara bajo bloqueo y conserva consumidores existentes', async () => {
+        const company = await registerCompany();
+        const row = await clientRowByEmail(company.email);
+        const endpoint = `/admin/clientes/${row.id_cliente}/estado-empresa`;
+        const change = (body) => apiRequest(endpoint, { method: 'PATCH', token: adminToken, body: JSON.stringify(body) });
+        assert.equal((await change({ estado: 'RECHAZADA', estadoEsperado: 'PENDIENTE' })).status, 200);
+        const stale = await change({ estado: 'APROBADA', estadoEsperado: 'PENDIENTE' });
+        assert.equal(stale.status, 409);
+        assert.equal((await stale.json()).code, 'ESTADO_EMPRESA_MODIFICADO');
+        assert.equal((await clientRowByEmail(company.email)).estado_aprobacion_empresa, 'RECHAZADA');
+        assert.equal((await change({ estado: 'APROBADA' })).status, 200, 'El campo sigue siendo opcional');
+        for (const expected of [null, '', 'OTRO', 1, {}, []]) {
+            assert.equal((await change({ estado: 'RECHAZADA', estadoEsperado: expected })).status, 400);
+        }
+        assert.equal((await change({ estado: 'PENDIENTE', estadoEsperado: ' aprobada ' })).status, 200);
+        const concurrent = await Promise.all([
+            change({ estado: 'APROBADA', estadoEsperado: 'PENDIENTE' }),
+            change({ estado: 'RECHAZADA', estadoEsperado: 'PENDIENTE' }),
+        ]);
+        assert.deepEqual(concurrent.map(r => r.status).sort(), [200, 409]);
+    });
+
+    test('A.1 Registro público EMPRESA crea PENDIENTE, sin cuenta corriente ni crédito', async () => {
             const { email, userId, body } = await registerCompany();
 
             assert.equal(body.message, 'Registro exitoso');
