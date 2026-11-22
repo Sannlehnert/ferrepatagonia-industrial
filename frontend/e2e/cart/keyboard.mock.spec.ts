@@ -61,6 +61,11 @@ for (const width of [1280, 360]) {
 
       await page.keyboard.press('Tab')
       await expect(dialog.getByRole('button', {
+        name: 'Volver a consultar elegibilidad',
+      })).toBeFocused()
+
+      await page.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', {
         name: 'Volver a consultar el total',
       })).toBeFocused()
 
