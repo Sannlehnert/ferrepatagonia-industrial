@@ -17,6 +17,7 @@ const order = useAccountOrderStore()
 const transfer = useTransferOrderStore()
 const cart = useCartStore()
 const selected = ref<'TRANSFERENCIA' | 'CUENTA_CORRIENTE'>('TRANSFERENCIA')
+const eligibilityFeedback = ref('')
 const eligibilityKey = computed(() => props.snapshot && JSON.stringify({
   id: props.snapshot.id_carrito,
   total: props.snapshot.totalUSD,
@@ -104,15 +105,18 @@ const transferReceiptPath = computed(() =>
 )
 
 watch(
-  eligibilityKey,
-  () => {
+  [eligibilityKey, showTotal],
+  ([, hasVerifiableTotal]) => {
     if (!hasLockedAttempt.value) selected.value = 'TRANSFERENCIA'
-    if (showTotal.value) {
-      void order.loadEligibility()
+    eligibilityFeedback.value = ''
+    if (hasVerifiableTotal) {
+      void order.loadEligibility(eligibilityKey.value ?? '')
       void transfer.loadEligibility()
+    } else {
+      order.invalidateEligibility()
     }
   },
-  { immediate: true },
+  { immediate: true, flush: 'sync' },
 )
 
 watch(
@@ -123,6 +127,7 @@ watch(
     order.canUseCredit,
   ] as const,
   ([transferLoading, transferEligible, creditLoading, creditEligible]) => {
+    if (creditLoading) eligibilityFeedback.value = ''
     if (hasLockedAttempt.value || transferLoading || creditLoading) return
     if (selected.value === 'TRANSFERENCIA' && transferEligible === false && creditEligible) {
       selected.value = 'CUENTA_CORRIENTE'
@@ -131,6 +136,13 @@ watch(
     }
   },
 )
+
+async function retryEligibility() {
+  eligibilityFeedback.value = ''
+  if (await order.loadEligibility(eligibilityKey.value ?? '')) {
+    eligibilityFeedback.value = 'Elegibilidad actualizada.'
+  }
+}
 
 async function confirmOrder() {
   await order.confirm()
@@ -143,7 +155,7 @@ async function confirmTransfer() {
 async function retryAfterRejection() {
   order.prepareRetry()
   await cart.cargarCarrito()
-  await order.loadEligibility()
+  await order.loadEligibility(eligibilityKey.value ?? '')
 }
 
 async function retryTransferAfterRejection() {
@@ -160,10 +172,13 @@ async function retryTransferAfterRejection() {
     </p>
     <div v-if="showTotal && !hasLockedAttempt && order.eligibilityError" class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3">
       <p role="alert" class="mb-2 mt-0 text-sm">{{ order.eligibilityError }}</p>
-      <button type="button" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="order.loadEligibility()">
+      <button type="button" :disabled="busy || order.eligibilityLoading" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60" @click="retryEligibility()">
         Volver a consultar elegibilidad
       </button>
     </div>
+    <p v-if="eligibilityFeedback" role="status" class="mb-3 text-sm text-green-800">
+      {{ eligibilityFeedback }}
+    </p>
     <p v-if="selected === 'TRANSFERENCIA' && transfer.eligibilityLoading" role="status" class="mb-3 text-sm text-slate-600">
       Verificando el total del pedido para transferencia…
     </p>
@@ -171,6 +186,33 @@ async function retryTransferAfterRejection() {
       <p role="alert" class="mb-2 mt-0 text-sm">{{ transfer.eligibilityError }}</p>
       <button type="button" class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d]" @click="transfer.loadEligibility()">
         Volver a consultar el total
+      </button>
+    </div>
+    <div
+      v-if="selected === 'TRANSFERENCIA' && showTotal && !hasLockedAttempt &&
+        order.eligibility && !order.eligibility.elegible"
+      class="mb-3 rounded-md border border-amber-300 bg-amber-50 p-3"
+    >
+      <p role="status" class="mb-2 mt-0 text-sm">
+        {{ order.eligibility.mensaje || 'El pedido no puede confirmarse a cuenta corriente.' }}
+      </p>
+      <dl v-if="hasServerAmounts" class="mb-2 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div class="flex flex-wrap justify-between gap-2">
+          <dt class="text-slate-600">Total del pedido</dt>
+          <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.totalUSD }}</dd>
+        </div>
+        <div class="flex flex-wrap justify-between gap-2">
+          <dt class="text-slate-600">Crédito disponible</dt>
+          <dd class="m-0 font-semibold text-[#0B2438]">USD {{ order.eligibility?.creditoDisponibleUSD }}</dd>
+        </div>
+      </dl>
+      <button
+        type="button"
+        :disabled="busy || order.eligibilityLoading"
+        class="inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+        @click="retryEligibility()"
+      >
+        {{ order.eligibilityLoading ? 'Consultando…' : 'Volver a consultar elegibilidad' }}
       </button>
     </div>
 
@@ -369,7 +411,7 @@ async function retryTransferAfterRejection() {
         type="button"
         :disabled="busy"
         class="mt-2 inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center border-0 bg-transparent p-0 font-[inherit] text-sm font-medium text-[#103a5c] underline focus-visible:outline-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
-        @click="order.loadEligibility()"
+        @click="retryEligibility()"
       >
         Volver a consultar elegibilidad
       </button>

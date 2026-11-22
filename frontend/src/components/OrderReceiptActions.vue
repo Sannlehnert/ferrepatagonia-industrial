@@ -7,7 +7,8 @@ const emit = defineEmits<{ open: []; retry: [] }>()
 const labels: Record<OrderReceiptStatus, string> = {
   NO_ADJUNTO: 'No adjunto',
   PENDIENTE: 'Pendiente de revisión',
-  REVISADO: 'Revisado',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
   NO_DISPONIBLE: 'No disponible para esta modalidad',
   CARGANDO: 'Consultando comprobantes…',
   ERROR: 'Estado no disponible',
@@ -18,7 +19,8 @@ const labels: Record<OrderReceiptStatus, string> = {
   <div class="flex flex-wrap items-center gap-2">
     <span
       class="rounded-full px-2.5 py-1 text-xs font-medium"
-      :class="status === 'REVISADO' ? 'bg-emerald-50 text-emerald-800'
+      :class="status === 'APROBADO' ? 'bg-emerald-50 text-emerald-800'
+        : status === 'RECHAZADO' ? 'bg-red-50 text-red-700'
         : status === 'PENDIENTE' ? 'bg-amber-50 text-amber-900' : 'bg-slate-100 text-slate-600'"
     >{{ labels[status] }}</span>
     <button

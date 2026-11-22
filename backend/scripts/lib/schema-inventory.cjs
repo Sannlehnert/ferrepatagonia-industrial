@@ -4,7 +4,7 @@ const baseTables = [
     'CONFIRMACION_PEDIDO_TRANSFERENCIA', 'COTIZACION', 'CUENTA_CORRIENTE', 'DETALLE_PEDIDO',
     'DETALLE_PEDIDO_CC_PRECIO', 'FER17_CALENDARIO', 'FER17_COTIZACION_VERIFICACION',
     'FER17_LISTA_INACTIVA_EVENTO', 'FER17_PRECIO_EVENTO', 'IMPUTACION_MOVIMIENTO_CUENTA',
-    'ITEM_CARRITO', 'LISTA_PRECIO', 'MOVIMIENTO_CUENTA_CORRIENTE', 'PAGO', 'PEDIDO',
+    'ITEM_CARRITO', 'LISTA_PRECIO', 'MOVIMIENTO_CUENTA_CORRIENTE', 'PAGO', 'PAGO_IDEMPOTENCIA', 'PEDIDO',
     'PRECIO_USD_EVIDENCIA', 'PRODUCTO', 'USUARIO',
 ];
 const fer20 = [
@@ -18,12 +18,20 @@ const fer17 = [
     'fer17_producto_alta_evento:PRODUCTO:AFTER:INSERT',
     'fer17_producto_precio_evento:PRODUCTO:AFTER:UPDATE',
 ];
+const s704 = [
+    's704_comprobante_before_update:COMPROBANTE_PAGO:BEFORE:UPDATE',
+    's704_movimiento_before_delete:MOVIMIENTO_CUENTA_CORRIENTE:BEFORE:DELETE',
+    's704_movimiento_before_update:MOVIMIENTO_CUENTA_CORRIENTE:BEFORE:UPDATE',
+    's704_pago_before_delete:PAGO:BEFORE:DELETE',
+    's704_pago_before_insert:PAGO:BEFORE:INSERT',
+    's704_pago_before_update:PAGO:BEFORE:UPDATE',
+];
 const priceViews = ['FER17_AUDITORIA_TRIGGERS'];
 const profiles = {
     // Suites that install only FER-20 intentionally have no price triggers or view.
     'fer20-only': { tables: [...baseTables, ...creditTables], triggers: fer20, views: [] },
-    'before-credit': { tables: baseTables, triggers: [...fer20, ...fer17], views: priceViews },
-    complete: { tables: [...baseTables, ...creditTables], triggers: [...fer20, ...fer17], views: priceViews },
+    'before-credit': { tables: baseTables, triggers: [...fer20, ...fer17, ...s704], views: priceViews },
+    complete: { tables: [...baseTables, ...creditTables], triggers: [...fer20, ...fer17, ...s704], views: priceViews },
 };
 
 async function readSchemaInventory(query) {

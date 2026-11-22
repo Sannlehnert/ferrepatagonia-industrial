@@ -78,11 +78,19 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   const particularRow = adminReceipts.getByRole('listitem').filter({ hasText: 'Cliente E2E · Cliente 1' })
   await expect(particularRow).toContainText(/Pedido PED-\d+ · PNG/)
   await download(admin, particularRow)
-  await particularRow.getByRole('button', { name: 'Marcar revisado' }).click()
-  await expect(particularRow.getByText(/^Revisado/)).toBeVisible()
+  const [reviewRequest] = await Promise.all([
+    admin.waitForRequest(request =>
+      new URL(request.url()).pathname.endsWith('/revision') && request.method() === 'PATCH'),
+    particularRow.getByRole('button', { name: 'Aprobar comprobante' }).click(),
+  ])
+  expect(reviewRequest.headers()['idempotency-key']).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  )
+  expect(reviewRequest.postDataJSON()).toEqual({ estado: 'APROBADO' })
+  await expect(particularRow.getByText('Aprobado', { exact: true })).toBeVisible()
 
   const reloaded = await openOrder(page)
-  await expect(reloaded.getByText(/^Revisado/)).toBeVisible()
+  await expect(reloaded.getByText('Aprobado', { exact: true })).toBeVisible()
   await company.close()
   await admin.close()
 });
@@ -373,9 +381,12 @@ for (const width of [1280, 360]) {
     const before = await page.request.get(path)
     expect(before.ok()).toBe(true)
     const previousReceipts = (await before.json()).data.items
-    const initialStatus = previousReceipts.some((item: { estadoRevision: string }) =>
-      item.estadoRevision === 'PENDIENTE') ? 'Pendiente de revisión'
-      : previousReceipts.length ? 'Revisado' : 'No adjunto'
+    const hasApproved = previousReceipts.some((item: { estadoRevision: string }) =>
+      item.estadoRevision === 'APROBADO')
+    const initialStatus = hasApproved ? 'Aprobado'
+      : previousReceipts.some((item: { estadoRevision: string }) =>
+        item.estadoRevision === 'PENDIENTE') ? 'Pendiente de revisión'
+        : previousReceipts.length ? 'Rechazado' : 'No adjunto'
 
     await page.goto('/mi-cuenta/pedidos')
     const row = page.getByRole('listitem').filter({
@@ -403,7 +414,8 @@ for (const width of [1280, 360]) {
     const receiptId = (await saved.json()).data.id
     const href = `${path}/${receiptId}`
     await expect(receipts.getByText('Comprobante recibido. La acreditación del pago se gestiona por separado.')).toBeVisible()
-    await expect(row.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await expect(receipts.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await expect(row.getByText(hasApproved ? 'Aprobado' : 'Pendiente de revisión', { exact: true })).toBeVisible()
 
     const downloaded = page.waitForEvent('download')
     await receipts.locator('a').filter({ hasText: 'Descargar comprobante' })
@@ -430,17 +442,28 @@ for (const width of [1280, 360]) {
         const adminRow = admin.getByRole('listitem').filter({
           has: admin.locator(`a[href="/api/admin/comprobantes/${id}"]`),
         })
-        await adminRow.getByRole('button', { name: 'Marcar revisado' }).click()
-        await expect(adminRow.getByText('Revisado', { exact: true })).toBeVisible()
+        const [reviewRequest] = await Promise.all([
+          admin.waitForRequest(request =>
+            new URL(request.url()).pathname === `/api/admin/comprobantes/${id}/revision`
+            && request.method() === 'PATCH'),
+          adminRow.getByRole('button', { name: 'Aprobar comprobante' }).click(),
+        ])
+        expect(reviewRequest.headers()['idempotency-key']).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        )
+        expect(reviewRequest.postDataJSON()).toEqual({ estado: 'APROBADO' })
+        await expect(adminRow.getByText('Aprobado', { exact: true })).toBeVisible()
       }
     } finally {
       await admin.close()
     }
 
     await page.reload()
-    await expect(row.getByText('Revisado', { exact: true })).toBeVisible()
-    await page.getByLabel('Estado del Comprobante').selectOption('REVISADO')
+    await expect(row.getByText('Aprobado', { exact: true })).toBeVisible()
+    await page.getByLabel('Estado del Comprobante').selectOption('APROBADO')
     await expect(row).toBeVisible()
+    await page.getByLabel('Estado del Comprobante').selectOption('RECHAZADO')
+    await expect(row).toHaveCount(0)
     await page.getByLabel('Estado del Comprobante').selectOption('NO_ADJUNTO')
     await expect(row).toHaveCount(0)
     await page.getByRole('button', { name: 'Limpiar filtros' }).click()
@@ -464,7 +487,7 @@ test('un error de consulta no se presenta como ausencia de comprobantes', async 
   await expect(page.getByRole('listitem').getByText('No adjunto', { exact: true })).toHaveCount(0)
   fail = false
   await page.getByRole('button', { name: 'Reintentar estados de comprobantes', exact: true }).click()
-  await expect(page.getByRole('listitem').getByText('Revisado', { exact: true })).toBeVisible()
+  await expect(page.getByRole('listitem').getByText('Aprobado', { exact: true })).toBeVisible()
   await expect(page.getByText('Estado no disponible', { exact: true })).toHaveCount(0)
 })
 

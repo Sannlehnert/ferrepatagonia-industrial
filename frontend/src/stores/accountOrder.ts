@@ -46,6 +46,7 @@ export function createAccountOrderStore(
     const eligibility = shallowRef<AccountOrderEligibility | null>(null)
     const eligibilityLoading = ref(false)
     const eligibilityError = ref('')
+    const eligibilityUpdated = ref(false)
     const attemptState = ref<'idle' | 'submitting' | 'pending' | 'confirmed' | 'rejected'>('idle')
     const attemptError = ref('')
     const confirmation = shallowRef<ConfirmedAccountOrder | null>(null)
@@ -66,6 +67,7 @@ export function createAccountOrderStore(
     let revision = 0
     let disposed = false
     let recoverAfterRequest = false
+    let eligibilityRequestKey = ''
 
     function current(userId: number, version: number) {
       return !disposed &&
@@ -85,6 +87,8 @@ export function createAccountOrderStore(
       eligibility.value = null
       eligibilityLoading.value = false
       eligibilityError.value = ''
+      eligibilityUpdated.value = false
+      eligibilityRequestKey = ''
       attemptState.value = 'idle'
       attemptError.value = ''
       confirmation.value = null
@@ -137,7 +141,7 @@ export function createAccountOrderStore(
       return requestId === revision && current(userId, version)
     }
 
-    async function loadEligibility() {
+    async function loadEligibility(cartKey = eligibilityRequestKey) {
       const userId = auth.user?.id
       const version = currentSessionGeneration()
       if (userId === undefined || !sessionKey.value || disposed) return false
@@ -145,20 +149,25 @@ export function createAccountOrderStore(
       activeEligibility?.abort()
       const controller = activeEligibility = new AbortController()
       const requestId = revision
+      eligibilityRequestKey = cartKey
       eligibility.value = null
       eligibilityLoading.value = true
       eligibilityError.value = ''
+      eligibilityUpdated.value = false
       try {
         const result = await transport.getEligibility(controller.signal)
-        if (activeEligibility !== controller || !isCurrent(requestId, userId, version)) return false
+        if (activeEligibility !== controller || eligibilityRequestKey !== cartKey ||
+            !isCurrent(requestId, userId, version)) return false
         eligibility.value = result
+        eligibilityUpdated.value = true
         if (result.elegible && attemptState.value === 'confirmed') {
           attemptState.value = 'idle'
           attemptError.value = ''
         }
         return true
       } catch (error: unknown) {
-        if (activeEligibility === controller && isCurrent(requestId, userId, version)) {
+        if (activeEligibility === controller && eligibilityRequestKey === cartKey &&
+            isCurrent(requestId, userId, version)) {
           const message = axios.isAxiosError<{ message?: string }>(error)
             ? error.response?.data?.message
             : undefined
@@ -173,6 +182,17 @@ export function createAccountOrderStore(
           if (isCurrent(requestId, userId, version)) eligibilityLoading.value = false
         }
       }
+    }
+
+    function invalidateEligibility() {
+      const request = activeEligibility
+      activeEligibility = undefined
+      eligibilityRequestKey = ''
+      eligibility.value = null
+      eligibilityLoading.value = false
+      eligibilityError.value = ''
+      eligibilityUpdated.value = false
+      request?.abort()
     }
 
     function finishAttempt(
@@ -367,10 +387,10 @@ export function createAccountOrderStore(
     })
 
     return {
-      eligibility, eligibilityLoading, eligibilityError, canUseCredit, attemptState,
+      eligibility, eligibilityLoading, eligibilityError, eligibilityUpdated, canUseCredit, attemptState,
       attemptError, confirmation, receipts, pendingKey, storageError,
       pendingQuoteToken,
-      loadEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
+      loadEligibility, invalidateEligibility, confirm, consultResult, retryPendingConfirmation, prepareRetry,
       clearConfirmation,
     }
   })

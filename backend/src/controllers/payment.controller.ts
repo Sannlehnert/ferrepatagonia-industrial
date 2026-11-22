@@ -132,7 +132,8 @@ export const patchReviewPayment: RequestHandler = async (req, res) => {
   try {
     const { id } = res.locals.dto.params as { id: number };
     const body = res.locals.dto.body as ReviewPayment;
-    const result = await reviewPayment(req.auth!, id, body);
+    const rawKey = req.get('Idempotency-Key');
+    const result = await reviewPayment(req.auth!, id, body, rawKey);
     respond(res, 200, result.data, result.replay);
   } catch (error) {
     fail(res, error, 'No se pudo registrar la revisión documental del pago.');
