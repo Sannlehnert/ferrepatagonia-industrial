@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
+interface AdminClient {
+  id: number
+  email: string
+  nombreRazonSocial: string
+  tipoCliente: string
+}
+
 const ids: Record<string, number> = JSON.parse(process.env.E2E_ADMIN_ACCOUNTS ?? '{}')
 async function login(page: Page) {
   await page.goto('/login')
@@ -18,10 +25,10 @@ async function setApproval(page: Page, path: string, estado: string) {
 async function company(page: Page) {
   const response = await page.request.get('/api/admin/clientes')
   expect(response.ok()).toBe(true)
-  const clients = (await response.json()).data.clientes
-  const client = clients.find((item: { id: number }) => item.id === ids.debt)
+  const clients = (await response.json()).data.clientes as AdminClient[]
+  const client = clients.find(item => item.id === ids.debt)
   expect(client).toBeTruthy()
-  return { client, clients }
+  return { client: client!, clients }
 }
 
 for (const width of [1280, 768, 360]) {
@@ -184,7 +191,7 @@ test('cada empresa publica su crédito y permite reintentar aunque otra consulta
   test.setTimeout(45_000)
   await login(page)
   const { clients } = await company(page)
-  const group = clients.filter((item: { tipoCliente: string }) => item.tipoCliente === 'EMPRESA'
+  const group = clients.filter(item => item.tipoCliente === 'EMPRESA'
     && item.email.startsWith('cc258-page-1'))
   expect(group.length).toBeGreaterThanOrEqual(3)
   const [slow, failed, healthy] = group
@@ -343,7 +350,7 @@ test('S7-345-04: aprobar una fila no borra ni reinicia el crédito ya visible de
   test.setTimeout(40_000)
   await login(page)
   const { clients } = await company(page)
-  const companies = clients.filter((client: { tipoCliente: string }) => client.tipoCliente === 'EMPRESA'
+  const companies = clients.filter(client => client.tipoCliente === 'EMPRESA'
     && client.email.startsWith('cc258-page-1'))
   expect(companies.length).toBeGreaterThanOrEqual(3)
   const target = companies[0]
@@ -365,6 +372,7 @@ test('S7-345-04: aprobar una fila no borra ni reinicia el crédito ya visible de
   try {
     await openClients(page, 'cc258-page-1')
     for (const client of companies) await expect(row(client).getByText(accountLabel)).toBeVisible()
+    await expect(page.getByText('Consultando crédito…', { exact: true })).toHaveCount(0)
     const before = new Map(reads)
     afterChange = true
     await row(target).getByRole('button', { name: `Aprobar cuenta empresa de ${target.nombreRazonSocial}` }).click()
