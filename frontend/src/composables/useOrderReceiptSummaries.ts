@@ -7,16 +7,18 @@ import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderSummary } from '@/types/clientOrder'
 
 export type OrderReceiptStatus =
-  | 'NO_ADJUNTO' | 'PENDIENTE' | 'REVISADO' | 'NO_DISPONIBLE' | 'CARGANDO' | 'ERROR'
+  | 'NO_ADJUNTO' | 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'NO_DISPONIBLE' | 'CARGANDO' | 'ERROR'
 
 async function readSummary(orderId: number, signal: AbortSignal): Promise<OrderReceiptStatus> {
   let page: number | null = 1
   let hasReceipts = false
+  let hasPending = false
 
   while (page !== null) {
     signal.throwIfAborted()
     const result = await listPaymentReceipts(orderReceiptsPath(orderId), page, signal)
-    if (result.items.some(receipt => receipt.estadoRevision === 'PENDIENTE')) return 'PENDIENTE'
+    if (result.items.some(receipt => receipt.estadoRevision === 'APROBADO')) return 'APROBADO'
+    if (result.items.some(receipt => receipt.estadoRevision === 'PENDIENTE')) hasPending = true
     hasReceipts ||= result.items.length > 0
     if (result.paginaSiguiente !== null && result.paginaSiguiente <= page) {
       throw new Error('La paginación de comprobantes no avanzó.')
@@ -24,7 +26,8 @@ async function readSummary(orderId: number, signal: AbortSignal): Promise<OrderR
     page = result.paginaSiguiente
   }
 
-  return hasReceipts ? 'REVISADO' : 'NO_ADJUNTO'
+  if (hasPending) return 'PENDIENTE'
+  return hasReceipts ? 'RECHAZADO' : 'NO_ADJUNTO'
 }
 
 export function useOrderReceiptSummaries(orders: () => ClientOrderSummary[] | null) {

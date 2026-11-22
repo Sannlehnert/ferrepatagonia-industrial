@@ -220,6 +220,8 @@ async function main(signal) {
     apply('migrate-fer-17-pricing-evidence.sql');
     apply('migrate-fer-17-price-verification.sql');
     apply('migrate-fer-17-price-verification.sql');
+    apply('migrate-s7-04-2-state-consistency.sql');
+    apply('migrate-s7-04-2-state-consistency.sql');
 
     const inventory = await assertSchemaInventory(sql => connection.query(sql), 'complete');
 

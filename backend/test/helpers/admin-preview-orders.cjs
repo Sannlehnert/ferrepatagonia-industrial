@@ -95,12 +95,15 @@ async function seedAdminPreviewReceipts(profile, directory) {
         assert.equal(path.dirname(file), root);
         fs.writeFileSync(file, bytes, { flag: 'wx', mode: 0o600 });
         written.push(file);
+        const reviewed = i % 3 === 2;
         await db.query(`
           INSERT INTO COMPROBANTE_PAGO (id_comprobante, id_cliente, id_usuario_carga, id_pedido,
-            tipo_mime, bytes, sha256, fecha_utc, id_admin_revision, revision_utc)
-          VALUES (?, ?, ?, ?, 'application/pdf', ?, ?, UTC_TIMESTAMP(3), ?, ?)
+            tipo_mime, bytes, sha256, fecha_utc, estado_revision, id_admin_revision, revision_utc)
+          VALUES (?, ?, ?, ?, 'application/pdf', ?, ?, UTC_TIMESTAMP(3), ?, ?, ?)
         `, [id, order.id_cliente, actor.id_usuario, order.id_pedido, bytes.length, createHash('sha256').update(bytes).digest(),
-          i % 3 === 2 ? admin.id_usuario : null, i % 3 === 2 ? new Date() : null]);
+          reviewed ? 'APROBADO' : 'PENDIENTE',
+          reviewed ? admin.id_usuario : null,
+          reviewed ? new Date() : null]);
         count++;
       }
       await db.commit();

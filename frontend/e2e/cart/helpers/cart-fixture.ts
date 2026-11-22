@@ -11,6 +11,8 @@ export async function mockCart(page: Page) {
     failCartReadOnRecovery: false,
     readGate: null as Promise<void> | null,
     confirmGate: null as Promise<void> | null,
+    eligibilityGate: null as Promise<void> | null,
+    eligibilityFailures: 0,
     creditEligibilityFails: false,
     creditEligibilityGate: null as Promise<void> | null,
     transform: null as ((value: CartSnapshot) => CartSnapshot) | null,
@@ -134,7 +136,20 @@ export async function mockCart(page: Page) {
       if (state.creditEligibilityFails) {
         return route.fulfill({ status: 500, json: { message: 'No se pudo consultar el crédito.' } })
       }
-      return route.fulfill({ json: { data: state.eligibility } })
+      if (state.eligibilityFailures > 0) {
+        state.eligibilityFailures--
+        return route.fulfill({
+          status: 500,
+          json: { message: 'Error de prueba al consultar elegibilidad.' },
+        })
+      }
+      if (state.eligibilityGate) {
+        await state.eligibilityGate
+      }
+      const eligibility = state.eligibility.elegible
+        ? { ...state.eligibility, totalUSD: amounts[state.quantity]! }
+        : state.eligibility
+      return route.fulfill({ json: { data: eligibility } })
     }
 
     if (path === '/api/pedidos/transferencia/eligibilidad' && method === 'GET') {
@@ -165,7 +180,6 @@ export async function mockCart(page: Page) {
           },
         })
       }
-
       if (state.transferConfirmationStatus === 202) {
         return route.fulfill({
           status: 202,
@@ -178,7 +192,6 @@ export async function mockCart(page: Page) {
           },
         })
       }
-
       state.removed = true
       return route.fulfill({
         status: state.transferConfirmationStatus,
@@ -194,48 +207,6 @@ export async function mockCart(page: Page) {
       })
     }
 
-    const transferRecoveryKey = path.match(/^\/api\/pedidos\/transferencia\/([^/]+)$/)?.[1]
-    if (transferRecoveryKey && method === 'GET') {
-      state.transferRecoveryRequests.push(decodeURIComponent(transferRecoveryKey))
-      if (state.transferRecoveryStatus === 202) {
-        return route.fulfill({
-          status: 202,
-          json: {
-            data: {
-              estado: 'PENDIENTE',
-              code: 'CONFIRMACION_PENDIENTE',
-              message: 'Todavía no hay un resultado definitivo.',
-            },
-          },
-        })
-      }
-
-      if (state.transferRecoveryStatus === 404) {
-        return route.fulfill({
-          status: 404,
-          json: { code: 'INTENTO_NO_ENCONTRADO', message: 'No se encontró el intento.' },
-        })
-      }
-
-      state.removed = true
-      return route.fulfill({
-        status: 200,
-        json: {
-          data: {
-            pedidoId: 789,
-            estado: 'CONFIRMADO',
-            modalidadPago: 'TRANSFERENCIA',
-            moneda: 'USD',
-            totalUSD: amounts[state.quantity],
-          },
-        },
-      })
-    }
-
-    if (/^\/api\/pedidos\/\d+\/comprobantes$/.test(path) && method === 'GET') {
-      return route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } })
-    }
-
     if (path === '/api/pedidos/cuenta-corriente' && method === 'POST') {
       state.orderRequests.push({
         method,
@@ -244,13 +215,6 @@ export async function mockCart(page: Page) {
       })
       if (state.confirmGate) await state.confirmGate
       if (state.confirmationStatus === 409) {
-        state.eligibility = {
-          ...state.eligibility,
-          elegible: false,
-          codigo: 'CREDITO_INSUFICIENTE',
-          mensaje: 'El crédito disponible no alcanza para confirmar este pedido.',
-          cotizacion: null,
-        }
         return route.fulfill({
           status: 409,
           json: {
@@ -289,6 +253,42 @@ export async function mockCart(page: Page) {
               estado: 'PENDIENTE',
               code: 'CONFIRMACION_PENDIENTE',
               message: 'Todavía no hay un resultado definitivo.',
+            },
+          },
+        })
+      }
+
+      const transferRecoveryKey = path.match(/^\/api\/pedidos\/transferencia\/([^/]+)$/)?.[1]
+      if (transferRecoveryKey && method === 'GET') {
+        state.transferRecoveryRequests.push(decodeURIComponent(transferRecoveryKey))
+        if (state.transferRecoveryStatus === 202) {
+          return route.fulfill({
+            status: 202,
+            json: {
+              data: {
+                estado: 'PENDIENTE',
+                code: 'CONFIRMACION_PENDIENTE',
+                message: 'Todavía no hay un resultado definitivo.',
+              },
+            },
+          })
+        }
+        if (state.transferRecoveryStatus === 404) {
+          return route.fulfill({
+            status: 404,
+            json: { code: 'INTENTO_NO_ENCONTRADO', message: 'No se encontró el intento.' },
+          })
+        }
+        state.removed = true
+        return route.fulfill({
+          status: 200,
+          json: {
+            data: {
+              pedidoId: 789,
+              estado: 'CONFIRMADO',
+              modalidadPago: 'TRANSFERENCIA',
+              moneda: 'USD',
+              totalUSD: amounts[state.quantity],
             },
           },
         })

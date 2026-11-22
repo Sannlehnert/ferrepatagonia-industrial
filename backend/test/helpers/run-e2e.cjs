@@ -15,11 +15,12 @@ const profile = newProfile('E2E');
 const args = process.argv.slice(2);
 const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
 const receipts = args.includes('--receipts');
+const payments = args.includes('--payments');
 const demoCatalog = args.includes('--demo-catalog');
 const demoInteractive = args.includes('--demo-interactiva');
 const paymentActions = args.includes('--payment-actions');
-const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--demo-catalog', '--demo-interactiva', '--payment-actions'].includes(arg));
-assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(demoCatalog) + Number(paymentActions) <= 1, 'Elegí un único perfil E2E.');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--payments', '--demo-catalog', '--demo-interactiva', '--payment-actions'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(payments) + Number(demoCatalog) + Number(paymentActions) <= 1, 'Elegí un único perfil E2E.');
 assert.ok(!demoInteractive || (demoCatalog && process.stdin.isTTY && testArgs.length === 0),
   'Para la demo interactiva usá --demo-catalog --demo-interactiva en una terminal, sin otros argumentos.');
 
@@ -126,18 +127,18 @@ async function main() {
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
   if (!fer19) await seedFixtures(connection, {
-    includeAccountOrderFixture: receipts || demoCatalog,
-    includeReceiptFixture: receipts,
+    includeAccountOrderFixture: receipts || payments || demoCatalog,
+    includeReceiptFixture: receipts || payments,
     includeCatalogProducts: !demoCatalog,
+    accountOrigin: payments ? 'REAL' : 'DEMO',
   });
-// Los E2E normales de checkout necesitan subir comprobantes.
-// Las pruebas específicas de comprobantes y demos interactivas
-// también requieren almacenamiento temporal.
-if (receipts || demoInteractive || paymentActions || (!fer19 && !demoCatalog)) {
-  receiptStorage = fs.mkdtempSync(
-    path.join(os.tmpdir(), 'ferre-receipts-e2e-')
-  );
-}
+  // Almacenamiento temporal para los E2E de comprobantes,
+  // pagos, acciones de pago ADMIN, checkout normal y demo interactiva.
+  if (receipts || payments || demoInteractive || paymentActions || (!fer19 && !demoCatalog)) {
+    receiptStorage = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ferre-receipts-e2e-')
+    );
+  }
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
@@ -171,6 +172,7 @@ if (receipts || demoInteractive || paymentActions || (!fer19 && !demoCatalog)) {
     JWT_SECRET: randomUUID(),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
+    E2E_PAYMENTS: payments ? '1' : '',
     E2E_PAYMENT_ACTIONS: paymentActions ? '1' : '',
     RECEIPT_STORAGE_DIR: receiptStorage ?? '',
     PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
@@ -201,6 +203,7 @@ if (receipts || demoInteractive || paymentActions || (!fer19 && !demoCatalog)) {
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
+    E2E_PAYMENTS: payments ? '1' : '',
     E2E_PAYMENT_ACTIONS: paymentActions ? '1' : '',
     E2E_PAYMENT_ACTIONS_FIXTURE: paymentActionsFixture ? JSON.stringify(paymentActionsFixture) : '',
   };

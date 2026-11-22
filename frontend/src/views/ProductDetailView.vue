@@ -89,9 +89,9 @@ onBeforeUnmount(() => controller?.abort())
 <template>
   <main class="fp-shell py-6 lg:py-10">
     <nav aria-label="Ruta de navegación" class="mb-5 flex flex-wrap items-center gap-1.5 text-sm">
-      <RouterLink :to="{ name: 'home' }" class="fp-focus text-[var(--fp-blue)] underline">Inicio</RouterLink>
+      <RouterLink :to="{ name: 'home' }" class="inline-flex min-h-11 min-w-11 items-center justify-center fp-focus text-[var(--fp-blue)] underline">Inicio</RouterLink>
       <span aria-hidden="true" class="text-slate-400"> / </span>
-      <RouterLink :to="returnTarget" class="fp-focus text-[var(--fp-blue)] underline">{{ returnLabel }}</RouterLink>
+      <RouterLink :to="returnTarget" class="inline-flex min-h-11 min-w-11 items-center fp-focus text-[var(--fp-blue)] underline">{{ returnLabel }}</RouterLink>
       <span aria-hidden="true" class="text-slate-400"> / </span>
       <span class="text-slate-600">Detalle del producto</span>
     </nav>

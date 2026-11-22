@@ -1,0 +1,83 @@
+{
+  "fotosNuevas": [
+    {
+      "numero": 53,
+      "sku": "FP-DEMO-ILU-LAMPARA-E27-10-W",
+      "fuente": "https://commons.wikimedia.org/wiki/File:%C5%BBar%C3%B3wka_led_E27_10W_bulb_kingled_krakow.jpg",
+      "autor": "Kingled",
+      "licencia": "CC BY-SA 4.0",
+      "referenciaLicencia": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "verificacionFicha": "2026-11-20",
+      "obtencion": "Copia local del relevamiento previo; la descarga original respondió 429 el 20/11/2026",
+      "archivoDescargadoSha256": "80e84021238b3e35eeb68cfb90291fa05dba6134904ec3e9af56276fd5be9579",
+      "archivoWebpSha256": "1b6cbc9c0fa18715af5ea3d73a8b9e855a3131037305d2e0bb53f7e02dcdaf82",
+      "urlDescargaRegistrada": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/%C5%BBar%C3%B3wka_led_E27_10W_bulb_kingled_krakow.jpg/500px-%C5%BBar%C3%B3wka_led_E27_10W_bulb_kingled_krakow.jpg"
+    },
+    {
+      "numero": 60,
+      "sku": "FP-DEMO-MAN-LLAVE-COMBINADA-10-MM",
+      "fuente": "https://commons.wikimedia.org/wiki/File:1970s_1980s_Quali_Kraft_N_105M_10_mm_ratcheting_open_end_combination_wrench_made_in_Japan.jpg",
+      "autor": "R. Henrik Nilsson",
+      "licencia": "CC BY 4.0",
+      "referenciaLicencia": "https://creativecommons.org/licenses/by/4.0/",
+      "verificacionFicha": "2026-11-20",
+      "obtencion": "Copia local del relevamiento previo; la descarga original respondió 429 el 20/11/2026",
+      "archivoDescargadoSha256": "22dc26dd7c1f3c1dca841be28f24fa2c761f38589541ad940bfd163ef97bb5c4",
+      "archivoWebpSha256": "d817b62a16cb53a0e42edee9da8961e45aa59c67c0d61b9929ac528f43a601ed",
+      "urlDescargaRegistrada": "https://upload.wikimedia.org/wikipedia/commons/d/d0/1970s_1980s_Quali_Kraft_N_105M_10_mm_ratcheting_open_end_combination_wrench_made_in_Japan.jpg"
+    },
+    {
+      "numero": 67,
+      "sku": "FP-DEMO-MEC-MECHA-MADERA-10-MM",
+      "fuente": "https://commons.wikimedia.org/wiki/File:Punta_da_legno.jpg",
+      "autor": "Tiesse",
+      "licencia": "Dominio público por el autor",
+      "referenciaLicencia": "https://commons.wikimedia.org/wiki/File:Punta_da_legno.jpg#Licensing",
+      "verificacionFicha": "2026-11-20",
+      "obtencion": "Copia local del relevamiento previo; la descarga original respondió 429 el 20/11/2026",
+      "archivoDescargadoSha256": "3f3c094abb2e551f858e4a1b502f4321512ca1792b7494e44d3abc3f80a49f7d",
+      "archivoWebpSha256": "f62402c82457f33921014aa05f94ed8e1c72a20bd8d5399a230a3d1b3abaa397",
+      "urlDescargaRegistrada": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a0/Punta_da_legno.jpg/330px-Punta_da_legno.jpg"
+    },
+    {
+      "numero": 68,
+      "sku": "FP-DEMO-MEC-MECHA-MAMPOSTERIA-10-MM",
+      "fuente": "https://commons.wikimedia.org/wiki/File:Concrete_drill_bit.JPG",
+      "autor": "Kszapsza",
+      "licencia": "CC BY-SA 3.0",
+      "referenciaLicencia": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "verificacionFicha": "2026-11-20",
+      "obtencion": "Copia local del relevamiento previo; la descarga original respondió 429 el 20/11/2026",
+      "archivoDescargadoSha256": "f67b1345c0ddc6fe6faf5f08fe7e9e878652c597af39edbfafb359978a30a227",
+      "archivoWebpSha256": "2bafe1ec4284b835bd13064745d6cd84435e95323b51b4fcbe8e46f5e45a4628",
+      "urlDescargaRegistrada": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/Concrete_drill_bit.JPG/330px-Concrete_drill_bit.JPG"
+    },
+    {
+      "numero": 87,
+      "sku": "FP-DEMO-ROP-MAMELUCO-TALLE-2XL",
+      "fuente": "https://commons.wikimedia.org/wiki/File:Boilersuit2.jpg",
+      "autor": "Stuz",
+      "licencia": "CC BY-SA 3.0",
+      "referenciaLicencia": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "verificacionFicha": "2026-11-20",
+      "obtencion": "Descarga HTTP 200 del 20/11/2026",
+      "archivoDescargadoSha256": "93e1f214f5c234cf4c92e08bb452eed8c9ff3e3a74c12562ca712f1e6eae898d",
+      "archivoWebpSha256": "2a3c5fba453f90e7db9f4189e856866ee851c43e1841c5e046e7543c2e0ba881",
+      "urlDescargaRegistrada": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Boilersuit2.jpg"
+    },
+    {
+      "numero": 100,
+      "sku": "FP-DEMO-TOR-ARANDELA-GROWER-M10",
+      "fuente": "https://commons.wikimedia.org/wiki/File:Grower01.jpg",
+      "autor": "Tiesse y Xoristzatziki",
+      "licencia": "Dominio público por sus autores",
+      "referenciaLicencia": "https://commons.wikimedia.org/wiki/File:Grower01.jpg#file",
+      "verificacionFicha": "2026-11-20",
+      "obtencion": "Descarga HTTP 200 del 20/11/2026",
+      "archivoDescargadoSha256": "d54e64a7457fd532389aadafabd1d43ed4d546e114ddc291ffd1b5dfe34916e8",
+      "archivoWebpSha256": "d13a4adca4c5a6f50139448490fa187258e9759240e8969831f016ee4b72afd6",
+      "urlDescargaRegistrada": "https://upload.wikimedia.org/wikipedia/commons/d/de/Grower01.jpg?utm_campaign=index&utm_content=original&utm_source=commons.wikimedia.org"
+    }
+  ],
+  "nota": "Condiciones contrastadas con las fichas de Commons; las copias locales no se presentan como una descarga nueva."
+}
