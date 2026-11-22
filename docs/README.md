@@ -47,6 +47,11 @@
   separada y acreditación financiera transaccional sobre cuentas corrientes,
   con pruebas de concurrencia, rollback, permisos y conversión ARS.
 
+- [Cuenta corriente y pagos de EMPRESA (T-S7-10.3 / #334)](334/README.md):
+  resumen financiero con estados desconocidos explícitos, movimientos y
+  vencimientos, declaración idempotente con comprobante propio, historial de
+  revisión y acreditación, seguridad de sesión y evidencia responsive.
+
 - [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
   matriz P0/P1/P2, cobertura existente frente a brechas, catálogo maestro de
   100 SKU separado de la demo sintética de 904, checkout de cuenta corriente

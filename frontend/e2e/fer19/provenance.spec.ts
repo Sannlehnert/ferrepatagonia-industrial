@@ -1,4 +1,4 @@
-﻿import { expect, test } from '@playwright/test'
+import { expect, test } from '@playwright/test'
 import type { AccountList, AccountQuery } from '../../src/types/adminAccount'
 import { adminAccounts, adminDetail, adminList, apiError, clientAccount, data, fixture, login, logout, own } from './support'
 
@@ -8,7 +8,7 @@ test('build de producción muestra datos REAL del backend y bloquea DEMO y el li
   await login(page, client('real'))
   await clientAccount(page)
   expect(await data<AccountQuery>(await page.request.get(own))).toMatchObject({ origen: 'REAL', saldo: '80.00', disponible: '420.00' })
-  const cards = page.getByRole('region', { name: 'Resumen de la cuenta' })
+  const cards = page.getByRole('region', { name: 'Resumen financiero' })
   await expect(cards).toContainText(/80,00/)
   await expect(cards).toContainText(/420,00/)
   await expect(page.getByRole('table')).toContainText(/80,00/)

@@ -74,8 +74,9 @@ export async function listClientesPage(query: AdminClientQuery) {
 export async function updateCompanyApprovalStatus(
     clientId: number,
     estado: EstadoAprobacionEmpresa,
+    estadoEsperado?: EstadoAprobacionEmpresa,
 ) {
-    const cliente = await updateEstadoAprobacionEmpresa(clientId, estado);
+    const cliente = await updateEstadoAprobacionEmpresa(clientId, estado, estadoEsperado);
     if (!cliente) {
         const err = new Error('El cliente no existe.');
         (err as unknown as { statusCode: number; code: string }).statusCode = 404;

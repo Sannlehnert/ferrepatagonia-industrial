@@ -112,6 +112,9 @@ async function mountView(t, { service = defaultService(), route = makeRoute(), q
       useRouter: () => route.router,
     },
     './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+    '@/components/AdminClientCreditStatus.vue': { __esModule: true, default: { render: () => null } },
+    '@/components/AdminClientStatusDialog.vue': { __esModule: true, default: { render: () => null } },
+    '@/composables/useAdminClientCredit': { useAdminClientCredit: () => ({ status: () => null, refresh: async () => {} }) },
   }).default;
   component.render = () => null;
   const app = vue.createRenderer({
@@ -406,4 +409,62 @@ test('si la reconciliación de lista falla, bloquea la asignación sin mostrar �
   assert.equal(state.feedback[1].error, true);
   assert.match(state.feedback[1].text, /No pudimos verificar el resultado/);
   assert.equal(state.canSavePriceList(1), false);
+});
+
+test('regresión #345+#346: aprobar en una página filtrada conserva URL y una respuesta paginada obsoleta no pisa el estado', async t => {
+  let resolveStale;
+  const service = defaultService({
+    getAdminClientPage: filters => {
+      if (filters.page === 1) {
+        return new Promise(resolve => { resolveStale = resolve; });
+      }
+      return Promise.resolve(page({
+        clientes: clients.slice(0, 20),
+        page: 2,
+        total: 45,
+        totalPages: 3,
+      }));
+    },
+    updateAdminCompanyApproval: async (id, estado) => ({
+      ...clients[0],
+      id,
+      estadoAprobacionEmpresa: estado,
+    }),
+  });
+  const { state, route } = await mountView(t, {
+    service,
+    query: { busqueda: 'Cliente', tipo: 'EMPRESA', estadoEmpresa: 'PENDIENTE', page: '2' },
+  });
+
+  const empresa = state.clients[0];
+  assert.equal(empresa.id, 1);
+  assert.equal(empresa.estadoAprobacionEmpresa, 'PENDIENTE');
+  assert.equal(state.pageData.page, 2);
+
+  // Inicia una lectura de la página 1 que quedará pendiente y luego aprueba la
+  // empresa desde la página 2.
+  state.changePage(-1);
+  await settle();
+  await state.setCompanyApproval(empresa, 'APROBADA');
+  assert.equal(empresa.estadoAprobacionEmpresa, 'APROBADA');
+  assert.equal(route.route.query.busqueda, 'Cliente');
+  assert.equal(route.route.query.tipo, 'EMPRESA');
+  assert.equal(route.route.query.estadoEmpresa, 'PENDIENTE');
+
+  // La respuesta de listado iniciada antes de la mutación trae el estado viejo.
+  resolveStale(page({
+    clientes: [{ ...clients[0], estadoAprobacionEmpresa: 'PENDIENTE' }],
+    page: 1,
+    total: 1,
+    totalPages: 1,
+  }));
+  await settle();
+
+  assert.equal(state.pageData.page, 1);
+  assert.equal(state.clients[0].id, 1);
+  assert.equal(state.clients[0].estadoAprobacionEmpresa, 'APROBADA');
+  assert.equal(route.route.query.busqueda, 'Cliente');
+  assert.equal(route.route.query.tipo, 'EMPRESA');
+  assert.equal(route.route.query.estadoEmpresa, 'PENDIENTE');
+  assert.equal(route.route.query.page, undefined);
 });

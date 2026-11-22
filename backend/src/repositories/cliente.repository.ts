@@ -113,6 +113,7 @@ export async function findClienteById(idCliente: number): Promise<Cliente | null
 export async function updateEstadoAprobacionEmpresa(
   idCliente: number,
   estado: EstadoAprobacionEmpresa,
+  estadoEsperado?: EstadoAprobacionEmpresa,
 ): Promise<Cliente | null> {
   return inTransaction(async (manager) => {
     const repo = manager.getRepository(ClienteSchema);
@@ -129,6 +130,15 @@ export async function updateEstadoAprobacionEmpresa(
       const err = new Error('Solo las cuentas de tipo empresa admiten aprobación o rechazo.');
       (err as unknown as { statusCode: number; code: string }).statusCode = 400;
       (err as unknown as { statusCode: number; code: string }).code = 'CLIENTE_NO_ES_EMPRESA';
+      throw err;
+    }
+
+    // La precondición opcional conserva los consumidores existentes.
+    // Compara estados bajo bloqueo de fila; no detecta un ciclo ABA.
+    if (estadoEsperado !== undefined && cliente.estado_aprobacion_empresa !== estadoEsperado) {
+      const err = new Error('El registro de la empresa cambió. Verificá su estado antes de volver a modificarlo.');
+      (err as unknown as { statusCode: number; code: string }).statusCode = 409;
+      (err as unknown as { statusCode: number; code: string }).code = 'ESTADO_EMPRESA_MODIFICADO';
       throw err;
     }
 
