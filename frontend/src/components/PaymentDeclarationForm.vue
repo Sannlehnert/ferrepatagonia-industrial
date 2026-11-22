@@ -21,6 +21,7 @@ import {
     isIdempotencyKey,
     isValidPaymentAmount,
     newIdempotencyKey,
+    receiptReviewStatusLabel,
 } from '@/utils/payment'
 
 const props = defineProps<{ refreshVersion: number }>()
@@ -401,7 +402,7 @@ onBeforeUnmount(() => {
                                     {{ receipt.pedidoId !== null ? `Pedido PED-${String(receipt.pedidoId).padStart(6, '0')}` : 'Saldo general de cuenta corriente' }}
                                 </span>
                                 <span class="block text-slate-600">
-                                    Cargado {{ formatInstant(receipt.fecha) }} · {{ receipt.estadoRevision === 'REVISADO' ? 'Revisado' : 'Pendiente de revisión documental' }}
+                                    Cargado {{ formatInstant(receipt.fecha) }} · {{ receiptReviewStatusLabel(receipt.estadoRevision) }}
                                 </span>
                             </span>
                         </label>

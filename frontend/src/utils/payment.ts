@@ -1,3 +1,4 @@
+import type { ReceiptReviewStatus } from '@/services/paymentReceiptService'
 import type {
     ClientPayment,
     PaymentCurrency,
@@ -82,6 +83,16 @@ export function documentStateLabel(state: string): string {
     if (state === 'APROBADO') return 'Documento aprobado'
     if (state === 'RECHAZADO') return 'Documento rechazado'
     return 'Estado documental no determinable'
+}
+
+const receiptReviewStatusLabels: Record<ReceiptReviewStatus, string> = {
+    PENDIENTE: 'Pendiente de revisión documental',
+    APROBADO: 'Documento aprobado',
+    RECHAZADO: 'Documento rechazado',
+}
+
+export function receiptReviewStatusLabel(status: ReceiptReviewStatus): string {
+    return receiptReviewStatusLabels[status]
 }
 
 export function documentStateClasses(state: string): string {
