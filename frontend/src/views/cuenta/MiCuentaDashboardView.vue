@@ -6,7 +6,6 @@ import DatosClientes from '@/views/cuenta/DatosClientes.vue'
 import { useOrderReceiptSummaries } from '@/composables/useOrderReceiptSummaries'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
-import { supportsOrderReceipts } from '@/services/paymentReceiptService'
 import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderSummary } from '@/types/clientOrder'
@@ -40,14 +39,7 @@ const creditOrdersCount = computed(() =>
   orders.value?.filter(o => o.modalidadPago === 'CUENTA_CORRIENTE').length ?? 0,
 )
 const pendingReceiptOrdersCount = computed(() =>
-  orders.value?.filter(o =>
-    supportsOrderReceipts(
-      auth.user?.tipo_cliente,
-      o.modalidadPago,
-      auth.user?.estadoAprobacionEmpresa,
-      auth.user?.cuentaCorrienteHabilitada,
-    ) && o.estadoDocumental === 'SIN_COMPROBANTE',
-  ).length ?? 0,
+  orders.value?.filter(order => receipts.status(order) === 'NO_ADJUNTO').length ?? 0,
 )
 const receiptError = computed(() => orders.value?.some(order => receipts.status(order) === 'ERROR') ?? false)
 const ultimoPedidoFecha = computed(() => {
@@ -157,8 +149,11 @@ const isCompany = computed(() => auth.user?.tipo_cliente === 'EMPRESA')
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
-          <div class="my-2 font-bold text-[#047857]" :class="error || (loading && !orders) ? 'text-xl' : 'text-4xl'">
-            {{ error ? 'No disponible' : loading && !orders ? 'Cargando…' : pendingReceiptOrdersCount }}
+          <div
+            class="my-2 font-bold text-[#047857]"
+            :class="error || receiptError || (loading && !orders) || receipts.loading.value ? 'text-xl' : 'text-4xl'"
+          >
+            {{ error || receiptError ? 'No disponible' : (loading && !orders) || receipts.loading.value ? 'Cargando…' : pendingReceiptOrdersCount }}
           </div>
           <p class="text-xs text-slate-500 m-0">
             Sin comprobante adjunto

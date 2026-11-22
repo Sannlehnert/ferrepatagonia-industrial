@@ -573,7 +573,8 @@ describe('Task #318 (T-S7-04.3) — Coherencia estructural de vistas y eventos S
       assert.doesNotMatch(source, /localStorage/)
     }
     assert.doesNotMatch(dashboardClient, /estado\s*===\s*'PENDIENTE'/)
-    assert.match(dashboardClient, /estadoDocumental\s*===\s*'SIN_COMPROBANTE'/)
+    assert.match(dashboardClient, /useOrderReceiptSummaries/)
+    assert.match(dashboardClient, /receipts\.status\(order\)\s*===\s*'NO_ADJUNTO'/)
 
     // HistorialPedidos usa los estados contractuales reales en filtro-estado (sin PENDIENTE/CANCELADO)
     const statusFilterBlock = historial.slice(

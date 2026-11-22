@@ -310,16 +310,16 @@ const filteredOrders = computed(() => {
         class="max-w-full rounded-[10px] border border-solid border-[#E2E8F0] overflow-x-auto bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         role="list"
       >
-        <table class="w-full min-w-[820px] border-collapse text-left">
+        <table class="w-full min-w-[760px] border-collapse text-left">
           <thead class="bg-slate-50 border-b border-[#E2E8F0]">
             <tr>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha</th>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Monto Total</th>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Modalidad</th>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Pedido</th>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Financiero</th>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider">Comprobante</th>
-              <th scope="col" class="py-4 px-5 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right">Detalle</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Monto Total</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Modalidad</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Pedido</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 max-w-[170px] text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Financiero</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 max-w-[165px] text-xs font-semibold text-slate-600 uppercase tracking-wider">Comprobante</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right">Detalle</th>
             </tr>
           </thead>
           <tbody
@@ -330,7 +330,7 @@ const filteredOrders = computed(() => {
           >
             <tr class="hover:bg-slate-50/50 transition-colors">
               <!-- Fecha -->
-              <td class="py-4 px-5 text-sm text-slate-600 whitespace-nowrap">
+              <td class="py-4 px-2.5 xl:px-3 text-sm text-slate-600 whitespace-normal">
                 <time :datetime="order.fecha">{{ dateFormat.format(new Date(order.fecha)) }}</time>
                 <h3 role="heading" class="m-0 block text-xs font-bold text-[#0B2438] font-mono">
                   {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
@@ -341,12 +341,12 @@ const filteredOrders = computed(() => {
               </td>
 
               <!-- Monto Total -->
-              <td class="py-4 px-5 text-sm font-bold text-[#0B2438] whitespace-nowrap tabular-nums">
+              <td class="py-4 px-2.5 xl:px-3 text-sm font-bold text-[#0B2438] whitespace-normal tabular-nums">
                 {{ order.total }} {{ order.moneda ?? '' }}
               </td>
 
               <!-- Método de Pago -->
-              <td class="py-4 px-5 text-sm">
+              <td class="py-4 px-2.5 xl:px-3 text-sm">
                 <span
                   :class="order.modalidadPago === 'CUENTA_CORRIENTE'
                     ? 'text-[#0369A1] font-medium'
@@ -357,12 +357,12 @@ const filteredOrders = computed(() => {
               </td>
 
               <!-- Estado Pedido (Comercial / Logístico) -->
-              <td class="py-4 px-5 text-sm whitespace-nowrap">
+              <td class="py-4 px-2.5 xl:px-3 text-sm whitespace-nowrap">
                 <AdminOrderStatusBadge :status="resolveOrderCommercialState(order)" />
               </td>
 
               <!-- Estado Financiero -->
-              <td class="py-4 px-5 text-sm max-w-[240px]">
+              <td class="py-4 px-2.5 xl:px-3 text-sm max-w-[170px]">
                 <OrderFinancialStatusBadge
                   :status="order.estadoFinanciero"
                   :monto-acreditado-usd="order.montoAcreditadoUSD"
@@ -371,7 +371,7 @@ const filteredOrders = computed(() => {
               </td>
 
               <!-- Comprobante (Documental) -->
-              <td class="py-4 px-5 text-sm">
+              <td class="py-4 px-2.5 xl:px-3 text-sm max-w-[165px]">
                 <OrderReceiptActions
                   :status="receipts.status(order)"
                   :order-number="order.numero"
@@ -381,7 +381,7 @@ const filteredOrders = computed(() => {
               </td>
 
               <!-- Detalle Action Button -->
-              <td class="py-4 px-5 text-sm text-right whitespace-nowrap">
+              <td class="py-4 px-2.5 xl:px-3 text-sm text-right whitespace-normal">
                 <button
                   type="button"
                   class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
