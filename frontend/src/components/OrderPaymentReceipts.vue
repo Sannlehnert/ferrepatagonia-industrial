@@ -16,7 +16,12 @@ const available = computed(() => auth.rol === 'CLIENTE' && !auth.loggingIn && !a
     auth.user?.cuentaCorrienteHabilitada,
   ))
 const receiptKey = computed(() => [
-  auth.user?.id, auth.sessionVersion, props.order.pedidoId, props.order.modalidadPago,
+  auth.user?.id,
+  auth.sessionVersion,
+  auth.user?.estadoAprobacionEmpresa,
+  auth.user?.cuentaCorrienteHabilitada,
+  props.order.pedidoId,
+  props.order.modalidadPago,
 ].join(':'))
 </script>
 
