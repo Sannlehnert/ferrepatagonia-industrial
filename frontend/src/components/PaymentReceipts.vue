@@ -202,20 +202,11 @@ function operation(receipt: PaymentReceipt) {
             <p class="m-0 flex flex-wrap items-center gap-1.5 text-slate-600">
               <span
                 class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
-<span
-  class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
-  :class="receipt.estadoRevision === 'APROBADO'
-    ? 'bg-[#DCFCE7] text-green-800 border border-solid border-emerald-200'
-    : receipt.estadoRevision === 'RECHAZADO'
-      ? 'bg-[#FEE2E2] text-red-800 border border-solid border-red-200'
-      : 'bg-[#FEF3C7] text-amber-900 border border-solid border-amber-200'"
->
-  {{ receipt.estadoRevision === 'APROBADO'
-    ? 'Aprobado'
-    : receipt.estadoRevision === 'RECHAZADO'
-      ? 'Rechazado'
-      : 'Pendiente de revisión' }}
-</span>
+                :class="receipt.estadoRevision === 'APROBADO'
+                  ? 'bg-[#DCFCE7] text-green-800 border border-solid border-emerald-200'
+                  : receipt.estadoRevision === 'RECHAZADO'
+                    ? 'bg-[#FEE2E2] text-red-800 border border-solid border-red-200'
+                    : 'bg-[#FEF3C7] text-amber-900 border border-solid border-amber-200'"
               >
                 {{ receipt.estadoRevision === 'APROBADO'
                   ? 'Aprobado'
@@ -224,7 +215,7 @@ function operation(receipt: PaymentReceipt) {
                     : 'Pendiente de revisión' }}
               </span>
               <span v-if="receipt.revisadoEn" class="text-xs text-slate-500">· {{ formatInstant(receipt.revisadoEn) }}</span>
-              <span v-if="receipt.estadoRevision === 'RECHAZADO' && receipt.motivoRechazo" class="text-xs text-[#DC2626]">
+              <span v-if="receipt.estadoRevision === 'RECHAZADO' && receipt.motivoRechazo" class="text-xs text-red-800 [overflow-wrap:anywhere]">
                 · {{ receipt.motivoRechazo }}
               </span>
             </p>
