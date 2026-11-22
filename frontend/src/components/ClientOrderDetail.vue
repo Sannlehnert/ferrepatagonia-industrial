@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
 import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
 import OrderFinancialStatusBadge from '@/components/OrderFinancialStatusBadge.vue'
 import OrderPaymentReceipts from '@/components/OrderPaymentReceipts.vue'
+import { useDeferredRealtimeReconcile } from '@/composables/useDeferredRealtimeReconcile'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { getClientOrderDetail } from '@/services/clientOrderService'
 import { supportsOrderReceipts } from '@/services/paymentReceiptService'
@@ -56,31 +57,52 @@ const documentBadge = computed(() => {
   return orderDocumentStateBadge(detail.value.estadoDocumental, { emptyLabel: 'No adjunto' })
 })
 
-let suppressRealtimeUntil = 0
+let updatingReceipt = false
+const realtimeReconcile = useDeferredRealtimeReconcile({
+  allowed,
+  isMutating: () => updatingReceipt,
+  reconcile: () => {
+    void loadDetail(true)
+  },
+})
 
 function loadDetail(keepData = false) {
   return load(signal => getClientOrderDetail(props.orderId, signal), { keepData })
 }
 
 async function handleReceiptUpdated() {
-  suppressRealtimeUntil = Date.now() + 800
-  await loadDetail(true)
-  emit('receiptUpdated')
+  const current = identity()
+  updatingReceipt = true
+  realtimeReconcile.suppress(800)
+  try {
+    await loadDetail(true)
+    if (identity() === current && allowed()) emit('receiptUpdated')
+  } finally {
+    updatingReceipt = false
+    if (identity() === current && allowed()) {
+      realtimeReconcile.settleAfterMutation()
+    }
+  }
 }
 
-watch([identity, allowed], () => void loadDetail(), {
-  immediate: true,
+watch([identity, allowed], () => {
+  updatingReceipt = false
+  realtimeReconcile.reset()
+  void loadDetail()
+}, { flush: 'sync', immediate: true })
+
+onBeforeUnmount(() => {
+  updatingReceipt = false
+  realtimeReconcile.reset()
 })
 
 onRealtime(change => {
-  if (!change.reconnect && Date.now() < suppressRealtimeUntil) return
-  if (
-    change.reconnect ||
+  if (!allowed()) return
+  const matchesScope =
     change.orders.has(props.orderId) ||
     (detail.value?.modalidadPago === 'CUENTA_CORRIENTE' && (change.payments || change.account))
-  ) {
-    void loadDetail(true)
-  }
+  if (!change.reconnect && !matchesScope) return
+  realtimeReconcile.notify(change.reconnect)
 })
 </script>
 

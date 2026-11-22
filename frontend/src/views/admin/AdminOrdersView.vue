@@ -57,6 +57,9 @@ const modalDialogRef = ref<HTMLElement | null>(null)
 let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
 let disposed = false
 let queuedListRefresh: string | undefined
+const inFlightOrderStatusIds = new Set<number>()
+const suppressOrderEchoUntil = new Map<number, number>()
+const pendingOrderEventsDuringInFlight = new Set<number>()
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
@@ -306,15 +309,19 @@ async function submitStatusChange() {
     return
   }
 
+  inFlightOrderStatusIds.add(targetId)
   savingOpeningId.value = targetOpening
   statusFeedback.value = null
   const session = identity()
   const isCurrentModal = () => isCurrentSession(session) &&
     targetOpening === currentModalOpeningId.value && selectedOrderId.value === targetId
+  let didReconcile = false
+  let authRejected = false
 
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
     reconcileList(session)
+    didReconcile = true
     if (!isCurrentModal()) return
 
     await detail.load(async () => updated)
@@ -327,7 +334,11 @@ async function submitStatusChange() {
     }
   } catch (error: unknown) {
     const { message, status } = resolveErrorMessage(error, 'mutation')
-    if (status !== 401 && status !== 403) reconcileList(session)
+    authRejected = status === 401 || status === 403
+    if (!authRejected) {
+      reconcileList(session)
+      didReconcile = true
+    }
     if (!isCurrentModal()) return
     statusFeedback.value = { text: message, error: true }
 
@@ -341,6 +352,18 @@ async function submitStatusChange() {
   } finally {
     if (savingOpeningId.value === targetOpening) {
       savingOpeningId.value = null
+    }
+    inFlightOrderStatusIds.delete(targetId)
+    const hadPendingRealtime = pendingOrderEventsDuringInFlight.delete(targetId)
+    if (didReconcile) {
+      if (isCurrentSession(session)) {
+        suppressOrderEchoUntil.set(targetId, Date.now() + 1500)
+      }
+    } else if (hadPendingRealtime && !authRejected && isCurrentSession(session)) {
+      reconcileList(session)
+      if (showModal.value && selectedOrderId.value === targetId && !isSaving.value) {
+        void refreshOpenOrderDetail(targetId)
+      }
     }
   }
 }
@@ -361,12 +384,26 @@ async function refreshOpenOrderDetail(orderId: number) {
 
 onRealtime(change => {
   if (!allowed()) return
-  if (change.receipts || change.payments) {
-    reconcileList(identity())
-    const currentId = selectedOrderId.value
-    if (showModal.value && currentId !== null && !isSaving.value) {
-      void refreshOpenOrderDetail(currentId)
+  for (const id of change.orders) {
+    if (inFlightOrderStatusIds.has(id)) {
+      pendingOrderEventsDuringInFlight.add(id)
     }
+  }
+  const now = Date.now()
+  const externalOrderIds = [...change.orders].filter(
+    id => !inFlightOrderStatusIds.has(id) && now >= (suppressOrderEchoUntil.get(id) ?? 0),
+  )
+  if (change.reconnect || externalOrderIds.length > 0 || change.receipts || change.payments) {
+    reconcileList(identity())
+  }
+  const currentId = selectedOrderId.value
+  if (
+    showModal.value &&
+    currentId !== null &&
+    !isSaving.value &&
+    (change.reconnect || externalOrderIds.includes(currentId) || change.receipts || change.payments)
+  ) {
+    void refreshOpenOrderDetail(currentId)
   }
 })
 
@@ -375,6 +412,10 @@ watch(
   () => {
     currentModalOpeningId.value++
     savingOpeningId.value = null
+    queuedListRefresh = undefined
+    inFlightOrderStatusIds.clear()
+    suppressOrderEchoUntil.clear()
+    pendingOrderEventsDuringInFlight.clear()
     list.reset()
     detail.reset()
     showModal.value = false
@@ -399,6 +440,9 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   disposed = true
+  inFlightOrderStatusIds.clear()
+  suppressOrderEchoUntil.clear()
+  pendingOrderEventsDuringInFlight.clear()
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>

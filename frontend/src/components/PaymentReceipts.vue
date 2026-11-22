@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { isAxiosError } from 'axios'
 import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
+import { useDeferredRealtimeReconcile } from '@/composables/useDeferredRealtimeReconcile'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
   listPaymentReceipts, markPaymentReceiptReviewed, uploadPaymentReceipt,
@@ -29,7 +30,13 @@ const rejectingReceiptId = ref<string | null>(null)
 const rejectReason = ref('')
 const rejectValidationError = ref('')
 let mutation: AbortController | undefined
-let suppressRealtimeUntil = 0
+const realtimeReconcile = useDeferredRealtimeReconcile({
+  allowed,
+  isMutating: () => busy.value,
+  reconcile: () => {
+    void load(signal => listPaymentReceipts(props.path, page.value, signal), { keepData: true })
+  },
+})
 
 const scopedOrderId = computed(() => {
   if (props.mode !== 'pedido') return null
@@ -89,6 +96,7 @@ function openRejectForm(id: string) {
 function reset() {
   mutation?.abort()
   busy.value = false
+  realtimeReconcile.reset()
   notice.value = ''
   failure.value = ''
   statusFilter.value = ''
@@ -103,14 +111,12 @@ watch([identity, allowed], () => {
 onBeforeUnmount(reset)
 
 onRealtime(change => {
-  if (!allowed() || busy.value) return
-  if (!change.reconnect && Date.now() < suppressRealtimeUntil) return
+  if (!allowed()) return
   const matchesScope = props.mode === 'pedido'
     ? (scopedOrderId.value !== null && change.orders.has(scopedOrderId.value))
     : change.receipts
-  if (change.reconnect || matchesScope) {
-    void load(signal => listPaymentReceipts(props.path, page.value, signal), { keepData: true })
-  }
+  if (!change.reconnect && !matchesScope) return
+  realtimeReconcile.notify(change.reconnect)
 })
 
 function selectFile(event: Event) {
@@ -144,7 +150,7 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
   try {
     const message = await work(controller.signal)
     if (!valid()) return
-    suppressRealtimeUntil = Date.now() + 800
+    realtimeReconcile.suppress(800)
     notice.value = message
     clearFile()
     closeRejectForm()
@@ -157,7 +163,10 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
       ? mutationErrors[code as keyof typeof mutationErrors]
       : 'No se pudo procesar el comprobante. Reintentá en unos instantes.'
   } finally {
-    if (valid()) busy.value = false
+    if (valid()) {
+      busy.value = false
+      realtimeReconcile.settleAfterMutation()
+    }
   }
 }
 
@@ -285,11 +294,11 @@ function operation(receipt: PaymentReceipt) {
       </div>
     </form>
 
-    <p v-if="notice" role="status" class="m-0 text-sm font-medium text-[#15803D]">{{ notice }}</p>
-    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-[#B91C1C]">{{ failure }}</p>
+    <p v-if="notice" role="status" class="m-0 text-sm font-medium text-green-800">{{ notice }}</p>
+    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-red-800">{{ failure }}</p>
     <p v-if="loading && !data" role="status" class="m-0 text-sm text-slate-600">Cargando comprobantes…</p>
     <div v-else-if="error" class="space-y-2">
-      <p role="alert" class="m-0 text-sm font-medium text-[#B91C1C]">No se pudieron cargar los comprobantes.</p>
+      <p role="alert" class="m-0 text-sm font-medium text-red-800">No se pudieron cargar los comprobantes.</p>
       <button type="button" :class="actionButtonClass" @click="reload(page)">Reintentar comprobantes</button>
     </div>
     <template v-else-if="data">
@@ -389,7 +398,7 @@ function operation(receipt: PaymentReceipt) {
               />
               <span class="font-normal text-slate-600">{{ rejectReason.trim().length }} / 1000 caracteres</span>
             </label>
-            <p v-if="rejectValidationError" role="alert" class="m-0 text-xs font-semibold text-[#B91C1C]">
+            <p v-if="rejectValidationError" role="alert" class="m-0 text-xs font-semibold text-red-800">
               {{ rejectValidationError }}
             </p>
             <div class="flex flex-wrap items-center gap-2">

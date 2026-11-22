@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
 import ClientOrderDetail from '@/components/ClientOrderDetail.vue'
 import OrderFinancialStatusBadge from '@/components/OrderFinancialStatusBadge.vue'
 import OrderReceiptActions from '@/components/OrderReceiptActions.vue'
 import OrderReceiptDialog from '@/components/OrderReceiptDialog.vue'
+import { useDeferredRealtimeReconcile } from '@/composables/useDeferredRealtimeReconcile'
 import { useOrderReceiptSummaries } from '@/composables/useOrderReceiptSummaries'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
@@ -48,10 +49,15 @@ function loadOrders(keepData = false) {
 const expandedOrderId = ref<number | null>(null)
 const receiptOrder = ref<ClientOrderSummary | null>(null)
 const receipts = useOrderReceiptSummaries(() => orders.value)
-let suppressRealtimeUntil = 0
+const realtimeReconcile = useDeferredRealtimeReconcile({
+  allowed,
+  reconcile: () => {
+    void loadOrders(true)
+  },
+})
 
 function refreshOrderStates() {
-  suppressRealtimeUntil = Date.now() + 800
+  realtimeReconcile.suppress(800)
   // loadOrders() actualiza orders.value, lo que dispara useOrderReceiptSummaries secuencialmente sin doble ráfaga.
   void loadOrders(true)
 }
@@ -87,16 +93,20 @@ onMounted(() => {
 })
 
 watch([identity, allowed], () => {
+  realtimeReconcile.reset()
   expandedOrderId.value = null
   receiptOrder.value = null
   void loadOrders()
-}, { immediate: true })
+}, { flush: 'sync', immediate: true })
+
+onBeforeUnmount(() => {
+  realtimeReconcile.reset()
+})
 
 onRealtime(change => {
-  if (!change.reconnect && Date.now() < suppressRealtimeUntil) return
-  if (change.reconnect || change.orders.size > 0 || change.payments || change.account) {
-    void loadOrders(true)
-  }
+  if (!allowed()) return
+  if (!change.reconnect && change.orders.size === 0 && !change.payments && !change.account) return
+  realtimeReconcile.notify(change.reconnect)
 })
 
 // Filters
