@@ -88,3 +88,9 @@ Seguimiento propuesto fuera de esta rama, sin dictamen de severidad ni aprobaci�
 - Distinguir una actualización en curso de un fallo real del carrito. En conexión lenta, needsSync activa mensajes por artículo y del resumen que repiten advertencias y cambian la altura. Se propone un estado neutral único durante la consulta, con espacio estable, conservando bloqueada la compra y sin presentar importes anteriores como vigentes; los mensajes de error deben reservarse para fallos o incompatibilidades comprobados.
 
 En las capturas móviles las tarjetas de pedidos mantienen la jerarquía y las acciones separadas; Bruno comprobó que los diálogos de detalle/comprobantes se ven bien. No se plantea un rediseño de esa vista dentro de la integración del catálogo.
+
+### Ajuste de la prueba de promoción tras el primer CI
+
+Frontend CI de fc86ec6 informó 332 unitarias aprobadas y una E2E fallida: pricing.mock.spec.ts exigía que Promoción especial estuviera dentro del mismo elemento que Descuento 5.00%. El precio base tachado reorganizó el componente y la etiqueta siguió visible en otra línea. Se actualiza la prueba de Home y Catálogo para comprobar por separado el porcentaje visible, la promoción visible y el precio base tachado correcto, manteniendo la aserción de precio final existente. No se cambia el componente ni el cálculo para corregir este fallo.
+
+Verificación local: los 19 escenarios de pricing.mock.spec.ts pasaron mediante el ejecutor E2E oficial, con Chromium y base descartables. Se comprobó la limpieza del entorno. El CI del commit correctivo queda pendiente de publicación y ejecución.
