@@ -3,11 +3,39 @@ import { onScopeDispose, watch } from 'vue'
 import type { useAuthStore } from '@/stores/auth'
 
 type AuthStore = ReturnType<typeof useAuthStore>
-type Invalidation = { cart: boolean; products: Set<number>; orders: Set<number>; reconnect: boolean }
+export type Invalidation = {
+  cart: boolean
+  products: Set<number>
+  orders: Set<number>
+  receipts: boolean
+  payments: boolean
+  account: boolean
+  reconnect: boolean
+}
+
 const listeners = new Set<(change: Invalidation) => void>()
-const empty = (): Invalidation => ({ cart: false, products: new Set(), orders: new Set(), reconnect: false })
+const empty = (): Invalidation => ({
+  cart: false,
+  products: new Set(),
+  orders: new Set(),
+  receipts: false,
+  payments: false,
+  account: false,
+  reconnect: false,
+})
 const isId = (id: unknown): id is number =>
   typeof id === 'number' && Number.isSafeInteger(id) && id > 0 && id <= 2147483647
+const isIsoInstant = (value: unknown): value is string =>
+  typeof value === 'string' && Number.isFinite(Date.parse(value))
+
+const ORDER_LIFECYCLE_STATES = new Set([
+  'CONFIRMADO',
+  'EN_PREPARACION',
+  'ENVIADO',
+  'ENTREGADO',
+])
+const RECEIPT_LIFECYCLE_STATES = new Set(['PENDIENTE', 'APROBADO', 'RECHAZADO'])
+const PAYMENT_LIFECYCLE_STATES = new Set(['PENDIENTE', 'ACREDITADO', 'RECHAZADO', 'ANULADO'])
 
 export function onRealtime(listener: (change: Invalidation) => void) {
   listeners.add(listener)
@@ -53,6 +81,13 @@ export function startRealtime(auth: AuthStore) {
     let scheduled: ReturnType<typeof setTimeout> | undefined
     let retry: ReturnType<typeof setTimeout> | undefined
     const seen = new Set<string>()
+
+    function markSeen(idEvento: string): boolean {
+      if (seen.has(idEvento)) return false
+      seen.add(idEvento)
+      if (seen.size > 256) seen.delete(seen.values().next().value!)
+      return true
+    }
 
     function schedule() {
       scheduled ??= setTimeout(() => {
@@ -110,13 +145,48 @@ export function startRealtime(auth: AuthStore) {
     })
     socket.on('pedido.confirmado.v1', payload => {
       if (!ready || payload?.version !== 1 || !isId(payload.pedidoId) ||
-          payload.estado !== 'CONFIRMADO' || typeof payload.notificadoEn !== 'string' ||
-          !Number.isFinite(Date.parse(payload.notificadoEn)) ||
-          payload.idEvento !== `pedido.confirmado.v1:${payload.pedidoId}` || seen.has(payload.idEvento)) return
-      seen.add(payload.idEvento)
-      if (seen.size > 256) seen.delete(seen.values().next().value!)
+          payload.estado !== 'CONFIRMADO' || !isIsoInstant(payload.notificadoEn) ||
+          payload.idEvento !== `pedido.confirmado.v1:${payload.pedidoId}` || !markSeen(payload.idEvento)) return
       batch.orders.add(payload.pedidoId)
       batch.cart = true
+      schedule()
+    })
+    socket.on('pedido.estado.actualizado.v1', payload => {
+      if (!ready || payload?.version !== 1 || !isId(payload.pedidoId) ||
+          typeof payload.estadoNuevo !== 'string' || !ORDER_LIFECYCLE_STATES.has(payload.estadoNuevo) ||
+          !isIsoInstant(payload.actualizadoEn) ||
+          typeof payload.idEvento !== 'string' ||
+          payload.idEvento !== `pedido.estado.actualizado.v1:${payload.pedidoId}:${payload.estadoNuevo}:${payload.actualizadoEn}` ||
+          !markSeen(payload.idEvento)) return
+      batch.orders.add(payload.pedidoId)
+      schedule()
+    })
+    socket.on('comprobante.estado.actualizado.v1', payload => {
+      if (!ready || payload?.version !== 1 || typeof payload.comprobanteId !== 'string' ||
+          !payload.comprobanteId ||
+          (payload.pedidoId !== null && !isId(payload.pedidoId)) ||
+          (payload.cuentaCorrienteId !== null && !isId(payload.cuentaCorrienteId)) ||
+          typeof payload.estadoDocumental !== 'string' || !RECEIPT_LIFECYCLE_STATES.has(payload.estadoDocumental) ||
+          !isIsoInstant(payload.actualizadoEn) ||
+          typeof payload.idEvento !== 'string' ||
+          payload.idEvento !== `comprobante.estado.actualizado.v1:${payload.comprobanteId}:${payload.estadoDocumental}` ||
+          !markSeen(payload.idEvento)) return
+      batch.receipts = true
+      if (isId(payload.pedidoId)) batch.orders.add(payload.pedidoId)
+      schedule()
+    })
+    socket.on('pago.acreditado.v1', payload => {
+      if (!ready || payload?.version !== 1 || !isId(payload.pagoId) ||
+          (payload.pedidoId !== null && !isId(payload.pedidoId)) ||
+          (payload.cuentaCorrienteId !== null && !isId(payload.cuentaCorrienteId)) ||
+          typeof payload.estadoPago !== 'string' || !PAYMENT_LIFECYCLE_STATES.has(payload.estadoPago) ||
+          !isIsoInstant(payload.actualizadoEn) ||
+          typeof payload.idEvento !== 'string' ||
+          payload.idEvento !== `pago.acreditado.v1:${payload.pagoId}:${payload.estadoPago}:${payload.actualizadoEn}` ||
+          !markSeen(payload.idEvento)) return
+      batch.payments = true
+      if (isId(payload.pedidoId)) batch.orders.add(payload.pedidoId)
+      if (isId(payload.cuentaCorrienteId)) batch.account = true
       schedule()
     })
     queueMicrotask(() => { if (active) socket.connect() })
