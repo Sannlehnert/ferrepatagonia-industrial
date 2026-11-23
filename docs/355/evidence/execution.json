@@ -1,0 +1,116 @@
+{
+  "task": 355,
+  "story": 305,
+  "verifiedSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "branch": "test/355-admin-regressions-persistence",
+  "generatedUTC": "2026-11-23T23:45:27.860Z",
+  "node": "v22.22.2",
+  "npm": "10.9.7",
+  "mariadb": "11.4",
+  "phase": "Posterior a integrar #335",
+  "baseline": {
+    "sha": "2616f478fe648dfa0ee1ee96b012273173cc9dd5",
+    "evidence": "baseline-2616f47/execution.json",
+    "initialAdminE2E": 49,
+    "scope": "Conserva sus propios resultados; no son reejecuciones sobre d0e1851."
+  },
+  "trackedSourceUnchanged": true,
+  "originalRepositoryApplicationCodeUnchanged": true,
+  "results": [
+    {
+      "name": "build-backend",
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:38:54.778Z",
+      "logSha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "name": "build-frontend",
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:39:00.739Z",
+      "logSha256": "ed05da9933d24a3f7293675ccc376a6b6785a890fda49d0f232714e1d0f896d8"
+    },
+    {
+      "name": "account-admin",
+      "result": "PASS",
+      "passed": 58,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:40:04.454Z",
+      "logSha256": "df8ad8ab0dc33b6b9465bc0253c3ba19cfb942ffd06f728eb2a7242d0e7bb4ea"
+    },
+    {
+      "name": "payments",
+      "result": "PASS",
+      "passed": 25,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:39:58.461Z",
+      "logSha256": "63bcd4854081c76cb407caf9a1de928f3953e60c29879d47941da75e9077c61a"
+    },
+    {
+      "name": "state-consistency",
+      "result": "PASS",
+      "passed": 11,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:40:19.305Z",
+      "logSha256": "3dcfcf9385eb770c375152f9dbae55d14760c30381b5a932e15ffab29b358aa7"
+    },
+    {
+      "name": "catalog-browser",
+      "result": "PASS",
+      "passed": 1,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:41:11.656Z",
+      "logSha256": "4ad703287016c7cc390768698183ab6bc6d3b3a0df8da554fc22ee98893ac373"
+    },
+    {
+      "name": "payment-actions",
+      "result": "PASS",
+      "passed": 23,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:43:07.279Z",
+      "logSha256": "547cfe0187959428f92f110bc10757dfb9a21562bb0a5a36128f2930b8bd0899"
+    },
+    {
+      "name": "payments-browser",
+      "result": "PASS",
+      "passed": 3,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:43:50.643Z",
+      "logSha256": "9b98b0c8e348dff34677f169e4babb611d238a0c1b83614a15d1211bdf65f5fc"
+    },
+    {
+      "name": "receipts-browser",
+      "result": "PASS",
+      "passed": 10,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T23:44:59.345Z",
+      "logSha256": "1a2356d4f00dfb40d7ac62b1c6fead468dec2988576075e317ae9459234d8b88"
+    }
+  ],
+  "baseCI": {
+    "run": 45251738522,
+    "evidence": "ci-base.json",
+    "futureTaskPR": "Pendiente de crear/verificar; el CI de base no lo sustituye."
+  },
+  "limits": [
+    "Revisión técnica de Zahir y CI del futuro PR de #355 pendientes",
+    "#346 / PR162 no está integrado en este SHA; repetir bloques afectados si se incorpora antes de release",
+    "El reinicio de BD cubre catálogo, imágenes y carritos del recorrido; no cada acreditación/comprobante",
+    "#354 y #356 corresponden a pruebas manuales/release separadas"
+  ],
+  "artifactSha256": {
+    "baseline-2616f47/catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
+    "baseline-2616f47/catalog-coverage.csv": "1b07623e8636b152193f78d820b5204c719a2a801791c1b650839b82b6d37937",
+    "baseline-2616f47/catalog-summary.json": "1b0725ee91834d1b3ac761039c1b78bc68b72b77397d4aa26d8dd32a72314071",
+    "baseline-2616f47/checks.txt": "e087c34c8e3fe5513cb5de1fbff248986973de4452afbe22bbb28a575845498a",
+    "baseline-2616f47/execution.json": "20d1a31ae8ae2774d7249457f8906ac876fb1b55252a7d267c4858932d96033d",
+    "catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
+    "catalog-coverage.csv": "1b07623e8636b152193f78d820b5204c719a2a801791c1b650839b82b6d37937",
+    "catalog-summary.json": "756e9e69e6eb637bc8fa00a3473c0924324eb22b7657dfdd8f3c5b473d82bba6",
+    "checks.txt": "16b90cd0c6cab2cd6e55f42f21f801b995804c48750422fc437dbce6999c9008",
+    "ci-base.json": "5cd8d0690f55a9b41717f850fd19cb7ffd20c34e554cad23a8d6fecfd05f57fe"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "sha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "branch": "develop",
+  "event": "push",
+  "run": 45251738522,
+  "url": "https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45251738522",
+  "jobs": [
+    {
+      "id": 137962879104,
+      "name": "Frontend CI (Node 22 + Vite + Playwright E2E)",
+      "head_sha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "id": 137962879841,
+      "name": "Backend CI (Node 22 + MariaDB + E2E & Cleanup)",
+      "head_sha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "scope": "CI de la base integrada, no del futuro PR de #355.",
+  "verifiedUTC": "2026-11-23T23:43:50.264Z"
+}

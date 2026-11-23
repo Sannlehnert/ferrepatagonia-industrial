@@ -1,0 +1,107 @@
+{
+  "task": 355,
+  "story": 305,
+  "verifiedSha": "2616f478fe648dfa0ee1ee96b012273173cc9dd5",
+  "branch": "test/355-admin-regressions-persistence",
+  "generatedUTC": "2026-11-23T13:56:41.428Z",
+  "node": "v22.22.2",
+  "npm": "10.9.7",
+  "mariadb": "11.4",
+  "docker": "29.8.2",
+  "trackedSourceUnchanged": true,
+  "execution": "Copia aislada del SHA; ejecutores existentes. No se escribió código ni se efectuaron acciones en GitHub/Taiga.",
+  "initialEnvironmentAttempt": "El primer acceso a Docker fue denegado por el entorno de ejecución. Los tres bloques afectados se reejecutaron con acceso autorizado y aprobaron; no se clasificó como fallo funcional.",
+  "results": [
+    {
+      "name": "build-backend",
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:42:17.701Z",
+      "logSha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "name": "build-frontend",
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:42:36.968Z",
+      "logSha256": "403d165588d0023f402232a44c2409cfaf722c4609ed7aaff4c432b917c7def8"
+    },
+    {
+      "name": "account-admin",
+      "result": "PASS",
+      "passed": 58,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:44:13.994Z",
+      "logSha256": "4b5e4b4e7e3f44473385e02b47b2a86daad47a5df26470aee45e96f2fed0b616"
+    },
+    {
+      "name": "company-approval",
+      "result": "PASS",
+      "passed": 23,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:45:14.039Z",
+      "logSha256": "2a9303388fc4cd38453d370d96fd3c30c3076f45a1fa12e621be2435b7695a99"
+    },
+    {
+      "name": "payments",
+      "result": "PASS",
+      "passed": 23,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:44:06.416Z",
+      "logSha256": "66c69a2718dbd62bc0d91eee06f92b15e147ad53015b564928ec91b093ab812f"
+    },
+    {
+      "name": "state-consistency",
+      "result": "PASS",
+      "passed": 11,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:45:44.482Z",
+      "logSha256": "bc11c8ab96294f64ed4da81f453d6b6c3ce2541ffbdef0116bcd831b3985d6bb"
+    },
+    {
+      "name": "local-bootstrap",
+      "result": "PASS",
+      "passed": 7,
+      "skipped": 1,
+      "finishedUTC": "2026-11-23T13:47:54.469Z",
+      "logSha256": "acb1e2eecb5b9a5412576c966834ad64e18aa513d513ac88bfc5b133d90cfa24"
+    },
+    {
+      "name": "admin-browser",
+      "result": "PASS",
+      "passed": 49,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:49:56.382Z",
+      "logSha256": "11e7836734648707c9097618fd1e58392b83a9ccfba5098f625d8b1f5dfe82b7"
+    },
+    {
+      "name": "catalog-browser",
+      "result": "PASS",
+      "passed": 1,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:45:21.770Z",
+      "logSha256": "30b9b00691ff1d368d5c985b264d7ed7cdbd27cfc2c907d7706b7255d214b61a"
+    },
+    {
+      "name": "receipts-browser",
+      "result": "PASS",
+      "passed": 10,
+      "skipped": 0,
+      "finishedUTC": "2026-11-23T13:55:39.030Z",
+      "logSha256": "337674f9a11abaa55b814cb376e8bb4f98ff407ec622cb8c4af74d4e8f449cff"
+    }
+  ],
+  "pending": [
+    "Revisión cruzada y CI del PR de #355",
+    "Integrar #335 y repetir el bloque de su bandeja ADMIN de pagos",
+    "Pruebas manuales #354 y release #356 son entregas separadas"
+  ],
+  "artifactSha256": {
+    "catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
+    "catalog-coverage.csv": "1b07623e8636b152193f78d820b5204c719a2a801791c1b650839b82b6d37937",
+    "catalog-summary.json": "1b0725ee91834d1b3ac761039c1b78bc68b72b77397d4aa26d8dd32a72314071",
+    "checks.txt": "e087c34c8e3fe5513cb5de1fbff248986973de4452afbe22bbb28a575845498a"
+  }
+}
