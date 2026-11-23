@@ -875,3 +875,174 @@ test('una verificación pendiente no bloquea modificaciones de otra empresa', as
   await pending;
   assert.equal(state.clients[2].estadoAprobacionEmpresa, 'RECHAZADA', 'Reconciliar una fila no sustituye las demás');
 });
+
+function createDialogDom(t) {
+  const prevHTMLElement = global.HTMLElement;
+  const prevDocument = global.document;
+
+  class FakeHTMLElement {
+    constructor(tag, text = '') {
+      this.tag = tag;
+      this.text = text;
+      this.props = {};
+      this.children = [];
+      this.parent = null;
+      this.open = false;
+      this.disabled = false;
+      this.focusCalls = [];
+    }
+    get isConnected() {
+      let current = this;
+      while (current.parent) current = current.parent;
+      return current.tag === 'root';
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    showModal() { this.open = true; }
+    close() { this.open = false; }
+    focus(options) {
+      if (this.disabled || this.props.disabled) return;
+      this.focusCalls.push(options ?? null);
+      fakeDocument.activeElement = vue.toRaw(this);
+    }
+    matches(selector) {
+      if (selector === ':disabled') return Boolean(this.disabled || this.props.disabled);
+      return false;
+    }
+    contains(target) {
+      if (!target) return false;
+      const rawTarget = vue.toRaw(target);
+      if (vue.toRaw(this) === rawTarget) return true;
+      return this.children.some(child => child.contains(rawTarget));
+    }
+    closest() { return null; }
+    querySelector() { return null; }
+    querySelectorAll() { return []; }
+    getClientRects() { return []; }
+  }
+
+  const body = new FakeHTMLElement('body');
+  const fakeDocument = { body, activeElement: body };
+  global.HTMLElement = FakeHTMLElement;
+  global.document = fakeDocument;
+  t.after(() => {
+    global.HTMLElement = prevHTMLElement;
+    global.document = prevDocument;
+  });
+
+  const renderer = vue.createRenderer({
+    createElement: tag => new FakeHTMLElement(tag),
+    createText: text => new FakeHTMLElement('#text', text),
+    createComment: text => new FakeHTMLElement('#comment', text),
+    insert(el, parent, anchor) {
+      el.parent = parent;
+      const i = anchor ? parent.children.indexOf(anchor) : -1;
+      if (i >= 0) parent.children.splice(i, 0, el);
+      else parent.children.push(el);
+    },
+    remove(el) {
+      if (!el.parent) return;
+      const i = el.parent.children.indexOf(el);
+      if (i >= 0) el.parent.children.splice(i, 1);
+      el.parent = null;
+      if (fakeDocument.activeElement && el.contains(fakeDocument.activeElement)) {
+        fakeDocument.activeElement = fakeDocument.body;
+      }
+    },
+    setText(el, text) { el.text = text; },
+    setElementText(el, text) { el.text = text; el.children = []; },
+    patchProp(el, key, _prev, next) {
+      el.props[key] = next;
+      if (key === 'disabled') el.disabled = Boolean(next);
+    },
+    parentNode: el => el.parent,
+    nextSibling: el => {
+      if (!el.parent) return null;
+      const i = el.parent.children.indexOf(el);
+      return el.parent.children[i + 1] || null;
+    },
+  });
+
+  return { FakeHTMLElement, fakeDocument, renderer, createRoot: () => new FakeHTMLElement('root') };
+}
+
+test('S7-345-A01: retorna el foco al botón Ver detalle cuando el disparador queda disabled tras resultado incierto', async t => {
+  const { FakeHTMLElement, fakeDocument, renderer, createRoot } = createDialogDom(t);
+  const Dialog = load('components/AdminClientStatusDialog.vue', {}, true).default;
+
+  const rootEl = createRoot();
+  const row = new FakeHTMLElement('tr');
+  const approveTrigger = new FakeHTMLElement('button');
+  const detailFallback = new FakeHTMLElement('button');
+  row.parent = rootEl;
+  approveTrigger.parent = row;
+  detailFallback.parent = row;
+  approveTrigger.closest = sel => (sel === 'tr' ? row : null);
+  row.querySelector = sel => (sel === '[data-client-detail]' ? detailFallback : null);
+
+  fakeDocument.activeElement = approveTrigger;
+  const open = vue.ref(true);
+  const app = renderer.createApp({
+    render: () => (open.value ? vue.h(Dialog, {
+      client: sampleClients()[1],
+      target: 'APROBADA',
+      credit: null,
+      busy: false,
+      uncertain: true,
+    }) : null),
+  });
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  await settle();
+
+  approveTrigger.disabled = true;
+  open.value = false;
+  await settle();
+
+  assert.equal(approveTrigger.focusCalls.length, 0);
+  assert.equal(detailFallback.focusCalls.length, 1);
+  assert.equal(fakeDocument.activeElement, detailFallback);
+});
+
+test('WCAG 2.4.3: enfoca el botón Cerrar dentro del diálogo cuando se confirma y se desmonta el botón de confirmación', async t => {
+  const { fakeDocument, renderer, createRoot } = createDialogDom(t);
+  const Dialog = load('components/AdminClientStatusDialog.vue', {}, true).default;
+
+  const state = vue.reactive({
+    client: { ...sampleClients()[1] },
+    busy: false,
+    uncertain: false,
+  });
+  const rootEl = createRoot();
+  const app = renderer.createApp({
+    render: () => vue.h(Dialog, {
+      client: state.client,
+      target: 'APROBADA',
+      credit: null,
+      busy: state.busy,
+      uncertain: state.uncertain,
+    }),
+  });
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  await settle();
+
+  const confirmBtn = findNode(rootEl, n => n.tag === 'button' && n.text.includes('Confirmar aprobación'));
+  const closeBtn = findNode(rootEl, n => n.tag === 'button' && n.props?.['aria-label'] === 'Cerrar detalle del cliente');
+  assert.ok(confirmBtn);
+  assert.ok(closeBtn);
+
+  confirmBtn.focus();
+  assert.equal(fakeDocument.activeElement, confirmBtn);
+
+  state.busy = true;
+  await settle();
+  state.client.estadoAprobacionEmpresa = 'APROBADA';
+  await settle();
+  state.busy = false;
+  await settle();
+
+  assert.equal(findNode(rootEl, n => n.tag === 'button' && n.text.includes('Confirmar aprobación')), null);
+  assert.equal(fakeDocument.activeElement, closeBtn);
+  assert.deepEqual(closeBtn.focusCalls.at(-1), { preventScroll: true });
+});

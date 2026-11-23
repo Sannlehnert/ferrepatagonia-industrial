@@ -468,3 +468,65 @@ test('regresión #345+#346: aprobar en una página filtrada conserva URL y una r
   assert.equal(route.route.query.estadoEmpresa, 'PENDIENTE');
   assert.equal(route.route.query.page, undefined);
 });
+
+test('AUD-346-01: loadPriceLists(true) conserva el borrador pendiente en un cliente sin asignación previa', async t => {
+  let lists = [
+    { id: 1, nombre: 'Lista uno', porcentajeDescuento: '10.00' },
+    { id: 2, nombre: 'Lista dos', porcentajeDescuento: '20.00' },
+  ];
+  const service = defaultService({
+    getAdminClientPriceLists: async () => ({
+      listas: lists,
+      asignaciones: [{ idListaPrecio: 1, nombre: 'Lista uno', activa: true, idCliente: 1 }],
+    }),
+  });
+  const { state } = await mountView(t, { service });
+  assert.equal(state.assignments[2], undefined);
+  state.selections[2] = 2;
+
+  await state.loadPriceLists(true);
+  await settle();
+  assert.equal(state.selections[2], 2);
+
+  lists = [{ id: 1, nombre: 'Lista uno', porcentajeDescuento: '10.00' }];
+  await state.loadPriceLists(true);
+  await settle();
+  assert.equal(state.selections[2], undefined);
+});
+
+test('AUD-346-02: el debounce de búsqueda preserva el espacio final mientras el input sigue enfocado', async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const { state, route } = await mountView(t);
+
+  state.searchInput = { matches: selector => selector === ':focus' };
+  state.searchQuery = 'Juan ';
+  await settle();
+  t.mock.timers.tick(300);
+  await settle();
+
+  assert.equal(route.route.query.busqueda, 'Juan');
+  assert.equal(state.searchQuery, 'Juan ');
+
+  state.searchInput = { matches: () => false };
+  state.searchQuery = 'Pedro ';
+  await settle();
+  t.mock.timers.tick(300);
+  await settle();
+
+  assert.equal(route.route.query.busqueda, 'Pedro');
+  assert.equal(state.searchQuery, 'Pedro');
+});
+
+test('AUD-346-03: navegar filtros o página por historial cierra el diálogo abierto', async t => {
+  const { state, route } = await mountView(t);
+  const empresa = state.clients.find(c => c.tipoCliente === 'EMPRESA');
+  state.openClient(empresa, 'APROBADA');
+  assert.equal(state.selectedClientId, empresa.id);
+  assert.equal(state.approvalTarget, 'APROBADA');
+
+  route.route.query = { page: '2' };
+  await settle();
+
+  assert.equal(state.selectedClientId, null);
+  assert.equal(state.approvalTarget, null);
+});

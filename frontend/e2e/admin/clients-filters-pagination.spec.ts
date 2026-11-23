@@ -250,11 +250,22 @@ test('filtros, paginación real, aprobación y contexto de listas en clientes', 
     await expect(region).toBeFocused()
     await page.keyboard.press('ArrowRight')
     await expect.poll(() => region.evaluate(element => element.scrollLeft)).toBeGreaterThan(0)
+    const helpBox = await page.locator('#clients-table-help').boundingBox()
+    expect(helpBox).toBeTruthy()
+    expect(helpBox!.x).toBeGreaterThanOrEqual(0)
+    expect(helpBox!.x + helpBox!.width).toBeLessThanOrEqual(320)
 
     const evidence = resolve(process.cwd(), '../docs/346/evidence')
     mkdirSync(evidence, { recursive: true })
     await page.setViewportSize({ width: 360, height: 844 })
-    await region.evaluate(element => { element.scrollLeft = 0 })
+    await expect.poll(() => region.evaluate(element => {
+      element.blur()
+      element.scrollTo({ left: 0, behavior: 'instant' })
+      return element.scrollLeft
+    })).toBe(0)
+    await page.waitForTimeout(350)
+    await region.evaluate(element => { element.scrollTo({ left: 0, behavior: 'instant' }) })
+    await expect.poll(() => region.evaluate(element => element.scrollLeft)).toBe(0)
     await page.screenshot({ path: resolve(evidence, 'clientes-360.png'), fullPage: true })
     await page.getByRole('button', { name: 'Nueva lista' }).click()
     await expect(page.getByRole('dialog', { name: 'Nueva lista de precios' })).toBeVisible()
@@ -263,7 +274,8 @@ test('filtros, paginación real, aprobación y contexto de listas en clientes', 
     await expect(page.getByRole('dialog', { name: 'Nueva lista de precios' })).toHaveCount(0)
 
     await page.setViewportSize({ width: 1280, height: 900 })
-    await region.evaluate(element => { element.scrollLeft = 0 })
+    await region.evaluate(element => { element.scrollTo({ left: 0, behavior: 'instant' }) })
+    await expect.poll(() => region.evaluate(element => element.scrollLeft)).toBe(0)
     await page.screenshot({ path: resolve(evidence, 'clientes-1280.png'), fullPage: true })
     await page.getByRole('button', { name: 'Nueva lista' }).click()
     await expect(page.getByRole('dialog', { name: 'Nueva lista de precios' })).toBeVisible()
