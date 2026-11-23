@@ -70,6 +70,10 @@ export const pagoPendienteRevision = () =>
     'El pago debe tener la revisión documental aprobada antes de acreditarse.',
   );
 
+export const pagoDocumentalmenteRechazado = (
+  message = 'El comprobante o pago fue rechazado documentalmente.',
+) => new PaymentError('PAGO_DOCUMENTALMENTE_RECHAZADO', 409, message);
+
 export const cuentaNoAcreditada = () =>
   new PaymentError(
     'CUENTA_NO_ACREDITADA',
