@@ -17,6 +17,8 @@ interface PaymentFixture {
   adminRevokedEmail: string
   quoteId: number
   quoteReference: string
+  directOrder360Id: number
+  directOrder1280Id: number
   totalRowCount: number
   scenarios: Record<string, number>
 }
@@ -578,6 +580,89 @@ for (const width of [320, 360, 390, 768, 1280]) {
         type: 'jpeg',
         quality: 72,
       })
+    })
+  })
+}
+
+const directOrderViewports = [
+  { width: 360, paymentKey: 'directOrderUsd360' as const, orderKey: 'directOrder360Id' as const, expectedUsd: 'USD 175,00', expectedDbUsd: '175.00' },
+  { width: 1280, paymentKey: 'directOrderUsd1280' as const, orderKey: 'directOrder1280Id' as const, expectedUsd: 'USD 185,00', expectedDbUsd: '185.00' },
+]
+
+for (const { width, paymentKey, orderKey, expectedUsd, expectedDbUsd } of directOrderViewports) {
+  test.describe(`Acreditación de pago directo a pedido TRANSFERENCIA a ${width}px`, () => {
+    test.use({ viewport: { width, height: 850 } })
+
+    test('adapta los mensajes sin anunciar ABONO en cuenta corriente y acredita sin desborde', async ({ page, db }) => {
+      test.setTimeout(50_000)
+      const paymentId = scenario[paymentKey]!
+      const orderId = fixture[orderKey]
+      expect(await abonoCount(db, paymentId)).toBe(0)
+
+      await login(page)
+      await openPayments(page)
+
+      const paymentCard = card(page, paymentId)
+      await expect(paymentCard).toContainText(`Pedido #${orderId}`)
+      expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+      const dialog = await openAccreditation(page, paymentId)
+      const description = dialog.locator('#payment-accreditation-description')
+      await expect(description).toContainText(`Pedido #${orderId}`)
+      await expect(description).toContainText('cobertura financiera')
+      await expect(description).toContainText('sin generar movimiento ABONO en cuenta corriente')
+      await expect(description).not.toContainText('Esta acción acredita el pago en la cuenta corriente')
+
+      const checkboxLabel = dialog.locator('label:has(input[type="checkbox"])')
+      await expect(checkboxLabel).toContainText(`Pedido #${orderId}`)
+      await expect(checkboxLabel).toContainText('cobertura financiera')
+      await expect(checkboxLabel).not.toContainText(/abono|cuenta corriente/i)
+
+      expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+      mkdirSync(capturesDir, { recursive: true })
+      await page.screenshot({
+        path: resolve(capturesDir, `payments-direct-order-previo-${width}.jpg`),
+        type: 'jpeg',
+        quality: 72,
+      })
+
+      const responsePromise = page.waitForResponse(response =>
+        response.request().method() === 'POST'
+        && response.url().includes(`/api/admin/pagos/${paymentId}/acreditar`))
+      await submitAccreditation(dialog, `Acreditación pedido directo TEST-ONLY #335 (${width}px)`)
+      const accreditedResponse = await responsePromise
+      expect(accreditedResponse.status()).toBe(200)
+
+      const statusBanner = dialog.getByRole('status').filter({ hasText: 'Acreditación confirmada por el servidor.' })
+      await expect(statusBanner).toBeVisible()
+      await expect(statusBanner).toContainText(`Pedido #${orderId}`)
+      await expect(statusBanner).toContainText(expectedUsd)
+      await expect(statusBanner).not.toContainText(/abono|cuenta corriente/i)
+      expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+      await page.screenshot({
+        path: resolve(capturesDir, `payments-direct-order-acreditado-${width}.jpg`),
+        type: 'jpeg',
+        quality: 72,
+      })
+
+      await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click()
+      await expect(dialog).toHaveCount(0)
+
+      const feedback = page.locator('.payments-feedback')
+      await expect(feedback).toContainText(`Pedido #${orderId}`)
+      await expect(feedback).toContainText(expectedUsd)
+      await expect(feedback).not.toContainText(/abono|cuenta corriente/i)
+      await expect(paymentCard).toContainText('Acreditado')
+      await expect(paymentCard.getByRole('button', { name: `Acreditar pago ${paymentId}`, exact: true })).toHaveCount(0)
+      expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+      const row = await paymentRow(db, paymentId)
+      expect(row.estado).toBe('ACREDITADO')
+      expect(row.id_cuenta_corriente).toBeNull()
+      expect(Number(row.id_pedido)).toBe(orderId)
+      expect(row.monto_usd).toBe(expectedDbUsd)
+      expect(await abonoCount(db, paymentId)).toBe(0)
     })
   })
 }

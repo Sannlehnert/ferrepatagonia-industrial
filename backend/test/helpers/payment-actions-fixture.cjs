@@ -96,16 +96,27 @@ async function seedPaymentActions(session) {
       'TEST-ONLY verificación #335', 1, ?, 1, 0)
   `, [quoteId, reference, sqlLoadedMs, sqlVerified])
 
-  async function createReceipt(label, mime = 'image/png') {
+  async function createReceipt(label, mime = 'image/png', options = {}) {
     const receiptId = randomUUID()
     const bytes = 512 + (label.length % 1024)
+    const receiptOrderId = options.orderId ?? null
+    const receiptAccountId = options.accountId === undefined ? accountId : options.accountId
     await connection.query(`
       INSERT INTO COMPROBANTE_PAGO
         (id_comprobante, id_cliente, id_usuario_carga, id_pedido, id_cuenta_corriente,
          tipo_mime, bytes, sha256, fecha_utc)
-      VALUES (?, ?, ?, NULL, ?, ?, ?, ?, UTC_TIMESTAMP(3))
-    `, [receiptId, clientId, userId, accountId, mime, bytes, sha(`#335-receipt:${label}`)])
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, UTC_TIMESTAMP(3))
+    `, [receiptId, clientId, userId, receiptOrderId, receiptAccountId, mime, bytes, sha(`#335-receipt:${label}`)])
     return receiptId
+  }
+
+  async function createDirectOrder(label, amount = '175.00') {
+    return insert(`
+      INSERT INTO PEDIDO
+        (id_cliente, estado, modalidad_pago, subtotal, descuento, total,
+         moneda_total, evidencia_total_usd)
+      VALUES (?, 'CONFIRMADO', 'TRANSFERENCIA', ?, 0, ?, 'USD', ?)
+    `, [clientId, amount, amount, `Fixture #335 ${label}`])
   }
 
   async function createPayment(label, options = {}) {
@@ -119,9 +130,13 @@ async function seedPaymentActions(session) {
       accredited = false,
       secondsAgo = 0,
       createMovement = false,
+      orderId = null,
+      targetAccountId = accountId,
     } = options
 
-    const receiptId = withReceipt ? await createReceipt(label) : null
+    const receiptId = withReceipt
+      ? await createReceipt(label, 'image/png', { orderId, accountId: targetAccountId })
+      : null
     const declarationKey = withReceipt ? randomUUID() : null
     const declarationHash = withReceipt ? sha(`#335-declaration:${label}:${amount}:${currency}`).toString('hex') : null
     const approved = documentState === 'APROBADO' || documentState === 'RECHAZADO'
@@ -133,7 +148,8 @@ async function seedPaymentActions(session) {
     const tasa = accredited && currency === 'ARS' ? '1000.00000000' : null
     const idCotizacion = accredited && currency === 'ARS' ? quoteId : null
     const payload = [
-      accountId,
+      targetAccountId,
+      orderId,
       amount,
       financialState,
       receiptId,
@@ -164,7 +180,7 @@ async function seedPaymentActions(session) {
 
     const paymentId = await insert(`
       INSERT INTO PAGO (
-        id_cuenta_corriente, monto, metodo_pago, estado, comprobante, observaciones, moneda,
+        id_cuenta_corriente, id_pedido, monto, metodo_pago, estado, comprobante, observaciones, moneda,
         id_usuario_declarante, clave_idempotencia, huella_declaracion, id_comprobante,
         estado_documental, id_admin_revision, revision_utc, motivo_revision,
         motivo_cierre, id_admin_cierre, fecha_cierre_utc,
@@ -172,7 +188,7 @@ async function seedPaymentActions(session) {
         monto_usd, fecha_acreditacion_utc, evidencia_acreditacion, id_admin_actor,
         id_cotizacion, tasa_historica, fecha
       ) VALUES (
-        ?, ?, 'TRANSFERENCIA', ?, ?, ?, ?,
+        ?, ?, ?, 'TRANSFERENCIA', ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?, ?,
         ?, ?, ?,
@@ -182,7 +198,7 @@ async function seedPaymentActions(session) {
       )
     `, payload)
 
-    if (createMovement || accredited) {
+    if ((createMovement || accredited) && targetAccountId !== null) {
       await connection.query(`
         INSERT INTO MOVIMIENTO_CUENTA_CORRIENTE
           (id_cuenta_corriente, tipo_movimiento, origen, id_pago, monto, moneda,
@@ -259,6 +275,22 @@ async function seedPaymentActions(session) {
   scenarios.missingReceipt = await createPayment('missing-receipt', {
     amount: '30.00', withReceipt: false, secondsAgo: 17,
   })
+  const directOrder360Id = await createDirectOrder('direct-order-360', '175.00')
+  scenarios.directOrderUsd360 = await createPayment('direct-order-usd-360', {
+    amount: '175.00',
+    documentState: 'APROBADO',
+    secondsAgo: 18,
+    orderId: directOrder360Id,
+    targetAccountId: null,
+  })
+  const directOrder1280Id = await createDirectOrder('direct-order-1280', '185.00')
+  scenarios.directOrderUsd1280 = await createPayment('direct-order-usd-1280', {
+    amount: '185.00',
+    documentState: 'APROBADO',
+    secondsAgo: 19,
+    orderId: directOrder1280Id,
+    targetAccountId: null,
+  })
 
   return {
     clientId,
@@ -268,6 +300,8 @@ async function seedPaymentActions(session) {
     adminRevokedEmail: 'admin-revocado-335@e2e.test',
     quoteId,
     quoteReference: reference,
+    directOrder360Id,
+    directOrder1280Id,
     totalRowCount: 40 + Object.keys(scenarios).length,
     scenarios,
   }

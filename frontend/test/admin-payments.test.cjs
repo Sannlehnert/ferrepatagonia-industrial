@@ -198,5 +198,80 @@ test('el diálogo de acreditación no genera la clave automáticamente en cada e
   assert.match(source, /idempotencyKey \?\?= createAccreditationKey\(\)/)
   assert.match(source, /Reintentar con la misma clave/)
   assert.match(source, /No afirmamos que la acreditación haya fallado ni que se haya completado/)
+  assert.match(source, /accreditationDestinationDescription/)
+  assert.match(source, /accreditationConfirmationLabel/)
+  assert.match(source, /accreditationSuccessNotice/)
+  assert.match(source, /accreditationReconciledNotice/)
+  assert.match(source, /id="payment-accreditation-description"[^>]*\[overflow-wrap:anywhere\]/)
   assert.doesNotMatch(source, /monto_usd\s*=|INSERT INTO MOVIMIENTO/)
+})
+
+test('adapta mensajes previos y posteriores de acreditación para cuenta corriente vs pedido directo', () => {
+  const {
+    accreditationDestinationDescription,
+    accreditationConfirmationLabel,
+    accreditationSuccessNotice,
+    accreditationReconciledNotice,
+    paymentUpdatedFeedback,
+  } = service({})
+
+  const accountPayment = payment({
+    id: 41,
+    cuentaCorrienteId: 10,
+    pedidoId: null,
+    estadoDocumental: 'APROBADO',
+    estado: 'ACREDITADO',
+    montoUsd: '250.00',
+    movimientoId: 77,
+  })
+  const accountDesc = accreditationDestinationDescription(accountPayment)
+  const accountConfirm = accreditationConfirmationLabel(accountPayment)
+  const accountNotice = accreditationSuccessNotice(accountPayment)
+  const accountReconciled = accreditationReconciledNotice(accountPayment)
+  const accountFeedback = paymentUpdatedFeedback(accountPayment)
+
+  assert.match(accountDesc, /cuenta corriente/)
+  assert.match(accountDesc, /ABONO/)
+  assert.match(accountDesc, /FIFO/)
+  assert.match(accountConfirm, /ABONO/)
+  assert.match(accountConfirm, /cuenta corriente/)
+  assert.match(accountNotice, /ABONO/)
+  assert.match(accountNotice, /#77/)
+  assert.match(accountNotice, /cuenta corriente/)
+  assert.match(accountNotice, /USD 250,00/)
+  assert.match(accountReconciled, /ABONO/)
+  assert.match(accountReconciled, /#77/)
+  assert.match(accountFeedback, /cuenta corriente #10/)
+  assert.match(accountFeedback, /USD 250,00/)
+
+  const directOrderPayment = payment({
+    id: 42,
+    cuentaCorrienteId: null,
+    pedidoId: 33,
+    estadoDocumental: 'APROBADO',
+    estado: 'ACREDITADO',
+    montoUsd: '250.00',
+    movimientoId: null,
+  })
+  const directDesc = accreditationDestinationDescription(directOrderPayment)
+  const directConfirm = accreditationConfirmationLabel(directOrderPayment)
+  const directNotice = accreditationSuccessNotice(directOrderPayment)
+  const directReconciled = accreditationReconciledNotice(directOrderPayment)
+  const directFeedback = paymentUpdatedFeedback(directOrderPayment)
+
+  assert.match(directDesc, /Pedido #33/)
+  assert.match(directDesc, /cobertura financiera/)
+  assert.match(directDesc, /sin generar movimiento ABONO en cuenta corriente/)
+  assert.match(directConfirm, /Pedido #33/)
+  assert.match(directConfirm, /cobertura financiera/)
+  assert.doesNotMatch(directConfirm, /abono|cuenta corriente/i)
+  assert.match(directNotice, /Pedido #33/)
+  assert.match(directNotice, /USD 250,00/)
+  assert.doesNotMatch(directNotice, /abono|cuenta corriente/i)
+  assert.match(directReconciled, /Pedido #33/)
+  assert.match(directReconciled, /USD 250,00/)
+  assert.doesNotMatch(directReconciled, /abono|cuenta corriente/i)
+  assert.match(directFeedback, /Pedido #33/)
+  assert.match(directFeedback, /USD 250,00/)
+  assert.doesNotMatch(directFeedback, /abono|cuenta corriente/i)
 })

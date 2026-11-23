@@ -209,8 +209,8 @@ estado documental, moneda, cotización e idempotencia dentro de la transacción.
 | `npm run type-check --prefix backend` | OK |
 | `npm run build --prefix frontend` | OK |
 | `npm run build --prefix backend` | OK |
-| `npm test --prefix frontend` | **348 pass, 0 fail** |
-| `node --test frontend/test/admin-payments.test.cjs` | **8 pass, 0 fail** |
+| `npm test --prefix frontend` | **363 pass, 0 fail** |
+| `node --test frontend/test/admin-payments.test.cjs` | **9 pass, 0 fail** |
 | `npm run test:unit --prefix backend` | **1407 pass, 3 skipped, 0 fail** |
 | `npm run test:payments:isolated --prefix backend` | **25 pass, 0 fail** sobre MariaDB 11.4.13 |
 
@@ -225,7 +225,7 @@ node backend/test/helpers/run-e2e.cjs --receipts
 ```
 
 Resultados:
-- `--payment-actions`: **21/21 pruebas E2E aprobadas** sobre MariaDB 11.4 descartable.
+- `--payment-actions`: **23/23 pruebas E2E aprobadas** sobre MariaDB 11.4 descartable.
 - `--payments` (no-regresión `#334`): **3/3 aprobadas**.
 - `--receipts` (no-regresión `#275`/`#318`): **10/10 aprobadas**.
 
@@ -254,6 +254,7 @@ Cobertura:
 21. Resultado incierto y respuesta perdida.
 22. Respuestas obsoletas después de logout.
 23. Responsive y accesibilidad en 320, 360, 390, 768 y 1280 px.
+24. Acreditación de pago directo a pedido `TRANSFERENCIA` (`cuentaCorrienteId = null`) en 360 y 1280 px con mensajes diferenciados y 0 ABONOS.
 
 ### 8.3. E2E integradas
 
@@ -281,6 +282,7 @@ WHERE id_pago = ? AND tipo_movimiento = 'ABONO';
 | Aprobar documentación | `APROBADO` | `PENDIENTE` | **0** |
 | Rechazar documentación | `RECHAZADO` | `RECHAZADO` | **0** |
 | Acreditar USD | `APROBADO` | `ACREDITADO` | **1** |
+| Acreditar pago directo a pedido `TRANSFERENCIA` | `APROBADO` | `ACREDITADO` | **0** |
 | Acreditar ARS válido | `APROBADO` | `ACREDITADO` | **1** |
 | Doble clic de acreditación | `APROBADO` | `ACREDITADO` | **1** |
 | Resultado incierto + reintento con misma clave | `APROBADO` | `ACREDITADO` | **1** |

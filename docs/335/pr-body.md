@@ -19,10 +19,10 @@ Implementa la interfaz ADMIN de **Gestión de pagos** para consultar declaracion
 
 ## Pruebas ejecutadas
 
-- `frontend`: type-check, build y **348/348 unitarios** OK (`8/8` en `test/admin-payments.test.cjs`).
+- `frontend`: type-check, build y **363/363 unitarios** OK (`9/9` en `test/admin-payments.test.cjs`).
 - `backend`: type-check, build y **1407/1410 unitarios** OK (3 omitidos preexistentes, 0 fallos).
 - `backend`: `npm run test:payments:isolated` → **25/25** sobre MariaDB 11.4.13.
-- E2E `--payment-actions`: **21/21**.
+- E2E `--payment-actions`: **23/23**.
 - E2E `--payments` (no-regresión `#334`): **3/3**.
 - E2E `--receipts` (no-regresión `#275`/`#318`): **10/10**.
 - `git diff --check` OK.
