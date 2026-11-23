@@ -28,6 +28,7 @@ const eligibilityKey = computed(() => props.snapshot && JSON.stringify({
     item.precio?.precioUnitarioUSD,
     item.precio?.estadoPrecio,
     item.precio?.compraAcademica,
+    item.precio?.referenciaCatalogo,
   ]),
 }))
 
@@ -66,7 +67,7 @@ const busy = computed(() =>
 const canConfirm = computed(() =>
   showTotal.value &&
   order.canUseCredit &&
-  (!props.snapshot?.items.some(item => item.precio?.datosSinteticos === true) || order.eligibility?.simulado === true) &&
+  (!props.snapshot?.items.some(item => item.precio?.datosSinteticos === true && item.precio?.referenciaCatalogo !== true) || order.eligibility?.simulado === true) &&
   selected.value === 'CUENTA_CORRIENTE' &&
   !busy.value &&
   order.attemptState === 'idle',
@@ -75,7 +76,7 @@ const canConfirm = computed(() =>
 const canConfirmTransfer = computed(() =>
   showTotal.value &&
   transfer.canUseTransfer &&
-  (!props.snapshot?.items.some(item => item.precio?.datosSinteticos === true) || transfer.eligibility?.simulado === true) &&
+  (!props.snapshot?.items.some(item => item.precio?.datosSinteticos === true && item.precio?.referenciaCatalogo !== true) || transfer.eligibility?.simulado === true) &&
   selected.value === 'TRANSFERENCIA' &&
   !busy.value &&
   transfer.attemptState === 'idle',

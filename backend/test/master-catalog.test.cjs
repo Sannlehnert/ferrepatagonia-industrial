@@ -18,8 +18,9 @@ test('el CSV versionado contiene 100 SKU originales y ocho categorías', () => {
   assert.equal(new Set(rows.map(row => row.category)).size, 8);
   assert.equal(rows[0].sku, 'FP-DEMO-ABR-DISCO-LIJA-100-MM');
   assert.equal(rows[0].stock, 48);
-  assert.match(rows[0].description, /Diámetro|diámetro/);
-  assert.match(rows[0].description, /Presentación:/);
+  assert.equal(rows[0].description, 'Disco abrasivo para tareas de lijado.');
+  assert.equal(rows[0].referencePrice, '1.68');
+  assert.doesNotMatch(rows[0].description, /Ficha original|Variante original|académico/);
 });
 
 test('rechaza lotes incompletos, duplicados, campos inválidos y CSV mal formado', () => {
@@ -137,4 +138,37 @@ test('el bloqueo cooperativo depende de la base y respeta el límite de MariaDB'
   assert.notEqual(first, masterCatalogLockName('otra_base'));
   assert.match(first, /^ferre\.s7\.catalogo\.[0-9a-f]{40}$/);
   assert.ok(first.length <= 64);
+});
+
+test('313: referencias compiladas coinciden con los 100 importes y solo autorizan su SKU e importe exactos', () => {
+  const { catalogReferencePrices, catalogReferenceVersion, catalogReferenceEvidence, isCatalogReference, catalogReferenceSql } = require('../dist/services/pricing/catalog-reference');
+  const { calculateLine } = require('../dist/services/pricing/pricing.engine');
+  const { parsePriceRequest } = require('../dist/services/pricing/pricing.service');
+  const rows = parseMasterCatalog(csv);
+  assert.equal(Object.keys(catalogReferencePrices).length, 100);
+  assert.equal(catalogReferenceVersion, require('node:crypto').createHash('sha256').update(JSON.stringify(Object.fromEntries(rows.map(row=>[row.sku,row.referencePrice])))).digest('hex'));
+  for (const row of rows) {
+    const evidence = catalogReferenceEvidence(row.sku);
+    assert.equal(catalogReferencePrices[row.sku], row.referencePrice);
+    assert.equal(isCatalogReference(row.sku, row.referencePrice, evidence, 1), true);
+    assert.equal(isCatalogReference(row.sku.toLowerCase(), row.referencePrice, evidence, 1), false);
+    assert.equal(isCatalogReference(row.sku, '999.99', evidence, 1), false);
+    assert.equal(isCatalogReference(row.sku, row.referencePrice, 'SINTETICO ACADEMICO #286 SHA256:' + '0'.repeat(64), 1), false);
+    assert.equal(isCatalogReference(row.sku, row.referencePrice, evidence, 0), false);
+    const product = { id:1, baseUSD:row.referencePrice, specialPercent:null, baseVerified:true, catalogReference:true,
+      evidence:{reference:evidence,verifiedAt:new Date().toISOString(),synthetic:true} };
+    for (const discount of ['0.00','10.00','20.00']) {
+      const line = calculateLine(product, {productoId:1,cantidad:3}, discount);
+      const cents = BigInt(row.referencePrice.replace('.',''));
+      const pct = BigInt(discount.replace('.',''));
+      const expected = (cents*(10000n-pct)+5000n)/10000n;
+      assert.equal(line.precioUnitarioUSD, (expected/100n)+'.'+String(expected%100n).padStart(2,'0'));
+      assert.equal(line.referenciaCatalogo, true);
+      assert.equal(line.evidenciaBaseUSD.synthetic, true, 'Se conserva la procedencia representativa');
+    }
+  }
+  assert.throws(()=>catalogReferenceEvidence('SKU-AJENO'));
+  assert.throws(()=>catalogReferenceSql('p;DROP TABLE PRODUCTO','e'));
+  assert.throws(()=>parsePriceRequest({moneda:'USD',productos:[{productoId:1,cantidad:1,referenciaCatalogo:true}]}));
+  assert.throws(()=>parseMasterCatalog(csv.replace('"48","1.68","1.68"','"48","1.68","0.00"')));
 });

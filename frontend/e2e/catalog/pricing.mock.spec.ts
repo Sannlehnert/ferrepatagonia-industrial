@@ -96,10 +96,14 @@ for (const [name,identity,endpoint,label,amount] of [
 test('contrato interceptado: Home y Catálogo comparten precio, descuento y promoción',async({page})=>{
   await setup(page);await page.goto('/')
   await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
-  await expect(page.getByText(/Descuento 5.00%/)).toContainText('Promoción especial')
+  await expect(page.getByText('Descuento 5.00%', { exact: true })).toBeVisible()
+  await expect(page.getByText('Promoción especial', { exact: true })).toBeVisible()
+  await expect(page.locator('s[aria-label="Precio base"]')).toHaveText('USD 100.00')
   await page.getByRole('link',{name:'Ver catálogo completo'}).click()
   await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
-  await expect(page.getByText(/Descuento 5.00%/)).toContainText('Promoción especial')
+  await expect(page.getByText('Descuento 5.00%', { exact: true })).toBeVisible()
+  await expect(page.getByText('Promoción especial', { exact: true })).toBeVisible()
+  await expect(page.locator('s[aria-label="Precio base"]')).toHaveText('USD 100.00')
 })
 test('contrato interceptado: el precio sintético no oculta el precio real del catálogo',async({page})=>{
  const s=await setup(page,user(1));s.mixed=true;await page.goto('/catalogo')
