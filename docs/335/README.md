@@ -6,19 +6,22 @@
 - **Revisor técnico:** Bruno
 - **Validación UX/UI:** Lucci
 - **Alcance:** interfaz administrativa para consultar declaraciones de pago de
-  cuentas corrientes de empresas, resolver la revisión documental y acreditar
-  pagos con evidencia, confirmación explícita e idempotencia.
-- **Backend productivo:** sin modificaciones. Se reutilizan los endpoints y
-  reglas financieras integrados por #333. Todo cambio de backend en esta rama es
-  de infraestructura de pruebas.
+  cuentas corrientes de empresas y pagos directos a pedidos `TRANSFERENCIA`
+  (`#158`), resolver la revisión documental de declaraciones y acreditar pagos
+  con evidencia, confirmación explícita e idempotencia.
+- **Backend productivo:** ajustes acotados en `payment.service.ts`,
+  `payment.repository.ts` y `payment.errors.ts` para serializar concurrencia
+  en `PATCH /api/admin/pagos/:id/revision`, validar bajo lock que el
+  comprobante no esté rechazado en `COMPROBANTE_PAGO` y alinear `pedidoId` con
+  `GET /api/admin/pagos/:id`.
 
 ## 1. Dependencias y estado real
 
 | Dependencia | Estado verificado |
 | --- | --- |
-| **#333 / PR #155** | Integrada en `develop` mediante `a5d3379`. Provee `GET /api/admin/pagos`, `GET /api/admin/pagos/:id`, `PATCH /api/admin/pagos/:id/revision` y `POST /api/admin/pagos/:id/acreditar`. |
-| **#317 / PR #158** | **No integrada** en `origin/develop`. La rama remota `feature/s7-04-2-order-payment-state-consistency` existe en `c1b1215`, pero no se incorporó ni se asumió su contrato. La UI consume únicamente el contrato ya presente en `develop`. |
-| **#334** | Tarea independiente. No se incorporaron sus commits, archivos ni modificaciones. |
+| **#333 / PR #155** | Integrada en `develop` mediante `a5d3379`. Provee `PATCH /api/admin/pagos/:id/revision` y el flujo de declaraciones de clientes. |
+| **#317 / PR #158** | **Integrada en `develop`** (incorporada mediante merge en `c701cd0`). Provee el router unificado `/api/admin/pagos*`, pagos directos a pedidos `TRANSFERENCIA` (`cuentaCorrienteId: null`), `PAGO_DOCUMENTALMENTE_RECHAZADO` y `COTIZACION_FER17_NO_VERIFICADA`. |
+| **#334** | Tarea independiente. Se ejecutan sus E2E (`--payments`) y `--receipts` como verificación de no-regresión. |
 
 ## 2. Funcionalidades implementadas
 
@@ -47,6 +50,7 @@
 - Diálogos diferenciados para **Aprobar documento** y **Rechazar documento**.
 - Antes de habilitar la acción se vuelve a consultar el pago al backend.
 - Solo se ofrece revisión cuando:
+  - `cuentaCorrienteId !== null` y `pedidoId === null` (declaraciones de cuenta corriente);
   - `estado === 'PENDIENTE'`;
   - `estadoDocumental === 'PENDIENTE'`;
   - existe comprobante.
@@ -66,7 +70,7 @@
   - `estado === 'PENDIENTE'`;
   - `estadoDocumental === 'APROBADO'`;
   - existe comprobante;
-  - la moneda es USD o ARS.
+  - la moneda es USD o ARS y el importe es mayor a `0.00`.
 - El diálogo vuelve a consultar el pago al backend antes de acreditar.
 - Muestra importe original, moneda, cliente, comprobante y estado.
 - Solicita evidencia de acreditación (hasta 1000 caracteres) y confirmación
@@ -121,9 +125,10 @@ La UI mantiene ambas dimensiones separadas y nunca deriva una de la otra.
 ### 4.3. Errores traducidos
 
 Se contemplan, entre otros: `PAGO_NO_ENCONTRADO`, `PAGO_YA_REVISADO`,
-`PAGO_YA_ACREDITADO`, `PAGO_PENDIENTE_REVISION`, `TRANSICION_PAGO_INVALIDA`,
-`COMPROBANTE_NO_ENCONTRADO`, `CUENTA_NO_ACREDITADA`, `CUENTA_RESTRINGIDA`,
-`COTIZACION_AUSENTE`, `COTIZACION_INVALIDA`, `CLAVE_IDEMPOTENCIA_REUTILIZADA`,
+`PAGO_YA_ACREDITADO`, `PAGO_PENDIENTE_REVISION`, `PAGO_DOCUMENTALMENTE_RECHAZADO`,
+`TRANSICION_PAGO_INVALIDA`, `COMPROBANTE_NO_ENCONTRADO`, `CUENTA_NO_ACREDITADA`,
+`CUENTA_RESTRINGIDA`, `COTIZACION_AUSENTE`, `COTIZACION_INVALIDA`,
+`COTIZACION_FER17_NO_VERIFICADA`, `CLAVE_IDEMPOTENCIA_REUTILIZADA`,
 `CONFLICTO_CONCURRENCIA` y `RESULTADO_DESCONOCIDO`.
 
 ## 5. Componentes y archivos
@@ -131,6 +136,7 @@ Se contemplan, entre otros: `PAGO_NO_ENCONTRADO`, `PAGO_YA_REVISADO`,
 ### Creados
 
 - `frontend/src/views/admin/AdminPaymentsView.vue`
+- `frontend/src/components/AdminPaymentDetailDialog.vue`
 - `frontend/src/components/AdminPaymentReviewDialog.vue`
 - `frontend/src/components/AdminPaymentAccreditationDialog.vue`
 - `frontend/src/components/AdminPaymentStateBadge.vue`
@@ -148,10 +154,13 @@ Se contemplan, entre otros: `PAGO_NO_ENCONTRADO`, `PAGO_YA_REVISADO`,
 - `frontend/src/config/menu.ts` — opción “Gestión de pagos”.
 - `frontend/playwright.config.ts` — perfil E2E `payment-actions`.
 - `frontend/e2e/sprint6-capture.spec.ts` — menú ADMIN actualizado.
+- `backend/src/services/payments/payment.service.ts` — serialización de `reviewPayment`, rechazo `409` con comprobante rechazado y revalidación bajo lock.
+- `backend/src/repositories/payment.repository.ts` — guarda `WHERE` en `updatePaymentReview`, lectura de `estado_revision` en `lockPaymentReceipt` y alineación de `pedidoId`.
+- `backend/src/services/payments/payment.errors.ts` — `PAGO_DOCUMENTALMENTE_RECHAZADO`.
+- `backend/test/payment-accreditation.mariadb.test.cjs` — pruebas de carrera `APROBADO` vs `RECHAZADO` y bloqueo ante comprobante rechazado.
 - `backend/test/helpers/e2e-server.cjs` — fixture opcional de pagos.
 - `backend/test/helpers/run-e2e.cjs` — flag `--payment-actions`.
-
-No se modificó código financiero del backend.
+- `.github/workflows/ci.yml` — ejecución de `--payment-actions` en `frontend-ci`.
 
 ## 6. Accesibilidad y UX/UI
 
@@ -196,25 +205,29 @@ estado documental, moneda, cotización e idempotencia dentro de la transacción.
 
 | Comando | Resultado |
 | --- | --- |
-| `cd frontend && npm run type-check` | OK |
-| `cd backend && npm run type-check` | OK |
-| `cd frontend && npm run build` | OK |
-| `cd backend && npm run build` | OK |
-| `cd frontend && npm test` | **298 pass, 0 fail** |
-| `cd frontend && node --test test/admin-payments.test.cjs` | **7 pass, 0 fail** |
-| `cd backend && node --require ./test/helpers/test-env.cjs --test test/payment-accreditation.unit.test.cjs` | **5 pass, 0 fail** |
-| `cd backend && npm run test:payments:isolated` | **23 pass, 0 fail** sobre MariaDB 11.4.13 |
+| `npm run type-check --prefix frontend` | OK |
+| `npm run type-check --prefix backend` | OK |
+| `npm run build --prefix frontend` | OK |
+| `npm run build --prefix backend` | OK |
+| `npm test --prefix frontend` | **348 pass, 0 fail** |
+| `node --test frontend/test/admin-payments.test.cjs` | **8 pass, 0 fail** |
+| `npm run test:unit --prefix backend` | **1407 pass, 3 skipped, 0 fail** |
+| `npm run test:payments:isolated --prefix backend` | **25 pass, 0 fail** sobre MariaDB 11.4.13 |
 
-### 8.2. E2E focalizadas con backend real
+### 8.2. E2E focalizadas con backend real y no-regresión
 
-Comando:
+Comandos:
 
 ```bash
-cd backend
-node test/helpers/run-e2e.cjs --payment-actions
+node backend/test/helpers/run-e2e.cjs --payment-actions
+node backend/test/helpers/run-e2e.cjs --payments
+node backend/test/helpers/run-e2e.cjs --receipts
 ```
 
-Resultado: **21/21 pruebas E2E aprobadas** sobre MariaDB 11.4 descartable.
+Resultados:
+- `--payment-actions`: **21/21 pruebas E2E aprobadas** sobre MariaDB 11.4 descartable.
+- `--payments` (no-regresión `#334`): **3/3 aprobadas**.
+- `--receipts` (no-regresión `#275`/`#318`): **10/10 aprobadas**.
 
 Cobertura:
 
@@ -304,9 +317,9 @@ Generadas por la suite E2E real:
 
 ## 11. Restricciones y riesgos residuales
 
-- **#317 / PR #158 no está integrada.** Si su contrato de pagos directos
-  cambia, habrá que revisar la convivencia de routers y estados. Esta rama no
-  monta routers nuevos ni modifica reglas del backend.
+- **#317 / PR #158 integrado:** la bandeja soporta pagos directos a pedidos
+  `TRANSFERENCIA` (`cuentaCorrienteId: null`), manteniendo la revisión
+  documental exclusiva para declaraciones sobre cuentas corrientes.
 - La UI replica compuertas de elegibilidad como protección visual; la autoridad
   definitiva sigue en el backend.
 - La `Idempotency-Key` se conserva mientras el diálogo permanece abierto. Si el
@@ -315,23 +328,11 @@ Generadas por la suite E2E real:
 - Los actores (`declaranteUsuarioId`, `revisadoPorUsuarioId`,
   `acreditadoPorUsuarioId`) se muestran solo como trazabilidad de la respuesta
   del backend; nunca se envían como autoridad.
+- Las capturas de prueba se escriben en `frontend/test-results/payment-actions-captures`
+  salvo que se pase explícitamente `E2E_UPDATE_DOCS_CAPTURES=1`.
 
 ## 12. Estado de publicación
 
-- Commit local: creado en `task/335-admin-payment-actions-ui` con el mensaje
-  `feat(admin): payment review and accreditation UI (#335)`.
-- Push/PR: **no ejecutados** desde este entorno por la política local de no
-  publicar en remotos. La rama y el commit quedan conservados localmente.
-- Comandos exactos pendientes:
-
-```bash
-git push -u origin task/335-admin-payment-actions-ui
-gh pr create \
-  --base develop \
-  --head task/335-admin-payment-actions-ui \
-  --title "feat(admin): payment review and accreditation UI (#335)" \
-  --body-file docs/335/pr-body.md
-```
-
-- CI: no ejecutado en GitHub todavía; todas las validaciones locales están
-  verdes y documentadas arriba.
+- Cambios de corrección (P0-01 a P3-01) aplicados y verificados localmente en el
+  working tree de `task/335-admin-payment-actions-ui` sin `commit` ni `push`
+  para revisión previa del diff.

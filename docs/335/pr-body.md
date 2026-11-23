@@ -1,29 +1,30 @@
 ## Resumen
 
-Implementa la interfaz ADMIN de **Gestión de pagos** para consultar declaraciones, resolver la revisión documental y acreditar pagos de cuentas corrientes de empresas.
+Implementa la interfaz ADMIN de **Gestión de pagos** para consultar declaraciones de cuentas corrientes y pagos directos a pedidos `TRANSFERENCIA`, resolver la revisión documental y acreditar pagos de cuentas corrientes de empresas.
 
-- Listado paginado con cliente/empresa, importe, moneda, comprobante, estados documental/financiero y fechas.
-- Detalle con reconsulta real al backend.
-- Aprobación y rechazo documental con motivo y confirmación expresa.
+- Listado paginado con cliente/empresa, destino (`Cuenta corriente` o `Pedido #id`), importe, moneda, comprobante, estados documental/financiero y fechas.
+- Detalle en diálogo modal accesible (`AdminPaymentDetailDialog`) con reconsulta real al backend, restauración de foco y soporte para `Escape`.
+- Aprobación y rechazo documental con motivo y confirmación expresa, serialización concurrente `409 PAGO_YA_REVISADO` y bloqueo ante comprobantes rechazados en `/admin/comprobantes`.
 - Acreditación USD/ARS con evidencia, confirmación explícita e `Idempotency-Key` UUID v4.
-- Manejo de doble clic, timeout, `RESULTADO_DESCONOCIDO`, respuesta perdida y reintento con la misma clave.
+- Manejo de doble clic, timeout, `RESULTADO_DESCONOCIDO`, respuesta perdida, errores `4xx` definitivos y reintento con la misma clave.
 - Sin creación local de ABONOS: solo la respuesta del backend actualiza la UI.
-- Tarjetas responsive, foco contenido en diálogos, `role="status"`/`role="alert"` y controles de 44 px.
+- Tarjetas responsive, foco contenido en diálogos, `role="status"`/`role="alert"`, enlaces de descarga y controles de al menos 44 px.
 
 ## Alcance y dependencias
 
-- Reutiliza el contrato de #333 ya integrado en `develop`.
-- No modifica reglas financieras ni código productivo del backend.
-- No incorpora #334.
-- #317 / PR #158 no está integrado en `develop`; esta rama no asume su contrato.
+- Integrado con el contrato unificado de #333 y #317 / PR #158 en `develop`.
+- Endurece `reviewPayment` en backend (`409 PAGO_YA_REVISADO` ante carreras `APROBADO` vs `RECHAZADO`, validación de `COMPROBANTE_PAGO.estado_revision` bajo lock y alineación de `pedidoId`).
+- Integra `--payment-actions` en `.github/workflows/ci.yml` (`frontend-ci`).
+- No rompe contratos de `#158` ni `#334`.
 
 ## Pruebas ejecutadas
 
-- `frontend`: type-check, build y **298 unitarios** OK.
-- `backend`: type-check, build y **5 unitarios de pagos** OK.
-- `backend`: `npm run test:payments:isolated` → **23/23** sobre MariaDB 11.4.13.
-- E2E focalizadas: `node test/helpers/run-e2e.cjs --payment-actions` → **21/21**.
-- E2E integradas: `node test/helpers/run-e2e.cjs` → **286 pass, 4 skipped, 0 fail**.
+- `frontend`: type-check, build y **348/348 unitarios** OK (`8/8` en `test/admin-payments.test.cjs`).
+- `backend`: type-check, build y **1407/1410 unitarios** OK (3 omitidos preexistentes, 0 fallos).
+- `backend`: `npm run test:payments:isolated` → **25/25** sobre MariaDB 11.4.13.
+- E2E `--payment-actions`: **21/21**.
+- E2E `--payments` (no-regresión `#334`): **3/3**.
+- E2E `--receipts` (no-regresión `#275`/`#318`): **10/10**.
 - `git diff --check` OK.
 
 ## Evidencia SQL
