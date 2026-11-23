@@ -293,3 +293,45 @@ ordersTest('R01-B: guardar estado propio no dispara consultas GET duplicadas por
   await expect(rowFor(page, a)).toContainText('En preparación')
   expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
 })
+
+ordersTest('R01-C: una transición externa posterior dentro de los 1.500 ms actualiza la fila y el modal abierto sin recargar', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+  await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+  await expect.poll(() => socket.upgraded).toBe(1)
+  await expect(rowFor(page, a)).toContainText('Confirmado')
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  const modalStatusHeader = dialog.getByRole('heading', { name: 'Estado del pedido (comercial / logístico)' }).locator('..')
+  const saveButton = dialog.getByRole('button', { name: 'Guardar Estado' })
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(modalStatusHeader).toContainText('Confirmado')
+  await expect(saveButton).toBeEnabled()
+
+  await saveButton.click()
+  await expect(dialog.getByText('Estado actualizado a En preparación.')).toBeVisible()
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  await expect(modalStatusHeader).toContainText('En preparación')
+  await expect(saveButton).toBeEnabled()
+  const savedAt = Date.now()
+
+  const patchResponse = await page.request.patch(`${ordersPath}/${a}/estado`, {
+    data: { estado: 'ENVIADO' },
+    headers: { Origin: new URL(page.url()).origin },
+  })
+  expect(patchResponse.status()).toBe(200)
+  expect(Date.now() - savedAt).toBeLessThan(1500)
+
+  await expect(rowFor(page, a)).toContainText('Enviado')
+  await expect(modalStatusHeader).toContainText('Enviado')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(dialog.getByRole('combobox')).toHaveValue('ENTREGADO')
+  await expect(dialog.getByRole('combobox').locator('option[value="ENTREGADO"]')).toHaveText('Entregado')
+  await expect(page.getByLabel('Buscar pedidos por empresa, ID o CUIT')).toHaveValue(company)
+  await expect(page.getByLabel('Filtrar por fecha')).toHaveValue('2026-11-10')
+  await expect(page.getByLabel('Filtrar por modalidad de pago')).toHaveValue('TRANSFERENCIA')
+  expect((await persisted(db, a))[0]?.estado).toBe('ENVIADO')
+})

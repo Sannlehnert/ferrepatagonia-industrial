@@ -683,9 +683,72 @@ describe('Task #318 (T-S7-04.3) — Coherencia estructural de vistas y eventos S
 
     assert.equal(received.length, 1)
     assert.deepEqual([...received[0].orders].sort((a, b) => a - b), [12, 15])
+    assert.equal(received[0].orderStatuses.get(12), 'EN_PREPARACION')
+    assert.equal(received[0].orderStatuses.has(15), false)
+    assert.equal(received[0].orderEventsWithoutState.has(15), true)
     assert.equal(received[0].receipts, true)
     assert.equal(received[0].payments, true)
     assert.equal(received[0].account, true)
+  })
+
+  test('realtime.ts propaga orderStatuses y conserva el último estado al recibir múltiples eventos del mismo pedido en un batch', async () => {
+    const handlers = new Map()
+    const fakeSocket = {
+      on(event, fn) { handlers.set(event, fn) },
+      connect() { handlers.get('connect')?.() },
+      removeAllListeners() { handlers.clear() },
+      disconnect() {},
+    }
+    const realtime = loadTypeScript('services/realtime.ts', {
+      'socket.io-client': { io: () => fakeSocket },
+    })
+
+    const received = []
+    const scope = effectScope()
+    const auth = reactive({
+      sessionChecked: true,
+      sessionError: false,
+      loggingIn: false,
+      loggingOut: false,
+      sessionVersion: 1,
+      user: { id: 1, rol: 'ADMIN' },
+      $onAction: () => () => {},
+      clear() {},
+      fetchSession: async () => true,
+    })
+
+    scope.run(() => {
+      realtime.onRealtime(change => received.push(change))
+      realtime.startRealtime(auth)
+    })
+    await settle()
+
+    const ts1 = '2026-11-22T09:00:00.000Z'
+    const ts2 = '2026-11-22T09:00:00.500Z'
+    handlers.get('pedido.estado.actualizado.v1')({
+      version: 1,
+      idEvento: `pedido.estado.actualizado.v1:25:EN_PREPARACION:${ts1}`,
+      pedidoId: 25,
+      estadoAnterior: 'CONFIRMADO',
+      estadoNuevo: 'EN_PREPARACION',
+      actualizadoEn: ts1,
+    })
+    handlers.get('pedido.estado.actualizado.v1')({
+      version: 1,
+      idEvento: `pedido.estado.actualizado.v1:25:ENVIADO:${ts2}`,
+      pedidoId: 25,
+      estadoAnterior: 'EN_PREPARACION',
+      estadoNuevo: 'ENVIADO',
+      actualizadoEn: ts2,
+    })
+
+    await new Promise(r => setTimeout(r, 60))
+    scope.stop()
+
+    assert.equal(received.length, 1)
+    assert.deepEqual([...received[0].orders], [25])
+    assert.equal(received[0].orderStatuses.get(25), 'ENVIADO')
+    assert.equal(received[0].orderEventsWithoutState.has(25), false)
   })
 })
 
