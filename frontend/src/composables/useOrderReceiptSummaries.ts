@@ -64,7 +64,7 @@ export function useOrderReceiptSummaries(orders: () => ClientOrderSummary[] | nu
       const result: Record<number, OrderReceiptStatus> = {}
       let nextIndex = 0
 
-      // Dos lecturas como máximo para conservar conexiones para las operaciones de compra.
+      // Una lectura por vez para conservar el pool de conexiones de MariaDB.
       async function readNext() {
         while (nextIndex < eligible.length) {
           const order = eligible[nextIndex++]!
@@ -78,13 +78,22 @@ export function useOrderReceiptSummaries(orders: () => ClientOrderSummary[] | nu
         }
       }
 
-      await Promise.all([readNext(), readNext()])
+      await readNext()
       return result
     })
   }
 
   function status(order: ClientOrderSummary): OrderReceiptStatus {
-    if (!available(order)) return 'NO_DISPONIBLE'
+    if (!available(order)) {
+      if (
+        order.estadoDocumental === 'APROBADO' ||
+        order.estadoDocumental === 'PENDIENTE' ||
+        order.estadoDocumental === 'RECHAZADO'
+      ) {
+        return order.estadoDocumental
+      }
+      return 'NO_DISPONIBLE'
+    }
     if (query.error.value) return 'ERROR'
     if (query.loading.value || !query.data.value) return 'CARGANDO'
     return query.data.value[order.pedidoId] ?? 'ERROR'

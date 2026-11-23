@@ -4,10 +4,10 @@ import { adminReceiptsPath } from '@/services/paymentReceiptService'
 </script>
 
 <template>
-  <section class="mx-auto max-w-5xl px-4 py-6">
+  <section class="mx-auto max-w-5xl px-4 py-6 text-[#0B2438]">
     <h1 class="m-0 mb-2 text-2xl font-semibold">Comprobantes de pago</h1>
     <p class="m-0 text-sm text-slate-600">
-      Consultá transferencias recibidas y registrá su revisión documental.
+      Consultá transferencias recibidas y registrá su dictamen documental (aprobado o rechazado con motivo). La revisión documental no acredita fondos ni cambia el estado del pedido.
     </p>
     <PaymentReceipts :path="adminReceiptsPath" mode="admin" />
   </section>

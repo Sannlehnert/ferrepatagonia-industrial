@@ -83,7 +83,7 @@ export async function markPaymentReceiptReviewed(
   id: string,
   signal: AbortSignal,
   decision: ReceiptReviewDecision = { estado: 'APROBADO' },
-  idempotencyKey = crypto.randomUUID(),
+  idempotencyKey: string = crypto.randomUUID(),
 ) {
   await api.patch(path + '/' + id + '/revision', decision, {
     headers: { 'Idempotency-Key': idempotencyKey },

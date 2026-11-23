@@ -1,28 +1,40 @@
 <script setup lang="ts">
-defineProps<{ summary?: { total: number; pendientesRevision: number } }>()
+import { computed } from 'vue'
+import type { OrderDocumentState } from '@/types/orderStates'
+import { orderDocumentStateBadge } from '@/utils/payment'
+
+const props = defineProps<{
+  estadoDocumental?: OrderDocumentState | string | null
+  summary?: { total: number; pendientesRevision: number }
+}>()
+
+const resolvedState = computed<OrderDocumentState | string | null>(() => {
+  if (props.estadoDocumental) return props.estadoDocumental
+  if (!props.summary) return null
+  if (props.summary.total === 0) return 'SIN_COMPROBANTE'
+  if (props.summary.pendientesRevision > 0) return 'PENDIENTE'
+  // Sin estadoDocumental explícito del servidor, nunca asumir APROBADO cuando podría estar RECHAZADO.
+  return null
+})
+
+const badge = computed(() => orderDocumentStateBadge(resolvedState.value))
 </script>
 
 <template>
-  <span class="inline-flex min-w-[136px] flex-col items-start text-xs">
-    <span class="inline-flex min-h-7 items-center gap-2 whitespace-nowrap text-sm font-medium text-[#13293A]">
-      <svg
-        width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
-        class="shrink-0"
-        :class="!summary || summary.total === 0 ? 'text-[#64748B]' : summary.pendientesRevision ? 'text-[#D97706]' : 'text-[#16A34A]'"
-      >
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Z" />
-        <path d="M14 2v6h6" />
-        <g v-if="summary && summary.total > 0 && summary.pendientesRevision">
-          <circle cx="10.5" cy="14" r="2.5" />
-          <path d="m12.3 15.8 3.2 3.2" />
-        </g>
-        <path v-else-if="summary && summary.total > 0" d="m8 14 2.5 2.5L16 11" />
-      </svg>
-      {{ !summary ? 'Sin información' : summary.total === 0 ? 'Sin adjuntar' : summary.pendientesRevision ? 'Sin revisar' : 'Revisados' }}
+  <span class="inline-flex min-w-[136px] max-w-full flex-col items-start gap-1 text-xs">
+    <span
+      class="box-border inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold leading-tight"
+      :class="badge.badgeClasses"
+    >
+      <span
+        aria-hidden="true"
+        class="h-1.5 w-1.5 shrink-0 rounded-full"
+        :class="badge.dotClasses"
+      />
+      <span class="min-w-0 break-words">{{ badge.label }}</span>
     </span>
-    <span v-if="summary && summary.total > 0" class="pl-[26px] text-[#64748B]">
-      {{ summary.total }} {{ summary.total === 1 ? 'comprobante' : 'comprobantes' }}<span v-if="summary.pendientesRevision"> · {{ summary.pendientesRevision }} sin revisar</span>
+    <span v-if="summary && summary.total > 0" class="pl-1 text-[#64748B]">
+      {{ summary.total }} {{ summary.total === 1 ? 'comprobante' : 'comprobantes' }}<span v-if="summary.pendientesRevision"> · {{ summary.pendientesRevision }} {{ summary.pendientesRevision === 1 ? 'pendiente' : 'pendientes' }}</span>
     </span>
   </span>
 </template>

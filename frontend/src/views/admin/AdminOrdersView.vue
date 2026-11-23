@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
 import AdminOrderReceiptSummary from '@/components/AdminOrderReceiptSummary.vue'
 import AdminOrdersPagination from '@/components/AdminOrdersPagination.vue'
+import OrderFinancialStatusBadge from '@/components/OrderFinancialStatusBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
@@ -15,6 +16,8 @@ import {
   getAdminOrders,
   updateAdminOrderStatus,
 } from '@/services/adminOrderService'
+import { onRealtime } from '@/services/realtime'
+import { resolveOrderCommercialState } from '@/utils/payment'
 import type {
   AdminOrderDetail,
   AdminOrderFilterStatus,
@@ -54,6 +57,10 @@ const modalDialogRef = ref<HTMLElement | null>(null)
 let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
 let disposed = false
 let queuedListRefresh: string | undefined
+const inFlightOrderTargets = new Map<number, string>()
+const recentLocalOrderSaves = new Map<number, { status: string; until: number }>()
+const pendingExternalOrderIds = new Set<number>()
+let deferredOrderReconcileTimer: ReturnType<typeof setTimeout> | undefined
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
@@ -287,6 +294,65 @@ const canSubmitStatusChange = computed(() => {
   return order.estadosPermitidos.includes(nextStatusSelection.value)
 })
 
+function clearDeferredOrderReconcileTimer() {
+  if (deferredOrderReconcileTimer !== undefined) {
+    clearTimeout(deferredOrderReconcileTimer)
+    deferredOrderReconcileTimer = undefined
+  }
+}
+
+function pruneExpiredRecentLocalOrderSaves(now: number) {
+  for (const [id, entry] of recentLocalOrderSaves) {
+    if (now >= entry.until) {
+      recentLocalOrderSaves.delete(id)
+    }
+  }
+}
+
+function resetRealtimeTracking() {
+  clearDeferredOrderReconcileTimer()
+  inFlightOrderTargets.clear()
+  recentLocalOrderSaves.clear()
+  pendingExternalOrderIds.clear()
+}
+
+function scheduleDeferredOrderReconcile(session: string, delayMs: number) {
+  clearDeferredOrderReconcileTimer()
+  deferredOrderReconcileTimer = setTimeout(() => {
+    deferredOrderReconcileTimer = undefined
+    if (!isCurrentSession(session)) return
+    const now = Date.now()
+    pruneExpiredRecentLocalOrderSaves(now)
+    const readyIds: number[] = []
+    for (const id of pendingExternalOrderIds) {
+      if (!inFlightOrderTargets.has(id) && !recentLocalOrderSaves.has(id)) {
+        readyIds.push(id)
+      }
+    }
+    for (const id of readyIds) {
+      pendingExternalOrderIds.delete(id)
+    }
+    if (readyIds.length > 0) {
+      reconcileList(session)
+      const currentId = selectedOrderId.value
+      if (showModal.value && currentId !== null && !isSaving.value && readyIds.includes(currentId)) {
+        void refreshOpenOrderDetail(currentId)
+      }
+    }
+    let nextDelay: number | undefined
+    for (const id of pendingExternalOrderIds) {
+      const entry = recentLocalOrderSaves.get(id)
+      if (entry && !inFlightOrderTargets.has(id)) {
+        const remaining = Math.max(0, entry.until - now)
+        nextDelay = nextDelay === undefined ? remaining : Math.min(nextDelay, remaining)
+      }
+    }
+    if (nextDelay !== undefined) {
+      scheduleDeferredOrderReconcile(session, nextDelay)
+    }
+  }, Math.max(0, delayMs))
+}
+
 async function submitStatusChange() {
   const targetId = selectedOrderId.value
   const order = selectedOrder.value
@@ -303,15 +369,24 @@ async function submitStatusChange() {
     return
   }
 
+  inFlightOrderTargets.set(targetId, targetStatus)
+  recentLocalOrderSaves.delete(targetId)
+  pendingExternalOrderIds.delete(targetId)
   savingOpeningId.value = targetOpening
   statusFeedback.value = null
   const session = identity()
   const isCurrentModal = () => isCurrentSession(session) &&
     targetOpening === currentModalOpeningId.value && selectedOrderId.value === targetId
+  let savedStatus: string | null = null
+  let authRejected = false
 
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
+    savedStatus = updated.estado
     reconcileList(session)
+    if (isCurrentSession(session)) {
+      recentLocalOrderSaves.set(targetId, { status: updated.estado, until: Date.now() + 1500 })
+    }
     if (!isCurrentModal()) return
 
     await detail.load(async () => updated)
@@ -324,13 +399,19 @@ async function submitStatusChange() {
     }
   } catch (error: unknown) {
     const { message, status } = resolveErrorMessage(error, 'mutation')
-    if (status !== 401 && status !== 403) reconcileList(session)
+    authRejected = status === 401 || status === 403
+    if (!authRejected) {
+      reconcileList(session)
+    }
     if (!isCurrentModal()) return
     statusFeedback.value = { text: message, error: true }
 
     if (status === undefined || status === 409 || status >= 500) {
       await detail.load(signal => getAdminOrderDetail(targetId, signal))
       const fresh = detail.data.value
+      if (fresh && fresh.idPedido === targetId) {
+        savedStatus = fresh.estado
+      }
       if (fresh && isCurrentModal()) {
         nextStatusSelection.value = fresh.estadosPermitidos[0] ?? ''
       }
@@ -339,14 +420,108 @@ async function submitStatusChange() {
     if (savingOpeningId.value === targetOpening) {
       savingOpeningId.value = null
     }
+    inFlightOrderTargets.delete(targetId)
+    if (savedStatus && isCurrentSession(session)) {
+      recentLocalOrderSaves.set(targetId, { status: savedStatus, until: Date.now() + 1500 })
+    }
+    const hadPendingExternal = pendingExternalOrderIds.delete(targetId)
+    if (hadPendingExternal && !authRejected && isCurrentSession(session)) {
+      reconcileList(session)
+      if (showModal.value && selectedOrderId.value === targetId && !isSaving.value) {
+        void refreshOpenOrderDetail(targetId)
+      }
+    }
   }
 }
+
+async function refreshOpenOrderDetail(orderId: number) {
+  const targetOpening = currentModalOpeningId.value
+  await detail.load(signal => getAdminOrderDetail(orderId, signal), { keepData: true })
+  if (targetOpening !== currentModalOpeningId.value || selectedOrderId.value !== orderId) {
+    return
+  }
+  const fresh = detail.data.value
+  if (fresh && fresh.idPedido === orderId) {
+    if (!nextStatusSelection.value || !fresh.estadosPermitidos.includes(nextStatusSelection.value)) {
+      nextStatusSelection.value = fresh.estadosPermitidos[0] ?? ''
+    }
+  }
+}
+
+onRealtime(change => {
+  if (!allowed()) return
+  const now = Date.now()
+  pruneExpiredRecentLocalOrderSaves(now)
+
+  const session = identity()
+  const externalOrderIds: number[] = []
+  let deferredDelay: number | undefined
+
+  for (const id of change.orders) {
+    const incomingStatus = change.orderStatuses?.get(id)
+
+    if (inFlightOrderTargets.has(id)) {
+      if (incomingStatus !== undefined && incomingStatus === inFlightOrderTargets.get(id)) {
+        continue
+      }
+      pendingExternalOrderIds.add(id)
+      continue
+    }
+
+    const recentEntry = recentLocalOrderSaves.get(id)
+    if (recentEntry && now < recentEntry.until) {
+      if (incomingStatus !== undefined && incomingStatus === recentEntry.status) {
+        recentLocalOrderSaves.delete(id)
+        continue
+      }
+      if (incomingStatus !== undefined && incomingStatus !== recentEntry.status) {
+        recentLocalOrderSaves.delete(id)
+        externalOrderIds.push(id)
+        continue
+      }
+      pendingExternalOrderIds.add(id)
+      const remaining = Math.max(0, recentEntry.until - now)
+      deferredDelay = deferredDelay === undefined ? remaining : Math.min(deferredDelay, remaining)
+      continue
+    }
+
+    externalOrderIds.push(id)
+  }
+
+  if (deferredDelay !== undefined) {
+    scheduleDeferredOrderReconcile(session, deferredDelay)
+  }
+
+  if (change.reconnect) {
+    clearDeferredOrderReconcileTimer()
+    for (const id of [...pendingExternalOrderIds]) {
+      if (!inFlightOrderTargets.has(id)) {
+        pendingExternalOrderIds.delete(id)
+      }
+    }
+  }
+
+  if (change.reconnect || externalOrderIds.length > 0 || change.receipts || change.payments) {
+    reconcileList(session)
+  }
+  const currentId = selectedOrderId.value
+  if (
+    showModal.value &&
+    currentId !== null &&
+    !isSaving.value &&
+    (change.reconnect || externalOrderIds.includes(currentId) || change.receipts || change.payments)
+  ) {
+    void refreshOpenOrderDetail(currentId)
+  }
+})
 
 watch(
   () => [identity(), auth.loggingOut, auth.loggingIn],
   () => {
     currentModalOpeningId.value++
     savingOpeningId.value = null
+    queuedListRefresh = undefined
+    resetRealtimeTracking()
     list.reset()
     detail.reset()
     showModal.value = false
@@ -371,6 +546,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   disposed = true
+  resetRealtimeTracking()
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>
@@ -463,7 +639,7 @@ onBeforeUnmount(() => {
       <p role="alert" class="m-0 mb-3 text-sm font-medium text-slate-700">{{ resolveErrorMessage(list.error.value, 'list').message }}</p>
       <button
         type="button"
-        class="rounded-lg bg-[#145A8D] px-4 py-2 text-sm font-bold text-white hover:bg-[#103A5C]"
+        class="box-border cursor-pointer rounded-lg border-0 bg-[#145A8D] px-4 py-2 font-[inherit] text-sm font-bold text-white hover:bg-[#103A5C]"
         @click="loadList()"
       >
         Reintentar consulta
@@ -484,8 +660,8 @@ onBeforeUnmount(() => {
         :aria-busy="list.loading.value"
         tabindex="0"
       >
-        <table class="w-full min-w-[750px] border-collapse text-left">
-          <caption class="sr-only">Pedidos registrados, con estado operativo e importes. La modalidad de pago no indica acreditación.</caption>
+        <table class="w-full min-w-[920px] border-collapse text-left">
+          <caption class="sr-only">Pedidos registrados, con estado comercial del pedido, estado documental de comprobantes y estado financiero del pago por separado.</caption>
           <thead>
             <tr class="border-b border-[#E2E8F0] bg-[#F8FAFC] text-xs font-semibold text-slate-600">
               <th class="py-3.5 pl-6 pr-4">Pedido</th>
@@ -495,6 +671,7 @@ onBeforeUnmount(() => {
               <th class="px-4 py-3.5">Modalidad de pago</th>
               <th class="px-4 py-3.5">Estado del pedido</th>
               <th class="px-4 py-3.5">Comprobantes</th>
+              <th class="px-4 py-3.5">Estado financiero</th>
               <th class="sticky right-0 z-10 bg-[#F8FAFC] py-3.5 pl-4 pr-6 text-left">Acciones</th>
             </tr>
           </thead>
@@ -506,7 +683,7 @@ onBeforeUnmount(() => {
             >
               <td class="whitespace-nowrap py-3 pl-6 pr-4 font-semibold text-[#0B2438]">
                 #{{ String(order.idPedido).padStart(2, '0') }}
-                <span v-if="order.origen === 'DEMO'" class="ml-1 text-[11px] font-normal text-slate-400">(DEMO)</span>
+                <span v-if="order.origen === 'DEMO'" class="ml-1 text-[11px] font-normal text-slate-600">(DEMO)</span>
               </td>
               <td class="whitespace-nowrap px-4 py-3 text-slate-600">{{ formatDate(order.fecha) }}</td>
               <td class="px-4 py-3 font-medium text-[#0B2438]">
@@ -521,9 +698,21 @@ onBeforeUnmount(() => {
               </td>
               <td class="px-4 py-3 text-slate-700">{{ formatAdminOrderPaymentMode(order.modalidadPago) }}</td>
               <td class="whitespace-nowrap px-4 py-3">
-                <AdminOrderStatusBadge :status="order.estado" />
+                <AdminOrderStatusBadge :status="resolveOrderCommercialState(order)" />
               </td>
-              <td class="px-4 py-3"><AdminOrderReceiptSummary :summary="order.comprobantes" /></td>
+              <td class="px-4 py-3">
+                <AdminOrderReceiptSummary
+                  :estado-documental="order.estadoDocumental"
+                  :summary="order.comprobantes"
+                />
+              </td>
+              <td class="max-w-[240px] px-4 py-3">
+                <OrderFinancialStatusBadge
+                  :status="order.estadoFinanciero"
+                  :monto-acreditado-usd="order.montoAcreditadoUSD"
+                  compact
+                />
+              </td>
               <td class="sticky right-0 bg-white transition-colors group-hover:bg-slate-50 whitespace-nowrap py-3 pl-4 pr-6 text-left">
                 <button
                   type="button"
@@ -573,13 +762,13 @@ onBeforeUnmount(() => {
 
         <!-- Cuerpo del Modal -->
         <div class="min-h-0 flex-1 overflow-y-auto break-words p-3 sm:p-4">
-          <p v-if="detail.loading.value" role="status" class="py-6 text-center text-slate-500">Cargando información del pedido…</p>
+          <p v-if="detail.loading.value && !selectedOrder" role="status" class="py-6 text-center text-slate-500">Cargando información del pedido…</p>
 
           <div v-else-if="detail.error.value" class="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-red-700">
             <p role="alert" class="m-0 mb-3 text-sm font-semibold">{{ resolveErrorMessage(detail.error.value, 'detail').message }}</p>
             <button
               type="button"
-              class="rounded-lg bg-[#145A8D] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#103A5C]"
+              class="box-border cursor-pointer rounded-lg border-0 bg-[#145A8D] px-3 py-1.5 font-[inherit] text-xs font-bold text-white hover:bg-[#103A5C]"
               @click="selectedOrderId && openOrderDetailModal(selectedOrderId)"
             >
               Reintentar
@@ -620,8 +809,8 @@ onBeforeUnmount(() => {
             <!-- Seguimiento de Estado -->
             <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4">
               <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h3 class="m-0 text-sm font-semibold text-[#0B2438]">Estado del pedido</h3>
-                <AdminOrderStatusBadge :status="selectedOrder.estado" />
+                <h3 class="m-0 text-sm font-semibold text-[#0B2438]">Estado del pedido (comercial / logístico)</h3>
+                <AdminOrderStatusBadge :status="resolveOrderCommercialState(selectedOrder)" />
               </div>
               <template v-if="selectedOrder.estadosPermitidos.length > 0">
                 <div class="detail-status-controls flex flex-wrap items-center gap-3">
@@ -648,9 +837,12 @@ onBeforeUnmount(() => {
                     {{ isSaving ? 'Guardando…' : 'Guardar Estado' }}
                   </button>
                 </div>
+                <p class="m-0 mt-2 text-xs text-slate-500">
+                  Cambiar el estado logístico del pedido no acredita pagos ni modifica saldos.
+                </p>
               </template>
               <p v-else class="m-0 text-xs text-slate-500">
-                Este pedido se encuentra en estado {{ formatAdminOrderStatus(selectedOrder.estado) }} y no admite transiciones manuales.
+                Este pedido se encuentra en estado {{ formatAdminOrderStatus(resolveOrderCommercialState(selectedOrder)) }} y no admite transiciones manuales.
               </p>
               <p
                 v-if="statusFeedback"
@@ -661,8 +853,23 @@ onBeforeUnmount(() => {
                 {{ statusFeedback.text }}
               </p>
               <div class="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-3 text-sm sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <span class="font-semibold text-[#0B2438]">Comprobantes</span>
-                <AdminOrderReceiptSummary :summary="selectedOrder.comprobantes" />
+                <div>
+                  <span class="block font-semibold text-[#0B2438]">Estado documental (comprobantes)</span>
+                  <span class="block text-xs text-slate-500">La revisión documental no acredita fondos.</span>
+                </div>
+                <AdminOrderReceiptSummary
+                  :estado-documental="selectedOrder.estadoDocumental"
+                  :summary="selectedOrder.comprobantes"
+                />
+              </div>
+              <div class="mt-4 flex flex-col gap-2 border-t border-slate-200 pt-3 text-sm">
+                <span class="font-semibold text-[#0B2438]">Estado financiero (pago / acreditación)</span>
+                <OrderFinancialStatusBadge
+                  :status="selectedOrder.estadoFinanciero"
+                  :monto-acreditado-usd="selectedOrder.montoAcreditadoUSD"
+                  :document-status="selectedOrder.estadoDocumental"
+                  show-explanation
+                />
               </div>
             </div>
 
@@ -709,7 +916,7 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
-.admin-orders :is(button, input, select) { box-sizing: border-box; min-height: 44px; }
+.admin-orders :is(button, input, select) { box-sizing: border-box; min-height: 44px; font-family: inherit; }
 .admin-orders button:not(:disabled), .admin-orders select:not(:disabled) { cursor: pointer; }
 .admin-orders button:disabled { cursor: not-allowed; }
 .admin-orders form :is(input, select) { width: 100%; min-width: 0; max-width: 100%; }
