@@ -105,7 +105,24 @@ test('las acciones visibles respetan las compuertas documental y financiera', ()
   assert.equal(canAccredit(payment({ estadoDocumental: 'APROBADO', estado: 'ACREDITADO' })), false)
   assert.equal(canAccredit(payment({ estadoDocumental: 'APROBADO', comprobanteId: null })), false)
   assert.equal(canAccredit(payment({ estadoDocumental: 'APROBADO', moneda: null })), false)
-  assert.equal(canAccredit(payment({ estadoDocumental: 'APROBADO', monto: '0.00' })), true)
+  assert.equal(canAccredit(payment({ estadoDocumental: 'APROBADO', monto: '0.00' })), false)
+})
+
+test('soporta pagos directos a pedidos TRANSFERENCIA con cuentaCorrienteId null y rechaza destino ausente', () => {
+  const { decodeAdminPayment, canReview, canAccredit } = service({})
+  const directOrderPayment = decodeAdminPayment(payment({
+    id: 99,
+    cuentaCorrienteId: null,
+    pedidoId: 42,
+    comprobanteId: null,
+  }))
+  assert.equal(directOrderPayment.cuentaCorrienteId, null)
+  assert.equal(directOrderPayment.pedidoId, 42)
+  assert.equal(canReview(directOrderPayment), false)
+  assert.equal(canReview(payment({ cuentaCorrienteId: null, pedidoId: 42 })), false)
+  assert.equal(canAccredit(directOrderPayment), false)
+
+  assert.throws(() => decodeAdminPayment(payment({ cuentaCorrienteId: null, pedidoId: null })))
 })
 
 test('formatea importes sin convertir dinero a Number', () => {

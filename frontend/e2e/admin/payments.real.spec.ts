@@ -28,6 +28,9 @@ const { connectOwned } = require('../../../backend/test/helpers/cc260-disposable
 const fixture = JSON.parse(process.env.E2E_PAYMENT_ACTIONS_FIXTURE ?? '{}') as PaymentFixture
 const scenario = fixture.scenarios
 const password = 'E2eLocal-214!'
+const capturesDir = process.env.E2E_UPDATE_DOCS_CAPTURES === '1'
+  ? resolve(process.cwd(), '../docs/335/captures')
+  : resolve(process.cwd(), 'test-results/payment-actions-captures')
 
 const test = base.extend<{ db: Db }>({
   db: async ({}, use) => {
@@ -137,15 +140,16 @@ test.describe('Gestión ADMIN de pagos con backend real', () => {
 
     const detail = card(page, scenario.approvedUsd!)
     await detail.getByRole('button', { name: `Ver detalle del pago ${scenario.approvedUsd}`, exact: true }).click()
-    const region = page.getByRole('region', { name: `Pago #${scenario.approvedUsd}` })
-    await expect(region).toContainText('Empresa Pagos E2E')
-    await expect(region).toContainText('USD 250,00')
-    await expect(region).toContainText('Cuenta corriente')
-    await expect(region.getByRole('link', { name: 'Descargar comprobante' })).toBeVisible()
-    await expect(region).toContainText('Documento aprobado')
-    await expect(region).toContainText('Pendiente de acreditación')
-    await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
-    await expect(page.getByRole('region', { name: `Pago #${scenario.approvedUsd}` })).toHaveCount(0)
+    const detailDialog = page.getByRole('dialog', { name: `Pago #${scenario.approvedUsd}` })
+    await expect(detailDialog).toBeVisible()
+    await expect(detailDialog).toContainText('Empresa Pagos E2E')
+    await expect(detailDialog).toContainText('USD 250,00')
+    await expect(detailDialog).toContainText('Cuenta corriente')
+    await expect(detailDialog.getByRole('link', { name: 'Descargar comprobante' })).toBeVisible()
+    await expect(detailDialog).toContainText('Documento aprobado')
+    await expect(detailDialog).toContainText('Pendiente de acreditación')
+    await detailDialog.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
+    await expect(page.getByRole('dialog', { name: `Pago #${scenario.approvedUsd}` })).toHaveCount(0)
 
     expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
   })
@@ -196,6 +200,7 @@ test.describe('Gestión ADMIN de pagos con backend real', () => {
 
     await dialog.getByRole('button', { name: 'Cerrar', exact: true }).click()
     const updated = card(page, scenario.approvalUsd!)
+    await expect(updated.getByRole('button', { name: `Ver detalle del pago ${scenario.approvalUsd}`, exact: true })).toBeFocused()
     await expect(updated).toContainText('Documento aprobado')
     await expect(updated).toContainText('Pendiente de acreditación')
     await expect(updated.getByRole('button', { name: `Acreditar pago ${scenario.approvalUsd}`, exact: true })).toBeVisible()
@@ -532,18 +537,21 @@ for (const width of [320, 360, 390, 768, 1280]) {
       const detailButton = card(page, scenario.responsiveUsd!)
         .getByRole('button', { name: `Ver detalle del pago ${scenario.responsiveUsd}`, exact: true })
       await detailButton.click()
-      await expect(page.getByRole('region', { name: `Pago #${scenario.responsiveUsd}` })).toBeVisible()
+      const detailDialog = page.getByRole('dialog', { name: `Pago #${scenario.responsiveUsd}` })
+      await expect(detailDialog).toBeVisible()
+      await expect(detailDialog.getByRole('button', { name: 'Cerrar detalle', exact: true })).toBeFocused()
       expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
       if (width === 360 || width === 1280) {
-        const captures = resolve(process.cwd(), '../docs/335/captures')
-        mkdirSync(captures, { recursive: true })
+        mkdirSync(capturesDir, { recursive: true })
         await page.screenshot({
-          path: resolve(captures, `payments-detalle-${width}.jpg`),
+          path: resolve(capturesDir, `payments-detalle-${width}.jpg`),
           type: 'jpeg',
           quality: 72,
         })
       }
-      await page.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
+      await detailDialog.getByRole('button', { name: 'Cerrar detalle', exact: true }).click()
+      await expect(detailDialog).toHaveCount(0)
+      await expect(detailButton).toBeFocused()
 
       const accreditationTrigger = card(page, scenario.responsiveUsd!)
         .getByRole('button', { name: `Acreditar pago ${scenario.responsiveUsd}`, exact: true })
@@ -553,9 +561,9 @@ for (const width of [320, 360, 390, 768, 1280]) {
       await expect(dialog.getByLabel('Evidencia de acreditación', { exact: true })).toBeFocused()
       expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
       if (width === 360 || width === 1280) {
-        const captures = resolve(process.cwd(), '../docs/335/captures')
+        mkdirSync(capturesDir, { recursive: true })
         await page.screenshot({
-          path: resolve(captures, `payments-acreditacion-${width}.jpg`),
+          path: resolve(capturesDir, `payments-acreditacion-${width}.jpg`),
           type: 'jpeg',
           quality: 72,
         })
@@ -564,10 +572,9 @@ for (const width of [320, 360, 390, 768, 1280]) {
       await expect(dialog).toHaveCount(0)
       await expect(accreditationTrigger).toBeFocused()
 
-      const captures = resolve(process.cwd(), '../docs/335/captures')
-      mkdirSync(captures, { recursive: true })
+      mkdirSync(capturesDir, { recursive: true })
       await page.screenshot({
-        path: resolve(captures, `payments-${width}.jpg`),
+        path: resolve(capturesDir, `payments-${width}.jpg`),
         type: 'jpeg',
         quality: 72,
       })
