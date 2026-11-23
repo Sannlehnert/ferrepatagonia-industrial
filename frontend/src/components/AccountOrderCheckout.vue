@@ -315,7 +315,7 @@ async function retryTransferAfterRejection() {
       <button
         type="button"
         :disabled="!canConfirm"
-        class="flex min-h-12 w-full items-center justify-center rounded-lg border-0 bg-[#103A5C] hover:bg-[#145A8D] px-4 py-2
+        class="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg border-0 bg-[#103A5C] hover:bg-[#145A8D] px-4 py-2
           font-[inherit] text-base sm:text-sm font-semibold text-white
           focus-visible:outline-2 focus-visible:outline-[#145a8d]
           disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
@@ -355,7 +355,7 @@ async function retryTransferAfterRejection() {
       <button
         type="button"
         :disabled="!canConfirmTransfer"
-        class="flex min-h-12 w-full items-center justify-center rounded-lg border-0 bg-[#103A5C] hover:bg-[#145A8D] px-4 py-2
+        class="flex min-h-12 w-full cursor-pointer items-center justify-center rounded-lg border-0 bg-[#103A5C] hover:bg-[#145A8D] px-4 py-2
           font-[inherit] text-base sm:text-sm font-semibold text-white
           focus-visible:outline-2 focus-visible:outline-[#145a8d]
           disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
