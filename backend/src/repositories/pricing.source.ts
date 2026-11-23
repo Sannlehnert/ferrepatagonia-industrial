@@ -1,3 +1,4 @@
+import { isCatalogReference } from '../services/pricing/catalog-reference';
 import type { DataSource, EntityManager } from 'typeorm';
 import { dataSource } from '../config/database.config';
 import { ProductoSchema, UsuarioSchema } from '../entities/active.schemas';
@@ -78,15 +79,16 @@ export class MariaDbPricingSource implements PricingSource {
         at: sqlUTC(at), nonBlank: nonBlankPriceEvidence,
       })
       .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
-      .select('p.id_producto', 'id').addSelect('p.precio', 'baseUSD').addSelect('p.descuento_especial_pct', 'specialPercent')
+      .select('p.id_producto', 'id').addSelect('p.codigo', 'sku').addSelect('p.precio', 'baseUSD').addSelect('p.descuento_especial_pct', 'specialPercent')
       .addSelect('ea.id_usuario', 'verifiedBy').addSelect('e.evidencia', 'evidence')
       .addSelect(utc('e.verificado_utc'), 'verifiedAt').addSelect('e.sintetica', 'synthetic')
       .where('p.id_producto IN (:...ids)', { ids: [...ids] }).andWhere('p.activo=1 AND c.activo=1').orderBy('p.id_producto', 'ASC')
-      .getRawMany<{ id: number; baseUSD: string | null; specialPercent: string | null; verifiedBy: number | null;
+      .getRawMany<{ id: number; sku: string; baseUSD: string | null; specialPercent: string | null; verifiedBy: number | null;
         evidence: string | null; verifiedAt: string; synthetic: number }>();
     const products = rawProducts.map(p => {
       const baseVerified = p.verifiedBy !== null;
       return { id: p.id, baseUSD: p.baseUSD, specialPercent: p.specialPercent, baseVerified,
+        ...(baseVerified && isCatalogReference(p.sku, p.baseUSD, p.evidence, p.synthetic) ? { catalogReference: true as const } : {}),
         ...(baseVerified ? { evidence: { reference: p.evidence!, verifiedAt: p.verifiedAt, synthetic: p.synthetic === 1 } } : {}) };
     });
     let calendar: VerifiedCalendar | null = null;

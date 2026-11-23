@@ -91,7 +91,7 @@ export async function quoteAccountOrderCart(
           );
         }
 
-        if (line.evidenciaBaseUSD.synthetic && (!academic || !isAcademicPrice(line))) {
+        if (line.evidenciaBaseUSD.synthetic && !line.referenciaCatalogo && (!academic || !isAcademicPrice(line))) {
           throw new AccountOrderError(
             'PRECIO_SINTETICO',
             422,

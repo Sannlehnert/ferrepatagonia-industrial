@@ -19,7 +19,7 @@ function precioAcreditado(line: PriceLine | undefined): boolean {
 export function precioComprable(line: PriceLine | undefined): boolean {
   return precioAcreditado(line) &&
     (line?.evidenciaBaseUSD?.synthetic === false ||
-      (line?.evidenciaBaseUSD?.synthetic === true && line.compraAcademica === true))
+      (line?.evidenciaBaseUSD?.synthetic === true && (line.compraAcademica === true || line.referenciaCatalogo === true)))
 }
 
 export async function getPrices(ids: readonly number[], personalized: boolean, signal?: AbortSignal): Promise<PriceLine[]> {
@@ -48,7 +48,7 @@ export async function getPrices(ids: readonly number[], personalized: boolean, s
       throw new Error('Respuesta de precios no acreditada.')
     }
     lines.push(...result.productos.map(p =>
-      p.evidenciaBaseUSD?.synthetic === true && !(personalized && p.compraAcademica === true)
+      p.evidenciaBaseUSD?.synthetic === true && !p.referenciaCatalogo && !(personalized && p.compraAcademica === true)
         ? { ...p, compraAcademica: undefined, precioComprable: false, precioBaseUSD: null,
             precioUnitarioUSD: null, subtotalUSD: null, subtotalARS: null }
         : p))

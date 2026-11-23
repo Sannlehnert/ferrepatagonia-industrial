@@ -32,7 +32,7 @@ onBeforeUnmount(() => {
         Comprobantes · {{ order.numero }}
       </h3>
       <button type="button" autofocus aria-label="Cerrar comprobantes"
-        class="min-h-[44px] min-w-[44px] rounded border border-slate-300 px-3"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded border border-solid border-slate-300 bg-white px-3 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="emit('close')">Cerrar</button>
     </header>
     <OrderPaymentReceipts :order="order" @updated="emit('updated')" />

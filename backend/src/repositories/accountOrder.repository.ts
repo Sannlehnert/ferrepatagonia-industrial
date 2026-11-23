@@ -19,6 +19,7 @@ import type {
   ClientOrderLine,
   ClientOrderSummary,
 } from '../services/orders/account-order.types';
+import { isCatalogReference } from '../services/pricing/catalog-reference';
 import { projectOrderStates } from '../services/orders/order-state-projection';
 
 function invalidAmount(): never {
@@ -46,7 +47,12 @@ function prepare(quote: AccountOrderQuote, simulated: boolean) {
       line.cantidad > 2147483647 ||
       !line.precioComprable ||
       !line.evidenciaBaseUSD ||
-      (simulated ? !isAcademicPrice(line) : line.evidenciaBaseUSD.synthetic) ||
+      (simulated ? !isAcademicPrice(line) : (line.evidenciaBaseUSD.synthetic && !(line.referenciaCatalogo === true && isCatalogReference(
+        line.evidenciaBaseUSD.reference.split(' SKU:')[1],
+        line.precioBaseUSD,
+        line.evidenciaBaseUSD.reference,
+        1,
+      )))) ||
       line.precioBaseUSD === null ||
       line.precioUnitarioUSD === null ||
       line.subtotalUSD === null) {
