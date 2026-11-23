@@ -613,10 +613,10 @@ test('rechaza bases DEMO vacías, parciales y completas antes de escribir', asyn
       }
     };
     let env;
-    const invoke = (database, overrides = {}) => {
+    const invoke = (database, overrides = {}, extraArgs = []) => {
       checkAbort();
       const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs',
-        'dist/scripts/import-master-catalog.js', '--confirmar-destino', `127.0.0.1:${port}/${database}`],
+        'dist/scripts/import-master-catalog.js', '--confirmar-destino', `127.0.0.1:${port}/${database}`, ...extraArgs],
       { cwd: backend, env: { ...env, DB_NAME: database, ...overrides }, encoding: 'utf8', timeout: 60000 });
       if (result.error) throw result.error;
       return result;
@@ -777,6 +777,37 @@ test('rechaza bases DEMO vacías, parciales y completas antes de escribir', asyn
         SELECT id_categoria, 'FP-DEMO-GUARD-EXTRA', 'Extra', 1, 0 FROM \`${cleanDb}\`.CATEGORIA LIMIT 1`);
       await assertRejected(cleanDb, /más de 100 SKU/);
       t.diagnostic('Control positivo: 100 altas, segunda ejecución idempotente y rechazo al superar 100 SKU DEMO.');
+
+      const publishDb = 'master_catalog_publicar_313';
+      await full(publishDb);
+      await categories(publishDb);
+      const publishAdminId = Number((await admin.query(`INSERT INTO \`${publishDb}\`.USUARIO
+        (email, password_hash, rol, activo) VALUES ('pub313@example.test', 'x', 'ADMIN', 1)`)).insertId);
+      const legacyRow = rows[0];
+      const [legacyCategory] = await admin.query(
+        `SELECT id_categoria FROM \`${publishDb}\`.CATEGORIA WHERE nombre = ?`, [legacyRow.category]);
+      await admin.query(`INSERT INTO \`${publishDb}\`.PRODUCTO
+        (codigo, nombre, descripcion, stock, id_categoria, precio, descuento_especial_pct, imagen, activo)
+        VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0)`,
+      [legacyRow.sku, legacyRow.name, legacyRow.legacyDescription, legacyRow.stock, legacyCategory.id_categoria]);
+      assert.equal(invoke(publishDb).status, 0);
+      const dbProducts = await admin.query(`SELECT id_producto, codigo FROM \`${publishDb}\`.PRODUCTO`);
+      for (const item of dbProducts) {
+        await admin.query(`UPDATE \`${publishDb}\`.PRODUCTO SET imagen = ? WHERE id_producto = ?`,
+          [`/api/product-images/${randomUUID()}.webp`, item.id_producto]);
+      }
+      const publishedResult = invoke(publishDb, {}, ['--publicar', '--admin', String(publishAdminId)]);
+      assert.equal(publishedResult.status, 0, publishedResult.stderr);
+      assert.equal(JSON.parse(publishedResult.stdout).publicados, 100);
+      const legacyEvents = await admin.query(`SELECT e.tipo, e.precio_anterior, e.precio_nuevo, e.id_admin
+        FROM \`${publishDb}\`.FER17_PRECIO_EVENTO e
+        JOIN \`${publishDb}\`.PRODUCTO p ON p.id_producto = e.id_producto
+        WHERE p.codigo = ? AND e.tipo = 'CAMBIO_PRECIO' ORDER BY e.id_evento`, [legacyRow.sku]);
+      assert.equal(legacyEvents.length, 1);
+      assert.equal(legacyEvents[0].precio_anterior, null);
+      assert.equal(legacyEvents[0].precio_nuevo, legacyRow.referencePrice);
+      assert.equal(Number(legacyEvents[0].id_admin), publishAdminId);
+      t.diagnostic('Publicación legacy con precio NULL registra id_admin en CAMBIO_PRECIO.');
     } finally {
       try { if (admin) await admin.end(); } catch { /* conexión ya cerrada */ }
       try {
