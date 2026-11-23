@@ -5,6 +5,10 @@ import { useAdminDialog } from '@/composables/useAdminDialog'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
   accreditAdminPayment,
+  accreditationConfirmationLabel,
+  accreditationDestinationDescription,
+  accreditationReconciledNotice,
+  accreditationSuccessNotice,
   canAccredit,
   createAccreditationKey,
   documentLabel,
@@ -26,6 +30,8 @@ const allowed = () => auth.isAuthenticated && !auth.loggingIn && !auth.loggingOu
 const state = usePrivateAccountRead<AdminPayment>(identity, allowed)
 const payment = computed(() => state.data.value)
 const accreditable = computed(() => payment.value ? canAccredit(payment.value) : false)
+const descriptionText = computed(() => accreditationDestinationDescription(payment.value))
+const confirmationText = computed(() => (payment.value ? accreditationConfirmationLabel(payment.value) : ''))
 
 const evidence = ref('')
 const confirmed = ref(false)
@@ -107,7 +113,7 @@ function applyKnownOutcome(fresh: AdminPayment) {
   if (fresh.estado === 'ACREDITADO') {
     uncertain.value = false
     operationError.value = ''
-    notice.value = `El servidor confirma que el pago está acreditado${fresh.montoUsd ? ` por ${formatPaymentMoney(fresh.montoUsd, 'USD')}` : ''}. No se envió un segundo movimiento.`
+    notice.value = accreditationReconciledNotice(fresh)
     emit('updated', fresh)
     return
   }
@@ -191,7 +197,7 @@ async function submit() {
     state.data.value = updated
     uncertain.value = false
     operationError.value = ''
-    notice.value = 'Acreditación confirmada por el servidor. Se registró un único movimiento de abono.'
+    notice.value = accreditationSuccessNotice(updated)
     emit('updated', updated)
   } catch (cause) {
     if (!valid()) return
@@ -259,8 +265,8 @@ async function submit() {
         </header>
 
         <div class="box-border min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 text-sm sm:px-6">
-          <p id="payment-accreditation-description" class="m-0 rounded-md border border-amber-300 bg-amber-50 p-3 text-[#0b2438]">
-            Esta acción registra un abono real en la cuenta corriente. La autorización y la idempotencia se validan en el backend.
+          <p id="payment-accreditation-description" class="m-0 rounded-md border border-amber-300 bg-amber-50 p-3 text-[#0b2438] [overflow-wrap:anywhere]">
+            {{ descriptionText }}
           </p>
 
           <p v-if="state.loading.value" role="status" class="m-0 text-slate-600">Consultando nuevamente el pago…</p>
@@ -280,6 +286,14 @@ async function submit() {
 
           <template v-else-if="payment">
             <dl class="m-0 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-[#f8fafc] p-3 sm:grid-cols-2">
+              <div class="min-w-0 sm:col-span-2">
+                <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {{ payment.cuentaCorrienteId !== null ? 'Cuenta corriente' : 'Destino' }}
+                </dt>
+                <dd class="m-0 font-semibold [overflow-wrap:anywhere]">
+                  {{ payment.cuentaCorrienteId !== null ? `#${payment.cuentaCorrienteId}` : `Pedido #${payment.pedidoId}` }}
+                </dd>
+              </div>
               <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Cliente</dt>
                 <dd class="m-0 font-semibold [overflow-wrap:anywhere]">{{ payment.cliente }} · Cliente #{{ payment.clienteId }}</dd>
@@ -378,8 +392,8 @@ async function submit() {
                   class="box-border mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed"
                   :disabled="busy || consulting"
                 />
-                <span>
-                  Confirmo que verifiqué el comprobante, el importe y la evidencia, y que autorizo la acreditación.
+                <span class="min-w-0 [overflow-wrap:anywhere]">
+                  {{ confirmationText }}
                 </span>
               </label>
 

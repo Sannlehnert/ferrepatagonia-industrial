@@ -12,6 +12,7 @@ import {
   formatPaymentMoney,
   getAdminPayment,
   listAdminPayments,
+  paymentUpdatedFeedback,
   type AdminPayment,
   type AdminPaymentPage,
   type ReviewDecision,
@@ -136,7 +137,7 @@ function closeAccreditation() {
 }
 
 function onUpdated(payment: AdminPayment) {
-  feedback.value = `Pago #${payment.id} actualizado con la respuesta del servidor.`
+  feedback.value = paymentUpdatedFeedback(payment)
   if (selectedId.value === payment.id) detail.data.value = payment
   if (list.data.value) {
     list.data.value = {
@@ -179,8 +180,9 @@ onMounted(() => {
 
     <div class="payments-separation" role="note">
       <strong>Dos decisiones separadas:</strong>
-      aprobar o rechazar el documento valida el comprobante; acreditar registra el
-      abono real en la cuenta corriente. Solo la acreditación mueve saldos.
+      aprobar o rechazar el documento valida el comprobante; acreditar confirma el
+      ingreso real (registra el abono en cuenta corriente o acredita el pago directo
+      sobre pedido). Solo la acreditación impacta saldos o cobertura.
     </div>
 
     <section ref="listContainer" aria-labelledby="payments-list-title" class="payments-list-section">
@@ -388,7 +390,7 @@ onMounted(() => {
 .payments-header h1 { margin: 0 0 .5rem; font-size: clamp(1.6rem, 4vw, 2rem); line-height: 1.15; }
 .payments-header p { margin: 0; line-height: 1.6; }
 .payments-feedback { box-sizing: border-box; margin: 0 0 1rem; border: 1px solid #86efac; border-radius: 8px; background: #f0fdf4; padding: .75rem 1rem; color: #166534; font-weight: 600; overflow-wrap: anywhere; }
-.payments-separation { box-sizing: border-box; margin: 1rem 0 1.5rem; border-left: 4px solid #145a8d; border-radius: 6px; background: #f4f7fa; padding: .85rem 1rem; line-height: 1.6; }
+.payments-separation { box-sizing: border-box; margin: 1rem 0 1.5rem; border-left: 4px solid #145a8d; border-radius: 6px; background: #f4f7fa; padding: .85rem 1rem; line-height: 1.6; overflow-wrap: anywhere; }
 .payments-list-section { min-width: 0; }
 .payments-list-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .5rem; }
 .payments-list-heading h2 { margin: 0; font-size: 1.25rem; }

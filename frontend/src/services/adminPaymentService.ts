@@ -154,6 +154,66 @@ export function formatPaymentMoney(value: string, currency: PaymentCurrency | nu
   return `${currency ?? 'Importe'} ${grouped},${cents}`
 }
 
+function directOrderTarget(pedidoId: number | null): string {
+  return pedidoId !== null ? `Pedido #${pedidoId}` : 'pedido directo'
+}
+
+export function accreditationDestinationDescription(
+  payment: Pick<AdminPayment, 'cuentaCorrienteId' | 'pedidoId'> | null,
+): string {
+  if (!payment) {
+    return 'Consultando el destino del pago. La autorización y la idempotencia se validan en el backend.'
+  }
+  if (payment.cuentaCorrienteId !== null) {
+    return 'Esta acción acredita el pago en la cuenta corriente y registra un movimiento ABONO USD con imputación FIFO. La autorización y la idempotencia se validan en el backend.'
+  }
+  return `Esta acción acreditará el pago USD hacia la cobertura financiera del pedido directo (${directOrderTarget(payment.pedidoId)}) sin generar movimiento ABONO en cuenta corriente. La autorización y la idempotencia se validan en el backend.`
+}
+
+export function accreditationConfirmationLabel(
+  payment: Pick<AdminPayment, 'cuentaCorrienteId' | 'pedidoId'>,
+): string {
+  if (payment.cuentaCorrienteId !== null) {
+    return 'Confirmo que verifiqué el comprobante, el importe y la evidencia, y que autorizo la acreditación y el registro del ABONO USD en la cuenta corriente.'
+  }
+  return `Confirmo que verifiqué el comprobante, el importe y la evidencia, y que autorizo la acreditación del pago USD hacia la cobertura financiera del ${directOrderTarget(payment.pedidoId)}.`
+}
+
+export function accreditationSuccessNotice(
+  payment: Pick<AdminPayment, 'cuentaCorrienteId' | 'pedidoId' | 'montoUsd' | 'movimientoId'>,
+): string {
+  const amount = payment.montoUsd ? ` por ${formatPaymentMoney(payment.montoUsd, 'USD')}` : ''
+  if (payment.cuentaCorrienteId !== null) {
+    const movement = payment.movimientoId !== null ? ` (#${payment.movimientoId})` : ''
+    return `Acreditación confirmada por el servidor. Se registró un único movimiento de ABONO${movement} en la cuenta corriente${amount}.`
+  }
+  return `Acreditación confirmada por el servidor. El pago quedó acreditado para el ${directOrderTarget(payment.pedidoId)}${amount}.`
+}
+
+export function accreditationReconciledNotice(
+  payment: Pick<AdminPayment, 'cuentaCorrienteId' | 'pedidoId' | 'montoUsd' | 'movimientoId'>,
+): string {
+  const amount = payment.montoUsd ? ` por ${formatPaymentMoney(payment.montoUsd, 'USD')}` : ''
+  if (payment.cuentaCorrienteId !== null) {
+    const movement = payment.movimientoId !== null ? ` (#${payment.movimientoId})` : ''
+    return `El servidor confirma que el pago está acreditado${amount} en la cuenta corriente${movement}. No se generó un segundo ABONO.`
+  }
+  return `El servidor confirma que el pago está acreditado para el ${directOrderTarget(payment.pedidoId)}${amount}. No se envió una segunda acreditación.`
+}
+
+export function paymentUpdatedFeedback(
+  payment: Pick<AdminPayment, 'id' | 'estado' | 'cuentaCorrienteId' | 'pedidoId' | 'montoUsd'>,
+): string {
+  if (payment.estado === 'ACREDITADO') {
+    const amount = payment.montoUsd ? ` por ${formatPaymentMoney(payment.montoUsd, 'USD')}` : ''
+    if (payment.cuentaCorrienteId !== null) {
+      return `Pago #${payment.id} acreditado en cuenta corriente #${payment.cuentaCorrienteId}${amount} con la respuesta del servidor.`
+    }
+    return `Pago #${payment.id} acreditado para el ${directOrderTarget(payment.pedidoId)}${amount} con la respuesta del servidor.`
+  }
+  return `Pago #${payment.id} actualizado con la respuesta del servidor.`
+}
+
 export function isUuidV4(value: string): boolean {
   return UUID_V4.test(value)
 }
