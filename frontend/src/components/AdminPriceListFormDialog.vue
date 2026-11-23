@@ -344,7 +344,7 @@ function submit() {
                         </p>
                     </div>
 
-                    <label class="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
+                    <label class="box-border flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium">
                         <input
                             v-model="active"
                             type="checkbox"

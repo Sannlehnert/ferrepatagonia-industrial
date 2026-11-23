@@ -362,6 +362,11 @@ async function restoreRowFocus(clientId: number) {
     target?.focus({ preventScroll: true })
 }
 
+function isSearchFocused() {
+    return (typeof document !== 'undefined' && document.activeElement === searchInput.value)
+        || (searchInput.value?.matches?.(':focus') ?? false)
+}
+
 function scheduleSearch() {
     clearTimeout(searchTimer)
     if (!searchPending.value) return
@@ -369,7 +374,9 @@ function scheduleSearch() {
     searchTimer = setTimeout(() => {
         if (unmounted) return
         const search = normalizeSearch(searchQuery.value)
-        searchQuery.value = search
+        if (!isSearchFocused()) {
+            searchQuery.value = search
+        }
         if (search !== appliedSearch.value) {
             void router.replace(listLocation({ page: 1, search }))
         }
@@ -474,7 +481,6 @@ async function loadPriceLists(preserveDrafts = false) {
             const availableLists = new Set(data.listas.map(list => list.id))
             for (const [rawId, previousSelection] of Object.entries(previousSelections)) {
                 const id = Number(rawId)
-                if (nextAssignments[id] === undefined) continue
                 const previousAssigned = previousAssignments[id]?.idListaPrecio ?? null
                 if (previousSelection === previousAssigned) continue
                 const selected = previousSelection === '' ? null : Number(previousSelection)
@@ -682,8 +688,11 @@ function applyRouteState() {
     const routeKey = queryKey(page, search, tipo, estado)
     if (routeKey !== lastRouteKey) {
         lastRouteKey = routeKey
+        selectedClientId.value = null
+        approvalTarget.value = null
         clearTimeout(searchTimer)
-        if (search !== lastRouteSearch || !searchPending.value) {
+        if ((search !== lastRouteSearch || !searchPending.value)
+            && !(isSearchFocused() && searchQuery.value.trim() === search)) {
             searchQuery.value = search
         }
         lastRouteSearch = search
@@ -745,7 +754,7 @@ onBeforeUnmount(() => {
         />
 
         <form role="search" class="mb-4 box-border rounded-lg border border-slate-200 bg-white p-4" novalidate @submit.prevent="applySearch">
-            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-end">
+            <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] xl:items-start">
                 <div class="min-w-0">
                     <label for="clients-search" class="mb-1 block text-sm font-medium">Buscar clientes</label>
                     <input
@@ -798,7 +807,7 @@ onBeforeUnmount(() => {
                     </p>
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2 xl:justify-end">
+                <div class="flex flex-wrap items-center gap-2 xl:justify-end xl:pt-6">
                     <button
                         type="submit"
                         class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#145a8d] px-4 font-[inherit] text-sm font-bold text-white hover:bg-[#103a5c] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-50"
@@ -873,6 +882,10 @@ onBeforeUnmount(() => {
                     </button>
                 </div>
 
+                <p id="clients-table-help" class="m-0 mb-2 text-xs text-slate-600">
+                    En pantallas angostas, enfocá esta región y usá las flechas para recorrer las columnas.
+                </p>
+
                 <div
                     ref="tableRegion"
                     class="overflow-x-auto rounded-lg border border-slate-200 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
@@ -882,9 +895,6 @@ onBeforeUnmount(() => {
                     :aria-busy="isLoading ? 'true' : 'false'"
                     tabindex="0"
                 >
-                    <p id="clients-table-help" class="m-0 border-b border-slate-200 px-4 py-2 text-xs text-slate-600">
-                        En pantallas angostas, enfocá esta región y usá las flechas para recorrer las columnas.
-                    </p>
                     <table class="clients-table w-full min-w-[1370px] table-fixed border-collapse text-left [&_tbody>tr:last-child>td]:border-b-0 [&_tbody>tr:nth-child(even)]:bg-[#fbfdff]">
                         <colgroup>
                             <col style="width: 19%">
