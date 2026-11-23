@@ -59,6 +59,11 @@ export function useAdminDialog(options: {
 
   function handleNativeClose() {
     if (unmounting || closing) return
+    if (!options.canClose()) {
+      const element = dialog.value
+      if (element && !element.open) element.showModal()
+      return
+    }
     requestClose()
   }
 

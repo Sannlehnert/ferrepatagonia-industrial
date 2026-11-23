@@ -35,6 +35,8 @@ const operationError = ref('')
 const fieldError = ref('')
 const notice = ref('')
 const consulting = ref(false)
+const closeButton = ref<HTMLButtonElement | null>(null)
+const evidenceInput = ref<HTMLTextAreaElement | null>(null)
 
 // La clave se genera una única vez por intento y se conserva para reintentos
 // inciertos. Nunca se regenera automáticamente después de un timeout.
@@ -45,8 +47,8 @@ let refreshController: AbortController | undefined
 let active = true
 
 const close = () => emit('close')
-const { dialog, handleCancel, handleKeydown, handleNativeClose, requestClose, focusInitial } = useAdminDialog({
-  canClose: () => !busy.value,
+const { dialog, initialFocus, handleCancel, handleKeydown, handleNativeClose, requestClose, focusInitial } = useAdminDialog({
+  canClose: () => !busy.value && !consulting.value,
   onClose: close,
 })
 
@@ -65,7 +67,10 @@ async function load() {
   notice.value = ''
   await state.load(signal => getAdminPayment(props.paymentId, signal))
   await nextTick()
-  if (active && state.data.value && !state.error.value) focusInitial()
+  if (active && state.data.value && !state.error.value) {
+    initialFocus.value = accreditable.value ? evidenceInput.value : closeButton.value
+    focusInitial()
+  }
 }
 
 function reload() {
@@ -133,6 +138,11 @@ async function consultState() {
   } finally {
     if (active) consulting.value = false
   }
+  if (active && notice.value) {
+    await nextTick()
+    initialFocus.value = closeButton.value
+    focusInitial()
+  }
 }
 
 async function submit() {
@@ -189,35 +199,42 @@ async function submit() {
     if (isUncertain(cause)) {
       uncertain.value = true
       const fresh = await refreshState()
-      if (!active) return
-      if (fresh) {
-        applyKnownOutcome(fresh)
-      } else {
-        operationError.value = 'No pudimos confirmar el resultado ni consultar el estado actual. No afirmamos que la acreditación haya fallado ni que se haya completado. Consultá el estado antes de reintentar.'
+      if (active) {
+        if (fresh) {
+          applyKnownOutcome(fresh)
+        } else {
+          operationError.value = 'No pudimos confirmar el resultado ni consultar el estado actual. No afirmamos que la acreditación haya fallado ni que se haya completado. Consultá el estado antes de reintentar.'
+        }
       }
-      return
+    } else {
+      const response = axios.isAxiosError<{ message?: string; code?: string }>(cause)
+        ? cause.response
+        : undefined
+      const code = response?.data?.code
+
+      // Una respuesta funcional 4xx/409/422 garantiza que el servidor no aplicó
+      // la acreditación. Se libera la clave para un intento futuro corregido.
+      idempotencyKey = undefined
+      attemptedEvidence = undefined
+      uncertain.value = false
+
+      if (code === 'PAGO_YA_ACREDITADO' || code === 'PAGO_PENDIENTE_REVISION'
+        || code === 'PAGO_DOCUMENTALMENTE_RECHAZADO' || code === 'COTIZACION_FER17_NO_VERIFICADA'
+        || code === 'TRANSICION_PAGO_INVALIDA' || code === 'COMPROBANTE_NO_ENCONTRADO') {
+        const fresh = await refreshState()
+        if (fresh) emit('updated', fresh)
+      }
+      operationError.value = response?.data?.message
+        || mapPaymentError(code, response?.status)
     }
-
-    const response = axios.isAxiosError<{ message?: string; code?: string }>(cause)
-      ? cause.response
-      : undefined
-    const code = response?.data?.code
-
-    // Una respuesta funcional 4xx/409/422 garantiza que el servidor no aplicó
-    // la acreditación. Se libera la clave para un intento futuro corregido.
-    idempotencyKey = undefined
-    attemptedEvidence = undefined
-    uncertain.value = false
-
-    if (code === 'PAGO_YA_ACREDITADO' || code === 'PAGO_PENDIENTE_REVISION'
-      || code === 'TRANSICION_PAGO_INVALIDA' || code === 'COMPROBANTE_NO_ENCONTRADO') {
-      const fresh = await refreshState()
-      if (fresh) emit('updated', fresh)
-    }
-    operationError.value = response?.data?.message
-      || mapPaymentError(code, response?.status)
   } finally {
     if (active) busy.value = false
+  }
+
+  if (active && notice.value) {
+    await nextTick()
+    initialFocus.value = closeButton.value
+    focusInitial()
   }
 }
 </script>
@@ -249,12 +266,12 @@ async function submit() {
           <p v-if="state.loading.value" role="status" class="m-0 text-slate-600">Consultando nuevamente el pago…</p>
 
           <div v-else-if="state.error.value" class="space-y-2">
-            <p role="alert" class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800">
+            <p role="alert" class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 [overflow-wrap:anywhere]">
               No se pudo consultar el pago. No se envió ninguna acreditación.
             </p>
             <button
               type="button"
-              class="min-h-11 rounded-md border border-[#145a8d] bg-white px-4 font-[inherit] text-sm font-semibold text-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+              class="box-border min-h-11 cursor-pointer rounded-md border border-[#145a8d] bg-white px-4 font-[inherit] text-sm font-semibold text-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed"
               @click="reload"
             >
               Reintentar consulta
@@ -262,30 +279,30 @@ async function submit() {
           </div>
 
           <template v-else-if="payment">
-            <dl class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-[#f8fafc] p-3 sm:grid-cols-2">
-              <div>
+            <dl class="m-0 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-[#f8fafc] p-3 sm:grid-cols-2">
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Cliente</dt>
-                <dd class="m-0 break-words font-semibold">{{ payment.cliente }} · Cliente #{{ payment.clienteId }}</dd>
+                <dd class="m-0 font-semibold [overflow-wrap:anywhere]">{{ payment.cliente }} · Cliente #{{ payment.clienteId }}</dd>
               </div>
-              <div>
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Importe original</dt>
                 <dd class="m-0 text-lg font-bold">{{ formatPaymentMoney(payment.monto, payment.moneda) }}</dd>
               </div>
-              <div>
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado documental</dt>
                 <dd class="m-0 font-semibold">{{ documentLabel(payment.estadoDocumental) }}</dd>
               </div>
-              <div>
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado financiero</dt>
                 <dd class="m-0 font-semibold">{{ financialLabel(payment.estado) }}</dd>
               </div>
-              <div class="sm:col-span-2">
+              <div class="min-w-0 sm:col-span-2">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Comprobante</dt>
                 <dd class="m-0 break-all font-mono text-xs">{{ payment.comprobanteId ?? 'Sin comprobante asociado' }}</dd>
               </div>
-              <div class="sm:col-span-2">
+              <div class="min-w-0 sm:col-span-2">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Acreditación</dt>
-                <dd class="m-0">
+                <dd class="m-0 [overflow-wrap:anywhere]">
                   <template v-if="payment.montoUsd">
                     {{ formatPaymentMoney(payment.montoUsd, 'USD') }} ·
                     {{ payment.moneda === 'ARS' ? 'conversión confirmada por el backend' : 'importe acreditado confirmado por el backend' }}.
@@ -304,7 +321,7 @@ async function submit() {
             <p
               v-if="notice"
               role="status"
-              class="m-0 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-medium text-emerald-800"
+              class="m-0 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-medium text-emerald-800 [overflow-wrap:anywhere]"
             >
               {{ notice }}
             </p>
@@ -312,7 +329,7 @@ async function submit() {
             <p
               v-if="operationError"
               role="alert"
-              class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800"
+              class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 [overflow-wrap:anywhere]"
             >
               {{ operationError }}
             </p>
@@ -322,13 +339,13 @@ async function submit() {
               role="alert"
               class="box-border space-y-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"
             >
-              <p class="m-0">
+              <p class="m-0 [overflow-wrap:anywhere]">
                 El resultado es incierto. No afirmamos que la acreditación haya fallado ni que se haya completado.
                 Se conserva la misma clave de idempotencia para un reintento seguro.
               </p>
               <button
                 type="button"
-                class="min-h-11 rounded-md border border-amber-700 bg-white px-4 font-[inherit] text-sm font-semibold text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:opacity-60"
+                class="box-border min-h-11 cursor-pointer rounded-md border border-amber-700 bg-white px-4 font-[inherit] text-sm font-semibold text-amber-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
                 :disabled="consulting || busy"
                 @click="consultState"
               >
@@ -337,15 +354,16 @@ async function submit() {
             </div>
 
             <form v-if="accreditable && !notice" class="space-y-4" @submit.prevent="submit">
-              <label class="grid gap-1">
+              <label class="box-border grid cursor-pointer gap-1">
                 <span class="font-semibold">Evidencia de acreditación</span>
                 <textarea
+                  ref="evidenceInput"
                   v-model="evidence"
                   aria-label="Evidencia de acreditación"
                   required
                   maxlength="1000"
                   rows="4"
-                  class="box-border min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white p-3 font-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:bg-slate-100"
+                  class="box-border min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white p-3 font-[inherit] text-sm text-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:bg-slate-100"
                   :disabled="busy || consulting || Boolean(uncertain && attemptedEvidence)"
                 />
                 <span class="text-xs text-slate-500">
@@ -353,11 +371,11 @@ async function submit() {
                 </span>
               </label>
 
-              <label class="flex min-h-11 items-start gap-3 rounded-md border border-slate-200 p-3">
+              <label class="box-border flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3">
                 <input
                   v-model="confirmed"
                   type="checkbox"
-                  class="mt-0.5 h-5 w-5 shrink-0 accent-[#145a8d]"
+                  class="box-border mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed"
                   :disabled="busy || consulting"
                 />
                 <span>
@@ -365,12 +383,12 @@ async function submit() {
                 </span>
               </label>
 
-              <p v-if="fieldError" role="alert" class="m-0 text-sm font-medium text-red-700">{{ fieldError }}</p>
+              <p v-if="fieldError" role="alert" class="m-0 text-sm font-medium text-red-700 [overflow-wrap:anywhere]">{{ fieldError }}</p>
 
               <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  class="min-h-11 rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="box-border min-h-11 cursor-pointer rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
                   :disabled="busy || consulting"
                   @click="requestClose"
                 >
@@ -378,7 +396,7 @@ async function submit() {
                 </button>
                 <button
                   type="submit"
-                  class="min-h-11 rounded-md border-0 bg-[#b45309] px-5 font-[inherit] text-sm font-semibold text-white hover:bg-[#92400e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="box-border min-h-11 cursor-pointer rounded-md border border-transparent bg-[#b45309] px-5 font-[inherit] text-sm font-semibold text-white hover:bg-[#92400e] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
                   :disabled="busy || consulting || !confirmed"
                 >
                   {{ busy ? 'Acreditando…'
@@ -388,18 +406,18 @@ async function submit() {
               </div>
             </form>
 
-            <p v-else-if="!accreditable && !notice" role="status" class="m-0 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p v-else-if="!accreditable && !notice" role="status" class="m-0 rounded-md border border-slate-200 bg-slate-50 p-3 [overflow-wrap:anywhere]">
               Este pago no es elegible para acreditación: se requiere revisión documental aprobada,
               comprobante asociado, estado financiero pendiente y moneda válida.
             </p>
           </template>
         </div>
 
-        <footer class="box-border flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-[#f8fafc] px-4 py-3 sm:flex-row sm:justify-end sm:px-6">
+        <footer v-if="notice || !accreditable" class="box-border flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-[#f8fafc] px-4 py-3 sm:flex-row sm:justify-end sm:px-6">
           <button
-            v-if="notice || !accreditable"
+            ref="closeButton"
             type="button"
-            class="min-h-11 rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:opacity-60"
+            class="box-border min-h-11 cursor-pointer rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="busy || consulting"
             @click="requestClose"
           >

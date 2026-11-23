@@ -10,7 +10,7 @@ export interface AdminPayment {
   id: number
   clienteId: number
   cliente: string
-  cuentaCorrienteId: number
+  cuentaCorrienteId: number | null
   declaranteUsuarioId: number | null
   revisadoPorUsuarioId: number | null
   acreditadoPorUsuarioId: number | null
@@ -85,13 +85,14 @@ const mime = (value: unknown): value is ReceiptMime | null =>
 function decodePayment(raw: unknown): AdminPayment {
   const value = object(raw)
 
-  if (!id(value.id) || !id(value.clienteId) || !id(value.cuentaCorrienteId)
+  if (!id(value.id) || !id(value.clienteId) || !optionalId(value.cuentaCorrienteId)
     || !text(value.cliente) || !money(value.monto) || !optionalMoney(value.montoUsd)
     || !(value.moneda === 'USD' || value.moneda === 'ARS' || value.moneda === null)
     || !documentState(value.estadoDocumental) || typeof value.estado !== 'string'
     || !instant(value.fecha) || !optionalInstant(value.revisadoEn) || !optionalInstant(value.acreditadoEn)
     || !optionalId(value.declaranteUsuarioId) || !optionalId(value.revisadoPorUsuarioId)
     || !optionalId(value.acreditadoPorUsuarioId) || !optionalId(value.pedidoId)
+    || (value.cuentaCorrienteId === null && value.pedidoId === null)
     || !optionalText(value.claveIdempotencia) || !optionalText(value.claveAcreditacion)
     || !optionalText(value.comprobanteId) || !mime(value.comprobanteTipoMime)
     || !(value.comprobanteBytes === null || (Number.isSafeInteger(value.comprobanteBytes) && Number(value.comprobanteBytes) > 0))
@@ -130,7 +131,9 @@ export function financialLabel(value: string): string {
 // La elegibilidad visual replica las compuertas del backend. La autorización
 // real y la transacción siguen siendo responsabilidad exclusiva del servidor.
 export function canReview(payment: AdminPayment): boolean {
-  return payment.estado === 'PENDIENTE'
+  return payment.cuentaCorrienteId !== null
+    && payment.pedidoId === null
+    && payment.estado === 'PENDIENTE'
     && payment.estadoDocumental === 'PENDIENTE'
     && Boolean(payment.comprobanteId)
 }
@@ -141,6 +144,7 @@ export function canAccredit(payment: AdminPayment): boolean {
     && Boolean(payment.comprobanteId)
     && (payment.moneda === 'USD' || payment.moneda === 'ARS')
     && MONEY.test(payment.monto)
+    && payment.monto !== '0.00'
 }
 
 export function formatPaymentMoney(value: string, currency: PaymentCurrency | null): string {
@@ -162,6 +166,9 @@ export function mapPaymentError(code: string | undefined, status: number | undef
   if (code === 'PAGO_PENDIENTE_REVISION') {
     return 'La revisión documental todavía no está aprobada. No se acreditó dinero.'
   }
+  if (code === 'PAGO_DOCUMENTALMENTE_RECHAZADO') {
+    return 'El pago o su comprobante fue rechazado documentalmente y no puede acreditarse.'
+  }
   if (code === 'PAGO_YA_ACREDITADO') return 'El pago ya estaba acreditado. No se generó otro movimiento.'
   if (code === 'PAGO_YA_REVISADO') return 'La revisión documental ya fue resuelta. Consultá el estado actualizado.'
   if (code === 'PAGO_NO_ENCONTRADO') return 'No se encontró el pago indicado. Recargá el listado.'
@@ -170,6 +177,9 @@ export function mapPaymentError(code: string | undefined, status: number | undef
   }
   if (code === 'COTIZACION_INVALIDA') {
     return 'La cotización FER17-v1 no es válida o no está verificada. No se acreditó dinero.'
+  }
+  if (code === 'COTIZACION_FER17_NO_VERIFICADA') {
+    return 'No existe una cotización BNA vendedor verificada por FER17-v1 para acreditar el pago en ARS.'
   }
   if (code === 'CUENTA_NO_ACREDITADA') {
     return 'La cuenta corriente no tiene cobertura histórica completa. No se acreditó dinero.'

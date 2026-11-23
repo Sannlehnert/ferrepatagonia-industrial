@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import axios from 'axios'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import AdminPaymentAccreditationDialog from '@/components/AdminPaymentAccreditationDialog.vue'
+import AdminPaymentDetailDialog from '@/components/AdminPaymentDetailDialog.vue'
 import AdminPaymentReviewDialog from '@/components/AdminPaymentReviewDialog.vue'
 import AdminPaymentStateBadge from '@/components/AdminPaymentStateBadge.vue'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
   canAccredit,
   canReview,
-  financialLabel,
   formatPaymentMoney,
   getAdminPayment,
   listAdminPayments,
@@ -30,9 +30,14 @@ const selectedId = ref<number | null>(null)
 const review = ref<{ id: number; decision: ReviewDecision } | null>(null)
 const accreditationId = ref<number | null>(null)
 const feedback = ref('')
+const listContainer = ref<HTMLElement | null>(null)
+const detailDialogRef = ref<InstanceType<typeof AdminPaymentDetailDialog> | null>(null)
 
 const payments = computed(() => list.data.value)
 const selected = computed(() => detail.data.value)
+const isInvalidPageError = computed(() =>
+  axios.isAxiosError(list.error.value) && list.error.value.response?.status === 400 && page.value > 1,
+)
 
 function errorMessage(error: unknown) {
   const status = axios.isAxiosError(error) ? error.response?.status : undefined
@@ -60,6 +65,9 @@ function actionHint(payment: AdminPayment) {
   if (payment.estado === 'ACREDITADO') return 'Pago acreditado. No hay acciones financieras pendientes.'
   if (payment.estado === 'RECHAZADO') return 'Pago rechazado. El expediente está cerrado.'
   if (payment.estado === 'ANULADO') return 'Pago anulado. No admite nuevas acciones.'
+  if (payment.cuentaCorrienteId === null || payment.pedidoId !== null) {
+    return 'Pago directo sobre pedido: no corresponde revisión documental de cuenta corriente.'
+  }
   if (!payment.comprobanteId) return 'Sin comprobante asociado: no se puede aprobar ni acreditar.'
   if (payment.estadoDocumental === 'RECHAZADO') return 'Documento rechazado. El pago no se puede acreditar.'
   if (payment.estadoDocumental === 'PENDIENTE') return 'Primero completá la revisión documental.'
@@ -67,9 +75,9 @@ function actionHint(payment: AdminPayment) {
   return 'Consultá el detalle para conocer el estado.'
 }
 
-function reloadList(number = page.value) {
+function reloadList(number = page.value, options?: { keepData?: boolean }) {
   page.value = number
-  return list.load(signal => listAdminPayments(number, signal))
+  return list.load(signal => listAdminPayments(number, signal), options)
 }
 
 function reload() {
@@ -97,10 +105,46 @@ function openAccreditation(payment: AdminPayment) {
   accreditationId.value = payment.id
 }
 
+async function restoreFallbackFocus(paymentId: number | undefined) {
+  await nextTick()
+  if (typeof document === 'undefined' || paymentId === undefined) return
+  if (selectedId.value !== null) {
+    if (!document.activeElement || document.activeElement === document.body) {
+      detailDialogRef.value?.focusClose()
+    }
+    return
+  }
+  const active = document.activeElement
+  const insideCard = active instanceof HTMLElement && Boolean(active.closest('[data-payment-id]'))
+  if (!insideCard) {
+    listContainer.value
+      ?.querySelector<HTMLElement>(`[data-payment-id="${paymentId}"] [aria-label="Ver detalle del pago ${paymentId}"]`)
+      ?.focus({ preventScroll: true })
+  }
+}
+
+function closeReview() {
+  const closedId = review.value?.id
+  review.value = null
+  void restoreFallbackFocus(closedId)
+}
+
+function closeAccreditation() {
+  const closedId = accreditationId.value ?? undefined
+  accreditationId.value = null
+  void restoreFallbackFocus(closedId)
+}
+
 function onUpdated(payment: AdminPayment) {
   feedback.value = `Pago #${payment.id} actualizado con la respuesta del servidor.`
   if (selectedId.value === payment.id) detail.data.value = payment
-  void reloadList(page.value)
+  if (list.data.value) {
+    list.data.value = {
+      ...list.data.value,
+      items: list.data.value.items.map(item => (item.id === payment.id ? payment : item)),
+    }
+  }
+  void reloadList(page.value, { keepData: true })
 }
 
 watch([identity, () => auth.loggingOut, () => auth.loggingIn], () => {
@@ -139,24 +183,36 @@ onMounted(() => {
       abono real en la cuenta corriente. Solo la acreditación mueve saldos.
     </div>
 
-    <section aria-labelledby="payments-list-title" class="payments-list-section">
+    <section ref="listContainer" aria-labelledby="payments-list-title" class="payments-list-section">
       <div class="payments-list-heading">
         <h2 id="payments-list-title">Declaraciones de pago</h2>
         <p v-if="payments" class="payments-page-label">Página {{ page }}</p>
       </div>
 
-      <p v-if="list.loading.value" role="status" class="payments-message">Cargando declaraciones de pago…</p>
+      <p v-if="list.loading.value && !payments" role="status" class="payments-message">Cargando declaraciones de pago…</p>
 
       <div v-else-if="list.error.value" class="payments-notice">
         <p role="alert" class="m-0">{{ errorMessage(list.error.value) }}</p>
-        <button type="button" class="payment-action" @click="reload">Reintentar consulta</button>
+        <div class="payment-actions">
+          <button type="button" class="payment-action" @click="reload">Reintentar consulta</button>
+          <button
+            v-if="isInvalidPageError"
+            type="button"
+            class="payment-action payment-action--secondary"
+            @click="reloadList(1)"
+          >
+            Volver a la página 1
+          </button>
+        </div>
       </div>
 
       <p v-else-if="payments && payments.items.length === 0" role="status" class="payments-message">
         No hay declaraciones de pago para mostrar.
       </p>
 
-      <ul v-else-if="payments" class="payments-grid" aria-label="Declaraciones de pago">
+      <template v-else-if="payments">
+        <p v-if="list.loading.value" role="status" class="payments-message">Actualizando declaraciones de pago…</p>
+        <ul class="payments-grid" aria-label="Declaraciones de pago">
         <li
           v-for="payment in payments.items"
           :key="payment.id"
@@ -176,6 +232,10 @@ onMounted(() => {
               <div class="payment-fact payment-fact--wide">
                 <dt>Cliente / empresa</dt>
                 <dd>{{ payment.cliente }} · Cliente #{{ payment.clienteId }}</dd>
+              </div>
+              <div class="payment-fact">
+                <dt>{{ payment.cuentaCorrienteId !== null ? 'Cuenta corriente' : 'Destino' }}</dt>
+                <dd>{{ payment.cuentaCorrienteId !== null ? `#${payment.cuentaCorrienteId}` : `Pedido #${payment.pedidoId}` }}</dd>
               </div>
               <div class="payment-fact">
                 <dt>Importe original</dt>
@@ -260,7 +320,8 @@ onMounted(() => {
             <p class="payment-hint">{{ actionHint(payment) }}</p>
           </article>
         </li>
-      </ul>
+        </ul>
+      </template>
 
       <nav v-if="payments && (page > 1 || payments.paginaSiguiente)" class="payments-pagination" aria-label="Paginación de pagos">
         <button
@@ -282,99 +343,27 @@ onMounted(() => {
       </nav>
     </section>
 
-    <section v-if="selectedId !== null" class="payment-detail" :aria-labelledby="`payment-detail-${selectedId}`">
-      <div class="payment-detail__head">
-        <div>
-          <p class="payments-kicker">Detalle administrativo</p>
-          <h2 :id="`payment-detail-${selectedId}`">Pago #{{ selectedId }}</h2>
-        </div>
-        <button type="button" class="payment-action payment-action--secondary" @click="closeDetail">
-          Cerrar detalle
-        </button>
-      </div>
-
-      <p v-if="detail.loading.value" role="status" class="payments-message">Consultando el detalle del pago…</p>
-
-      <div v-else-if="detail.error.value" class="payments-notice">
-        <p role="alert" class="m-0">{{ errorMessage(detail.error.value) }}</p>
-        <button type="button" class="payment-action" @click="selectedId !== null && loadDetail(selectedId)">Reintentar detalle</button>
-      </div>
-
-      <template v-else-if="selected">
-        <div class="payment-badges payment-badges--detail" aria-label="Estados del pago">
-          <AdminPaymentStateBadge kind="document" :state="selected.estadoDocumental" />
-          <AdminPaymentStateBadge kind="financial" :state="selected.estado" />
-        </div>
-
-        <dl class="payment-detail__facts">
-          <div><dt>Cliente / empresa</dt><dd>{{ selected.cliente }} · Cliente #{{ selected.clienteId }}</dd></div>
-          <div><dt>Cuenta corriente</dt><dd>#{{ selected.cuentaCorrienteId }}</dd></div>
-          <div><dt>Importe original</dt><dd>{{ formatPaymentMoney(selected.monto, selected.moneda) }}</dd></div>
-          <div><dt>Moneda</dt><dd>{{ selected.moneda ?? 'No informada' }}</dd></div>
-          <div v-if="selected.montoUsd">
-            <dt>USD acreditado</dt>
-            <dd>
-              {{ formatPaymentMoney(selected.montoUsd, 'USD') }} ·
-              {{ selected.moneda === 'ARS' ? 'conversión confirmada por el backend' : 'importe acreditado' }}
-            </dd>
-          </div>
-          <div><dt>Estado documental</dt><dd>{{ selected.estadoDocumental }}</dd></div>
-          <div><dt>Estado financiero</dt><dd>{{ financialLabel(selected.estado) }}</dd></div>
-          <div><dt>Declarado</dt><dd>{{ formatInstant(selected.fecha) }}</dd></div>
-          <div><dt>Revisado</dt><dd>{{ selected.revisadoEn ? formatInstant(selected.revisadoEn) : 'Sin revisar' }}</dd></div>
-          <div><dt>Acreditado</dt><dd>{{ selected.acreditadoEn ? formatInstant(selected.acreditadoEn) : 'Sin acreditar' }}</dd></div>
-          <div><dt>Comprobante</dt><dd class="payment-receipt">
-            <template v-if="selected.comprobanteId">
-              {{ typeLabel(selected) }} · {{ receiptSize(selected.comprobanteBytes) }} ·
-              <a :href="`/api/admin/comprobantes/${selected.comprobanteId}`" class="payment-link">Descargar comprobante</a>
-            </template>
-            <template v-else>Sin comprobante asociado</template>
-          </dd></div>
-          <div><dt>Declarante</dt><dd>{{ selected.declaranteUsuarioId ? `Usuario #${selected.declaranteUsuarioId}` : 'No informado' }}</dd></div>
-          <div><dt>Revisor</dt><dd>{{ selected.revisadoPorUsuarioId ? `Usuario #${selected.revisadoPorUsuarioId}` : 'Sin revisor' }}</dd></div>
-          <div><dt>Acreditador</dt><dd>{{ selected.acreditadoPorUsuarioId ? `Usuario #${selected.acreditadoPorUsuarioId}` : 'Sin acreditador' }}</dd></div>
-          <div v-if="selected.movimientoId"><dt>Movimiento</dt><dd>#{{ selected.movimientoId }} · {{ selected.movimientoEstado }}</dd></div>
-          <div class="payment-detail__wide"><dt>Observaciones</dt><dd>{{ selected.observaciones || 'Sin observaciones' }}</dd></div>
-          <div v-if="selected.motivoRevision" class="payment-detail__wide"><dt>Motivo de rechazo documental</dt><dd>{{ selected.motivoRevision }}</dd></div>
-          <div v-if="selected.evidenciaAcreditacion" class="payment-detail__wide"><dt>Evidencia de acreditación</dt><dd>{{ selected.evidenciaAcreditacion }}</dd></div>
-        </dl>
-
-        <div class="payment-actions">
-          <button
-            v-if="canReview(selected)"
-            type="button"
-            class="payment-action payment-action--approve"
-            @click="openReview(selected, 'APROBADO')"
-          >
-            Aprobar documento
-          </button>
-          <button
-            v-if="canReview(selected)"
-            type="button"
-            class="payment-action payment-action--reject"
-            @click="openReview(selected, 'RECHAZADO')"
-          >
-            Rechazar documento
-          </button>
-          <button
-            v-if="canAccredit(selected)"
-            type="button"
-            class="payment-action payment-action--accredit"
-            @click="openAccreditation(selected)"
-          >
-            Acreditar pago
-          </button>
-        </div>
-        <p class="payment-hint">{{ actionHint(selected) }}</p>
-      </template>
-    </section>
+    <AdminPaymentDetailDialog
+      v-if="selectedId !== null"
+      ref="detailDialogRef"
+      :key="`detail-${selectedId}`"
+      :payment-id="selectedId"
+      :payment="selected"
+      :loading="detail.loading.value"
+      :error="detail.error.value ? errorMessage(detail.error.value) : ''"
+      :action-hint="selected ? actionHint(selected) : ''"
+      @close="closeDetail"
+      @retry="selectedId !== null && loadDetail(selectedId)"
+      @review="openReview"
+      @accredit="openAccreditation"
+    />
 
     <AdminPaymentReviewDialog
       v-if="review"
       :key="`review-${review.id}-${review.decision}`"
       :payment-id="review.id"
       :decision="review.decision"
-      @close="review = null"
+      @close="closeReview"
       @updated="onUpdated"
     />
 
@@ -382,7 +371,7 @@ onMounted(() => {
       v-if="accreditationId !== null"
       :key="`accredit-${accreditationId}`"
       :payment-id="accreditationId"
-      @close="accreditationId = null"
+      @close="closeAccreditation"
       @updated="onUpdated"
     />
   </section>
@@ -417,12 +406,12 @@ onMounted(() => {
 .payment-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem .9rem; margin: 0; }
 .payment-fact { min-width: 0; }
 .payment-fact--wide { grid-column: 1 / -1; }
-.payment-facts dt, .payment-detail__facts dt { color: #475569; font-size: .75rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
-.payment-facts dd, .payment-detail__facts dd { margin: .15rem 0 0; overflow-wrap: anywhere; line-height: 1.5; }
+.payment-facts dt { color: #475569; font-size: .75rem; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; }
+.payment-facts dd { margin: .15rem 0 0; overflow-wrap: anywhere; line-height: 1.5; }
 .payment-amount { font-weight: 700; }
 .payment-confirmed { color: #166534; font-size: .75rem; font-weight: 700; }
 .payment-receipt { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .45rem; }
-.payment-link { color: #145a8d; font-weight: 700; text-decoration: underline; }
+.payment-link { display: inline-flex; min-height: 44px; align-items: center; color: #145a8d; font-weight: 700; text-decoration: underline; }
 .payment-link:focus-visible { outline: 2px solid #145a8d; outline-offset: 2px; }
 .payment-reason { box-sizing: border-box; margin: 0; border-left: 3px solid #dc2626; background: #fef2f2; padding: .55rem .7rem; color: #7f1d1d; font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
 .payment-actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: auto; }
@@ -461,17 +450,10 @@ onMounted(() => {
 .payment-action--accredit:hover:not(:disabled) { background: #92400e; }
 .payment-hint { margin: 0; color: #475569; font-size: .8125rem; line-height: 1.5; }
 .payments-pagination { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.25rem 0; }
-.payment-detail { box-sizing: border-box; min-width: 0; margin-top: 2rem; border-top: 1px solid #cbd5e1; padding-top: 1.25rem; }
-.payment-detail__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
-.payment-detail__head h2 { margin: 0; font-size: 1.35rem; }
-.payment-detail__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .85rem 1.1rem; margin: 0 0 1.25rem; }
-.payment-detail__facts > div { min-width: 0; border-bottom: 1px solid #e2e8f0; padding-bottom: .55rem; }
-.payment-detail__wide { grid-column: 1 / -1; }
 
 @media (max-width: 480px) {
   .payment-facts { grid-template-columns: minmax(0, 1fr); }
   .payment-actions { flex-direction: column; }
   .payment-action { width: 100%; }
-  .payment-detail__head .payment-action { width: 100%; }
 }
 </style>

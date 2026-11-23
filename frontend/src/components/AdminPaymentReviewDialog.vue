@@ -33,14 +33,17 @@ const uncertain = ref(false)
 const operationError = ref('')
 const fieldError = ref('')
 const notice = ref('')
+const closeButton = ref<HTMLButtonElement | null>(null)
+const formFocus = ref<HTMLElement | null>(null)
 let mutation: AbortController | undefined
+let refreshController: AbortController | undefined
 let active = true
 
 const approving = computed(() => props.decision === 'APROBADO')
 const title = computed(() => approving.value ? 'Aprobar documento' : 'Rechazar documento')
 const reviewable = computed(() => payment.value ? canReview(payment.value) : false)
 const close = () => emit('close')
-const { dialog, handleCancel, handleKeydown, handleNativeClose, requestClose, focusInitial } = useAdminDialog({
+const { dialog, initialFocus, handleCancel, handleKeydown, handleNativeClose, requestClose, focusInitial } = useAdminDialog({
   canClose: () => !busy.value,
   onClose: close,
 })
@@ -48,6 +51,7 @@ const { dialog, handleCancel, handleKeydown, handleNativeClose, requestClose, fo
 onBeforeUnmount(() => {
   active = false
   mutation?.abort()
+  refreshController?.abort()
 })
 
 onMounted(() => {
@@ -59,7 +63,10 @@ async function load() {
   notice.value = ''
   await state.load(signal => getAdminPayment(props.paymentId, signal))
   await nextTick()
-  if (active && state.data.value && !state.error.value) focusInitial()
+  if (active && state.data.value && !state.error.value) {
+    initialFocus.value = reviewable.value ? formFocus.value : closeButton.value
+    focusInitial()
+  }
 }
 
 function reload() {
@@ -76,16 +83,30 @@ function isUncertain(cause: unknown): boolean {
     || code === 'CONFLICTO_CONCURRENCIA'
 }
 
+async function refreshState(): Promise<AdminPayment | null> {
+  refreshController?.abort()
+  const controller = new AbortController()
+  refreshController = controller
+  try {
+    const fresh = await getAdminPayment(props.paymentId, controller.signal)
+    if (!active || controller.signal.aborted) return null
+    state.data.value = fresh
+    state.error.value = null
+    return fresh
+  } catch {
+    if (!active || controller.signal.aborted) return null
+    return null
+  }
+}
+
 async function refreshAfterUncertain() {
-  await state.load(signal => getAdminPayment(props.paymentId, signal))
+  const current = await refreshState()
   if (!active) return
 
-  const current = state.data.value
-  if (state.error.value) {
+  if (!current) {
     operationError.value = 'No pudimos confirmar el resultado ni consultar el estado actual. Cerrá el diálogo y recargá el listado antes de reintentar.'
     return
   }
-  if (!current) return
 
   const applied = approving.value
     ? current.estadoDocumental === 'APROBADO'
@@ -154,22 +175,28 @@ async function submit() {
     if (isUncertain(cause)) {
       uncertain.value = true
       await refreshAfterUncertain()
-      return
+    } else {
+      uncertain.value = false
+      const response = axios.isAxiosError<{ message?: string; code?: string }>(cause)
+        ? cause.response
+        : undefined
+      const code = response?.data?.code
+      if (code === 'PAGO_YA_REVISADO' || code === 'PAGO_YA_ACREDITADO'
+        || code === 'PAGO_DOCUMENTALMENTE_RECHAZADO' || code === 'TRANSICION_PAGO_INVALIDA') {
+        const fresh = await refreshState()
+        if (fresh) emit('updated', fresh)
+      }
+      operationError.value = response?.data?.message
+        || mapPaymentError(code, response?.status)
     }
-
-    const response = axios.isAxiosError<{ message?: string; code?: string }>(cause)
-      ? cause.response
-      : undefined
-    const code = response?.data?.code
-    if (code === 'PAGO_YA_REVISADO' || code === 'PAGO_YA_ACREDITADO'
-      || code === 'TRANSICION_PAGO_INVALIDA') {
-      await state.load(signal => getAdminPayment(props.paymentId, signal))
-      if (state.data.value) emit('updated', state.data.value)
-    }
-    operationError.value = response?.data?.message
-      || mapPaymentError(code, response?.status)
   } finally {
     if (active) busy.value = false
+  }
+
+  if (active && notice.value) {
+    await nextTick()
+    initialFocus.value = closeButton.value
+    focusInitial()
   }
 }
 </script>
@@ -201,12 +228,12 @@ async function submit() {
           <p v-if="state.loading.value" role="status" class="m-0 text-slate-600">Consultando el estado actual del pago…</p>
 
           <div v-else-if="state.error.value" class="space-y-2">
-            <p role="alert" class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800">
+            <p role="alert" class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 [overflow-wrap:anywhere]">
               No se pudo consultar el pago. No se envió ninguna revisión.
             </p>
             <button
               type="button"
-              class="min-h-11 rounded-md border border-[#145a8d] bg-white px-4 font-[inherit] text-sm font-semibold text-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+              class="box-border min-h-11 cursor-pointer rounded-md border border-[#145a8d] bg-white px-4 font-[inherit] text-sm font-semibold text-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed"
               @click="reload"
             >
               Reintentar consulta
@@ -214,33 +241,40 @@ async function submit() {
           </div>
 
           <template v-else-if="payment">
-            <dl class="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-[#f8fafc] p-3 sm:grid-cols-2">
-              <div>
+            <dl class="m-0 grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-[#f8fafc] p-3 sm:grid-cols-2">
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Cliente</dt>
-                <dd class="m-0 break-words font-semibold">{{ payment.cliente }} · Cliente #{{ payment.clienteId }}</dd>
+                <dd class="m-0 font-semibold [overflow-wrap:anywhere]">{{ payment.cliente }} · Cliente #{{ payment.clienteId }}</dd>
               </div>
-              <div>
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Importe original</dt>
                 <dd class="m-0 font-semibold">{{ formatPaymentMoney(payment.monto, payment.moneda) }}</dd>
               </div>
-              <div>
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado documental</dt>
                 <dd class="m-0 font-semibold">{{ documentLabel(payment.estadoDocumental) }}</dd>
               </div>
-              <div>
+              <div class="min-w-0">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Estado financiero</dt>
                 <dd class="m-0 font-semibold">{{ financialLabel(payment.estado) }}</dd>
               </div>
-              <div class="sm:col-span-2">
+              <div class="min-w-0 sm:col-span-2">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Comprobante</dt>
-                <dd class="m-0 break-all font-mono text-xs">
-                  {{ payment.comprobanteId ?? 'Sin comprobante asociado' }}
+                <dd class="m-0 flex flex-wrap items-center gap-x-2 gap-y-1 break-all font-mono text-xs">
+                  <span>{{ payment.comprobanteId ?? 'Sin comprobante asociado' }}</span>
                   <span v-if="payment.comprobanteTipoMime" class="font-sans font-semibold">
                     · {{ payment.comprobanteTipoMime === 'application/pdf' ? 'PDF' : payment.comprobanteTipoMime === 'image/png' ? 'PNG' : 'JPG' }}
                   </span>
+                  <a
+                    v-if="payment.comprobanteId"
+                    :href="`/api/admin/comprobantes/${payment.comprobanteId}`"
+                    class="box-border inline-flex min-h-[44px] cursor-pointer items-center font-sans text-xs font-semibold text-[#145a8d] underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+                  >
+                    Descargar comprobante
+                  </a>
                 </dd>
               </div>
-              <div class="sm:col-span-2">
+              <div class="min-w-0 sm:col-span-2">
                 <dt class="text-xs font-semibold uppercase tracking-wide text-slate-500">Declarado</dt>
                 <dd class="m-0">{{ formatInstant(payment.fecha) }}</dd>
               </div>
@@ -249,7 +283,7 @@ async function submit() {
             <p
               v-if="notice"
               role="status"
-              class="m-0 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-medium text-emerald-800"
+              class="m-0 rounded-md border border-emerald-200 bg-emerald-50 p-3 font-medium text-emerald-800 [overflow-wrap:anywhere]"
             >
               {{ notice }}
             </p>
@@ -257,7 +291,7 @@ async function submit() {
             <p
               v-if="operationError"
               role="alert"
-              class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800"
+              class="m-0 rounded-md border border-red-200 bg-red-50 p-3 text-red-800 [overflow-wrap:anywhere]"
             >
               {{ operationError }}
             </p>
@@ -265,31 +299,33 @@ async function submit() {
             <p
               v-if="uncertain"
               role="alert"
-              class="m-0 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900"
+              class="m-0 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 [overflow-wrap:anywhere]"
             >
               No afirmamos que la revisión haya fallado ni que se haya completado. El estado mostrado proviene del servidor.
             </p>
 
             <form v-if="canReview(payment) && !notice" class="space-y-4" @submit.prevent="submit">
-              <label v-if="!approving" class="grid gap-1">
+              <label v-if="!approving" class="box-border grid cursor-pointer gap-1">
                 <span class="font-semibold">Motivo del rechazo documental</span>
                 <textarea
+                  ref="formFocus"
                   v-model="reason"
                   aria-label="Motivo del rechazo documental"
                   required
                   maxlength="1000"
                   rows="4"
-                  class="box-border min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white p-3 font-[inherit] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+                  class="box-border min-h-24 w-full resize-y rounded-md border border-slate-300 bg-white p-3 font-[inherit] text-sm text-[#0b2438] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:bg-slate-100"
                   :disabled="busy"
                 />
                 <span class="text-xs text-slate-500">{{ reason.length }} / 1000 caracteres</span>
               </label>
 
-              <label class="flex min-h-11 items-start gap-3 rounded-md border border-slate-200 p-3">
+              <label class="box-border flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-slate-200 p-3">
                 <input
+                  :ref="el => { if (approving) formFocus = el as HTMLElement | null }"
                   v-model="confirmed"
                   type="checkbox"
-                  class="mt-0.5 h-5 w-5 shrink-0 accent-[#145a8d]"
+                  class="box-border mt-0.5 h-5 w-5 shrink-0 cursor-pointer accent-[#145a8d] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed"
                   :disabled="busy"
                 />
                 <span>
@@ -297,12 +333,12 @@ async function submit() {
                 </span>
               </label>
 
-              <p v-if="fieldError" role="alert" class="m-0 text-sm font-medium text-red-700">{{ fieldError }}</p>
+              <p v-if="fieldError" role="alert" class="m-0 text-sm font-medium text-red-700 [overflow-wrap:anywhere]">{{ fieldError }}</p>
 
               <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  class="min-h-11 rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="box-border min-h-11 cursor-pointer rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
                   :disabled="busy"
                   @click="requestClose"
                 >
@@ -310,7 +346,7 @@ async function submit() {
                 </button>
                 <button
                   type="submit"
-                  class="min-h-11 rounded-md border-0 px-5 font-[inherit] text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
+                  class="box-border min-h-11 cursor-pointer rounded-md border border-transparent px-5 font-[inherit] text-sm font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
                   :class="approving ? 'bg-[#15803d] hover:bg-[#166534]' : 'bg-[#b91c1c] hover:bg-[#991b1b]'"
                   :disabled="busy || !confirmed"
                 >
@@ -319,17 +355,17 @@ async function submit() {
               </div>
             </form>
 
-            <p v-else-if="!canReview(payment) && !notice" role="status" class="m-0 rounded-md border border-slate-200 bg-slate-50 p-3">
+            <p v-else-if="!canReview(payment) && !notice" role="status" class="m-0 rounded-md border border-slate-200 bg-slate-50 p-3 [overflow-wrap:anywhere]">
               Este pago no admite una nueva revisión documental en su estado actual.
             </p>
           </template>
         </div>
 
-        <footer class="box-border flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-[#f8fafc] px-4 py-3 sm:flex-row sm:justify-end sm:px-6">
+        <footer v-if="notice || !reviewable" class="box-border flex shrink-0 flex-col gap-2 border-t border-slate-200 bg-[#f8fafc] px-4 py-3 sm:flex-row sm:justify-end sm:px-6">
           <button
-            v-if="notice || !reviewable"
+            ref="closeButton"
             type="button"
-            class="min-h-11 rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:opacity-60"
+            class="box-border min-h-11 cursor-pointer rounded-md border border-slate-300 bg-white px-4 font-[inherit] text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-60"
             :disabled="busy"
             @click="requestClose"
           >
