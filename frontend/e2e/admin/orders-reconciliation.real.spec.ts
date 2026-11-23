@@ -219,3 +219,119 @@ ordersTest('si la red pierde la respuesta después del commit, el listado se rec
   expect(patches).toBe(1)
   expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
 })
+
+function observeSocket(page: Page) {
+  const state = { upgraded: 0, events: [] as string[] }
+  page.on('websocket', ws => {
+    if (new URL(ws.url()).pathname !== '/socket.io/') return
+    ws.on('framesent', ({ payload }) => { if (payload === '5') state.upgraded++ })
+    ws.on('framereceived', ({ payload }) => {
+      if (typeof payload === 'string' && payload.startsWith('42')) state.events.push(payload)
+    })
+  })
+  return state
+}
+
+ordersTest('R01-A: un cambio comercial externo actualiza la fila y el modal abierto conservando filtros activos', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+  await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+  await expect.poll(() => socket.upgraded).toBe(1)
+  await expect(rowFor(page, a)).toContainText('Confirmado')
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  const modalStatusHeader = dialog.getByRole('heading', { name: 'Estado del pedido (comercial / logístico)' }).locator('..')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(modalStatusHeader).toContainText('Confirmado')
+
+  const patchResponse = await page.request.patch(`${ordersPath}/${a}/estado`, {
+    data: { estado: 'EN_PREPARACION' },
+    headers: { Origin: new URL(page.url()).origin },
+  })
+  expect(patchResponse.status()).toBe(200)
+
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  await expect(modalStatusHeader).toContainText('En preparación')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(dialog.getByRole('combobox')).toHaveValue('ENVIADO')
+  await expect(page.getByLabel('Buscar pedidos por empresa, ID o CUIT')).toHaveValue(company)
+  await expect(page.getByLabel('Filtrar por fecha')).toHaveValue('2026-11-10')
+  await expect(page.getByLabel('Filtrar por modalidad de pago')).toHaveValue('TRANSFERENCIA')
+  expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+})
+
+ordersTest('R01-B: guardar estado propio no dispara consultas GET duplicadas por su propio evento Socket.IO', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await expect.poll(() => socket.upgraded).toBe(1)
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'Guardar Estado' })).toBeEnabled()
+
+  const listGets: string[] = []
+  const detailGets: string[] = []
+  const detailPath = `${ordersPath}/${a}`
+  page.on('request', request => {
+    if (request.method() !== 'GET') return
+    const pathname = new URL(request.url()).pathname
+    if (pathname === ordersPath) listGets.push(request.url())
+    if (pathname === detailPath) detailGets.push(request.url())
+  })
+
+  await dialog.getByRole('button', { name: 'Guardar Estado' }).click()
+  await expect(dialog.getByText('Estado actualizado a En preparación.')).toBeVisible()
+  await expect.poll(() => socket.events.some(event => event.includes('pedido.estado.actualizado.v1'))).toBe(true)
+  await page.waitForTimeout(150)
+
+  expect(listGets.length).toBe(1)
+  expect(detailGets.length).toBe(0)
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+})
+
+ordersTest('R01-C: una transición externa posterior dentro de los 1.500 ms actualiza la fila y el modal abierto sin recargar', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+  await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+  await expect.poll(() => socket.upgraded).toBe(1)
+  await expect(rowFor(page, a)).toContainText('Confirmado')
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  const modalStatusHeader = dialog.getByRole('heading', { name: 'Estado del pedido (comercial / logístico)' }).locator('..')
+  const saveButton = dialog.getByRole('button', { name: 'Guardar Estado' })
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(modalStatusHeader).toContainText('Confirmado')
+  await expect(saveButton).toBeEnabled()
+
+  await saveButton.click()
+  await expect(dialog.getByText('Estado actualizado a En preparación.')).toBeVisible()
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  await expect(modalStatusHeader).toContainText('En preparación')
+  await expect(saveButton).toBeEnabled()
+  const savedAt = Date.now()
+
+  const patchResponse = await page.request.patch(`${ordersPath}/${a}/estado`, {
+    data: { estado: 'ENVIADO' },
+    headers: { Origin: new URL(page.url()).origin },
+  })
+  expect(patchResponse.status()).toBe(200)
+  expect(Date.now() - savedAt).toBeLessThan(1500)
+
+  await expect(rowFor(page, a)).toContainText('Enviado')
+  await expect(modalStatusHeader).toContainText('Enviado')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(dialog.getByRole('combobox')).toHaveValue('ENTREGADO')
+  await expect(dialog.getByRole('combobox').locator('option[value="ENTREGADO"]')).toHaveText('Entregado')
+  await expect(page.getByLabel('Buscar pedidos por empresa, ID o CUIT')).toHaveValue(company)
+  await expect(page.getByLabel('Filtrar por fecha')).toHaveValue('2026-11-10')
+  await expect(page.getByLabel('Filtrar por modalidad de pago')).toHaveValue('TRANSFERENCIA')
+  expect((await persisted(db, a))[0]?.estado).toBe('ENVIADO')
+})

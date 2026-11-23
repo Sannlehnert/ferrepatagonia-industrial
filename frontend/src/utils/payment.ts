@@ -1,5 +1,11 @@
 import type { ReceiptReviewStatus } from '@/services/paymentReceiptService'
 import type {
+    OrderCommercialState,
+    OrderDocumentState,
+    OrderFinancialState,
+    OrderStateBadgeMeta,
+} from '@/types/orderStates'
+import type {
     ClientPayment,
     PaymentCurrency,
     PaymentDocumentState,
@@ -9,6 +15,67 @@ import type {
 const AMOUNT_PATTERN = /^(0|[1-9]\d{0,9})(?:\.(\d{1,2}))?$/
 const DECIMAL_PATTERN = /^-?(?:0|[1-9]\d*)\.\d{2}$/
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+export const STATE_BADGE_TONES = {
+    positive: {
+        badgeClasses: 'bg-[#DCFCE7] text-[#166534] border border-[#BBF7D0]',
+        dotClasses: 'bg-[#16A34A]',
+    },
+    warning: {
+        badgeClasses: 'bg-[#FEF3C7] text-[#92400E] border border-[#FDE68A]',
+        dotClasses: 'bg-[#B45309]',
+    },
+    preparation: {
+        badgeClasses: 'bg-amber-100 text-amber-800 border border-amber-200',
+        dotClasses: 'bg-[#D97706]',
+    },
+    info: {
+        badgeClasses: 'bg-[#E0F2FE] text-[#0369A1] border border-[#BAE6FD]',
+        dotClasses: 'bg-[#0369A1]',
+    },
+    danger: {
+        badgeClasses: 'bg-[#FEE2E2] text-[#B91C1C] border border-[#FECACA]',
+        dotClasses: 'bg-[#DC2626]',
+    },
+    neutral: {
+        badgeClasses: 'bg-[#F1F5F9] text-[#475569] border border-[#E2E8F0]',
+        dotClasses: 'bg-[#64748B]',
+    },
+} as const
+
+export const ORDER_COMMERCIAL_STATES: readonly OrderCommercialState[] = [
+    'CONFIRMADO',
+    'EN_PREPARACION',
+    'ENVIADO',
+    'ENTREGADO',
+    'DEMO_REGISTRADO',
+] as const
+
+export const ORDER_COMMERCIAL_STATUS_LABELS: Readonly<Record<OrderCommercialState, string>> = {
+    CONFIRMADO: 'Confirmado',
+    EN_PREPARACION: 'En preparación',
+    ENVIADO: 'Enviado',
+    ENTREGADO: 'Entregado',
+    DEMO_REGISTRADO: 'Registrado (DEMO)',
+}
+
+export const ORDER_PAYMENT_MODE_LABELS: Readonly<Record<string, string>> = {
+    TRANSFERENCIA: 'Transferencia bancaria',
+    CUENTA_CORRIENTE: 'Cuenta corriente',
+    DEMO_DIRECTO: 'Pago directo (DEMO)',
+    DEMO_CUENTA_CORRIENTE: 'Cuenta corriente (DEMO)',
+}
+
+const ORDER_FINANCIAL_STATE_LABELS: Readonly<Record<OrderFinancialState, string>> = {
+    NO_DETERMINABLE: 'Estado financiero no determinable',
+    SIN_PAGO_ACREDITADO: 'Sin pago acreditado',
+    PAGO_PARCIAL: 'Pago parcial acreditado',
+    ACREDITADO: 'Pago acreditado',
+    CARGO_ANULADO: 'Cargo anulado',
+    CARGO_PENDIENTE: 'Imputado a cuenta corriente — pendiente de cancelación',
+    IMPUTADO_PARCIAL: 'Cancelado parcialmente en CC',
+    CANCELADO_EN_CC: 'Cancelado en cuenta corriente',
+}
 
 const moneyFormatters: Record<PaymentCurrency, Intl.NumberFormat> = {
     USD: new Intl.NumberFormat('es-AR', {
@@ -78,6 +145,31 @@ export function sumExactDecimals(values: Iterable<string>): string | null {
     return fromCents(total)
 }
 
+export function resolveOrderCommercialState(
+    order: { estadoPedido?: string | null; estado: string },
+): string {
+    return order.estadoPedido ?? order.estado
+}
+
+export function orderCommercialStateLabel(status: string): string {
+    if (Object.hasOwn(ORDER_COMMERCIAL_STATUS_LABELS, status)) {
+        return ORDER_COMMERCIAL_STATUS_LABELS[status as OrderCommercialState]
+    }
+    return status
+}
+
+export function orderCommercialStateBadge(status: string): OrderStateBadgeMeta {
+    const label = orderCommercialStateLabel(status)
+    if (status === 'ENTREGADO') return { label, ...STATE_BADGE_TONES.positive }
+    if (status === 'EN_PREPARACION') return { label, ...STATE_BADGE_TONES.preparation }
+    if (status === 'ENVIADO') return { label, ...STATE_BADGE_TONES.info }
+    return { label, ...STATE_BADGE_TONES.neutral }
+}
+
+export function orderPaymentModeLabel(mode: string): string {
+    return ORDER_PAYMENT_MODE_LABELS[mode] ?? mode
+}
+
 export function documentStateLabel(state: string): string {
     if (state === 'PENDIENTE') return 'Revisión documental pendiente'
     if (state === 'APROBADO') return 'Documento aprobado'
@@ -96,10 +188,116 @@ export function receiptReviewStatusLabel(status: ReceiptReviewStatus): string {
 }
 
 export function documentStateClasses(state: string): string {
-    if (state === 'PENDIENTE') return 'border-amber-300 bg-amber-50 text-amber-900'
-    if (state === 'APROBADO') return 'border-sky-300 bg-sky-50 text-sky-900'
-    if (state === 'RECHAZADO') return 'border-red-300 bg-red-50 text-red-900'
-    return 'border-slate-300 bg-slate-50 text-slate-700'
+    if (state === 'PENDIENTE') return STATE_BADGE_TONES.warning.badgeClasses
+    if (state === 'APROBADO') return STATE_BADGE_TONES.positive.badgeClasses
+    if (state === 'RECHAZADO') return STATE_BADGE_TONES.danger.badgeClasses
+    return STATE_BADGE_TONES.neutral.badgeClasses
+}
+
+export function documentStateDotClasses(state: string): string {
+    if (state === 'PENDIENTE') return STATE_BADGE_TONES.warning.dotClasses
+    if (state === 'APROBADO') return STATE_BADGE_TONES.positive.dotClasses
+    if (state === 'RECHAZADO') return STATE_BADGE_TONES.danger.dotClasses
+    return STATE_BADGE_TONES.neutral.dotClasses
+}
+
+export function receiptBadge(state: ReceiptReviewStatus | string): OrderStateBadgeMeta {
+    if (state === 'APROBADO') return { label: 'Aprobado', ...STATE_BADGE_TONES.positive }
+    if (state === 'PENDIENTE') return { label: 'Pendiente de revisión', ...STATE_BADGE_TONES.warning }
+    if (state === 'RECHAZADO') return { label: 'Rechazado', ...STATE_BADGE_TONES.danger }
+    return { label: 'Estado documental no determinable', ...STATE_BADGE_TONES.neutral }
+}
+
+export function orderDocumentStateBadge(
+    state: OrderDocumentState | string | null | undefined,
+    options?: { emptyLabel?: string },
+): OrderStateBadgeMeta {
+    if (state === 'APROBADO') return { label: 'Aprobado', ...STATE_BADGE_TONES.positive }
+    if (state === 'PENDIENTE') return { label: 'Pendiente de revisión', ...STATE_BADGE_TONES.warning }
+    if (state === 'RECHAZADO') return { label: 'Rechazado', ...STATE_BADGE_TONES.danger }
+    if (state === 'SIN_COMPROBANTE' || state === 'NO_ADJUNTO') {
+        return { label: options?.emptyLabel ?? 'Sin comprobante', ...STATE_BADGE_TONES.neutral }
+    }
+    return { label: 'Estado documental no determinable', ...STATE_BADGE_TONES.neutral }
+}
+
+export function orderFinancialStateLabel(
+    state: OrderFinancialState | string | null | undefined,
+): string {
+    if (typeof state === 'string' && Object.hasOwn(ORDER_FINANCIAL_STATE_LABELS, state)) {
+        return ORDER_FINANCIAL_STATE_LABELS[state as OrderFinancialState]
+    }
+    return ORDER_FINANCIAL_STATE_LABELS.NO_DETERMINABLE
+}
+
+export function orderFinancialStateBadge(
+    state: OrderFinancialState | string | null | undefined,
+): OrderStateBadgeMeta {
+    const label = orderFinancialStateLabel(state)
+    if (state === 'ACREDITADO' || state === 'CANCELADO_EN_CC') {
+        return { label, ...STATE_BADGE_TONES.positive }
+    }
+    if (state === 'SIN_PAGO_ACREDITADO' || state === 'CARGO_PENDIENTE') {
+        return { label, ...STATE_BADGE_TONES.warning }
+    }
+    if (state === 'PAGO_PARCIAL' || state === 'IMPUTADO_PARCIAL') {
+        return { label, ...STATE_BADGE_TONES.info }
+    }
+    if (state === 'CARGO_ANULADO') {
+        return { label, ...STATE_BADGE_TONES.danger }
+    }
+    return { label, ...STATE_BADGE_TONES.neutral }
+}
+
+export function orderFinancialStateExplanation(
+    state: OrderFinancialState | string | null | undefined,
+    documentState?: OrderDocumentState | string | null,
+): string {
+    if (state === 'ACREDITADO') {
+        return 'El pago directo en USD fue acreditado por administración.'
+    }
+    if (state === 'PAGO_PARCIAL') {
+        return 'Se acreditó un pago parcial en USD; resta acreditar el saldo pendiente.'
+    }
+    if (state === 'SIN_PAGO_ACREDITADO') {
+        if (documentState === 'APROBADO') {
+            return 'El comprobante fue aprobado documentalmente, pero el pago todavía no fue acreditado.'
+        }
+        if (documentState === 'PENDIENTE') {
+            return 'Hay un comprobante en revisión documental. La carga del archivo no acredita el pago.'
+        }
+        if (documentState === 'RECHAZADO') {
+            return 'El comprobante fue rechazado y no hay fondos acreditados. Se requiere un nuevo comprobante.'
+        }
+        return 'No hay pagos acreditados para este pedido. Confirmar o entregar el pedido no implica pago.'
+    }
+    if (state === 'CARGO_PENDIENTE') {
+        return 'El pedido generó un cargo vigente en cuenta corriente que todavía está pendiente de cancelación.'
+    }
+    if (state === 'IMPUTADO_PARCIAL') {
+        return 'El cargo en cuenta corriente registra una cancelación parcial mediante abonos acreditados.'
+    }
+    if (state === 'CANCELADO_EN_CC') {
+        return 'El cargo en cuenta corriente fue cancelado íntegramente por abonos acreditados.'
+    }
+    if (state === 'CARGO_ANULADO') {
+        return 'El cargo asociado en cuenta corriente fue anulado por administración.'
+    }
+    return 'El estado financiero no puede determinarse con los datos acreditados disponibles.'
+}
+
+export function formatAccreditedUsdSummary(
+    state: OrderFinancialState | string | null | undefined,
+    montoAcreditadoUSD: string | null | undefined,
+): string | null {
+    if (!montoAcreditadoUSD || !DECIMAL_PATTERN.test(montoAcreditadoUSD)) return null
+    if (state === 'PAGO_PARCIAL' || state === 'ACREDITADO') {
+        return `Acreditado: ${formatPaymentMoney(montoAcreditadoUSD, 'USD')}`
+    }
+    if (state === 'IMPUTADO_PARCIAL' || state === 'CANCELADO_EN_CC') {
+        return `Cancelado en CC: ${formatPaymentMoney(montoAcreditadoUSD, 'USD')}`
+    }
+    return null
 }
 
 export function financialStateLabel(state: string): string {
@@ -111,10 +309,17 @@ export function financialStateLabel(state: string): string {
 }
 
 export function financialStateClasses(state: string): string {
-    if (state === 'PENDIENTE') return 'border-amber-300 bg-amber-50 text-amber-900'
-    if (state === 'ACREDITADO') return 'border-emerald-300 bg-emerald-50 text-emerald-900'
-    if (state === 'RECHAZADO' || state === 'ANULADO') return 'border-red-300 bg-red-50 text-red-900'
-    return 'border-slate-300 bg-slate-50 text-slate-700'
+    if (state === 'PENDIENTE') return STATE_BADGE_TONES.warning.badgeClasses
+    if (state === 'ACREDITADO') return STATE_BADGE_TONES.positive.badgeClasses
+    if (state === 'RECHAZADO' || state === 'ANULADO') return STATE_BADGE_TONES.danger.badgeClasses
+    return STATE_BADGE_TONES.neutral.badgeClasses
+}
+
+export function financialStateDotClasses(state: string): string {
+    if (state === 'PENDIENTE') return STATE_BADGE_TONES.warning.dotClasses
+    if (state === 'ACREDITADO') return STATE_BADGE_TONES.positive.dotClasses
+    if (state === 'RECHAZADO' || state === 'ANULADO') return STATE_BADGE_TONES.danger.dotClasses
+    return STATE_BADGE_TONES.neutral.dotClasses
 }
 
 export function paymentStatusExplanation(payment: ClientPayment): string {

@@ -9,6 +9,7 @@ export const basePriceLabels: Record<AdminBasePriceState, string> = {
   SINTETICO: 'Precio base simulado · No es evidencia real',
 }
 export interface PriceLine {
+  referenciaCatalogo?: true
   compraAcademica?: true
   productoId: number
   moneda: 'USD' | 'ARS'

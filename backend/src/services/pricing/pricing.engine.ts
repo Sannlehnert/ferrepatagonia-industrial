@@ -22,6 +22,7 @@ export function calculateLine(product: PriceProduct, item: PriceItem, listPercen
   const state = base === null ? 'PRECIO_AUSENTE' : base === 0n ? 'BASE_CERO'
     : !verified ? 'BASE_NO_VERIFICADA' : unit === 0n ? 'FINAL_CERO' : converted === 0n ? 'ARS_CERO' : 'DEFINIDO';
   return {
+    ...(verified && product.catalogReference ? { referenciaCatalogo: true as const } : {}),
     productoId: product.id, moneda: rate === null ? 'USD' : 'ARS',
     precioBaseUSD: base === null || (!verified && base !== 0n) ? null : format(base), descuentoAplicado: format(discount),
     origenDescuento: discount === 0n ? 'NINGUNO' : list === special ? 'AMBOS'

@@ -17,7 +17,7 @@ export type CartMutation =
     | { type: 'remove'; productoId: number };
 
 type CartPrice = Pick<PriceLine, 'estadoPrecio' | 'precioComprable' | 'precioUnitarioUSD' | 'subtotalUSD'
-    | 'descuentoAplicado' | 'origenDescuento'> & { datosSinteticos: boolean; compraAcademica?: true };
+    | 'descuentoAplicado' | 'origenDescuento'> & { datosSinteticos: boolean; compraAcademica?: true; referenciaCatalogo?: true };
 
 function pricing(manager: EntityManager) {
     return new PricingService(new MariaDbPricingSource(undefined, manager));
@@ -90,6 +90,7 @@ export function getAuthenticatedClientCart(auth: AuthContext, signal: AbortSigna
                         precioUnitarioUSD: line.precioUnitarioUSD, subtotalUSD: line.subtotalUSD,
                         descuentoAplicado: line.descuentoAplicado, origenDescuento: line.origenDescuento,
                         datosSinteticos: line.evidenciaBaseUSD?.synthetic ?? false,
+                        ...(line.referenciaCatalogo ? { referenciaCatalogo: true as const } : {}),
                         ...(academicCheckout && isAcademicPrice(line) ? { compraAcademica: true as const } : {}),
                     };
                 }

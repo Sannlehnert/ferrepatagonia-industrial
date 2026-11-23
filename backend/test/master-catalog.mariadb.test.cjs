@@ -274,11 +274,12 @@ test('carga normal: 100/0/0, reinicio de API y MariaDB, conflictos y recuperaci√
         assert.equal(product.descripcion, row.description);
         assert.equal(product.stock, row.stock);
         assert.equal(product.activo, 0);
-        for (const field of ['precio', 'descuento_especial_pct', 'imagen']) assert.equal(product[field], null);
+        assert.equal(product.precio, row.referencePrice);
+        for (const field of ['descuento_especial_pct', 'imagen']) assert.equal(product[field], null);
         const event = firstEvents[index + 1];
         assert.equal(event.id_producto, product.id_producto);
         assert.equal(event.tipo, 'ALTA');
-        assert.equal(event.precio_nuevo, null);
+        assert.equal(event.precio_nuevo, row.referencePrice);
         assert.equal(event.evidencia, null);
         assert.equal(event.id_admin, null);
       }

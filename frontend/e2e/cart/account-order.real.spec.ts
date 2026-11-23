@@ -128,7 +128,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   })
 
   await expect(order).toHaveCount(1)
-  await expect(order).toContainText('CONFIRMADO')
+  await expect(order).toContainText('Confirmado')
   const orderNumber = await order.getByRole('heading').innerText()
   const savedOrder = history.items.find(item => item.numero === orderNumber)
   if (!savedOrder) throw new Error(`El pedido ${orderNumber} no figura en la respuesta del historial.`)

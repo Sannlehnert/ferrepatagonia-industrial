@@ -31,7 +31,7 @@ La guarda valida primero la presencia de cada tabla y columna que necesita consu
 
 Dos importadores sobre la misma base se serializan con un bloqueo cooperativo `GET_LOCK`, con nombre derivado de la base y espera acotada (30 segundos por defecto; `MASTER_CATALOG_LOCK_TIMEOUT_SECONDS` admite 1 a 300). El bloqueo se adquiere antes de abrir la transacción, se mantiene hasta después del `COMMIT` y se libera explícitamente en el mismo cierre, incluso ante errores. No reemplaza los locks de InnoDB ni protege frente a escritores externos que no usan el mismo bloqueo: esos conflictos siguen resolviéndose con rollback y el manejo seguro de errores existente.
 
-- **Altas:** conservan el SKU, el nombre propuesto, la descripción junto con la variante y ficha originales, la presentación, la categoría y el stock por presentación. Se crean inactivas, con precio, descuento e imagen nulos. El stock académico queda registrado para revisión antes de publicar.
+- **Altas:** conservan el SKU, el nombre propuesto, la descripción junto con la variante y ficha originales, la presentación, la categoría y el stock por presentación. Se crean inactivas, con el precio de referencia del maestro, sin descuento especial ni imagen. La procedencia es representativa; la carga por sí sola no acredita ni publica el precio. El stock académico queda registrado para revisión antes de publicar.
 - **SKU existentes:** se conservan completos, incluso si difieren de la ficha de #309. La salida JSON enumera `insertados` y `conservados`; en los conservados aparecen tanto el SKU del CSV como el código almacenado. MariaDB determina si dos códigos son equivalentes usando la misma comparación que protege el índice único.
 - **Auditoría:** los triggers FER-17 siguen registrando el evento normal de alta con importe nulo. El comando no genera evidencia ni inicia una verificación. Las tareas #310 y #311 no son necesarias para cargar las fichas.
 - **Reintentos:** la carga valida el CSV antes de conectarse y escribe las altas en una transacción. Si el proceso falla o la confirmación de MariaDB se pierde, volvé a ejecutar contra el mismo destino. La restricción única permite recuperar el lote conservando lo que ya esté confirmado.
@@ -44,3 +44,8 @@ npm run test:catalogo-maestro
 ```
 
 La prueba de integración requiere Docker. Crea su propia MariaDB 11.4 con credenciales efímeras, un puerto en loopback y un volumen dedicado. Aplica el esquema normal, arranca y reinicia la API, y comprueba la carga inicial, los reintentos, un fallo provocado a mitad de lote, la conservación de datos ajenos, la concurrencia serializada, el inventario FER-17 completo y el rechazo sin mutaciones de bases DEMO vacías, parciales y completas. Al finalizar elimina sus recursos y verifica que no queden contenedores ni volúmenes de la prueba.
+
+
+## Publicación del catálogo de presentación (#313)
+
+Después de cargar, asociar las 100 imágenes mediante el procedimiento de #310/#311 y revisar el plan, el modo explícito `--publicar --admin ID` completa la publicación. Requiere destino confirmado y ADMIN activo. Conserva stock, imágenes y datos ajenos; rechaza fichas/precios modificados en vez de sobrescribirlos. No inicia ni depende de la demo de 904 productos. Procedimiento, autorización de referencias y pruebas: [docs/313/README.md](../313/README.md).
