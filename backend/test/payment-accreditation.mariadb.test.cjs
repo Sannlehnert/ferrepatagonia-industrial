@@ -418,21 +418,18 @@ test('#333 revisión documental no acredita y el rechazo bloquea la acreditació
   assert.equal(repeated.body.data.revisadoEn, validation.body.data.revisadoEn);
   assert.equal(Number((await paymentsFor(company.accountId))[0].id_admin_revision), admin.id);
 
-  // P2-04: un pago PENDIENTE puede rechazarse financieramente aunque su
-  // revisión documental ya esté APROBADA. El rechazo es terminal y no mueve saldo.
+  // P1-02: una vez aprobada la revisión documental, un rechazo posterior o
+  // concurrente se bloquea con 409 PAGO_YA_REVISADO y no muta el pago.
   const contradictory = await review(paymentId, 'RECHAZADO', { motivo: 'Cambio de decisión' });
-  assert.equal(contradictory.status, 200, JSON.stringify(contradictory.body));
-  assert.equal(contradictory.body.data.estado, 'RECHAZADO');
-  assert.equal(contradictory.body.data.estadoDocumental, 'RECHAZADO');
-  assert.equal(contradictory.body.data.motivoRevision, 'Cambio de decisión');
+  assert.equal(contradictory.status, 409, JSON.stringify(contradictory.body));
+  assert.equal(contradictory.body.code, 'PAGO_YA_REVISADO');
   const afterContradictory = await ledgerSnapshot(company.accountId);
   assert.deepEqual(afterContradictory.movements, before.movements);
   assert.deepEqual(afterContradictory.imputations, before.imputations);
   assert.equal(afterContradictory.saldo, before.saldo);
-  const blockedAfterRejection = await accredit(paymentId);
-  assert.equal(blockedAfterRejection.status, 409, JSON.stringify(blockedAfterRejection.body));
-  assert.equal(blockedAfterRejection.body.code, 'TRANSICION_PAGO_INVALIDA');
-  assert.equal((await movementForPayment(paymentId)).length, 0);
+  const [stillApproved] = await paymentsFor(company.accountId);
+  assert.equal(stillApproved.estado, 'PENDIENTE');
+  assert.equal(stillApproved.estado_documental, 'APROBADO');
 
   const rejectedDeclaration = await declare(company, '5.00');
   assert.equal(rejectedDeclaration.status, 201, JSON.stringify(rejectedDeclaration.body));
@@ -1041,4 +1038,55 @@ test('#333 claves de idempotencia son globales entre cuentas y flujos', async ()
   assert.equal(reused.status, 409, JSON.stringify(reused.body));
   assert.equal(reused.body.code, 'CLAVE_IDEMPOTENCIA_REUTILIZADA');
   assert.equal((await paymentsFor(companyB.accountId)).length, 0);
+});
+
+test('#335 P1-02: carrera concurrente APROBADO vs RECHAZADO devuelve [200, 409] y alinea pedidoId', async () => {
+  const company = await newCompany('race-review', { charge: '50.00' });
+  const receiptId = await newReceipt(company, { orderId: company.orderId });
+  const declaration = await declare(company, '20.00', { receiptId });
+  assert.equal(declaration.status, 201, JSON.stringify(declaration.body));
+  const paymentId = declaration.body.data.id;
+
+  const [approveRes, rejectRes] = await Promise.all([
+    review(paymentId, 'APROBADO', { token: admin.token }),
+    review(paymentId, 'RECHAZADO', { token: admin2.token, motivo: 'Carrera documental' }),
+  ]);
+  const responses = [approveRes, rejectRes].sort((a, b) => a.status - b.status);
+  assert.deepEqual(responses.map(r => r.status), [200, 409], JSON.stringify({ approveRes, rejectRes }));
+  assert.equal(responses[1].body.code, 'PAGO_YA_REVISADO');
+
+  // El campo pedidoId en PATCH /revision coincide con GET /api/admin/pagos/:id (PAGO.id_pedido = null).
+  const adminDetail = await api(`/admin/pagos/${paymentId}`, { token: admin.token });
+  assert.equal(adminDetail.status, 200);
+  assert.equal(responses[0].body.data.pedidoId, adminDetail.body.data.pedidoId);
+  assert.equal(responses[0].body.data.pedidoId, null);
+
+  const [row] = await paymentsFor(company.accountId);
+  assert.equal(row.estado_documental, responses[0].body.data.estadoDocumental);
+  assert.equal(row.estado, responses[0].body.data.estado);
+  assert.equal((await movementForPayment(paymentId)).length, 0);
+});
+
+test('#335 P1-02: comprobante rechazado en /admin/comprobantes bloquea aprobación documental en /revision', async () => {
+  const company = await newCompany('rejected-receipt-review', { charge: '50.00' });
+  const declaration = await declare(company, '15.00');
+  assert.equal(declaration.status, 201, JSON.stringify(declaration.body));
+  const paymentId = declaration.body.data.id;
+
+  const receiptRejection = await api(`/admin/comprobantes/${declaration.receiptId}/revision`, {
+    method: 'PATCH',
+    token: admin.token,
+    key: idem(),
+    body: { estado: 'RECHAZADO', motivo: 'Comprobante adulterado' },
+  });
+  assert.equal(receiptRejection.status, 200, JSON.stringify(receiptRejection.body));
+
+  const approveAttempt = await review(paymentId, 'APROBADO');
+  assert.equal(approveAttempt.status, 409, JSON.stringify(approveAttempt.body));
+  assert.equal(approveAttempt.body.code, 'PAGO_DOCUMENTALMENTE_RECHAZADO');
+
+  const [row] = await paymentsFor(company.accountId);
+  assert.equal(row.estado, 'PENDIENTE');
+  assert.equal(row.estado_documental, 'PENDIENTE');
+  assert.equal((await movementForPayment(paymentId)).length, 0);
 });

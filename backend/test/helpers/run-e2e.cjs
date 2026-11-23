@@ -18,8 +18,9 @@ const receipts = args.includes('--receipts');
 const payments = args.includes('--payments');
 const demoCatalog = args.includes('--demo-catalog');
 const demoInteractive = args.includes('--demo-interactiva');
-const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--payments', '--demo-catalog', '--demo-interactiva'].includes(arg));
-assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(payments) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
+const paymentActions = args.includes('--payment-actions');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--payments', '--demo-catalog', '--demo-interactiva', '--payment-actions'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(payments) + Number(demoCatalog) + Number(paymentActions) <= 1, 'Elegí un único perfil E2E.');
 assert.ok(!demoInteractive || (demoCatalog && process.stdin.isTTY && testArgs.length === 0),
   'Para la demo interactiva usá --demo-catalog --demo-interactiva en una terminal, sin otros argumentos.');
 
@@ -167,8 +168,8 @@ async function main() {
     accountOrigin: payments ? 'REAL' : 'DEMO',
   });
   // Almacenamiento temporal para los E2E de comprobantes,
-  // pagos, checkout normal y demo interactiva.
-  if (receipts || payments || demoInteractive || (!fer19 && !demoCatalog)) {
+  // pagos, acciones de pago ADMIN, checkout normal y demo interactiva.
+  if (receipts || payments || demoInteractive || paymentActions || (!fer19 && !demoCatalog)) {
     receiptStorage = fs.mkdtempSync(
       path.join(os.tmpdir(), 'ferre-receipts-e2e-')
     );
@@ -215,6 +216,7 @@ async function main() {
       E2E_FER19: fer19,
       E2E_RECEIPTS: receipts ? '1' : '',
       E2E_PAYMENTS: payments ? '1' : '',
+      E2E_PAYMENT_ACTIONS: paymentActions ? '1' : '',
       RECEIPT_STORAGE_DIR: receiptStorage ?? '',
       PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
       DB_HOST: profile.host,
@@ -237,7 +239,7 @@ async function main() {
     await releaseCandidatePort();
   }
 
-  const { port: apiPort, adminAccounts, fer19Fixture } = apiReady;
+  const { port: apiPort, adminAccounts, fer19Fixture, paymentActions: paymentActionsFixture } = apiReady;
 
   const browserEnv = {
     ...process.env,
@@ -250,6 +252,8 @@ async function main() {
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
     E2E_PAYMENTS: payments ? '1' : '',
+    E2E_PAYMENT_ACTIONS: paymentActions ? '1' : '',
+    E2E_PAYMENT_ACTIONS_FIXTURE: paymentActionsFixture ? JSON.stringify(paymentActionsFixture) : '',
   };
   if (fer19 === 'production') browserEnv.E2E_PRODUCTION_BUILD = '1';
   else if (fer19) browserEnv.E2E_PRODUCTION_BUILD = '0';
