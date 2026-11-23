@@ -59,6 +59,15 @@ const hash = bytes => createHash('sha256').update(bytes).digest('hex');
 const browserMode = process.env.CATALOG313_BROWSER === '1';
 const { chromium, expect } = browserMode ? require('../../frontend/node_modules/@playwright/test') : {};
 
+const gitBaseRef = () => {
+  try {
+    const sha = execFileSync('git', ['rev-parse', '--short', 'HEAD'], { cwd: root, encoding: 'utf8', timeout: 5000, stdio: 'pipe' }).trim();
+    return sha ? `${sha} + cambios de integración #313` : 'HEAD + cambios de integración #313';
+  } catch {
+    return 'HEAD + cambios de integración #313';
+  }
+};
+
 test('313: catálogo autónomo de 100, listas 10/20, carrito y persistencia', { timeout: 600000 }, async t => {
   const run = 'audit313-' + randomUUID();
   const label = 'ferrepatagonia.audit313=' + run;
@@ -72,7 +81,7 @@ test('313: catálogo autónomo de 100, listas 10/20, carrito y persistencia', { 
   const origin = 'http://127.0.0.1:' + (browserMode ? webPort : apiPort);
   const apiOrigin = 'http://127.0.0.1:' + apiPort;
   let cookie;
-  const summary = { base: '1c68d7a + cambios de integración #313', criteriaSource: 'Capturas de Bruno: HU288 y tareas309–313', normalInstall: true, academicCheckout: false, publication: 'Asociación oficial de imágenes y activación ADMIN explícita, solo en base descartable', checkpoints: [] };
+  const summary = { base: gitBaseRef(), criteriaSource: 'Capturas de Bruno: HU288 y tareas309–313', normalInstall: true, academicCheckout: false, publication: 'Asociación oficial de imágenes y activación ADMIN explícita, solo en base descartable', checkpoints: [] };
   const connect = async () => {
     const port = Number(docker(['port', run, '3306/tcp']).split(':').at(-1));
     for(let i=0;i<50;i++) {
@@ -151,6 +160,11 @@ test('313: catálogo autónomo de 100, listas 10/20, carrito y persistencia', { 
     await connection.query('UPDATE PRODUCTO SET descripcion=? WHERE codigo=?',[last.description,last.sku]);
     const pub = publish(admin.id_usuario); assert.equal(pub.status,0,pub.stderr);
     assert.equal(JSON.parse(pub.stdout).publicados,100);
+    const legacyPriceEvents=await connection.query("SELECT e.tipo,e.precio_anterior,e.precio_nuevo,e.id_admin FROM FER17_PRECIO_EVENTO e JOIN PRODUCTO p ON p.id_producto=e.id_producto WHERE p.codigo=? AND e.tipo='CAMBIO_PRECIO' AND e.precio_anterior IS NULL ORDER BY e.id_evento",[legacy.sku]);
+    assert.equal(legacyPriceEvents.length,1);
+    assert.equal(legacyPriceEvents[0].precio_anterior,null);
+    assert.equal(legacyPriceEvents[0].precio_nuevo,legacy.referencePrice);
+    assert.equal(Number(legacyPriceEvents[0].id_admin),Number(admin.id_usuario));
     const afterPublish=await snapshot();
     const eventsBefore=serial(await connection.query('SELECT * FROM FER17_PRECIO_EVENTO ORDER BY id_evento'));
     const publishedAgain=publish(admin.id_usuario);assert.equal(publishedAgain.status,0,publishedAgain.stderr);assert.equal(JSON.parse(publishedAgain.stdout).publicados,0);
@@ -297,9 +311,15 @@ test('313: catálogo autónomo de 100, listas 10/20, carrito y persistencia', { 
         const result=await response;assert.ok(result.ok(),await result.text());
         await expect(buyer.getByText(/Pedido #\d+ registrado por USD/)).toBeVisible();
         const cart=await buyer.request.get(origin+'/api/carrito');assert.equal((await cart.json()).items.length,0);
+        await buyer.goto(origin+'/mi-cuenta/pedidos');
+        const detailButton=buyer.getByRole('button',{name:/^Ver detalle/}).first();
+        await expect(detailButton).toBeVisible();
+        await detailButton.click();
+        await expect(buyer.getByRole('button',{name:'Adjuntar comprobante',exact:true})).toBeVisible();
         await buyer.close();
       }
       summary.browser.confirmedTransferLists=[10,20];
+      summary.browser.orderDetailReceipts=[10,20];
     }
 
     write('summary.json',summary);

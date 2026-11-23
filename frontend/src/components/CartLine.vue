@@ -138,7 +138,7 @@ const availabilityMessage = computed(() => {
         </p>
         <p
           v-if="item.precio.descuentoAplicado !== '0.00'"
-          class="mb-0 mt-1 text-[11px] text-slate-500"
+          class="mb-0 mt-1 text-[11px] text-green-700"
         >
           Descuento {{ item.precio.descuentoAplicado }}%
         </p>

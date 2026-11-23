@@ -599,35 +599,40 @@ async function main() {
       const [admin] = await manager.query("SELECT id_usuario FROM USUARIO WHERE id_usuario=? AND rol='ADMIN' AND activo=1 FOR UPDATE", [adminId]);
       if (!admin) throw new CatalogError('La publicación requiere un ADMIN activo.');
       let published = 0;
-      for (const row of [...rows].sort((a,b) => a.sku.localeCompare(b.sku))) {
-        if (catalogReferencePrices[row.sku] !== row.referencePrice) throw new CatalogError('Las referencias del CSV difieren del catálogo versionado.');
-        const [product] = await manager.query('SELECT * FROM PRODUCTO WHERE codigo=? FOR UPDATE', [row.sku]);
-        if (!product || product.codigo !== row.sku || product.nombre !== row.name ||
-          product.id_categoria !== categories.get(row.category) ||
-          ![row.description, row.legacyDescription].includes(product.descripcion) ||
-          (product.precio !== null && product.precio !== row.referencePrice) ||
-          typeof product.imagen !== 'string' || !/^\/api\/product-images\/[a-f0-9-]+\.webp$/.test(product.imagen)) {
-          throw new CatalogError('El SKU ' + row.sku + ' requiere revisión: ficha, precio o imagen no coincide. No se sobrescriben datos ajenos.');
+      await manager.query('SET @fer17_actor_id = ?', [adminId]);
+      try {
+        for (const row of [...rows].sort((a,b) => a.sku.localeCompare(b.sku))) {
+          if (catalogReferencePrices[row.sku] !== row.referencePrice) throw new CatalogError('Las referencias del CSV difieren del catálogo versionado.');
+          const [product] = await manager.query('SELECT * FROM PRODUCTO WHERE codigo=? FOR UPDATE', [row.sku]);
+          if (!product || product.codigo !== row.sku || product.nombre !== row.name ||
+            product.id_categoria !== categories.get(row.category) ||
+            ![row.description, row.legacyDescription].includes(product.descripcion) ||
+            (product.precio !== null && product.precio !== row.referencePrice) ||
+            typeof product.imagen !== 'string' || !/^\/api\/product-images\/[a-f0-9-]+\.webp$/.test(product.imagen)) {
+            throw new CatalogError('El SKU ' + row.sku + ' requiere revisión: ficha, precio o imagen no coincide. No se sobrescriben datos ajenos.');
+          }
+          const [previous] = await manager.query("SELECT e.*, (a.rol='ADMIN') AS admin_valido, (e.verificado_utc<=UTC_TIMESTAMP(3)) AS vigente FROM PRECIO_USD_EVIDENCIA e LEFT JOIN USUARIO a ON a.id_usuario=e.id_admin WHERE e.id_producto=? FOR UPDATE", [product.id_producto]);
+          const reference = catalogReferenceEvidence(row.sku);
+          // No convertir evidencia real existente en referencia de presentación.
+          const validEvidence = previous?.valida === 1 && previous.admin_valido === 1 && previous.vigente === 1 && typeof previous.evidencia === 'string' && previous.evidencia.trim().length > 0;
+          const realEvidence = validEvidence && previous.sintetica === 0 && previous.precio_verificado === row.referencePrice;
+          const currentReference = validEvidence && previous.sintetica === 1 && previous.evidencia === reference && previous.precio_verificado === row.referencePrice;
+          if (previous && !realEvidence && !currentReference) throw new CatalogError('El precio del SKU ' + row.sku + ' tiene una revisión distinta; requiere decisión individual en ADMIN.');
+          const changed = product.activo !== 1 || product.descripcion !== row.description || product.precio !== row.referencePrice;
+          if (changed) await manager.query('UPDATE PRODUCTO SET descripcion=?, precio=?, activo=1 WHERE id_producto=?', [row.description, row.referencePrice, product.id_producto]);
+          if (!realEvidence && !currentReference) {
+            await manager.query(`INSERT INTO PRECIO_USD_EVIDENCIA
+              (id_producto,precio_verificado,evidencia,id_admin,verificado_utc,valida,sintetica)
+              VALUES (?,?,?,?,UTC_TIMESTAMP(3),1,1)`, [product.id_producto,row.referencePrice,reference,adminId]);
+            await manager.query(`INSERT INTO FER17_PRECIO_EVENTO
+              (id_producto,tipo,precio_anterior,precio_nuevo,evidencia,id_admin,ocurrido_utc,resultado,motivo)
+              VALUES (?,'VERIFICACION',?,?,?,?,UTC_TIMESTAMP(3),'APLICADO','REFERENCIA_CATALOGO')`,
+              [product.id_producto,product.precio,row.referencePrice,reference,adminId]);
+          }
+          if (changed || (!realEvidence && !currentReference)) published++;
         }
-        const [previous] = await manager.query("SELECT e.*, (a.rol='ADMIN') AS admin_valido, (e.verificado_utc<=UTC_TIMESTAMP(3)) AS vigente FROM PRECIO_USD_EVIDENCIA e LEFT JOIN USUARIO a ON a.id_usuario=e.id_admin WHERE e.id_producto=? FOR UPDATE", [product.id_producto]);
-        const reference = catalogReferenceEvidence(row.sku);
-        // No convertir evidencia real existente en referencia de presentación.
-        const validEvidence = previous?.valida === 1 && previous.admin_valido === 1 && previous.vigente === 1 && typeof previous.evidencia === 'string' && previous.evidencia.trim().length > 0;
-        const realEvidence = validEvidence && previous.sintetica === 0 && previous.precio_verificado === row.referencePrice;
-        const currentReference = validEvidence && previous.sintetica === 1 && previous.evidencia === reference && previous.precio_verificado === row.referencePrice;
-        if (previous && !realEvidence && !currentReference) throw new CatalogError('El precio del SKU ' + row.sku + ' tiene una revisión distinta; requiere decisión individual en ADMIN.');
-        const changed = product.activo !== 1 || product.descripcion !== row.description || product.precio !== row.referencePrice;
-        if (changed) await manager.query('UPDATE PRODUCTO SET descripcion=?, precio=?, activo=1 WHERE id_producto=?', [row.description, row.referencePrice, product.id_producto]);
-        if (!realEvidence && !currentReference) {
-          await manager.query(`INSERT INTO PRECIO_USD_EVIDENCIA
-            (id_producto,precio_verificado,evidencia,id_admin,verificado_utc,valida,sintetica)
-            VALUES (?,?,?,?,UTC_TIMESTAMP(3),1,1)`, [product.id_producto,row.referencePrice,reference,adminId]);
-          await manager.query(`INSERT INTO FER17_PRECIO_EVENTO
-            (id_producto,tipo,precio_anterior,precio_nuevo,evidencia,id_admin,ocurrido_utc,resultado,motivo)
-            VALUES (?,'VERIFICACION',?,?,?,?,UTC_TIMESTAMP(3),'APLICADO','REFERENCIA_CATALOGO')`,
-            [product.id_producto,product.precio,row.referencePrice,reference,adminId]);
-        }
-        if (changed || (!realEvidence && !currentReference)) published++;
+      } finally {
+        await manager.query('SET @fer17_actor_id = NULL').catch(() => undefined);
       }
       return { insertados: inserted, conservados: preserved, publicados: published };
     }, { isolation: 'READ COMMITTED' });
