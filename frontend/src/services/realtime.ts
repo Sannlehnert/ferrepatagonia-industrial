@@ -7,6 +7,8 @@ export type Invalidation = {
   cart: boolean
   products: Set<number>
   orders: Set<number>
+  orderStatuses: Map<number, string>
+  orderEventsWithoutState: Set<number>
   receipts: boolean
   payments: boolean
   account: boolean
@@ -18,6 +20,8 @@ const empty = (): Invalidation => ({
   cart: false,
   products: new Set(),
   orders: new Set(),
+  orderStatuses: new Map(),
+  orderEventsWithoutState: new Set(),
   receipts: false,
   payments: false,
   account: false,
@@ -148,6 +152,7 @@ export function startRealtime(auth: AuthStore) {
           payload.estado !== 'CONFIRMADO' || !isIsoInstant(payload.notificadoEn) ||
           payload.idEvento !== `pedido.confirmado.v1:${payload.pedidoId}` || !markSeen(payload.idEvento)) return
       batch.orders.add(payload.pedidoId)
+      batch.orderEventsWithoutState.add(payload.pedidoId)
       batch.cart = true
       schedule()
     })
@@ -159,6 +164,11 @@ export function startRealtime(auth: AuthStore) {
           payload.idEvento !== `pedido.estado.actualizado.v1:${payload.pedidoId}:${payload.estadoNuevo}:${payload.actualizadoEn}` ||
           !markSeen(payload.idEvento)) return
       batch.orders.add(payload.pedidoId)
+      if (payload.estadoNuevo.trim().length > 0) {
+        batch.orderStatuses.set(payload.pedidoId, payload.estadoNuevo)
+      } else {
+        batch.orderEventsWithoutState.add(payload.pedidoId)
+      }
       schedule()
     })
     socket.on('comprobante.estado.actualizado.v1', payload => {
@@ -172,7 +182,10 @@ export function startRealtime(auth: AuthStore) {
           payload.idEvento !== `comprobante.estado.actualizado.v1:${payload.comprobanteId}:${payload.estadoDocumental}` ||
           !markSeen(payload.idEvento)) return
       batch.receipts = true
-      if (isId(payload.pedidoId)) batch.orders.add(payload.pedidoId)
+      if (isId(payload.pedidoId)) {
+        batch.orders.add(payload.pedidoId)
+        batch.orderEventsWithoutState.add(payload.pedidoId)
+      }
       schedule()
     })
     socket.on('pago.acreditado.v1', payload => {
@@ -185,7 +198,10 @@ export function startRealtime(auth: AuthStore) {
           payload.idEvento !== `pago.acreditado.v1:${payload.pagoId}:${payload.estadoPago}:${payload.actualizadoEn}` ||
           !markSeen(payload.idEvento)) return
       batch.payments = true
-      if (isId(payload.pedidoId)) batch.orders.add(payload.pedidoId)
+      if (isId(payload.pedidoId)) {
+        batch.orders.add(payload.pedidoId)
+        batch.orderEventsWithoutState.add(payload.pedidoId)
+      }
       if (isId(payload.cuentaCorrienteId)) batch.account = true
       schedule()
     })

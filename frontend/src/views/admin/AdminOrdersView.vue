@@ -57,9 +57,10 @@ const modalDialogRef = ref<HTMLElement | null>(null)
 let activeFilters: AdminOrderQueryFilters = { page: 1, limit: 20 }
 let disposed = false
 let queuedListRefresh: string | undefined
-const inFlightOrderStatusIds = new Set<number>()
-const suppressOrderEchoUntil = new Map<number, number>()
-const pendingOrderEventsDuringInFlight = new Set<number>()
+const inFlightOrderTargets = new Map<number, string>()
+const recentLocalOrderSaves = new Map<number, { status: string; until: number }>()
+const pendingExternalOrderIds = new Set<number>()
+let deferredOrderReconcileTimer: ReturnType<typeof setTimeout> | undefined
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
@@ -293,6 +294,65 @@ const canSubmitStatusChange = computed(() => {
   return order.estadosPermitidos.includes(nextStatusSelection.value)
 })
 
+function clearDeferredOrderReconcileTimer() {
+  if (deferredOrderReconcileTimer !== undefined) {
+    clearTimeout(deferredOrderReconcileTimer)
+    deferredOrderReconcileTimer = undefined
+  }
+}
+
+function pruneExpiredRecentLocalOrderSaves(now: number) {
+  for (const [id, entry] of recentLocalOrderSaves) {
+    if (now >= entry.until) {
+      recentLocalOrderSaves.delete(id)
+    }
+  }
+}
+
+function resetRealtimeTracking() {
+  clearDeferredOrderReconcileTimer()
+  inFlightOrderTargets.clear()
+  recentLocalOrderSaves.clear()
+  pendingExternalOrderIds.clear()
+}
+
+function scheduleDeferredOrderReconcile(session: string, delayMs: number) {
+  clearDeferredOrderReconcileTimer()
+  deferredOrderReconcileTimer = setTimeout(() => {
+    deferredOrderReconcileTimer = undefined
+    if (!isCurrentSession(session)) return
+    const now = Date.now()
+    pruneExpiredRecentLocalOrderSaves(now)
+    const readyIds: number[] = []
+    for (const id of pendingExternalOrderIds) {
+      if (!inFlightOrderTargets.has(id) && !recentLocalOrderSaves.has(id)) {
+        readyIds.push(id)
+      }
+    }
+    for (const id of readyIds) {
+      pendingExternalOrderIds.delete(id)
+    }
+    if (readyIds.length > 0) {
+      reconcileList(session)
+      const currentId = selectedOrderId.value
+      if (showModal.value && currentId !== null && !isSaving.value && readyIds.includes(currentId)) {
+        void refreshOpenOrderDetail(currentId)
+      }
+    }
+    let nextDelay: number | undefined
+    for (const id of pendingExternalOrderIds) {
+      const entry = recentLocalOrderSaves.get(id)
+      if (entry && !inFlightOrderTargets.has(id)) {
+        const remaining = Math.max(0, entry.until - now)
+        nextDelay = nextDelay === undefined ? remaining : Math.min(nextDelay, remaining)
+      }
+    }
+    if (nextDelay !== undefined) {
+      scheduleDeferredOrderReconcile(session, nextDelay)
+    }
+  }, Math.max(0, delayMs))
+}
+
 async function submitStatusChange() {
   const targetId = selectedOrderId.value
   const order = selectedOrder.value
@@ -309,19 +369,24 @@ async function submitStatusChange() {
     return
   }
 
-  inFlightOrderStatusIds.add(targetId)
+  inFlightOrderTargets.set(targetId, targetStatus)
+  recentLocalOrderSaves.delete(targetId)
+  pendingExternalOrderIds.delete(targetId)
   savingOpeningId.value = targetOpening
   statusFeedback.value = null
   const session = identity()
   const isCurrentModal = () => isCurrentSession(session) &&
     targetOpening === currentModalOpeningId.value && selectedOrderId.value === targetId
-  let didReconcile = false
+  let savedStatus: string | null = null
   let authRejected = false
 
   try {
     const updated = await updateAdminOrderStatus(targetId, targetStatus)
+    savedStatus = updated.estado
     reconcileList(session)
-    didReconcile = true
+    if (isCurrentSession(session)) {
+      recentLocalOrderSaves.set(targetId, { status: updated.estado, until: Date.now() + 1500 })
+    }
     if (!isCurrentModal()) return
 
     await detail.load(async () => updated)
@@ -337,7 +402,6 @@ async function submitStatusChange() {
     authRejected = status === 401 || status === 403
     if (!authRejected) {
       reconcileList(session)
-      didReconcile = true
     }
     if (!isCurrentModal()) return
     statusFeedback.value = { text: message, error: true }
@@ -345,6 +409,9 @@ async function submitStatusChange() {
     if (status === undefined || status === 409 || status >= 500) {
       await detail.load(signal => getAdminOrderDetail(targetId, signal))
       const fresh = detail.data.value
+      if (fresh && fresh.idPedido === targetId) {
+        savedStatus = fresh.estado
+      }
       if (fresh && isCurrentModal()) {
         nextStatusSelection.value = fresh.estadosPermitidos[0] ?? ''
       }
@@ -353,13 +420,12 @@ async function submitStatusChange() {
     if (savingOpeningId.value === targetOpening) {
       savingOpeningId.value = null
     }
-    inFlightOrderStatusIds.delete(targetId)
-    const hadPendingRealtime = pendingOrderEventsDuringInFlight.delete(targetId)
-    if (didReconcile) {
-      if (isCurrentSession(session)) {
-        suppressOrderEchoUntil.set(targetId, Date.now() + 1500)
-      }
-    } else if (hadPendingRealtime && !authRejected && isCurrentSession(session)) {
+    inFlightOrderTargets.delete(targetId)
+    if (savedStatus && isCurrentSession(session)) {
+      recentLocalOrderSaves.set(targetId, { status: savedStatus, until: Date.now() + 1500 })
+    }
+    const hadPendingExternal = pendingExternalOrderIds.delete(targetId)
+    if (hadPendingExternal && !authRejected && isCurrentSession(session)) {
       reconcileList(session)
       if (showModal.value && selectedOrderId.value === targetId && !isSaving.value) {
         void refreshOpenOrderDetail(targetId)
@@ -384,17 +450,59 @@ async function refreshOpenOrderDetail(orderId: number) {
 
 onRealtime(change => {
   if (!allowed()) return
+  const now = Date.now()
+  pruneExpiredRecentLocalOrderSaves(now)
+
+  const session = identity()
+  const externalOrderIds: number[] = []
+  let deferredDelay: number | undefined
+
   for (const id of change.orders) {
-    if (inFlightOrderStatusIds.has(id)) {
-      pendingOrderEventsDuringInFlight.add(id)
+    const incomingStatus = change.orderStatuses?.get(id)
+
+    if (inFlightOrderTargets.has(id)) {
+      if (incomingStatus !== undefined && incomingStatus === inFlightOrderTargets.get(id)) {
+        continue
+      }
+      pendingExternalOrderIds.add(id)
+      continue
+    }
+
+    const recentEntry = recentLocalOrderSaves.get(id)
+    if (recentEntry && now < recentEntry.until) {
+      if (incomingStatus !== undefined && incomingStatus === recentEntry.status) {
+        recentLocalOrderSaves.delete(id)
+        continue
+      }
+      if (incomingStatus !== undefined && incomingStatus !== recentEntry.status) {
+        recentLocalOrderSaves.delete(id)
+        externalOrderIds.push(id)
+        continue
+      }
+      pendingExternalOrderIds.add(id)
+      const remaining = Math.max(0, recentEntry.until - now)
+      deferredDelay = deferredDelay === undefined ? remaining : Math.min(deferredDelay, remaining)
+      continue
+    }
+
+    externalOrderIds.push(id)
+  }
+
+  if (deferredDelay !== undefined) {
+    scheduleDeferredOrderReconcile(session, deferredDelay)
+  }
+
+  if (change.reconnect) {
+    clearDeferredOrderReconcileTimer()
+    for (const id of [...pendingExternalOrderIds]) {
+      if (!inFlightOrderTargets.has(id)) {
+        pendingExternalOrderIds.delete(id)
+      }
     }
   }
-  const now = Date.now()
-  const externalOrderIds = [...change.orders].filter(
-    id => !inFlightOrderStatusIds.has(id) && now >= (suppressOrderEchoUntil.get(id) ?? 0),
-  )
+
   if (change.reconnect || externalOrderIds.length > 0 || change.receipts || change.payments) {
-    reconcileList(identity())
+    reconcileList(session)
   }
   const currentId = selectedOrderId.value
   if (
@@ -413,9 +521,7 @@ watch(
     currentModalOpeningId.value++
     savingOpeningId.value = null
     queuedListRefresh = undefined
-    inFlightOrderStatusIds.clear()
-    suppressOrderEchoUntil.clear()
-    pendingOrderEventsDuringInFlight.clear()
+    resetRealtimeTracking()
     list.reset()
     detail.reset()
     showModal.value = false
@@ -440,9 +546,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   disposed = true
-  inFlightOrderStatusIds.clear()
-  suppressOrderEchoUntil.clear()
-  pendingOrderEventsDuringInFlight.clear()
+  resetRealtimeTracking()
   window.removeEventListener('keydown', handleKeydown)
 })
 </script>
