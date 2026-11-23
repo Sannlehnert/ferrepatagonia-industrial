@@ -203,6 +203,13 @@ async function seedPaymentActions(session) {
     return paymentId
   }
 
+  for (let index = 0; index < 40; index += 1) {
+    await createPayment(`bulk-${index}`, {
+      amount: `${100 + index}.00`,
+      secondsAgo: 3600 + index * 60,
+    })
+  }
+
   const scenarios = {}
   scenarios.pendingUsd = await createPayment('pending-usd', { amount: '100.00', secondsAgo: 1 })
   scenarios.pendingArs = await createPayment('pending-ars', {
@@ -252,13 +259,6 @@ async function seedPaymentActions(session) {
   scenarios.missingReceipt = await createPayment('missing-receipt', {
     amount: '30.00', withReceipt: false, secondsAgo: 17,
   })
-
-  for (let index = 0; index < 40; index += 1) {
-    await createPayment(`bulk-${index}`, {
-      amount: `${100 + index}.00`,
-      secondsAgo: 3600 + index * 60,
-    })
-  }
 
   return {
     clientId,
