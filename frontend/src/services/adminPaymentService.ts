@@ -167,7 +167,7 @@ export function accreditationDestinationDescription(
   if (payment.cuentaCorrienteId !== null) {
     return 'Esta acción acredita el pago en la cuenta corriente y registra un movimiento ABONO USD con imputación FIFO. La autorización y la idempotencia se validan en el backend.'
   }
-  return `Esta acción acreditará el pago USD hacia la cobertura financiera del pedido directo (${directOrderTarget(payment.pedidoId)}) sin generar movimiento ABONO en cuenta corriente. La autorización y la idempotencia se validan en el backend.`
+  return `Esta acción acreditará el pago USD hacia la cobertura financiera exclusiva del pedido directo (${directOrderTarget(payment.pedidoId)}). La autorización y la idempotencia se validan en el backend.`
 }
 
 export function accreditationConfirmationLabel(

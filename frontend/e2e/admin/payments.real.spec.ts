@@ -609,9 +609,8 @@ for (const { width, paymentKey, orderKey, expectedUsd, expectedDbUsd } of direct
       const dialog = await openAccreditation(page, paymentId)
       const description = dialog.locator('#payment-accreditation-description')
       await expect(description).toContainText(`Pedido #${orderId}`)
-      await expect(description).toContainText('cobertura financiera')
-      await expect(description).toContainText('sin generar movimiento ABONO en cuenta corriente')
-      await expect(description).not.toContainText('Esta acción acredita el pago en la cuenta corriente')
+      await expect(description).toContainText('cobertura financiera exclusiva del pedido directo')
+      await expect(description).not.toContainText(/ABONO|cuenta corriente/i)
 
       const checkboxLabel = dialog.locator('label:has(input[type="checkbox"])')
       await expect(checkboxLabel).toContainText(`Pedido #${orderId}`)

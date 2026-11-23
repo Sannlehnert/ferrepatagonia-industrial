@@ -260,8 +260,8 @@ test('adapta mensajes previos y posteriores de acreditación para cuenta corrien
   const directFeedback = paymentUpdatedFeedback(directOrderPayment)
 
   assert.match(directDesc, /Pedido #33/)
-  assert.match(directDesc, /cobertura financiera/)
-  assert.match(directDesc, /sin generar movimiento ABONO en cuenta corriente/)
+  assert.match(directDesc, /cobertura financiera exclusiva del pedido directo/)
+  assert.doesNotMatch(directDesc, /ABONO|cuenta corriente/i)
   assert.match(directConfirm, /Pedido #33/)
   assert.match(directConfirm, /cobertura financiera/)
   assert.doesNotMatch(directConfirm, /abono|cuenta corriente/i)
