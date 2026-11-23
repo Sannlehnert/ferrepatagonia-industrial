@@ -1,3 +1,4 @@
+import { catalogReferencePrices, catalogReferenceEvidence, catalogReferenceSql } from '../services/pricing/catalog-reference';
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -166,7 +167,7 @@ export function expectedFer17Triggers(migration: string): TriggerDefinition[] {
 
 const fields = [
   'numero', 'sku', 'categoria', 'nombre_propuesto', 'descripcion_propuesta',
-  'variante_original', 'descripcion_original', 'presentacion', 'stock_presentacion'
+  'variante_original', 'descripcion_original', 'presentacion', 'stock_presentacion', 'precio_referencia_usd', 'fuente_precio'
 ] as const;
 
 class CatalogError extends Error {}
@@ -187,21 +188,20 @@ export function parseMasterCatalog(csv: string) {
     const category = get('categoria');
     const name = get('nombre_propuesto');
     const stock = get('stock_presentacion');
-    const description = [
-      get('descripcion_propuesta'),
-      `Variante original: ${get('variante_original')}`,
-      `Ficha original: ${get('descripcion_original')}`,
-      `Presentación: ${get('presentacion')}`
-    ].join('\n');
+    const description = get('descripcion_propuesta');
+    const legacyDescription = [description, 'Variante original: ' + get('variante_original'),
+      'Ficha original: ' + get('descripcion_original'), 'Presentación: ' + get('presentacion')].join('\n');
+    const referencePrice = get('precio_referencia_usd');
     if (row.length !== header.length || get('numero') !== String(index + 1) ||
         fields.some(field => !get(field).trim() || get(field) !== get(field).trim()) ||
         !/^FP-DEMO-[A-Z0-9-]{1,92}$/.test(sku) || seen.has(sku) ||
         category.length > 150 || name.length > 200 || Buffer.byteLength(description) > 65535 ||
+        !/^(0|[1-9][0-9]{0,9})\.[0-9]{2}$/.test(referencePrice) || Number(referencePrice) <= 0 ||
         !/^(0|[1-9][0-9]*)$/.test(stock) || Number(stock) > 2147483647) {
       throw new CatalogError(`Fila de catálogo inválida o SKU repetido (registro ${index + 1}).`);
     }
     seen.add(sku);
-    return { sku, category, name, description, stock: Number(stock) };
+    return { sku, category, name, description, legacyDescription, referencePrice, stock: Number(stock) };
   });
 }
 
@@ -223,8 +223,8 @@ const demoEvidence = [
   },
   {
     table: 'PRECIO_USD_EVIDENCIA',
-    columns: ['sintetica'],
-    predicate: 'sintetica = 1',
+    columns: ['sintetica', 'id_producto', 'evidencia', 'precio_verificado'],
+    predicate: `sintetica = 1 AND NOT EXISTS (SELECT 1 FROM PRODUCTO p WHERE p.id_producto=PRECIO_USD_EVIDENCIA.id_producto AND ${catalogReferenceSql('p', 'PRECIO_USD_EVIDENCIA', true)})`,
     description: 'evidencias de precio sintéticas (sintetica = 1)',
   },
   {
@@ -293,7 +293,7 @@ async function assertNoDemoData(query: SqlQuery, configuredUser: string): Promis
   }
 
   const requiredColumns = [
-    { table: 'PRODUCTO', columns: ['codigo'] },
+    { table: 'PRODUCTO', columns: ['codigo', 'id_producto', 'precio'] },
     ...demoEvidence.map(evidence => ({ table: evidence.table, columns: evidence.columns })),
   ];
   const missingTables = [...new Set(requiredColumns
@@ -506,9 +506,12 @@ async function assertFer17Triggers(
 
 async function main() {
   const args = process.argv.slice(2);
-  if (args.length !== 2 || args[0] !== '--confirmar-destino') {
-    throw new CatalogError('Uso: npm run catalogo:importar-maestro -- --confirmar-destino HOST:PUERTO/BASE');
+  const publish = args.length === 5 && args[2] === '--publicar' && args[3] === '--admin' && /^[1-9]\d{0,9}$/.test(args[4]);
+  if (args[0] !== '--confirmar-destino' || (args.length !== 2 && !publish)) {
+    throw new CatalogError('Uso: npm run catalogo:importar-maestro -- --confirmar-destino HOST:PUERTO/BASE [--publicar --admin ID]');
   }
+  const adminId = publish ? Number(args[4]) : null;
+  if (adminId !== null && adminId > 2147483647) throw new CatalogError('ID de ADMIN inválido.');
   const rows = parseMasterCatalog(new TextDecoder('utf-8', { fatal: true }).decode(await readFile(masterCsv)));
   const { env } = await import('../config/env.config.js');
   if (args[1] !== `${env.db.host}:${env.db.port}/${env.db.database}`) {
@@ -578,8 +581,8 @@ async function main() {
             await manager.query(`
               INSERT INTO PRODUCTO
                 (codigo, nombre, descripcion, stock, id_categoria, precio, descuento_especial_pct, imagen, activo)
-              VALUES (?, ?, ?, ?, ?, NULL, NULL, NULL, 0)`,
-            [row.sku, row.name, row.description, row.stock, categories.get(row.category)]);
+              VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0)`,
+            [row.sku, row.name, row.description, row.stock, categories.get(row.category), row.referencePrice]);
             inserted.push(row.sku);
           } catch (error) {
             // A concurrent insert can win after the lookup. Only skip a confirmed SKU match.
@@ -590,7 +593,43 @@ async function main() {
         }
         if (existing) preserved.push({ sku: row.sku, codigoExistente: existing.codigo });
       }
-      return { insertados: inserted, conservados: preserved };
+      if (!publish) return { insertados: inserted, conservados: preserved };
+      // La publicación es una acción operativa explícita. Conserva el origen
+      // sintético: no simula una certificación comercial ni habilita otros SKU.
+      const [admin] = await manager.query("SELECT id_usuario FROM USUARIO WHERE id_usuario=? AND rol='ADMIN' AND activo=1 FOR UPDATE", [adminId]);
+      if (!admin) throw new CatalogError('La publicación requiere un ADMIN activo.');
+      let published = 0;
+      for (const row of [...rows].sort((a,b) => a.sku.localeCompare(b.sku))) {
+        if (catalogReferencePrices[row.sku] !== row.referencePrice) throw new CatalogError('Las referencias del CSV difieren del catálogo versionado.');
+        const [product] = await manager.query('SELECT * FROM PRODUCTO WHERE codigo=? FOR UPDATE', [row.sku]);
+        if (!product || product.codigo !== row.sku || product.nombre !== row.name ||
+          product.id_categoria !== categories.get(row.category) ||
+          ![row.description, row.legacyDescription].includes(product.descripcion) ||
+          (product.precio !== null && product.precio !== row.referencePrice) ||
+          typeof product.imagen !== 'string' || !/^\/api\/product-images\/[a-f0-9-]+\.webp$/.test(product.imagen)) {
+          throw new CatalogError('El SKU ' + row.sku + ' requiere revisión: ficha, precio o imagen no coincide. No se sobrescriben datos ajenos.');
+        }
+        const [previous] = await manager.query("SELECT e.*, (a.rol='ADMIN') AS admin_valido, (e.verificado_utc<=UTC_TIMESTAMP(3)) AS vigente FROM PRECIO_USD_EVIDENCIA e LEFT JOIN USUARIO a ON a.id_usuario=e.id_admin WHERE e.id_producto=? FOR UPDATE", [product.id_producto]);
+        const reference = catalogReferenceEvidence(row.sku);
+        // No convertir evidencia real existente en referencia de presentación.
+        const validEvidence = previous?.valida === 1 && previous.admin_valido === 1 && previous.vigente === 1 && typeof previous.evidencia === 'string' && previous.evidencia.trim().length > 0;
+        const realEvidence = validEvidence && previous.sintetica === 0 && previous.precio_verificado === row.referencePrice;
+        const currentReference = validEvidence && previous.sintetica === 1 && previous.evidencia === reference && previous.precio_verificado === row.referencePrice;
+        if (previous && !realEvidence && !currentReference) throw new CatalogError('El precio del SKU ' + row.sku + ' tiene una revisión distinta; requiere decisión individual en ADMIN.');
+        const changed = product.activo !== 1 || product.descripcion !== row.description || product.precio !== row.referencePrice;
+        if (changed) await manager.query('UPDATE PRODUCTO SET descripcion=?, precio=?, activo=1 WHERE id_producto=?', [row.description, row.referencePrice, product.id_producto]);
+        if (!realEvidence && !currentReference) {
+          await manager.query(`INSERT INTO PRECIO_USD_EVIDENCIA
+            (id_producto,precio_verificado,evidencia,id_admin,verificado_utc,valida,sintetica)
+            VALUES (?,?,?,?,UTC_TIMESTAMP(3),1,1)`, [product.id_producto,row.referencePrice,reference,adminId]);
+          await manager.query(`INSERT INTO FER17_PRECIO_EVENTO
+            (id_producto,tipo,precio_anterior,precio_nuevo,evidencia,id_admin,ocurrido_utc,resultado,motivo)
+            VALUES (?,'VERIFICACION',?,?,?,?,UTC_TIMESTAMP(3),'APLICADO','REFERENCIA_CATALOGO')`,
+            [product.id_producto,product.precio,row.referencePrice,reference,adminId]);
+        }
+        if (changed || (!realEvidence && !currentReference)) published++;
+      }
+      return { insertados: inserted, conservados: preserved, publicados: published };
     }, { isolation: 'READ COMMITTED' });
     console.log(JSON.stringify(result));
   } finally {

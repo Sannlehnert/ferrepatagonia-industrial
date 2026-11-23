@@ -235,3 +235,17 @@ test('visibilitychange and focus within 20 ms trigger one auto-refresh, manual r
   assert.equal(listeners.window.size,0);
   assert.equal(listeners.document.size,0);
 });
+
+test('313: precios del catálogo publicados por backend usan el motor normal y conservan el origen de referencia', async () => {
+  const reference = line({ referenciaCatalogo:true, evidenciaBaseUSD:{reference:'CATALOGO #309 REFERENCIA USD SHA256:version SKU:sku', verifiedAt:'2026-01-01T00:00:00Z', synthetic:true} });
+  const r = runtime(async()=>response([reference],{datosSinteticos:true}));
+  for (const personalized of [false,true]) {
+    const [price] = await r.service.getPrices([1],personalized);
+    assert.equal(price.precioUnitarioUSD,'90.00');
+    assert.equal(r.service.precioComprable(price),true);
+    const html = await renderToString(vue.createSSRApp(r.load('components/ProductPrice.vue').default,{line:price,loading:false,error:'',personalized}));
+    assert.match(html,/USD 90\.00/);
+    assert.doesNotMatch(html,/Precio sintético no disponible|Precio simulado académico/);
+  }
+  r.stop();
+});

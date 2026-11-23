@@ -1,3 +1,4 @@
+import { catalogReferenceSql } from '../services/pricing/catalog-reference';
 import { pool } from '../config/catalog-snapshot.config';
 import type { CatalogOrder } from '../dtos/catalog/catalog-query.dto';
 import { CatalogPagination } from '../validators/catalog.validator';
@@ -13,7 +14,7 @@ const ORDER_BY: Readonly<Record<CatalogOrder, string>> = Object.freeze({
 });
 
 // FER17-v1 (PUBLICO, USD, cantidad 1). ROUND sobre DECIMAL aplica HALF_UP.
-const PUBLIC_PRICE = `CASE WHEN ea.id_usuario IS NOT NULL AND e.sintetica = 0 AND p.precio > 0
+const PUBLIC_PRICE = `CASE WHEN ea.id_usuario IS NOT NULL AND (e.sintetica = 0 OR ${catalogReferenceSql('p', 'e')}) AND p.precio > 0
     AND COALESCE(p.descuento_especial_pct, 0) BETWEEN 0 AND 99.99
   THEN NULLIF(ROUND(p.precio * (100.00 - COALESCE(p.descuento_especial_pct, 0)) * 0.01, 2), 0)
   END`;

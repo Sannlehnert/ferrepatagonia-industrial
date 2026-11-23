@@ -149,3 +149,8 @@ no errores operativos. La identidad, evidencia y trazabilidad se consultan en se
 
 Fuera de alcance: #242, #243, FER-16, carrito, crédito, checkout y APIs administrativas.
 La carga manual verificable es operación de datos controlada, no una interfaz de administración.
+
+
+## Referencias del catálogo normal (#313)
+
+La publicación operativa de los 100 SKU de #309 puede emitir `referenciaCatalogo: true` en cada línea o precio de carrito. Es una salida del backend, nunca un dato aceptado del navegador. El servidor contrasta SKU, importe, huella versionada y evidencia válida del ADMIN. Se conserva `datosSinteticos: true` (y `evidenciaBaseUSD.synthetic: true` en precios) para expresar su procedencia representativa. Esta marca permite consumir las referencias publicadas mediante los descuentos y totales existentes, sin el checkout académico de la demo. Otra evidencia sintética sigue bloqueada en el cliente. No equivale a evidencia comercial real. Procedimiento y límites: [#313](../313/README.md).
