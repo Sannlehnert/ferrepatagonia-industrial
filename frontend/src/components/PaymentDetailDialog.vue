@@ -119,9 +119,17 @@ onBeforeUnmount(() => {
                         <dt class="font-medium text-slate-600">Observaciones</dt>
                         <dd class="m-0 mt-1 whitespace-pre-wrap break-words">{{ payment.observaciones }}</dd>
                     </div>
-                    <div v-if="payment.motivoRevision" class="min-w-0 sm:col-span-2">
-                        <dt class="font-medium text-slate-600">Motivo informado</dt>
-                        <dd class="m-0 mt-1 whitespace-pre-wrap break-words">{{ payment.motivoRevision }}</dd>
+                    <div
+                        v-if="payment.motivoRevision"
+                        class="min-w-0 sm:col-span-2"
+                        :class="payment.estadoDocumental === 'RECHAZADO' || payment.estado === 'RECHAZADO'
+                            ? 'rounded-md border border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-[#B91C1C]'
+                            : ''"
+                    >
+                        <dt class="font-semibold">
+                            {{ payment.estadoDocumental === 'RECHAZADO' || payment.estado === 'RECHAZADO' ? 'Motivo de rechazo' : 'Motivo informado' }}
+                        </dt>
+                        <dd class="m-0 mt-1 whitespace-pre-wrap [overflow-wrap:anywhere]">{{ payment.motivoRevision }}</dd>
                     </div>
                 </dl>
             </template>

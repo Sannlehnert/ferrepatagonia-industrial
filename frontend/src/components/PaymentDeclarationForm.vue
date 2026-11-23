@@ -13,10 +13,13 @@ import {
     paymentErrorCode,
     paymentErrorMessage,
 } from '@/services/paymentService'
+import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import type { DeclarePaymentPayload, PaymentCurrency } from '@/types/payment'
 import { formatInstant } from '@/utils/cuentaCorriente'
 import {
+    documentStateClasses,
+    documentStateDotClasses,
     formatPaymentMoney,
     isIdempotencyKey,
     isValidPaymentAmount,
@@ -324,6 +327,13 @@ watch(() => props.refreshVersion, () => {
     void loadReceipts(1)
 })
 
+onRealtime(change => {
+    if (!allowed() || submitting.value || uncertain.value) return
+    if (change.reconnect || change.receipts) {
+        void loadReceipts(receiptsPage.value)
+    }
+})
+
 onBeforeUnmount(() => {
     receiptsRequest += 1
     receiptsController?.abort()
@@ -389,7 +399,7 @@ onBeforeUnmount(() => {
                     </p>
                     <div v-else class="grid max-h-72 gap-2 overflow-y-auto pr-1">
                         <label v-for="receipt in receipts" :key="receipt.id"
-                            class="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm"
+                            class="flex min-w-0 cursor-pointer items-start gap-3 rounded-md border p-3 text-sm"
                             :class="selectedReceiptId === receipt.id
                                 ? 'border-[#145A8D] bg-sky-50'
                                 : 'border-slate-200 bg-white hover:bg-slate-50'">
@@ -401,8 +411,25 @@ onBeforeUnmount(() => {
                                     {{ receiptTypeLabels[receipt.tipoMime] ?? 'Archivo' }} ·
                                     {{ receipt.pedidoId !== null ? `Pedido PED-${String(receipt.pedidoId).padStart(6, '0')}` : 'Saldo general de cuenta corriente' }}
                                 </span>
-                                <span class="block text-slate-600">
-                                    Cargado {{ formatInstant(receipt.fecha) }} · {{ receiptReviewStatusLabel(receipt.estadoRevision) }}
+                                <span class="mt-1 flex flex-wrap items-center gap-2 text-slate-600">
+                                    <span>Cargado {{ formatInstant(receipt.fecha) }}</span>
+                                    <span
+                                        class="box-border inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold"
+                                        :class="documentStateClasses(receipt.estadoRevision)"
+                                    >
+                                        <span
+                                            aria-hidden="true"
+                                            class="h-1.5 w-1.5 shrink-0 rounded-full"
+                                            :class="documentStateDotClasses(receipt.estadoRevision)"
+                                        />
+                                        {{ receiptReviewStatusLabel(receipt.estadoRevision) }}
+                                    </span>
+                                </span>
+                                <span
+                                    v-if="receipt.estadoRevision === 'RECHAZADO' && receipt.motivoRechazo"
+                                    class="mt-1 block [overflow-wrap:anywhere] text-xs text-[#DC2626]"
+                                >
+                                    Motivo de rechazo: {{ receipt.motivoRechazo }}
                                 </span>
                             </span>
                         </label>

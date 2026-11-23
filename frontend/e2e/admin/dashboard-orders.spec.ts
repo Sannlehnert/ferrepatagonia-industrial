@@ -5,11 +5,21 @@ const admin = { id: 1, email: 'admin@ferrepatagonia.test', rol: 'ADMIN', tipoCli
 function makeOrder(index: number) {
   const demo = index === 22
   const estado = demo ? 'DEMO_REGISTRADO' : index === 0 ? 'CONFIRMADO' : 'EN_PREPARACION'
+  const modalidadPago = demo ? 'DEMO_DIRECTO' : index < 22 ? 'TRANSFERENCIA' : 'CUENTA_CORRIENTE'
+  const moneda = index === 3 ? null : 'USD'
+  const estadoDocumental = index === 0 ? 'PENDIENTE' : 'SIN_COMPROBANTE'
+  const estadoFinanciero = demo || moneda === null
+    ? 'NO_DETERMINABLE'
+    : modalidadPago === 'TRANSFERENCIA'
+      ? 'SIN_PAGO_ACREDITADO'
+      : 'CARGO_PENDIENTE'
   return {
     idPedido: 1001 + index, fecha: '2026-11-18T12:00:00Z', estado,
+    estadoPedido: estado, estadoDocumental, estadoFinanciero,
+    montoAcreditadoUSD: estadoFinanciero === 'NO_DETERMINABLE' ? null : '0.00',
     estadosPermitidos: demo ? [] : estado === 'CONFIRMADO' ? ['EN_PREPARACION'] : ['ENVIADO', 'ENTREGADO'],
-    modalidadPago: demo ? 'DEMO_DIRECTO' : index < 22 ? 'TRANSFERENCIA' : 'CUENTA_CORRIENTE',
-    moneda: index === 3 ? null : 'USD', subtotal: '123.45', descuento: '0.00', total: '123.45',
+    modalidadPago,
+    moneda, subtotal: '123.45', descuento: '0.00', total: '123.45',
     evidenciaTotalUSD: null, observaciones: null, cantidadItems: 1, totalUnidades: 1,
     cargoCuentaCorrienteId: null, origen: demo ? 'DEMO' : 'REAL',
     comprobantes: { total: index === 0 ? 2 : 0, pendientesRevision: index === 0 ? 1 : 0 },
@@ -77,11 +87,12 @@ for (const width of [360, 1280]) {
     await expect(summary.getByLabel('Empresas fieles', { exact: true })).toHaveText('3')
     await expect(summary.getByRole('region', { name: 'Pedidos por estado', exact: true })).toContainText('10 pedidos operativos')
     await expect(summary.locator('dl[aria-label="Indicadores"]').getByRole('definition')).toHaveCount(6)
-    await expect(summary.getByRole('columnheader')).toHaveCount(6)
+    await expect(summary.getByRole('columnheader')).toHaveCount(7)
     const receiptRow = summary.getByRole('row').filter({ has: page.getByRole('link', { name: 'Ver pedido #1001', exact: true }) })
     await expect(receiptRow).toContainText('2 comprobantes')
-    await expect(receiptRow).toContainText('1 sin revisar')
-    await expect(receiptRow.getByText('Sin revisar', { exact: true })).toBeVisible()
+    await expect(receiptRow).toContainText('1 pendiente')
+    await expect(receiptRow.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await expect(receiptRow.getByText('Sin pago acreditado', { exact: true })).toBeVisible()
     await expect(summary.getByRole('link', { name: 'Ver todos los pedidos' })).toHaveCount(0)
     await expect(summary.getByRole('link', { name: 'Consultar comprobantes' })).toHaveCount(0)
     await expect(summary.getByText('Confirmado', { exact: true })).toBeVisible()

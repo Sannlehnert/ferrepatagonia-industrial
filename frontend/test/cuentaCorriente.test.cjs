@@ -138,6 +138,7 @@ function loadAccountView(account) {
         '@/components/PaymentDeclarationForm.vue': { __esModule: true, default: { render: () => h('div', { 'data-payment-form': '' }) } },
         '@/components/PaymentHistory.vue': { __esModule: true, default: { render: () => h('div', { 'data-payment-history': '' }) } },
         '@/services/paymentReceiptService': { accountReceiptsPath: '/cuenta-corriente/comprobantes' },
+        '@/services/realtime': { onRealtime() {} },
         '@/utils/companyStatus': loadTypeScript('utils/companyStatus.ts'),
         '@/utils/payment': loadTypeScript('utils/payment.ts'),
         '@/utils/cuentaCorriente': {

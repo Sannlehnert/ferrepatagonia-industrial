@@ -157,6 +157,7 @@ async function mountDeclarationForm(t, onDeclare) {
         '@/components/PaymentReviewDialog.vue': { default: {} },
         '@/services/paymentReceiptService': receipts,
         '@/services/paymentService': service,
+        '@/services/realtime': { onRealtime() {} },
         '@/stores/auth': { useAuthStore: () => auth },
         '@/utils/cuentaCorriente': loadTypeScript('utils/cuentaCorriente.ts'),
         '@/utils/payment': loadTypeScript('utils/payment.ts'),
