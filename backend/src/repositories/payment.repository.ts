@@ -9,6 +9,7 @@ export interface PaymentDestination {
 
 export interface PaymentRow {
   id: number;
+  pedidoId: number | null;
   clienteId: number;
   cliente: string;
   cuentaCorrienteId: number;
@@ -52,6 +53,7 @@ export interface PaymentDeclarationInput {
 
 const PAYMENT_SELECT = `
   SELECT p.id_pago AS id,
+         p.id_pedido AS pedidoId,
          c.id_cliente AS clienteId, c.nombre_razon_social AS cliente,
          p.id_cuenta_corriente AS cuentaCorrienteId,
          p.id_usuario_declarante AS declaranteUsuarioId,
@@ -217,7 +219,7 @@ export async function lockPayment(manager: EntityManager, paymentId: number) {
 export async function lockPaymentReceipt(manager: EntityManager, paymentId: number) {
   const [row] = await manager.query(`
     SELECT r.id_comprobante, r.id_cliente, r.id_cuenta_corriente, r.id_pedido,
-           r.tipo_mime, r.bytes, r.sha256,
+           r.estado_revision, r.tipo_mime, r.bytes, r.sha256,
            p.id_pedido AS pedido_id, p.id_cliente AS pedido_cliente,
            p.modalidad_pago
     FROM PAGO g
@@ -242,7 +244,7 @@ export async function updatePaymentReview(
       revision_utc = UTC_TIMESTAMP(3), motivo_revision = ?,
       motivo_cierre = ?, id_admin_cierre = ?,
       fecha_cierre_utc = CASE WHEN ? THEN UTC_TIMESTAMP(3) ELSE NULL END
-    WHERE id_pago = ?
+    WHERE id_pago = ? AND estado = 'PENDIENTE' AND estado_documental = 'PENDIENTE'
   `, [
     input.financialState, input.documentState, input.adminId,
     rejected ? input.reason : null,
@@ -298,7 +300,7 @@ function paymentView(row: PaymentRow, admin: boolean) {
     comprobanteTipoMime: row.comprobanteTipoMime,
     comprobanteBytes: row.comprobanteBytes,
     comprobanteRevisadoEn: row.comprobanteRevisadoEn,
-    pedidoId: row.comprobantePedidoId,
+    pedidoId: admin ? row.pedidoId : row.comprobantePedidoId,
     monto: row.monto,
     montoUsd: row.montoUsd,
     moneda: row.moneda,

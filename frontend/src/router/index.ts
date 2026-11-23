@@ -40,6 +40,11 @@ const router = createRouter({
           component: () => import('@/views/admin/AdminAccountsView.vue'),
         },
         {
+          path: 'pagos',
+          name: 'admin-payments',
+          component: () => import('@/views/admin/AdminPaymentsView.vue'),
+        },
+        {
           path: 'comprobantes',
           name: 'admin-receipts',
           component: () => import('@/views/admin/AdminPaymentReceiptsView.vue'),

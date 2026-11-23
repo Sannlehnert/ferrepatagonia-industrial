@@ -57,6 +57,7 @@ import {
   importeUsdInvalido,
   invalidPaymentRequest,
   noAutenticado,
+  pagoDocumentalmenteRechazado,
   pagoNoAcreditable,
   pagoNoEncontrado,
   pagoPendienteRevision,
@@ -88,7 +89,7 @@ async function assertPaymentReceipt(
   paymentId: number,
   accountId: number,
   clientId: number,
-): Promise<void> {
+) {
   if (!payment.id_comprobante) throw comprobanteNoEncontrado();
   const receipt = await lockPaymentReceipt(manager, paymentId);
   if (!receipt || !receipt.id_comprobante) throw comprobanteNoEncontrado();
@@ -102,6 +103,7 @@ async function assertPaymentReceipt(
       || receipt.modalidad_pago !== 'CUENTA_CORRIENTE')) {
     throw comprobanteNoEncontrado();
   }
+  return receipt;
 }
 
 async function resolveAccreditation(
@@ -418,14 +420,22 @@ export async function reviewPayment(
         }
         throw pagoYaRevisado();
       }
-      if (payment.estado_documental === 'APROBADO' && decision === 'APROBADO') {
-        return replayOrConflict(manager, null, paymentId, true);
+      if (payment.estado_documental === 'APROBADO') {
+        if (decision === 'APROBADO') {
+          return replayOrConflict(manager, null, paymentId, true);
+        }
+        throw pagoYaRevisado();
       }
       if (payment.estado !== 'PENDIENTE') throw pagoNoAcreditable();
 
-      await assertPaymentReceipt(
+      const receipt = await assertPaymentReceipt(
         manager, payment, paymentId, account.id_cuenta_corriente, client.id_cliente,
       );
+      if (decision === 'APROBADO' && receipt.estado_revision === 'RECHAZADO') {
+        throw pagoDocumentalmenteRechazado(
+          'El comprobante asociado ya fue rechazado documentalmente y no puede aprobarse.',
+        );
+      }
 
       await updatePaymentReview(manager, {
         paymentId,
@@ -599,9 +609,14 @@ export async function accreditPayment(
       if (payment.estado !== 'PENDIENTE') throw pagoNoAcreditable();
       if (payment.estado_documental !== 'APROBADO') throw pagoPendienteRevision();
 
-      await assertPaymentReceipt(
+      const receipt = await assertPaymentReceipt(
         manager, payment, paymentId, account.id_cuenta_corriente, client.id_cliente,
       );
+      if (receipt.estado_revision === 'RECHAZADO') {
+        throw pagoDocumentalmenteRechazado(
+          'El comprobante asociado al pago fue rechazado documentalmente y no admite acreditación.',
+        );
+      }
 
       const keyOwner = await findPaymentByAccreditationKey(
         manager, account.id_cuenta_corriente, key,
