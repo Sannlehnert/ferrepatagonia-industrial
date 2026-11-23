@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { watch } from 'vue'
+import { computed, onBeforeUnmount, watch } from 'vue'
+import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
+import OrderFinancialStatusBadge from '@/components/OrderFinancialStatusBadge.vue'
 import OrderPaymentReceipts from '@/components/OrderPaymentReceipts.vue'
+import { useDeferredRealtimeReconcile } from '@/composables/useDeferredRealtimeReconcile'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { getClientOrderDetail } from '@/services/clientOrderService'
+import { supportsOrderReceipts } from '@/services/paymentReceiptService'
 import { onRealtime } from '@/services/realtime'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderDetail } from '@/types/clientOrder'
+import { formatCivilDate } from '@/utils/cuentaCorriente'
+import {
+  orderDocumentStateBadge,
+  orderPaymentModeLabel,
+  resolveOrderCommercialState,
+  STATE_BADGE_TONES,
+} from '@/utils/payment'
 
 const props = withDefaults(defineProps<{ orderId: number; showReceipts?: boolean }>(), {
   showReceipts: true,
@@ -20,24 +31,86 @@ const { data: detail, loading, error, load } = usePrivateAccountRead<ClientOrder
   allowed,
 )
 
-function loadDetail() {
-  return load(signal => getClientOrderDetail(props.orderId, signal))
+const receiptsAvailable = computed(() =>
+  detail.value
+    ? supportsOrderReceipts(
+        auth.user?.tipo_cliente,
+        detail.value.modalidadPago,
+        auth.user?.estadoAprobacionEmpresa,
+        auth.user?.cuentaCorrienteHabilitada,
+      )
+    : false,
+)
+
+const documentBadge = computed(() => {
+  if (!detail.value) return null
+  if (!receiptsAvailable.value) {
+    if (
+      detail.value.estadoDocumental === 'APROBADO' ||
+      detail.value.estadoDocumental === 'PENDIENTE' ||
+      detail.value.estadoDocumental === 'RECHAZADO'
+    ) {
+      return orderDocumentStateBadge(detail.value.estadoDocumental, { emptyLabel: 'No adjunto' })
+    }
+    return { label: 'No disponible para esta modalidad', ...STATE_BADGE_TONES.neutral }
+  }
+  return orderDocumentStateBadge(detail.value.estadoDocumental, { emptyLabel: 'No adjunto' })
+})
+
+let updatingReceipt = false
+const realtimeReconcile = useDeferredRealtimeReconcile({
+  allowed,
+  isMutating: () => updatingReceipt,
+  reconcile: () => {
+    void loadDetail(true)
+  },
+})
+
+function loadDetail(keepData = false) {
+  return load(signal => getClientOrderDetail(props.orderId, signal), { keepData })
 }
 
-watch([identity, allowed], () => void loadDetail(), {
-  immediate: true,
+async function handleReceiptUpdated() {
+  const current = identity()
+  updatingReceipt = true
+  realtimeReconcile.suppress(800)
+  try {
+    await loadDetail(true)
+    if (identity() === current && allowed()) emit('receiptUpdated')
+  } finally {
+    updatingReceipt = false
+    if (identity() === current && allowed()) {
+      realtimeReconcile.settleAfterMutation()
+    }
+  }
+}
+
+watch([identity, allowed], () => {
+  updatingReceipt = false
+  realtimeReconcile.reset()
+  void loadDetail()
+}, { flush: 'sync', immediate: true })
+
+onBeforeUnmount(() => {
+  updatingReceipt = false
+  realtimeReconcile.reset()
 })
 
 onRealtime(change => {
-  if (change.reconnect || change.orders.has(props.orderId)) void loadDetail()
+  if (!allowed()) return
+  const matchesScope =
+    change.orders.has(props.orderId) ||
+    (detail.value?.modalidadPago === 'CUENTA_CORRIENTE' && (change.payments || change.account))
+  if (!change.reconnect && !matchesScope) return
+  realtimeReconcile.notify(change.reconnect)
 })
 </script>
 
 <template>
-  <div class="mt-4 border-t border-slate-200 pt-4">
-    <p v-if="loading" role="status" class="text-sm text-slate-500">Cargando el detalle…</p>
+  <div class="mt-4 border-t border-slate-200 pt-4 space-y-4">
+    <p v-if="loading && !detail" role="status" class="text-sm text-slate-500">Cargando el detalle…</p>
 
-    <div v-else-if="error" class="space-y-3">
+    <div v-else-if="error && !detail" class="space-y-3">
       <p role="alert" class="text-sm text-red-700">No se pudo cargar el detalle del pedido.</p>
       <button
         type="button"
@@ -49,20 +122,69 @@ onRealtime(change => {
     </div>
 
     <template v-else-if="detail">
-      <h4 class="m-0 mb-3 font-semibold text-[#0B2438]">Productos del pedido</h4>
-      <p v-if="!detail.items.length" class="text-sm text-slate-600">Este pedido no tiene productos registrados.</p>
-      <ul v-else class="m-0 list-none divide-y divide-slate-200 p-0">
-        <li v-for="item in detail.items" :key="item.detalleId" class="py-3 text-sm">
-          <p class="m-0 font-semibold text-[#0B2438] [overflow-wrap:anywhere]">{{ item.nombre }}</p>
-          <p class="m-0 text-slate-600 [overflow-wrap:anywhere]">Código {{ item.codigo }}</p>
-          <dl class="mb-0 mt-2 grid grid-cols-1 gap-1 text-slate-700 sm:grid-cols-2">
-            <div><dt class="inline">Cantidad: </dt><dd class="m-0 inline font-medium">{{ item.cantidad }}</dd></div>
-            <div class="[overflow-wrap:anywhere]"><dt class="inline">Precio unitario: </dt><dd class="m-0 inline font-medium">{{ item.precioUnitario }} {{ detail.moneda ?? '' }}</dd></div>
-            <div class="[overflow-wrap:anywhere]"><dt class="inline">Subtotal de la línea: </dt><dd class="m-0 inline font-semibold">{{ item.subtotal }} {{ detail.moneda ?? '' }}</dd></div>
-          </dl>
-        </li>
-      </ul>
-      <OrderPaymentReceipts v-if="showReceipts" :order="detail" @updated="emit('receiptUpdated')" />
+      <!-- Separación de los tres dominios de estado (§2 y §7) -->
+      <section
+        aria-label="Estados del pedido"
+        class="grid grid-cols-1 gap-3 rounded-lg border border-solid border-[#E2E8F0] bg-white p-3.5 lg:grid-cols-3"
+      >
+        <div class="min-w-0 space-y-1.5">
+          <p class="m-0 text-xs font-semibold text-slate-600">Estado del pedido (logístico)</p>
+          <AdminOrderStatusBadge :status="resolveOrderCommercialState(detail)" />
+          <p class="m-0 text-xs text-slate-500">
+            Modalidad: {{ orderPaymentModeLabel(detail.modalidadPago) }}
+          </p>
+        </div>
+
+        <div class="min-w-0 space-y-1.5">
+          <p class="m-0 text-xs font-semibold text-slate-600">Estado documental (comprobante)</p>
+          <span
+            v-if="documentBadge"
+            class="box-border inline-flex max-w-full items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold leading-tight"
+            :class="documentBadge.badgeClasses"
+          >
+            <span
+              aria-hidden="true"
+              class="h-1.5 w-1.5 shrink-0 rounded-full"
+              :class="documentBadge.dotClasses"
+            />
+            <span>{{ documentBadge.label }}</span>
+          </span>
+          <p class="m-0 text-xs text-slate-500">
+            Revisión independiente de la acreditación del pago.
+          </p>
+        </div>
+
+        <div class="min-w-0 space-y-1.5">
+          <p class="m-0 text-xs font-semibold text-slate-600">Estado financiero (pago / acreditación)</p>
+          <OrderFinancialStatusBadge
+            :status="detail.estadoFinanciero"
+            :monto-acreditado-usd="detail.montoAcreditadoUSD"
+            :document-status="detail.estadoDocumental"
+            show-explanation
+          />
+          <p v-if="detail.modalidadPago === 'CUENTA_CORRIENTE' && detail.venceEl" class="m-0 text-xs text-slate-600">
+            Vencimiento del cargo: {{ formatCivilDate(detail.venceEl) }}
+          </p>
+        </div>
+      </section>
+
+      <div>
+        <h4 class="m-0 mb-3 font-semibold text-[#0B2438]">Productos del pedido</h4>
+        <p v-if="!detail.items.length" class="text-sm text-slate-600">Este pedido no tiene productos registrados.</p>
+        <ul v-else class="m-0 list-none divide-y divide-slate-200 p-0">
+          <li v-for="item in detail.items" :key="item.detalleId" class="py-3 text-sm">
+            <p class="m-0 font-semibold text-[#0B2438] [overflow-wrap:anywhere]">{{ item.nombre }}</p>
+            <p class="m-0 text-slate-600 [overflow-wrap:anywhere]">Código {{ item.codigo }}</p>
+            <dl class="mb-0 mt-2 grid grid-cols-1 gap-1 text-slate-700 sm:grid-cols-2">
+              <div><dt class="inline">Cantidad: </dt><dd class="m-0 inline font-medium">{{ item.cantidad }}</dd></div>
+              <div class="[overflow-wrap:anywhere]"><dt class="inline">Precio unitario: </dt><dd class="m-0 inline font-medium">{{ item.precioUnitario }} {{ detail.moneda ?? '' }}</dd></div>
+              <div class="[overflow-wrap:anywhere]"><dt class="inline">Subtotal de la línea: </dt><dd class="m-0 inline font-semibold">{{ item.subtotal }} {{ detail.moneda ?? '' }}</dd></div>
+            </dl>
+          </li>
+        </ul>
+      </div>
+
+      <OrderPaymentReceipts v-if="showReceipts" :order="detail" @updated="handleReceiptUpdated" />
     </template>
   </div>
 </template>

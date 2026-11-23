@@ -197,8 +197,13 @@ test('componentes y vistas de comprobantes usan APROBADO / RECHAZADO sin referen
   const { descriptor } = parse(readFileSync(actionsFilename, 'utf8'), { filename: actionsFilename })
   const compiled = compileScript(descriptor, { id: 'order-receipt-actions-test', inlineTemplate: true }).content
   const output = ts.transpileModule(compiled, { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText
+  const paymentUtils = loadTypeScript('utils/payment.ts')
   const mod = { exports: {} }
-  new Function('require', 'module', 'exports', output)(require, mod, mod.exports)
+  new Function('require', 'module', 'exports', output)(
+    name => (name === '@/utils/payment' ? paymentUtils : require(name)),
+    mod,
+    mod.exports,
+  )
   const Component = mod.exports.default
 
   assert.match(await renderToString(createSSRApp(Component, { status: 'APROBADO', orderNumber: 'PED-000001' })), /Aprobado/)
