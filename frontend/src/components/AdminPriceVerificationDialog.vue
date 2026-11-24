@@ -175,7 +175,7 @@ async function submit() {
             rows="4"
             :disabled="submitting"
             aria-describedby="price-evidence-help"
-            class="box-border w-full rounded-md border border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] disabled:opacity-60"
+            class="box-border w-full rounded-md border border-solid border-slate-300 bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-60"
           />
           <span id="price-evidence-help" class="text-xs font-normal text-slate-600">
             Documento, origen y localizador verificable. No se aceptan referencias genéricas,
@@ -183,12 +183,12 @@ async function submit() {
           </span>
         </label>
 
-        <label class="flex items-start gap-2 text-sm text-[#0B2438]">
+        <label class="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[#0B2438]">
           <input
             v-model="confirmed"
             type="checkbox"
             :disabled="submitting"
-            class="mt-0.5 h-4 w-4"
+            class="box-border h-5 w-5 shrink-0 cursor-pointer accent-[#103A5C] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
           />
           <span>Confirmo que revisé manualmente el precio y la evidencia.</span>
         </label>
@@ -206,7 +206,7 @@ async function submit() {
         <button
           type="button"
           :disabled="submitting"
-          class="box-border min-h-11 rounded-md border border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] disabled:opacity-50"
+          class="box-border min-h-11 cursor-pointer rounded-md border border-solid border-slate-300 bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
           @click="close"
         >
           Cancelar
@@ -214,7 +214,7 @@ async function submit() {
         <button
           type="submit"
           :disabled="submitting || !confirmed || evidence.trim().length < 8"
-          class="box-border min-h-11 rounded-md border-0 bg-[#103A5C] px-4 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+          class="box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#103A5C] px-4 py-2 font-[inherit] text-sm font-semibold text-white hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {{ submitting ? 'Verificando…' : uncertain ? 'Reintentar verificación' : 'Verificar precio' }}
         </button>
