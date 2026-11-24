@@ -12,7 +12,53 @@ export class SafeDatabaseLogger implements Logger {
   log(): void {}
 }
 
+interface PooledConnectionLike {
+  release?: () => void;
+}
+
+interface MysqlPoolLike {
+  getConnection(callback: (error: unknown, connection?: PooledConnectionLike) => void): void;
+}
+
+const DEFAULT_POOL_ACQUIRE_TIMEOUT_MS = 1200;
+const boundedPools = new WeakSet<object>();
+
+function attachBoundedPoolAcquire(pool: MysqlPoolLike, timeoutMs: number): void {
+  if (boundedPools.has(pool)) return;
+  boundedPools.add(pool);
+  const originalGetConnection = pool.getConnection.bind(pool);
+  pool.getConnection = callback => {
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      callback(Object.assign(new Error('No connections available.'), { code: 'POOL_NO_CONNECTIONS' }));
+    }, timeoutMs);
+    timer.unref?.();
+    originalGetConnection((error, connection) => {
+      clearTimeout(timer);
+      if (settled) {
+        if (!error && connection?.release) {
+          try { connection.release(); } catch {}
+        }
+        return;
+      }
+      settled = true;
+      callback(error, connection);
+    });
+  };
+}
+
 export class ControlledDataSource extends DataSource {
+  override async initialize(): Promise<this> {
+    await super.initialize();
+    const driver = this.driver as { pool?: MysqlPoolLike } | undefined;
+    if (driver?.pool && typeof driver.pool.getConnection === 'function') {
+      attachBoundedPoolAcquire(driver.pool, DEFAULT_POOL_ACQUIRE_TIMEOUT_MS);
+    }
+    return this;
+  }
+
   override createQueryRunner(mode: 'master' | 'slave' = 'master', lockWaitSeconds = 5): QueryRunner {
     const runner = super.createQueryRunner(mode);
     const query = runner.query.bind(runner);
