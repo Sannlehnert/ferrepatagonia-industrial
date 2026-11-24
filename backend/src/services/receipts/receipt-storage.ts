@@ -4,6 +4,13 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { readStorageDir } from '../../config/storage-env.config';
 import { isReceiptId, ReceiptError, receiptUnavailable, type ReceiptMime } from './receipt-types';
+import type { ReceiptValidationFailure, ReceiptValidationResult } from './receipt-file.worker';
+
+const validationMessages: Record<ReceiptValidationFailure, string> = {
+  ARCHIVO_DANADO: 'El archivo está dañado o incompleto. Probá con otro archivo.',
+  CONTENIDO_NO_PERMITIDO: 'El archivo contiene elementos activos o incrustados no permitidos. Probá con un PDF o una imagen simple.',
+  TIPO_INCOMPATIBLE: 'El archivo no coincide con el formato declarado. Verificá que sea PDF, JPG o PNG.',
+};
 
 function contains(parent: string, child: string): boolean {
   const location = relative(parent, child);
@@ -46,23 +53,30 @@ export async function validateReceiptContent(bytes: Buffer, mime: ReceiptMime, s
     execArgv: [],
   });
 
-  const valid = await new Promise<boolean>(resolve => {
-    const finish = (result: boolean) => {
+  const result = await new Promise<ReceiptValidationResult | null>(resolve => {
+    const finish = (value: ReceiptValidationResult | null) => {
       clearTimeout(timer);
       signal.removeEventListener('abort', cancel);
-      resolve(result);
+      resolve(value);
     };
-    const cancel = () => finish(false);
+    const cancel = () => finish(null);
     const timer = setTimeout(cancel, 6000);
-    worker.once('message', result => finish(result === true));
+    worker.once('message', value => {
+      if (value && typeof value === 'object' && value.ok === true) finish({ ok: true });
+      else if (value && typeof value === 'object' && value.ok === false
+        && typeof value.code === 'string' && Object.hasOwn(validationMessages, value.code)) {
+        finish({ ok: false, code: value.code as ReceiptValidationFailure });
+      } else finish(null);
+    });
     worker.once('error', cancel);
     worker.once('exit', cancel);
     signal.addEventListener('abort', cancel, { once: true });
   }).finally(() => worker.terminate());
 
   signal.throwIfAborted();
-  if (!valid) {
-    throw new ReceiptError(422, 'CONTENIDO_INVALIDO', 'El archivo está dañado, contiene elementos no permitidos o no coincide con su tipo.');
+  if (!result || !result.ok) {
+    const code: ReceiptValidationFailure = result?.code ?? 'ARCHIVO_DANADO';
+    throw new ReceiptError(422, code, validationMessages[code]);
   }
 }
 

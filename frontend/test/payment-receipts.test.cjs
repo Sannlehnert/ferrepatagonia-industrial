@@ -210,3 +210,13 @@ test('componentes y vistas de comprobantes usan APROBADO / RECHAZADO sin referen
   assert.match(await renderToString(createSSRApp(Component, { status: 'RECHAZADO', orderNumber: 'PED-000001' })), /Rechazado/)
   assert.match(await renderToString(createSSRApp(Component, { status: 'PENDIENTE', orderNumber: 'PED-000001' })), /Pendiente de revisión/)
 })
+
+test('PaymentReceipts distingue archivo dañado, incompatible y contenido no permitido', () => {
+  const source = readFileSync(
+    resolve(__dirname, '../src/components/PaymentReceipts.vue'),
+    'utf8',
+  )
+  assert.match(source, /ARCHIVO_DANADO: 'El archivo está dañado o incompleto/)
+  assert.match(source, /CONTENIDO_NO_PERMITIDO: 'El archivo contiene elementos activos o incrustados no permitidos/)
+  assert.match(source, /TIPO_INCOMPATIBLE: 'El archivo no coincide con el formato declarado/)
+})
