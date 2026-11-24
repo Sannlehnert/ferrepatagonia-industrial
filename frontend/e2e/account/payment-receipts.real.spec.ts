@@ -116,6 +116,63 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   await admin.close()
 });
 
+test('a 1024 px los metadatos del comprobante conservan ancho útil y las acciones quedan debajo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await signIn(page, 'admin@e2e.test')
+  await page.goto('/admin/comprobantes')
+  const region = page.getByRole('region', { name: 'Comprobantes de pago' })
+  const pending = region.getByRole('listitem').filter({
+    has: page.getByRole('link', { name: 'Descargar comprobante' }),
+    hasText: 'Pendiente de revisión',
+  }).first()
+  await expect(pending).toBeVisible()
+  await expect(pending.getByRole('link', { name: 'Descargar comprobante' })).toBeVisible()
+  await expect(pending.getByRole('button', { name: 'Aprobar comprobante' })).toBeVisible()
+  await expect(pending.getByRole('button', { name: 'Rechazar comprobante' })).toBeVisible()
+
+  // El menú lateral ADMIN en 1024 px es persistente; se comprueba su presencia.
+  await expect(page.getByRole('complementary', { name: 'Panel administrativo' })).toBeVisible()
+
+  const metadata = pending.getByTestId('receipt-metadata')
+  const actions = pending.getByTestId('receipt-actions')
+  const metadataBox = await metadata.boundingBox()
+  const actionsBox = await actions.boundingBox()
+  expect(metadataBox).not.toBeNull()
+  expect(actionsBox).not.toBeNull()
+  if (process.env.E2E_RECEIPT_CAPTURE) {
+    await page.screenshot({
+      path: `../docs/354/evidence/receipts-1024-${process.env.E2E_RECEIPT_CAPTURE}.png`,
+      fullPage: true,
+    })
+  }
+  // La medición es efectiva: no alcanza con que existan clases responsive.
+  expect(metadataBox!.width).toBeGreaterThanOrEqual(300)
+  expect(actionsBox!.y).toBeGreaterThanOrEqual(metadataBox!.y + metadataBox!.height - 1)
+  expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+  for (const width of [320, 360, 390, 768, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    const boxes = await pending.evaluate(element => {
+      const metadata = element.querySelector('[data-testid="receipt-metadata"]')
+      const actions = element.querySelector('[data-testid="receipt-actions"]')
+      if (!metadata || !actions) return null
+      return {
+        metadata: metadata.getBoundingClientRect(),
+        actions: actions.getBoundingClientRect(),
+      }
+    })
+    expect(boxes, `medición a ${width} px`).not.toBeNull()
+    expect(boxes!.metadata.width, `metadatos a ${width} px`).toBeGreaterThan(0)
+    // Los nombres, fechas, estados y referencias no quedan aplastados.
+    expect(boxes!.metadata.width, `legibilidad a ${width} px`).toBeGreaterThanOrEqual(
+      width >= 768 ? 280 : 180,
+    )
+    expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+  }
+})
+
 test('rechaza archivos inválidos antes de enviarlos', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
   await signIn(page, 'cliente@e2e.test')
