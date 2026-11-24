@@ -219,4 +219,38 @@ test('PaymentReceipts distingue archivo dañado, incompatible y contenido no per
   assert.match(source, /ARCHIVO_DANADO: 'El archivo está dañado o incompleto/)
   assert.match(source, /CONTENIDO_NO_PERMITIDO: 'El archivo contiene elementos activos o incrustados no permitidos/)
   assert.match(source, /TIPO_INCOMPATIBLE: 'El archivo no coincide con el formato declarado/)
+  // El código real del backend queda disponible en el DOM para diagnóstico manual.
+  assert.match(source, /data-error-code/)
+  assert.match(source, /receiptMime\(file\)/)
+  // El mensaje genérico antiguo ya no se usa: delataba un backend desactualizado.
+  assert.doesNotMatch(source, /El archivo está dañado, contiene elementos no permitidos o no coincide con su tipo/)
+  assert.match(source, /El servidor rechazó el archivo con un código obsoleto \(CONTENIDO_INVALIDO\)/)
+})
+
+test('normaliza MIME vacío o image/jpg para archivos móviles y envía el tipo validado', async () => {
+  const calls = []
+  const api = {
+    post: async (...args) => {
+      calls.push(args)
+      return { status: 201 }
+    },
+  }
+  const service = loadTypeScript('services/paymentReceiptService.ts', {
+    './api': { __esModule: true, default: api },
+  })
+
+  assert.equal(service.receiptMime({ name: 'comprobante.pdf', type: '' }), 'application/pdf')
+  assert.equal(service.receiptMime({ name: 'captura.PNG', type: 'application/octet-stream' }), 'image/png')
+  assert.equal(service.receiptMime({ name: 'foto.jpeg', type: 'image/jpg' }), 'image/jpeg')
+  assert.equal(service.receiptMime({ name: 'foto.heic', type: 'image/heic' }), null)
+  assert.equal(service.receiptMime({ name: 'nota.txt', type: '' }), null)
+
+  const controller = new AbortController()
+  const file = { name: 'comprobante.pdf', type: '', size: 10 }
+  assert.equal(await service.uploadPaymentReceipt('/cuenta-corriente/comprobantes', file, controller.signal), true)
+  assert.equal(calls[0][2].headers['Content-Type'], 'application/pdf')
+  assert.equal(calls[0][2].signal, controller.signal)
+  await assert.rejects(
+    () => service.uploadPaymentReceipt('/x', { name: 'nota.txt', type: '', size: 10 }, controller.signal),
+  )
 })

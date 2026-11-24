@@ -4,7 +4,7 @@ import { computed, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { useDeferredRealtimeReconcile } from '@/composables/useDeferredRealtimeReconcile'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import {
-  listPaymentReceipts, markPaymentReceiptReviewed, uploadPaymentReceipt,
+  listPaymentReceipts, markPaymentReceiptReviewed, receiptMime, uploadPaymentReceipt,
   type PaymentReceipt, type ReceiptPage, type ReceiptReviewStatus,
 } from '@/services/paymentReceiptService'
 import { onRealtime } from '@/services/realtime'
@@ -26,6 +26,7 @@ const selectedFile = shallowRef<File | null>(null)
 const busy = ref(false)
 const notice = ref('')
 const failure = ref('')
+const failureCode = ref('')
 const rejectingReceiptId = ref<string | null>(null)
 const rejectReason = ref('')
 const rejectValidationError = ref('')
@@ -54,7 +55,9 @@ const mutationErrors = {
   ARCHIVO_VACIO: 'Seleccioná un archivo con contenido.',
   ARCHIVO_DEMASIADO_GRANDE: 'El comprobante debe pesar hasta 5 MB.',
   TIPO_NO_PERMITIDO: 'Seleccioná un archivo PDF, JPG o PNG.',
-  CONTENIDO_INVALIDO: 'El archivo está dañado, contiene elementos no permitidos o no coincide con su tipo.',
+  // Compatibilidad diagnóstica: este código ya no lo emite el backend actual.
+  // Si aparece, el servidor desplegado está desactualizado.
+  CONTENIDO_INVALIDO: 'El servidor rechazó el archivo con un código obsoleto (CONTENIDO_INVALIDO). Actualizá el backend y reintentá.',
   ARCHIVO_DANADO: 'El archivo está dañado o incompleto. Probá con otro archivo.',
   CONTENIDO_NO_PERMITIDO: 'El archivo contiene elementos activos o incrustados no permitidos. Probá con un PDF o una imagen simple.',
   TIPO_INCOMPATIBLE: 'El archivo no coincide con el formato declarado. Verificá que sea PDF, JPG o PNG.',
@@ -87,9 +90,14 @@ function closeRejectForm() {
   rejectValidationError.value = ''
 }
 
+function clearFailure() {
+  failure.value = ''
+  failureCode.value = ''
+}
+
 function openRejectForm(id: string) {
   if (busy.value) return
-  failure.value = ''
+  clearFailure()
   notice.value = ''
   rejectingReceiptId.value = id
   rejectReason.value = ''
@@ -101,7 +109,7 @@ function reset() {
   busy.value = false
   realtimeReconcile.reset()
   notice.value = ''
-  failure.value = ''
+  clearFailure()
   statusFilter.value = ''
   closeRejectForm()
   clearFile()
@@ -132,11 +140,12 @@ function handleDrop(event: DragEvent) {
 
 function setFile(file?: File) {
   if (!allowed() || busy.value) return
-  failure.value = ''
+  clearFailure()
   notice.value = ''
   selectedFile.value = file ?? null
-  if (file && (file.size === 0 || file.size > 5 * 1024 * 1024 || !Object.hasOwn(typeLabels, file.type))) {
+  if (file && (file.size === 0 || file.size > 5 * 1024 * 1024 || receiptMime(file) === null)) {
     failure.value = 'Seleccioná un PDF, JPG o PNG con contenido y de hasta 5 MB.'
+    failureCode.value = 'SELECCION_LOCAL'
     clearFile()
   }
 }
@@ -148,7 +157,7 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
   mutation = controller
   const valid = () => !controller.signal.aborted && identity() === current && allowed()
   busy.value = true
-  failure.value = ''
+  clearFailure()
   notice.value = ''
   try {
     const message = await work(controller.signal)
@@ -162,6 +171,7 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
   } catch (cause) {
     if (!valid()) return
     const code: unknown = isAxiosError(cause) ? cause.response?.data?.code : undefined
+    failureCode.value = typeof code === 'string' ? code : 'SIN_CODIGO'
     failure.value = typeof code === 'string' && Object.hasOwn(mutationErrors, code)
       ? mutationErrors[code as keyof typeof mutationErrors]
       : 'No se pudo procesar el comprobante. Reintentá en unos instantes.'
@@ -175,8 +185,9 @@ async function mutate(work: (signal: AbortSignal) => Promise<string>) {
 
 function upload() {
   const file = selectedFile.value
-  if (!file) return
-  void mutate(async signal => await uploadPaymentReceipt(props.path, file, signal)
+  const mime = file ? receiptMime(file) : null
+  if (!file || !mime) return
+  void mutate(async signal => await uploadPaymentReceipt(props.path, file, signal, mime)
     ? 'Comprobante recibido. La acreditación del pago se gestiona por separado.'
     : 'Este comprobante ya estaba registrado para la operación.')
 }
@@ -298,7 +309,12 @@ function operation(receipt: PaymentReceipt) {
     </form>
 
     <p v-if="notice" role="status" class="m-0 text-sm font-medium text-green-800">{{ notice }}</p>
-    <p v-if="failure" role="alert" class="m-0 text-sm font-medium text-red-800">{{ failure }}</p>
+    <p
+      v-if="failure"
+      role="alert"
+      :data-error-code="failureCode"
+      class="m-0 text-sm font-medium text-red-800"
+    >{{ failure }}</p>
     <p v-if="loading && !data" role="status" class="m-0 text-sm text-slate-600">Cargando comprobantes…</p>
     <div v-else-if="error" class="space-y-2">
       <p role="alert" class="m-0 text-sm font-medium text-red-800">No se pudieron cargar los comprobantes.</p>
@@ -316,7 +332,7 @@ function operation(receipt: PaymentReceipt) {
           class="flex flex-col gap-3 py-3 text-sm"
         >
           <div class="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-            <div class="min-w-0 flex-1 space-y-1.5">
+            <div class="min-w-0 flex-1 space-y-1.5" data-testid="receipt-metadata">
               <p v-if="mode === 'admin'" class="m-0 break-words font-semibold text-[#0B2438]">
                 {{ receipt.cliente }} · Cliente {{ receipt.clienteId }}
               </p>
@@ -360,7 +376,7 @@ function operation(receipt: PaymentReceipt) {
                 </p>
               </div>
             </div>
-            <div class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end">
+            <div class="flex shrink-0 flex-wrap items-center gap-2 lg:justify-end" data-testid="receipt-actions">
               <a :class="actionButtonClass" :href="'/api' + path + '/' + receipt.id">Descargar comprobante</a>
               <button
                 v-if="mode === 'admin' && receipt.estadoRevision === 'PENDIENTE'"

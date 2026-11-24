@@ -298,6 +298,24 @@ test('acepta PDF/PNG/JPG reales y distingue dañado, incompatible y contenido no
   assertDownloadHeaders(pdfDownload, 'application/pdf', realPdf.length, 'pdf');
   assert.deepEqual(Buffer.from(await pdfDownload.arrayBuffer()), realPdf);
 
+  // Variantes legítimas de generadores móviles: relleno posterior al marcador
+  // final de la imagen y OpenAction con destino interno nombrado.
+  const paddedPng = Buffer.concat([realPng, Buffer.from('\r\n\u0000')]);
+  const paddedJpg = Buffer.concat([realJpg, Buffer.from('\n\u0000')]);
+  const namedOpenAction = await PDFDocument.create();
+  const namedPage = namedOpenAction.addPage();
+  namedOpenAction.catalog.set(PDFName.of('OpenAction'), PDFName.of('FitPage'));
+  namedOpenAction.catalog.set(PDFName.of('Dests'), namedOpenAction.context.obj({
+    FitPage: [namedPage.ref, { Type: 'Fit' }],
+  }));
+  for (const [bytes, mime] of [
+    [paddedPng, 'image/png'],
+    [paddedJpg, 'image/jpeg'],
+    [Buffer.from(await namedOpenAction.save()), 'application/pdf'],
+  ]) {
+    await body(await upload(path, client.auth, bytes, mime), 201);
+  }
+
   const openAction = await PDFDocument.create();
   openAction.addPage();
   openAction.catalog.set(PDFName.of('OpenAction'), openAction.context.obj({

@@ -1,5 +1,5 @@
 import { parentPort, workerData } from 'node:worker_threads';
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream } from 'pdf-lib';
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFString } from 'pdf-lib';
 import sharp from 'sharp';
 import type { ReceiptMime } from './receipt-types';
 
@@ -32,8 +32,21 @@ const unsafeActionTypes = new Set([
 ]);
 
 function entryName(dict: PDFDict, key: string): string | null {
-  const entry = dict.entries().find(([name]) => name.decodeText() === key);
-  return entry?.[1] instanceof PDFName ? entry[1].decodeText() : null;
+  const value = dict.lookup(PDFName.of(key));
+  return value instanceof PDFName ? value.decodeText() : null;
+}
+
+// Algunos generadores móviles agregan relleno (saltos de línea o NUL) después
+// del marcador final de la imagen. No es contenido activo ni altera los píxeles.
+function isPadding(byte: number): boolean {
+  return byte === 0x00 || byte === 0x09 || byte === 0x0a || byte === 0x0c || byte === 0x0d || byte === 0x20;
+}
+
+function onlyPadding(buffer: Buffer, from: number): boolean {
+  for (let offset = from; offset < buffer.length; offset++) {
+    if (!isPadding(buffer[offset]!)) return false;
+  }
+  return true;
 }
 
 async function validatePdf(buffer: Buffer): Promise<ReceiptValidationResult> {
@@ -41,7 +54,7 @@ async function validatePdf(buffer: Buffer): Promise<ReceiptValidationResult> {
     return fail('TIPO_INCOMPATIBLE');
   }
   const tail = buffer.toString('latin1', Math.max(0, buffer.length - 1024));
-  const trailer = /startxref\s+(\d+)\s+%%EOF[ \t\r\n\f]*$/.exec(tail);
+  const trailer = /startxref\s+(\d+)\s+%%EOF[ \t\r\n\f\0]*$/.exec(tail);
   if (!trailer) return fail('ARCHIVO_DANADO');
   const xref = Number(trailer[1]);
   if (!Number.isSafeInteger(xref) || xref < 9 || xref >= buffer.length) {
@@ -95,7 +108,9 @@ async function validatePdf(buffer: Buffer): Promise<ReceiptValidationResult> {
         if (keyText === 'OpenAction') {
           const action = pdf.context.lookup(value);
           if (action instanceof PDFArray) {
-            // Destino interno de apertura.
+            // Destino interno explícito.
+          } else if (action instanceof PDFName || action instanceof PDFString) {
+            // Destino interno con nombre; no ejecuta ninguna acción.
           } else if (action instanceof PDFDict) {
             if (entryName(action, 'S') !== 'GoTo') return fail('CONTENIDO_NO_PERMITIDO');
           } else {
@@ -125,7 +140,9 @@ function pngFailure(buffer: Buffer): ReceiptValidationFailure | null {
     if (['acTL', 'fcTL', 'fdAT'].includes(type)) return 'CONTENIDO_NO_PERMITIDO';
     if (offset + length + 12 > buffer.length) return 'ARCHIVO_DANADO';
     offset += length + 12;
-    if (type === 'IEND') return length === 0 && offset === buffer.length ? null : 'ARCHIVO_DANADO';
+    if (type === 'IEND') {
+      return length === 0 && onlyPadding(buffer, offset) ? null : 'ARCHIVO_DANADO';
+    }
   }
   return 'ARCHIVO_DANADO';
 }
@@ -142,7 +159,7 @@ function jpegFailure(buffer: Buffer): ReceiptValidationFailure | null {
     const marker = buffer[offset++];
     if (scanning && (marker === 0x00 || (marker >= 0xd0 && marker <= 0xd7))) continue;
     if (marker === 0xd9) {
-      return sawScan && offset === buffer.length ? null : 'ARCHIVO_DANADO';
+      return sawScan && onlyPadding(buffer, offset) ? null : 'ARCHIVO_DANADO';
     }
     if (marker === 0x00 || marker === 0xd8 || offset + 2 > buffer.length) return 'ARCHIVO_DANADO';
     const length = buffer.readUInt16BE(offset);
