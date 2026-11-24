@@ -424,4 +424,3 @@ Chromium; en CI no es necesario si se usa `playwright install --with-deps`.
 
 Estos commits permanecen locales: no se hizo push, no se abrió PR y no se
 realizó merge.
-

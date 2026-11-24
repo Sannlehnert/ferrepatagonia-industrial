@@ -8,7 +8,7 @@ El sistema está destinado a:
 - **Clientes registrados (`PARTICULAR` y `EMPRESA`):** gestión de carrito persistente y, para empresas aprobadas con cuenta corriente habilitada, confirmación de pedidos a crédito, consulta de saldos/movimientos y envío de comprobantes.
 - **Administradores (`ADMIN`):** gestión de productos, imágenes, importación masiva CSV/XLSX, categorías, listas de precios, aprobación de clientes empresa, seguimiento de pedidos y revisión de comprobantes.
 
-> **Alcance del proyecto:** se trata de un **proyecto académico de desarrollo full stack** (entrega académica de Programación Backend, corte `develop` posterior al PR #105). No constituye un sistema listo para producción ni reemplaza las validaciones comerciales, de infraestructura TLS/proxy o de pruebas manuales integrales pendientes.
+> **Alcance del proyecto:** se trata de un **proyecto académico de desarrollo full stack** desarrollado para la asignatura **Práctica Profesionalizante** (estado vigente sobre `develop`). No constituye un sistema listo para producción ni reemplaza las validaciones comerciales, de infraestructura TLS/proxy o de pruebas manuales integrales pendientes.
 
 ---
 
@@ -20,7 +20,7 @@ El sistema está destinado a:
 4. [Requisitos de instalación](#requisitos-de-instalación)
 5. [Instalación local paso a paso](#instalación-local-paso-a-paso)
 6. [Variables de entorno](#variables-de-entorno)
-7. [Programación Backend — Requisitos implementados](#programación-backend--requisitos-implementados)
+7. [Práctica Profesionalizante — Requisitos técnicos implementados](#práctica-profesionalizante--requisitos-técnicos-implementados)
 8. [Pruebas y calidad](#pruebas-y-calidad)
 9. [Estructura del repositorio](#estructura-del-repositorio)
 10. [Equipo](#equipo)
@@ -91,7 +91,7 @@ El sistema sigue una arquitectura cliente-servidor desacoplada:
 - **API REST y WebSockets (`backend/`):** un único servidor HTTP Node/Express ([http-server.ts](backend/src/http-server.ts)) expone los endpoints `/api/*` y monta Socket.IO (`attachOrderSockets`).
 - **Configuración fail-fast con Joi:** al arrancar ([server.ts](backend/src/server.ts)), `env.config.ts` valida variables críticas y reglas HTTP/proxy antes de inicializar MariaDB o abrir el puerto HTTP.
 - **Seguridad basada en cookies:** el inicio de sesión emite la cookie `HttpOnly` `jwt_token`; Passport JWT valida firma, expiración, estado activo y rol vigente en MariaDB. Los middlewares HTTP validan `Origin`/`Referer`/Fetch Metadata y límites de tasa antes de los controladores privados.
-- **Persistencia mixta sobre MariaDB:** `ControlledDataSource` (TypeORM con `mysql2`) mapea 11 `EntitySchema` activos y convive con consultas SQL parametrizadas y un pool `mariadb` dedicado para lectura consistente de catálogo (`catalog-snapshot.config.ts`). El esquema SQL ([database/schema.sql](database/schema.sql) junto con los triggers FER-20 de [database/migrate-fer-20-account-movements.sql](database/migrate-fer-20-account-movements.sql)) es la fuente autoritativa; `synchronize`, `dropSchema` y `migrationsRun` están deshabilitados.
+- **Persistencia mixta sobre MariaDB:** `ControlledDataSource` (TypeORM con `mysql2`) mapea 11 `EntitySchema` activos y convive con consultas SQL parametrizadas, un pool `mariadb` dedicado para lectura consistente de catálogo (`catalog-snapshot.config.ts`) y un pool específico de privilegios mínimos para verificación de precios (`price-verification.config.ts`). El esquema SQL ([database/schema.sql](database/schema.sql) junto con las 6 migraciones documentadas en [database/README.md](database/README.md)) es la fuente autoritativa; `synchronize`, `dropSchema` y `migrationsRun` están deshabilitados.
 - **Almacenamiento en disco y tiempo real:** fotos de productos, comprobantes privados y archivos JSON de seguimiento de importaciones CSV/XLSX se guardan en directorios del filesystem definidos por variables de entorno; tras confirmar transacciones críticas en MariaDB, el servidor publica eventos Socket.IO post-commit.
 
 ```mermaid
@@ -186,26 +186,29 @@ flowchart LR
    Estos directorios y el volumen de MariaDB deben incluirse en la estrategia
    de respaldo del entorno.
 
-6. **Inicializar esquema, triggers y datos de prueba (solo sobre una base nueva/vacía):**
+6. **Inicializar esquema, migraciones, triggers y datos de prueba (solo sobre una base nueva/vacía):**
 
-   > `database/schema.sql` crea las **24 tablas** base, pero **no incluye los 7 triggers** (3 FER-20 de cuenta corriente y 4 FER-17 de precio). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql`, `database/migrate-fer-17-price-verification.sql` y `database/migrate-s7-09-1-credit-workflow.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Si la base tiene tablas pero no cumple el esquema vigente, detenerse, respaldar y acordar su actualización con el equipo; no borrar el volumen. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
+   > `database/schema.sql` crea las **26 tablas** base, pero **no incluye los 13 triggers** (3 FER-20 de cuenta corriente, 4 FER-17 de precio y 6 S7-04.2 de consistencia de estados) ni la vista `FER17_AUDITORIA_TRIGGERS`. Toda instalación desde cero debe aplicar las **6 migraciones** (`migrate-fer-20-account-movements.sql`, `migrate-fer-17-price-verification.sql`, `migrate-s7-09-1-credit-workflow.sql`, `migrate-s7-06-1-transfer-order-confirmation.sql`, `migrate-s7-04-2-state-consistency.sql` y `migrate-s7-10-2-payment-accreditation.sql`) inmediatamente después de `schema.sql` y antes de cargar datos o arrancar el backend. No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Si la base tiene tablas pero no cumple el esquema vigente, detenerse, respaldar y acordar su actualización con el equipo; no borrar el volumen. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
 
    ```bash
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-20-account-movements.sql'
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-17-price-verification.sql'
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-09-1-credit-workflow.sql'
+   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-06-1-transfer-order-confirmation.sql'
+   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-04-2-state-consistency.sql'
+   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-10-2-payment-accreditation.sql'
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/seed.sql'
    docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/verify-seed.sql'
    ```
 
-   `verify-seed.sql` debe mostrar `PASS: conteos, relaciones, importes y destinos de pago` (pero no comprueba la existencia de los triggers). Verificar explícitamente mediante SQL las **24 tablas** y los **7 triggers**:
+   `verify-seed.sql` debe mostrar `PASS: conteos, relaciones, importes y destinos de pago` (pero no comprueba la existencia de los triggers). Verificar explícitamente mediante SQL las **26 tablas**, los **13 triggers** y **1 vista**:
 
    ```bash
    docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'; SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME; SELECT TABLE_NAME FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'FER17_AUDITORIA_TRIGGERS';"
    ```
 
-   La salida debe informar `24` tablas base y exactamente los triggers `fer17_precio_evento_no_delete`, `fer17_precio_evento_no_update`, `fer17_producto_alta_evento`, `fer17_producto_precio_evento`, `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. La migración FER-17 también crea la vista `FER17_AUDITORIA_TRIGGERS` para que el CLI compruebe los cuatro triggers de precios. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, las tres migraciones y esta comprobación SQL.)*
+   La salida debe informar `26` tablas base, la vista `FER17_AUDITORIA_TRIGGERS` y exactamente los 13 triggers: `fer17_precio_evento_no_delete`, `fer17_precio_evento_no_update`, `fer17_producto_alta_evento`, `fer17_producto_precio_evento`, `fer260_cuenta_revision`, `fer260_imputacion_insert`, `fer260_imputacion_update`, `s704_comprobante_before_update`, `s704_movimiento_before_delete`, `s704_movimiento_before_update`, `s704_pago_before_delete`, `s704_pago_before_insert` y `s704_pago_before_update`. La migración FER-17 crea la vista `FER17_AUDITORIA_TRIGGERS` para comprobar los cuatro triggers de precios. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, las 6 migraciones y esta comprobación SQL.)*
 
    **Usuarios locales:** el registro público crea clientes, no administradores;
    el usuario del seed es un fixture sin login. Para preparar usuarios locales
@@ -264,10 +267,27 @@ La plantilla local de referencia es [backend/.env.example](backend/.env.example)
 | Categoría | Variables | Descripción y comportamiento |
 | --- | --- | --- |
 | **Base de datos** | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `LEGACY_ORDER_UTC_OFFSET` | Parámetros de conexión a MariaDB (el Compose local expone `127.0.0.1:3307` y base `ferrepatagonia_dev`). `DB_HOST`, `DB_NAME`, `DB_USER` y `DB_PASSWORD` son obligatorias. |
+| **Verificación de precios** | `PRICE_VERIFICATION_DB_USER`, `PRICE_VERIFICATION_DB_PASSWORD` | Credenciales dedicadas de privilegios mínimos para publicar precios verificados vía `POST /api/admin/productos/:id/verificar-precio` (usa `DB_HOST`, `DB_PORT` y `DB_NAME`). Deben configurarse en par o omitirse ambas; si faltan, la API arranca pero el endpoint responde HTTP `503` (`VERIFICACION_NO_CONFIGURADA`). |
 | **Autenticación JWT** | `JWT_SECRET` | Obligatoria al iniciar. Secreto para firmar/verificar JWT `HS256`. Sin fallback interno; en producción exige secreto privado de al menos 32 bytes sin repetición trivial. |
 | **Entorno HTTP y origen** | `NODE_ENV`, `PORT`, `APP_PUBLIC_ORIGIN` | `NODE_ENV` (`development`, `test`, `production`) es obligatorio. `APP_PUBLIC_ORIGIN` define el origen exacto permitido (`http://localhost:5173` en dev; HTTPS obligatorio en `production`). |
 | **Proxy y rate limit** | `TRUSTED_PROXY_CIDRS`, `HTTPS_TERMINATION`, `AUTH_RATE_STORE`, `API_PROCESS_COUNT`, `AUTH_LOGIN_LIMIT`, `AUTH_LOGIN_WINDOW_MS`, `AUTH_REGISTER_LIMIT`, `AUTH_REGISTER_WINDOW_MS` | Regulan confianza en proxies, requerimiento de HTTPS (`trusted-proxy` obligatorio en producción) y cuotas en memoria (`memory`, 1 proceso). |
 | **Almacenamiento** | `PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR` | Rutas absolutas opcionales al arrancar (Joi rechaza valores relativos o malformados). |
+
+### Provisión del usuario de verificación de precios en MariaDB
+
+Para habilitar la verificación administrativa de precios sin otorgar permisos de DDL ni escrituras sobre tablas de negocio ajenas, crear un usuario MariaDB exclusivo de privilegios mínimos y cargar sus credenciales en `PRICE_VERIFICATION_DB_USER` y `PRICE_VERIFICATION_DB_PASSWORD`:
+
+```sql
+CREATE USER '<usuario_verificador>'@'%' IDENTIFIED BY '<clave_segura>';
+GRANT SELECT ON ferrepatagonia_dev.PRODUCTO TO '<usuario_verificador>'@'%';
+GRANT SELECT ON ferrepatagonia_dev.USUARIO TO '<usuario_verificador>'@'%';
+GRANT SELECT, INSERT, UPDATE ON ferrepatagonia_dev.PRECIO_USD_EVIDENCIA TO '<usuario_verificador>'@'%';
+GRANT SELECT, INSERT ON ferrepatagonia_dev.FER17_PRECIO_EVENTO TO '<usuario_verificador>'@'%';
+GRANT SELECT ON ferrepatagonia_dev.FER17_AUDITORIA_TRIGGERS TO '<usuario_verificador>'@'%';
+FLUSH PRIVILEGES;
+```
+
+En MariaDB, `SELECT ... FOR UPDATE` sobre `PRODUCTO` funciona con permiso `SELECT` sin habilitar `UPDATE` ni `DELETE` sobre el catálogo ni sobre cuentas corrientes o pedidos.
 
 ### Diferencia entre variables de almacenamiento opcionales al arrancar vs requeridas al operar
 
@@ -276,9 +296,9 @@ La plantilla local de referencia es [backend/.env.example](backend/.env.example)
 
 ---
 
-## Programación Backend — Requisitos implementados
+## Práctica Profesionalizante — Requisitos técnicos implementados
 
-Sección de verificación técnica para la evaluación académica de Backend:
+Sección de verificación técnica para la evaluación de la asignatura **Práctica Profesionalizante**:
 
 | Requisito | Tecnología | Estado | Archivos principales |
 | --- | --- | --- | --- |
@@ -295,7 +315,7 @@ Sección de verificación técnica para la evaluación académica de Backend:
 2. **Joi:** `loadEnv` valida de manera estricta (`convert: false`) configuración de BD, `JWT_SECRET`, seguridad HTTP/proxy, rate limits y rutas opcionales de almacenamiento al importar la configuración antes de abrir conexiones.
    - *Verificación:* `node --require ./test/helpers/test-env.cjs --test test/env-config.test.cjs` desde `backend/`, que incluye ensayos reales de arranque fallido de `dist/server.js` sin filtrar secretos.
 3. **TypeORM:** `ControlledDataSource` registra **11 `EntitySchema` activos** en `activeSchemas` (`CategoriaSchema`, `ProductoSchema`, `ClienteSchema`, `UsuarioSchema`, `ListaPrecioSchema`, `CotizacionSchema`, `CarritoSchema`, `ItemCarritoSchema`, `CuentaCorrienteSchema`, `MovimientoCuentaCorrienteSchema`, `ImputacionMovimientoCuentaCorrienteSchema`).
-   - *Aclaración técnica:* no todas las tablas de `database/schema.sql` (24 tablas) están mapeadas con `EntitySchema`. El uso de TypeORM (`getRepository`, `QueryBuilder`, `QueryRunner` / transacciones) convive con consultas SQL parametrizadas mediante `EntityManager.query` (por ejemplo bloqueos `FOR UPDATE`) y con el pool `mariadb` dedicado al snapshot de lectura consistente del catálogo (`catalog-snapshot.config.ts`). `synchronize`, `dropSchema` y `migrationsRun` permanecen en `false`.
+   - *Aclaración técnica:* no todas las tablas de `database/schema.sql` (26 tablas) están mapeadas con `EntitySchema`. El uso de TypeORM (`getRepository`, `QueryBuilder`, `QueryRunner` / transacciones) convive con consultas SQL parametrizadas mediante `EntityManager.query` (por ejemplo bloqueos `FOR UPDATE`) y con el pool `mariadb` dedicado al snapshot de lectura consistente del catálogo (`catalog-snapshot.config.ts`). `synchronize`, `dropSchema` y `migrationsRun` permanecen en `false`.
    - *Verificación:* `npm --prefix backend run test:unit` (`test/database.test.cjs`, `test/database-outcome.test.cjs`) y `npm --prefix backend run test:integration`.
 4. **Multer:** utilizado con `memoryStorage` y límite de `5 MiB` en dos flujos: importación masiva de catálogo CSV/XLSX (`uploadCatalogFile`, validación de extensión/MIME/cabeceras binarias) y carga/reemplazo de fotos de productos (`uploadProductImage` + normalización WebP con `sharp`). *(La carga de comprobantes de pago usa `express.raw` + Worker Threads en [paymentReceipt.routes.ts](backend/src/routes/paymentReceipt.routes.ts), no Multer.)*
    - *Verificación:* `node --require ./test/helpers/test-env.cjs --test test/productImport.test.cjs` y `npm --prefix backend run test:integration` (`test/helpers/run-admin-products-mariadb.cjs`).
