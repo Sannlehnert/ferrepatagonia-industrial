@@ -1,6 +1,8 @@
 import api from '@/services/api'
 import type {
     AdminClient,
+    AdminClientFilters,
+    AdminClientPage,
     AdminClientPriceList,
     AdminClientPriceLists,
     AdminPriceList,
@@ -12,6 +14,33 @@ import type {
 export async function getAdminClients(signal?: AbortSignal): Promise<AdminClient[]> {
     const response = await api.get<AdminClientsResponse>('/admin/clientes', ...(signal ? [{ signal }] : []))
     return response.data.data.clientes
+}
+
+export async function getAdminClientPage(
+    filters: AdminClientFilters = {},
+    signal?: AbortSignal,
+): Promise<AdminClientPage> {
+    const page = filters.page ?? 1
+    const limit = filters.limit ?? 20
+    const params: Record<string, string | number> = { page, limit }
+
+    if (filters.busqueda) params.busqueda = filters.busqueda
+    if (filters.tipo) params.tipo = filters.tipo
+    if (filters.estadoEmpresa) params.estadoEmpresa = filters.estadoEmpresa
+
+    const response = await api.get<AdminClientsResponse>('/admin/clientes', {
+        params,
+        ...(signal ? { signal } : {}),
+    })
+    const data = response.data.data
+    const pagination = data.paginacion ?? {
+        page,
+        limit,
+        total: data.clientes.length,
+        totalPages: data.clientes.length === 0 ? 0 : Math.ceil(data.clientes.length / limit),
+    }
+
+    return { clientes: data.clientes, ...pagination }
 }
 
 export async function updateAdminCompanyApproval(

@@ -1,5 +1,12 @@
 import { expect, test, type Page } from '@playwright/test'
 
+interface AdminClient {
+  id: number
+  email: string
+  nombreRazonSocial: string
+  tipoCliente: string
+}
+
 const ids: Record<string, number> = JSON.parse(process.env.E2E_ADMIN_ACCOUNTS ?? '{}')
 async function login(page: Page) {
   await page.goto('/login')
@@ -8,16 +15,20 @@ async function login(page: Page) {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/dashboard$/)
 }
+async function openClients(page: Page, busqueda?: string) {
+  const query = busqueda ? `?busqueda=${encodeURIComponent(busqueda)}` : ''
+  await page.goto(`/admin/clientes${query}`)
+}
 async function setApproval(page: Page, path: string, estado: string) {
   return page.request.patch(path, { headers: { Origin: new URL(page.url()).origin }, data: { estado } })
 }
 async function company(page: Page) {
   const response = await page.request.get('/api/admin/clientes')
   expect(response.ok()).toBe(true)
-  const clients = (await response.json()).data.clientes
-  const client = clients.find((item: { id: number }) => item.id === ids.debt)
+  const clients = (await response.json()).data.clientes as AdminClient[]
+  const client = clients.find(item => item.id === ids.debt)
   expect(client).toBeTruthy()
-  return { client, clients }
+  return { client: client!, clients }
 }
 
 for (const width of [1280, 768, 360]) {
@@ -34,18 +45,13 @@ for (const width of [1280, 768, 360]) {
     page.on('request', request => {
       if (new URL(request.url()).pathname === path && request.method() === 'PATCH') mutations++
     })
-    await page.goto('/admin/clientes')
+    await openClients(page, client.email)
     const row = page.getByRole('row').filter({ hasText: client.email })
     await expect(row.getByText('Pendiente', { exact: true })).toBeVisible()
     await expect(row.getByText('Cuenta habilitada', { exact: true })).toBeVisible()
     await expect(row.getByText('Datos de demostración', { exact: true })).toHaveCount(0)
     await expect(row.getByText('Crédito disponible según la cuenta', { exact: true })).toHaveCount(0)
     const individual = clients.find((item: { tipoCliente: string }) => item.tipoCliente === 'PARTICULAR')
-    if (individual) {
-      const individualRow = page.getByRole('row').filter({ hasText: individual.email })
-      await expect(individualRow.getByRole('button', { name: /Aprobar|Rechazar/ })).toHaveCount(0)
-      await expect(individualRow).toContainText('No aplica a particulares')
-    }
     const detailButton = row.getByRole('button', { name: `Ver detalle de ${client.nombreRazonSocial}` })
     for (const badge of [row.locator('.company-badge'), row.locator('.credit-badge')]) {
       await expect(badge).toHaveCSS('width', '176px')
@@ -97,6 +103,8 @@ for (const width of [1280, 768, 360]) {
     await approve.click()
     await dialog.getByRole('button', { name: 'Confirmar aprobación' }).click()
     await expect(dialog.getByRole('status').filter({ hasText: 'Empresa aprobada.' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Confirmar aprobación' })).toHaveCount(0)
+    await expect(dialog.getByRole('button', { name: 'Cerrar detalle del cliente' })).toBeFocused()
     expect(mutations).toBe(1)
     await dialog.getByRole('button', { name: 'Cerrar detalle del cliente' }).click()
     await expect(row.getByText('Aprobada', { exact: true })).toBeVisible()
@@ -111,6 +119,8 @@ for (const width of [1280, 768, 360]) {
     await expect(rejection.getByRole('button', { name: 'Confirmar rechazo' })).toHaveCSS('background-color', 'rgb(220, 38, 38)')
     await rejection.getByRole('button', { name: 'Confirmar rechazo' }).click()
     await expect(rejection.getByRole('status').filter({ hasText: 'Empresa rechazada.' })).toBeVisible()
+    await expect(rejection.getByRole('button', { name: 'Confirmar rechazo' })).toHaveCount(0)
+    await expect(rejection.getByRole('button', { name: 'Cerrar detalle del cliente' })).toBeFocused()
     await rejection.getByRole('button', { name: 'Cerrar detalle del cliente' }).click()
     await expect(row.getByRole('button', { name: `Rechazar cuenta empresa de ${client.nombreRazonSocial}` })).toHaveCount(0)
     await expect(approve).toBeEnabled()
@@ -120,11 +130,18 @@ for (const width of [1280, 768, 360]) {
     await expect(row.getByText('Crédito bloqueado', { exact: true })).toBeVisible()
     const after = (await (await page.request.get(accountPath)).json()).data
     for (const field of ['estado', 'cuentaId', 'saldo', 'limite']) expect(after[field]).toEqual(before[field])
+    await openClients(page, client.email)
     await page.reload()
     await expect(row.getByText('Rechazada', { exact: true })).toBeVisible()
     await expect(row.getByText('Cuenta habilitada', { exact: true })).toBeVisible()
     expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
     await page.screenshot({ path: test.info().outputPath(`clientes-${width}.png`), fullPage: true })
+    if (individual) {
+      await openClients(page, individual.email)
+      const individualRow = page.getByRole('row').filter({ hasText: individual.email })
+      await expect(individualRow.getByRole('button', { name: /Aprobar|Rechazar/ })).toHaveCount(0)
+      await expect(individualRow).toContainText('No aplica a particulares')
+    }
   })
 }
 
@@ -139,7 +156,7 @@ test('verifica una respuesta perdida y recupera una consulta de crédito fallida
     if (failCredit) await route.fulfill({ status: 503, json: { message: 'Consulta no disponible' } })
     else await route.continue()
   })
-  await page.goto('/admin/clientes')
+  await openClients(page, client.email)
   const row = page.getByRole('row').filter({ hasText: client.email })
   await expect(row).toContainText('Crédito no disponible para consulta')
   await expect(row.getByText('Sin cuenta corriente', { exact: true })).toHaveCount(0)
@@ -178,8 +195,10 @@ test('cada empresa publica su crédito y permite reintentar aunque otra consulta
   test.setTimeout(45_000)
   await login(page)
   const { clients } = await company(page)
-  const [slow, failed, healthy] = clients.filter((item: { tipoCliente: string }) => item.tipoCliente === 'EMPRESA')
-  expect(healthy).toBeTruthy()
+  const group = clients.filter(item => item.tipoCliente === 'EMPRESA'
+    && item.email.startsWith('cc258-page-1'))
+  expect(group.length).toBeGreaterThanOrEqual(3)
+  const [slow, failed, healthy] = group
   const row = (client: { email: string }) => page.getByRole('row').filter({ hasText: client.email })
   let release!: () => void
   const held = new Promise<void>(resolve => { release = resolve })
@@ -197,7 +216,7 @@ test('cada empresa publica su crédito y permite reintentar aunque otra consulta
   })
   const accountLabel = /Cuenta\s+(?:habilitada|inhabilitada)|Sin cuenta corriente/
   try {
-    await page.goto('/admin/clientes')
+    await openClients(page, 'cc258-page-1')
     await expect(row(slow).getByText('Consultando crédito…', { exact: true })).toBeVisible()
     await expect(row(failed).getByRole('button', { name: 'Reintentar crédito' })).toBeVisible()
     await expect(row(healthy).getByText(accountLabel)).toBeVisible()
@@ -252,7 +271,7 @@ test('estadoEsperado rechaza una aprobación retenida si se confirmó otro estad
     await route.fulfill({ response }).catch(() => {})
   })
   try {
-    await page.goto('/admin/clientes')
+    await openClients(page, client.email)
     const row = page.getByRole('row').filter({hasText:client.email})
     await row.getByRole('button',{name: 'Aprobar cuenta empresa de '+client.nombreRazonSocial}).click()
     await page.getByRole('button',{name:'Confirmar aprobación'}).click()
@@ -280,7 +299,7 @@ test('S7-345-06: fallo antes del backend se recupera verificando y permite decid
     if(fail) await route.fulfill({status:503,json:{message:'No disponible'}})
     else await route.continue()
   })
-  await page.goto('/admin/clientes')
+  await openClients(page, client.email)
   const row=page.getByRole('row').filter({hasText:client.email})
   await row.getByRole('button',{name:'Aprobar cuenta empresa de '+client.nombreRazonSocial}).click()
   const dialog=page.getByRole('dialog')
@@ -314,7 +333,7 @@ test('S7-345-03: una verificación sin respuesta vence y permite cerrar y reinte
     await route.abort('failed')
   })
   try {
-    await page.goto('/admin/clientes')
+    await openClients(page, client.email)
     const row = page.getByRole('row').filter({ hasText: client.email })
     await row.getByRole('button', { name: `Aprobar cuenta empresa de ${client.nombreRazonSocial}` }).click()
     const dialog = page.getByRole('dialog', { name: 'Aprobar empresa' })
@@ -323,6 +342,8 @@ test('S7-345-03: una verificación sin respuesta vence y permite cerrar y reinte
     await expect(dialog).toContainText('No pudimos verificar el estado con el servidor')
     await dialog.getByRole('button', { name: 'Cerrar detalle del cliente' }).click()
     await expect(dialog).toHaveCount(0)
+    await expect(row.getByRole('button', { name: `Aprobar cuenta empresa de ${client.nombreRazonSocial}` })).toBeDisabled()
+    await expect(row.getByRole('button', { name: `Ver detalle de ${client.nombreRazonSocial}` })).toBeFocused()
     holdRead = false
     release()
     await row.getByRole('button', { name: `Reintentar verificación de cuenta empresa de ${client.nombreRazonSocial}` }).click()
@@ -335,8 +356,10 @@ test('S7-345-04: aprobar una fila no borra ni reinicia el crédito ya visible de
   test.setTimeout(40_000)
   await login(page)
   const { clients } = await company(page)
-  const companies = clients.filter((client: { tipoCliente: string }) => client.tipoCliente === 'EMPRESA')
-  const target = companies[companies.length - 1]
+  const companies = clients.filter(client => client.tipoCliente === 'EMPRESA'
+    && client.email.startsWith('cc258-page-1'))
+  expect(companies.length).toBeGreaterThanOrEqual(3)
+  const target = companies[0]
   const path = `/api/admin/clientes/${target.id}/estado-empresa`
   expect((await setApproval(page, path, 'PENDIENTE')).ok()).toBe(true)
   let afterChange = false
@@ -353,8 +376,9 @@ test('S7-345-04: aprobar una fila no borra ni reinicia el crédito ya visible de
   const row = (client: { email: string }) => page.getByRole('row').filter({ hasText: client.email })
   const accountLabel = /Cuenta\s+(?:habilitada|inhabilitada)|Sin cuenta corriente/
   try {
-    await page.goto('/admin/clientes')
+    await openClients(page, 'cc258-page-1')
     for (const client of companies) await expect(row(client).getByText(accountLabel)).toBeVisible()
+    await expect(page.getByText('Consultando crédito…', { exact: true })).toHaveCount(0)
     const before = new Map(reads)
     afterChange = true
     await row(target).getByRole('button', { name: `Aprobar cuenta empresa de ${target.nombreRazonSocial}` }).click()

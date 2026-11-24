@@ -1,14 +1,32 @@
 import { Request, Response } from 'express';
 import { DatabaseOutcomeUnknownError } from '../config/database-policy';
-import { listClientes, updateCompanyApprovalStatus } from '../services/clientes.service';
+import {
+  hasAdminClientQuery,
+  listClientes,
+  listClientesPage,
+  updateCompanyApprovalStatus,
+} from '../services/clientes.service';
 import type { EstadoAprobacionEmpresa } from '../dtos/clients/company-approval.dto';
+import type { AdminClientQuery } from '../dtos/clients/admin-client-query.dto';
 
 export async function getClientes(_req: Request, res: Response) {
   try {
-    const clientes = await listClientes();
+    const query = res.locals?.dto?.query as AdminClientQuery | undefined;
+
+    // Sin parámetros se conserva el contrato histórico: todos los clientes y
+    // exactamente la misma forma de respuesta que consumían los clientes viejos.
+    if (!hasAdminClientQuery(query)) {
+      const clientes = await listClientes();
+      return res.status(200).json({
+        message: 'Clientes obtenidos correctamente',
+        data: { clientes },
+      });
+    }
+
+    const page = await listClientesPage(query);
     return res.status(200).json({
       message: 'Clientes obtenidos correctamente',
-      data: { clientes },
+      data: page,
     });
   } catch {
     console.error('Error al obtener clientes.');

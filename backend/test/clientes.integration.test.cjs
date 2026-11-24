@@ -184,6 +184,127 @@ test('listado HTTP de cuentas registradas en MariaDB', { skip: !process.env.CLIE
         for (const id of listIds) await pool.query('DELETE FROM LISTA_PRECIO WHERE id_lista_precio = ?', [id]);
       }
     });
+
+    await t.test('#346: búsqueda, filtros y paginación real sobre MariaDB', async () => {
+      const prefix = `filtro346-${randomUUID()}`;
+      const clientIds = [];
+      const readPage = async (params = {}) => {
+        const query = new URLSearchParams(params);
+        const response = await fetch(`${url}${query.size ? '?' + query : ''}`, {
+          headers: { Cookie: adminCookie },
+        });
+        const body = await response.json();
+        return { response, body };
+      };
+      try {
+        for (let i = 1; i <= 45; i++) {
+          const numero = String(i).padStart(2, '0');
+          const empresa = i > 25;
+          const estado = empresa
+            ? (i % 3 === 0 ? 'APROBADA' : i % 3 === 1 ? 'PENDIENTE' : 'RECHAZADA')
+            : null;
+          const result = await pool.query(`INSERT INTO CLIENTE
+            (tipo_cliente, nombre_razon_social, doc_cliente, cuit, email, estado_aprobacion_empresa, es_fiel, activo)
+            VALUES (?, ?, ?, ?, ?, ?, 0, 1)`, [
+            empresa ? 'EMPRESA' : 'PARTICULAR',
+            `${prefix} ${empresa ? 'Empresa' : 'Particular'} ${numero}`,
+            `DOC-${numero}`,
+            empresa ? `30-${numero}-9` : null,
+            `${prefix}-${numero}@example.test`,
+            estado,
+          ]);
+          const id = Number(result.insertId);
+          clientIds.push(id);
+          await pool.query(`INSERT INTO USUARIO
+            (id_cliente, email, password_hash, rol, activo, fecha_creacion)
+            VALUES (?, ?, 'fixture-no-login', 'CLIENTE', 1, ?)`, [
+            id,
+            `${prefix}-${numero}@example.test`,
+            `2035-01-${String((i % 28) + 1).padStart(2, '0')} ${String(Math.floor(i / 60)).padStart(2, '0')}:${String(i % 60).padStart(2, '0')}:00`,
+          ]);
+        }
+
+        const first = await readPage({ page: '1', limit: '20', busqueda: prefix, tipo: 'PARTICULAR' });
+        assert.equal(first.response.status, 200);
+        assert.equal(first.body.data.paginacion.page, 1);
+        assert.equal(first.body.data.paginacion.limit, 20);
+        assert.equal(first.body.data.paginacion.total, 25);
+        assert.equal(first.body.data.paginacion.totalPages, 2);
+        assert.equal(first.body.data.clientes.length, 20);
+        assert.ok(first.body.data.clientes.every(row => row.nombreRazonSocial.startsWith(prefix)
+          && row.tipoCliente === undefined && row.estadoAprobacionEmpresa === undefined));
+
+        const second = await readPage({ page: '2', limit: '20', busqueda: prefix, tipo: 'PARTICULAR' });
+        assert.equal(second.body.data.paginacion.page, 2);
+        assert.equal(second.body.data.clientes.length, 5);
+        const firstIds = new Set(first.body.data.clientes.map(row => row.id));
+        assert.ok(second.body.data.clientes.every(row => !firstIds.has(row.id)),
+          'Las páginas no deben repetir clientes');
+
+        const clamped = await readPage({ page: '999', limit: '20', busqueda: prefix, tipo: 'PARTICULAR' });
+        assert.equal(clamped.body.data.paginacion.page, 2);
+        assert.equal(clamped.body.data.paginacion.totalPages, 2);
+
+        const searchByName = await readPage({ busqueda: `  ${prefix.toUpperCase()} PARTICULAR  `, tipo: 'PARTICULAR' });
+        assert.equal(searchByName.body.data.paginacion.total, 25);
+        const searchByEmail = await readPage({ busqueda: `${prefix}-07@` });
+        assert.equal(searchByEmail.body.data.paginacion.total, 1);
+        assert.equal(searchByEmail.body.data.clientes[0].email, `${prefix}-07@example.test`);
+        const searchByDoc = await readPage({ busqueda: 'doc-08' });
+        assert.equal(searchByDoc.body.data.paginacion.total, 1);
+        const searchByCuit = await readPage({ busqueda: '30-30-9' });
+        assert.equal(searchByCuit.body.data.paginacion.total, 1);
+        const searchById = await readPage({ busqueda: `#${clientIds[6]}` });
+        assert.equal(searchById.body.data.paginacion.total, 1);
+        assert.equal(searchById.body.data.clientes[0].id, clientIds[6]);
+
+        const empresas = await readPage({ busqueda: prefix, tipo: 'EMPRESA' });
+        assert.equal(empresas.body.data.paginacion.total, 20);
+        const aprobadas = await readPage({ busqueda: prefix, estadoEmpresa: 'APROBADA' });
+        const expectedApproved = clientIds.slice(25).filter((_id, index) => (index + 26) % 3 === 0).length;
+        assert.equal(aprobadas.body.data.paginacion.total, expectedApproved);
+        assert.ok(aprobadas.body.data.clientes.every(row =>
+          row.tipoCliente === 'EMPRESA' && row.estadoAprobacionEmpresa === 'APROBADA'));
+        const combined = await readPage({
+          busqueda: `${prefix} Empresa`, tipo: 'EMPRESA', estadoEmpresa: 'PENDIENTE', limit: '5',
+        });
+        assert.ok(combined.body.data.clientes.every(row =>
+          row.tipoCliente === 'EMPRESA' && row.estadoAprobacionEmpresa === 'PENDIENTE'));
+        assert.ok(combined.body.data.clientes.every(row => row.nombreRazonSocial.includes(`${prefix} Empresa`)));
+        const pendingTotal = combined.body.data.paginacion.total;
+        assert.equal((await readPage({
+          busqueda: `${prefix} Empresa`, tipo: 'EMPRESA', estadoEmpresa: 'PENDIENTE', limit: '5', page: '2',
+        })).body.data.paginacion.total, pendingTotal);
+
+        for (const params of [
+          { page: '0' }, { limit: '101' }, { page: '01' }, { busqueda: '   ' },
+          { tipo: 'PARTICULAR', estadoEmpresa: 'PENDIENTE' }, { extra: 'x' },
+        ]) {
+          const invalid = await readPage(params);
+          assert.equal(invalid.response.status, 400, JSON.stringify(params));
+          assert.equal(typeof invalid.body.message, 'string');
+        }
+        const repeated = await fetch(`${url}?page=1&page=2`, { headers: { Cookie: adminCookie } });
+        assert.equal(repeated.status, 400);
+        const clientDenied = await createAuthUser(pool, 'CLIENTE');
+        try {
+          const denied = await fetch(`${url}?page=1&limit=20`, {
+            headers: { Cookie: clientDenied.cookie },
+          });
+          assert.equal(denied.status, 403);
+        } finally {
+          await clientDenied.destroy();
+        }
+      } finally {
+        await pool.query('DELETE FROM USUARIO WHERE email LIKE ?', [`${prefix}-%`]);
+        if (clientIds.length) {
+          await pool.query(
+            `DELETE FROM CLIENTE WHERE id_cliente IN (${clientIds.map(() => '?').join(',')})`,
+            clientIds,
+          );
+        }
+      }
+    });
   } finally {
     await new Promise((resolve, reject) => server.close(err => err ? reject(err) : resolve()));
     try { await admin.destroy(); } finally { await pool.end(); }

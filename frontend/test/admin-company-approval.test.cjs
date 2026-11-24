@@ -9,7 +9,26 @@ const ts = require('typescript');
 const root = path.resolve(__dirname, '../src');
 
 function createTestRenderer() {
-  const node = (tag, text = '') => ({ tag, text, props: {}, children: [], parent: null });
+  const node = (tag, text = '') => ({
+    tag,
+    text,
+    props: {},
+    children: [],
+    parent: null,
+    addEventListener() {},
+    removeEventListener() {},
+    focus() {},
+    matches() { return false; },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
+    getClientRects() { return []; },
+    contains() { return false; },
+    get isConnected() {
+      let current = this;
+      while (current.parent) current = current.parent;
+      return current.tag === 'root';
+    },
+  });
   return {
     createRoot: () => node('root'),
     serialize(n) {
@@ -74,6 +93,16 @@ function load(file, mocks = {}, inlineTemplate = false) {
       emits: ['confirm'],
       setup(_props, { emit }) { return () => vue.h('button', { 'aria-label': 'Confirmar aprobación de prueba', onClick: () => emit('confirm') }, 'Confirmar'); },
     } },
+    'vue-router': {
+      useRoute: () => vue.reactive({ query: {}, hash: '' }),
+      useRouter: () => ({ replace: async () => {}, push: async () => {} }),
+    },
+    '@/services/adminMutationError': {
+      isMutationResultUncertain: error => {
+        const status = error?.response?.status;
+        return !status || ![400, 401, 403, 404, 409, 422].includes(status);
+      },
+    },
   };
   mocks = { ...defaults, ...mocks };
   const filename = path.resolve(root, file);
@@ -136,6 +165,53 @@ const sampleClients = () => [
   },
 ];
 
+function clientPage(clients = sampleClients(), overrides = {}) {
+  const total = overrides.total ?? clients.length;
+  const limit = overrides.limit ?? 20;
+  return {
+    clientes: clients,
+    page: overrides.page ?? 1,
+    limit,
+    total,
+    totalPages: overrides.totalPages ?? (total === 0 ? 0 : Math.ceil(total / limit)),
+  };
+}
+
+function createRoute(query = {}) {
+  const route = vue.reactive({ query: { ...query }, hash: '' });
+  const replace = async location => {
+    route.query = { ...(location?.query ?? {}) };
+    route.hash = location?.hash ?? '';
+  };
+  const push = async location => { await replace(location); };
+  return { route, router: { push, replace } };
+}
+
+const mutationError = {
+  isMutationResultUncertain: error => {
+    const status = error?.response?.status;
+    return !status || ![400, 401, 403, 404, 409, 422].includes(status);
+  },
+};
+
+function clientViewMocks(service, routeState, auth = {
+  user: { id: 1 },
+  rol: 'ADMIN',
+  sessionVersion: 1,
+  isAuthenticated: true,
+}) {
+  return {
+    '@/services/adminClientService': service,
+    '@/services/adminMutationError': mutationError,
+    '@/stores/auth': { useAuthStore: () => auth },
+    'vue-router': {
+      useRoute: () => routeState.route,
+      useRouter: () => routeState.router,
+    },
+    './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
+  };
+}
+
 test('adminClientService usa PATCH /admin/clientes/:id/estado-empresa y retorna el cliente actualizado', async () => {
   const calls = [];
   const api = {
@@ -188,18 +264,16 @@ test('adminClientService usa PATCH /admin/clientes/:id/estado-empresa y retorna 
 
 test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y acciones Aprobar/Rechazar', async t => {
   const service = {
-    getAdminClients: async () => sampleClients(),
+    getAdminClientPage: async () => clientPage(),
     getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     saveAdminClientPriceList: async () => null,
     updateAdminCompanyApproval: async () => sampleClients()[1],
   };
+  const routeState = createRoute();
 
   const component = load(
     'views/admin/AdminClientsView.vue',
-    {
-      '@/services/adminClientService': service,
-      './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
-    },
+    clientViewMocks(service, routeState),
     true,
   ).default;
 
@@ -219,6 +293,7 @@ test('AdminClientsView renderiza tipos, badges PENDIENTE/APROBADA/RECHAZADA y ac
   assert.match(tableHtml, /Rechazada/);
   assert.match(tableHtml, /Aprobar cuenta empresa de Constructora Sur SRL/);
   assert.match(tableHtml, /Rechazar cuenta empresa de Constructora Sur SRL/);
+  assert.match(tableHtml, /Página 1 de 1/);
   assert.doesNotMatch(tableHtml, /Aprobar cuenta empresa de Metalúrgica Austral SA/);
   assert.match(tableHtml, /Rechazar cuenta empresa de Metalúrgica Austral SA/);
   assert.match(tableHtml, /Aprobar cuenta empresa de Obras Patagónicas SA/);
@@ -360,6 +435,9 @@ async function approvalView(t, service, auth) {
     ...(auth ? { '@/stores/auth': { useAuthStore: () => auth } } : {}),
     '@/services/adminClientService': {
       getAdminClients: (...args) => service.getAdminClients ? service.getAdminClients(...args) : Promise.resolve(sampleClients()),
+      getAdminClientPage: (...args) => service.getAdminClientPage
+        ? service.getAdminClientPage(...args)
+        : Promise.resolve(clientPage()),
       getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
       updateAdminCompanyApproval: (...args) => service.updateAdminCompanyApproval(...args),
     },
@@ -492,20 +570,18 @@ test('S7-345-04: aprobación durante una lectura pendiente descarta el crédito 
 
 test('H-01: AdminClientsView renderiza botón Reintentar verificación y bloquea acciones ante resultado incierto', async t => {
   const service = {
-    getAdminClients: async () => sampleClients(),
+    getAdminClientPage: async () => clientPage(),
     getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     saveAdminClientPriceList: async () => null,
     updateAdminCompanyApproval: async () => {
       throw Object.assign(new Error('timeout'), { isAxiosError: true, response: undefined });
     },
   };
+  const routeState = createRoute();
 
   const component = load(
     'views/admin/AdminClientsView.vue',
-    {
-      '@/services/adminClientService': service,
-      './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
-    },
+    clientViewMocks(service, routeState),
     true,
   ).default;
 
@@ -547,7 +623,7 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
   let resolvePending;
 
   const service = {
-    getAdminClients: async () => sampleClients(),
+    getAdminClientPage: async () => clientPage(),
     getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     saveAdminClientPriceList: async () => null,
     updateAdminCompanyApproval: (id, status) => {
@@ -572,11 +648,9 @@ test('setCompanyApproval actualiza APROBADA/RECHAZADA/PENDIENTE, bloquea doble e
       });
     },
   };
+  const routeState = createRoute();
 
-  const component = load('views/admin/AdminClientsView.vue', {
-    '@/services/adminClientService': service,
-    './AdminPriceListsPanel.vue': { default: { render: () => null } },
-  }).default;
+  const component = load('views/admin/AdminClientsView.vue', clientViewMocks(service, routeState)).default;
   component.render = () => null;
 
   const dom = createTestRenderer();
@@ -721,7 +795,7 @@ test('descarta el listado de una sesión ADMIN anterior', async t => {
   const component = load('views/admin/AdminClientsView.vue', {
     '@/stores/auth': { useAuthStore: () => auth },
     '@/services/adminClientService': {
-      getAdminClients: () => new Promise(resolve => { release = resolve; }),
+      getAdminClientPage: () => new Promise(resolve => { release = resolve; }),
       getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     },
     './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
@@ -734,7 +808,7 @@ test('descarta el listado de una sesión ADMIN anterior', async t => {
   const state = app._instance.setupState;
   auth.loggingOut = true;
   await settle();
-  release(sampleClients());
+  release(clientPage(sampleClients()));
   await settle();
   assert.deepEqual(state.clients, []);
   assert.equal(state.selectedClient, null);
@@ -745,6 +819,7 @@ test('no declara verificado un cliente ausente de la respuesta de reconciliació
   const component = load('views/admin/AdminClientsView.vue', {
     '@/services/adminClientService': {
       getAdminClients: async () => result,
+      getAdminClientPage: async () => clientPage(result),
       getAdminClientPriceLists: async () => ({ listas: [], asignaciones: [] }),
     },
     './AdminPriceListsPanel.vue': { __esModule: true, default: { render: () => null } },
@@ -765,7 +840,8 @@ test('no declara verificado un cliente ausente de la respuesta de reconciliació
 test('409 reconcilia el estado actual y no repite la modificación', async t => {
   let writes = 0, reads = 0;
   const service = {
-    getAdminClients: async () => { reads++; return sampleClients().map(c => reads > 1 && c.id === 20 ? { ...c, estadoAprobacionEmpresa: 'RECHAZADA' } : c); },
+    getAdminClientPage: async () => { reads++; return clientPage(sampleClients()); },
+    getAdminClients: async () => { reads++; return sampleClients().map(c => c.id === 20 ? { ...c, estadoAprobacionEmpresa: 'RECHAZADA' } : c); },
     updateAdminCompanyApproval: async (id, target, signal, expected) => {
       writes++;
       assert.equal(expected, 'PENDIENTE');
@@ -798,4 +874,175 @@ test('una verificación pendiente no bloquea modificaciones de otra empresa', as
   finish(sampleClients());
   await pending;
   assert.equal(state.clients[2].estadoAprobacionEmpresa, 'RECHAZADA', 'Reconciliar una fila no sustituye las demás');
+});
+
+function createDialogDom(t) {
+  const prevHTMLElement = global.HTMLElement;
+  const prevDocument = global.document;
+
+  class FakeHTMLElement {
+    constructor(tag, text = '') {
+      this.tag = tag;
+      this.text = text;
+      this.props = {};
+      this.children = [];
+      this.parent = null;
+      this.open = false;
+      this.disabled = false;
+      this.focusCalls = [];
+    }
+    get isConnected() {
+      let current = this;
+      while (current.parent) current = current.parent;
+      return current.tag === 'root';
+    }
+    addEventListener() {}
+    removeEventListener() {}
+    showModal() { this.open = true; }
+    close() { this.open = false; }
+    focus(options) {
+      if (this.disabled || this.props.disabled) return;
+      this.focusCalls.push(options ?? null);
+      fakeDocument.activeElement = vue.toRaw(this);
+    }
+    matches(selector) {
+      if (selector === ':disabled') return Boolean(this.disabled || this.props.disabled);
+      return false;
+    }
+    contains(target) {
+      if (!target) return false;
+      const rawTarget = vue.toRaw(target);
+      if (vue.toRaw(this) === rawTarget) return true;
+      return this.children.some(child => child.contains(rawTarget));
+    }
+    closest() { return null; }
+    querySelector() { return null; }
+    querySelectorAll() { return []; }
+    getClientRects() { return []; }
+  }
+
+  const body = new FakeHTMLElement('body');
+  const fakeDocument = { body, activeElement: body };
+  global.HTMLElement = FakeHTMLElement;
+  global.document = fakeDocument;
+  t.after(() => {
+    global.HTMLElement = prevHTMLElement;
+    global.document = prevDocument;
+  });
+
+  const renderer = vue.createRenderer({
+    createElement: tag => new FakeHTMLElement(tag),
+    createText: text => new FakeHTMLElement('#text', text),
+    createComment: text => new FakeHTMLElement('#comment', text),
+    insert(el, parent, anchor) {
+      el.parent = parent;
+      const i = anchor ? parent.children.indexOf(anchor) : -1;
+      if (i >= 0) parent.children.splice(i, 0, el);
+      else parent.children.push(el);
+    },
+    remove(el) {
+      if (!el.parent) return;
+      const i = el.parent.children.indexOf(el);
+      if (i >= 0) el.parent.children.splice(i, 1);
+      el.parent = null;
+      if (fakeDocument.activeElement && el.contains(fakeDocument.activeElement)) {
+        fakeDocument.activeElement = fakeDocument.body;
+      }
+    },
+    setText(el, text) { el.text = text; },
+    setElementText(el, text) { el.text = text; el.children = []; },
+    patchProp(el, key, _prev, next) {
+      el.props[key] = next;
+      if (key === 'disabled') el.disabled = Boolean(next);
+    },
+    parentNode: el => el.parent,
+    nextSibling: el => {
+      if (!el.parent) return null;
+      const i = el.parent.children.indexOf(el);
+      return el.parent.children[i + 1] || null;
+    },
+  });
+
+  return { FakeHTMLElement, fakeDocument, renderer, createRoot: () => new FakeHTMLElement('root') };
+}
+
+test('S7-345-A01: retorna el foco al botón Ver detalle cuando el disparador queda disabled tras resultado incierto', async t => {
+  const { FakeHTMLElement, fakeDocument, renderer, createRoot } = createDialogDom(t);
+  const Dialog = load('components/AdminClientStatusDialog.vue', {}, true).default;
+
+  const rootEl = createRoot();
+  const row = new FakeHTMLElement('tr');
+  const approveTrigger = new FakeHTMLElement('button');
+  const detailFallback = new FakeHTMLElement('button');
+  row.parent = rootEl;
+  approveTrigger.parent = row;
+  detailFallback.parent = row;
+  approveTrigger.closest = sel => (sel === 'tr' ? row : null);
+  row.querySelector = sel => (sel === '[data-client-detail]' ? detailFallback : null);
+
+  fakeDocument.activeElement = approveTrigger;
+  const open = vue.ref(true);
+  const app = renderer.createApp({
+    render: () => (open.value ? vue.h(Dialog, {
+      client: sampleClients()[1],
+      target: 'APROBADA',
+      credit: null,
+      busy: false,
+      uncertain: true,
+    }) : null),
+  });
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  await settle();
+
+  approveTrigger.disabled = true;
+  open.value = false;
+  await settle();
+
+  assert.equal(approveTrigger.focusCalls.length, 0);
+  assert.equal(detailFallback.focusCalls.length, 1);
+  assert.equal(fakeDocument.activeElement, detailFallback);
+});
+
+test('WCAG 2.4.3: enfoca el botón Cerrar dentro del diálogo cuando se confirma y se desmonta el botón de confirmación', async t => {
+  const { fakeDocument, renderer, createRoot } = createDialogDom(t);
+  const Dialog = load('components/AdminClientStatusDialog.vue', {}, true).default;
+
+  const state = vue.reactive({
+    client: { ...sampleClients()[1] },
+    busy: false,
+    uncertain: false,
+  });
+  const rootEl = createRoot();
+  const app = renderer.createApp({
+    render: () => vue.h(Dialog, {
+      client: state.client,
+      target: 'APROBADA',
+      credit: null,
+      busy: state.busy,
+      uncertain: state.uncertain,
+    }),
+  });
+  app.mount(rootEl);
+  t.after(() => app.unmount());
+  await settle();
+
+  const confirmBtn = findNode(rootEl, n => n.tag === 'button' && n.text.includes('Confirmar aprobación'));
+  const closeBtn = findNode(rootEl, n => n.tag === 'button' && n.props?.['aria-label'] === 'Cerrar detalle del cliente');
+  assert.ok(confirmBtn);
+  assert.ok(closeBtn);
+
+  confirmBtn.focus();
+  assert.equal(fakeDocument.activeElement, confirmBtn);
+
+  state.busy = true;
+  await settle();
+  state.client.estadoAprobacionEmpresa = 'APROBADA';
+  await settle();
+  state.busy = false;
+  await settle();
+
+  assert.equal(findNode(rootEl, n => n.tag === 'button' && n.text.includes('Confirmar aprobación')), null);
+  assert.equal(fakeDocument.activeElement, closeBtn);
+  assert.deepEqual(closeBtn.focusCalls.at(-1), { preventScroll: true });
 });
