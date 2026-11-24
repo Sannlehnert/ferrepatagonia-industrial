@@ -554,6 +554,7 @@ async function reconcilePriceListAssignments(clientId: number) {
         const data = await getAdminClientPriceLists()
         if (unmounted || request !== priceListsRequest || session !== identity() || !allowed()) return
 
+        const selectionChangedDuringRead = selections.value[clientId] !== selectionAtStart
         const nextAssignments = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item])) as PriceListAssignments
         const nextSelections = mergePriceListSelections({
             assignments: nextAssignments,
@@ -569,7 +570,7 @@ async function reconcilePriceListAssignments(clientId: number) {
         selections.value = nextSelections
         delete uncertainPriceListClientIds.value[clientId]
 
-        if (selections.value[clientId] !== selectionAtStart) {
+        if (selectionChangedDuringRead) {
             // La selección cambió mientras consultábamos: la respuesta ya es
             // obsoleta para este cliente y no debe pisar el nuevo borrador.
             delete feedback.value[clientId]

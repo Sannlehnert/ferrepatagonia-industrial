@@ -820,3 +820,75 @@ test('AUD-346-03: navegar filtros o página por historial cierra el diálogo abi
   assert.equal(state.selectedClientId, null);
   assert.equal(state.approvalTarget, null);
 });
+
+test('S7-346-R02: si la reconciliación confirma que el servidor conservó la asignación anterior, informa error y conserva otros borradores', async t => {
+  const service = defaultService({
+    getAdminClientPriceLists: async () => ({
+      listas: priceLists346,
+      asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+    }),
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[1] = 2;
+  state.selections[2] = 3;
+
+  await state.savePriceList(2);
+  await settle();
+
+  assert.equal(state.assignments[2].idListaPrecio, 1);
+  assert.equal(state.selections[2], 1);
+  assert.deepEqual(state.feedback[2], {
+    text: 'El servidor conserva la asignación anterior.',
+    error: true,
+  });
+  assert.equal(state.selections[1], 2, 'el borrador de otra fila debe conservarse');
+  assert.equal(state.canSavePriceList(1), true);
+  assert.equal(state.uncertainPriceListClientIds[2], undefined);
+  assert.equal(state.savingClientId, null);
+});
+
+test('S7-346-R02: si el operador cambia la selección durante la lectura de reconciliación, limpia el feedback y no pisa su nueva edición', async t => {
+  let reads = 0;
+  let resolveReconciliation;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      if (reads === 1) {
+        return {
+          listas: priceLists346,
+          asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+        };
+      }
+      return new Promise(resolve => { resolveReconciliation = resolve; });
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[1] = 2;
+  state.selections[2] = 3;
+  const saving = state.savePriceList(2);
+  await settle();
+
+  // El operador cambia el selector de la fila reconciliada mientras la lectura está en curso.
+  state.selections[2] = 2;
+  resolveReconciliation({
+    listas: priceLists346,
+    asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+  });
+  await saving;
+  await settle();
+
+  assert.equal(state.assignments[2].idListaPrecio, 1);
+  assert.equal(state.selections[2], 2, 'la nueva edición concurrente no debe pisarse');
+  assert.equal(state.feedback[2], undefined, 'el feedback obsoleto debe limpiarse');
+  assert.equal(state.selections[1], 2);
+  assert.equal(state.uncertainPriceListClientIds[2], undefined);
+  assert.equal(state.savingClientId, null);
+});

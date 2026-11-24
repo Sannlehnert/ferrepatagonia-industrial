@@ -332,6 +332,7 @@ test('S7-346-R01: una respuesta de escritura perdida conserva el borrador de otr
 
       const region = clientsRegion(page)
       await expect(region.locator('tbody tr')).toHaveCount(2)
+      await expectPageFits(page)
       const rowA = region.getByRole('row').filter({ hasText: clientA })
       const rowB = region.getByRole('row').filter({ hasText: clientB })
       const selectA = rowA.getByRole('combobox')
@@ -363,6 +364,7 @@ test('S7-346-R01: una respuesta de escritura perdida conserva el borrador de otr
       await expect(selectB).toHaveValue(targetValue!)
       await expect(selectA).toHaveValue(targetValue!)
       await expect(rowA.getByRole('button', { name: 'Guardar lista' })).toBeEnabled()
+      await expectPageFits(page)
 
       const url = new URL(page.url())
       expect(url.searchParams.get('busqueda')).toBe(prefix)
