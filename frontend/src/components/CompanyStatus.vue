@@ -122,7 +122,7 @@ async function refresh() {
       :disabled="refreshing"
       @click="refresh"
     >
-      {{ refreshing ? 'Actualizando…' : 'Actualizar estado comercial' }}
+      {{ refreshing ? 'Actualizando estado…' : 'Actualizar estado comercial' }}
     </button>
   </section>
 </template>
