@@ -703,10 +703,11 @@ test('timeout y luego otro error incierto: conserva la misma clave y la revisió
 
     await dialog.getByRole('button', { name: 'Reintentar con la misma clave' }).click()
 
+    await expect(dialog.getByRole('alert')).toContainText('Conservamos la misma clave para evitar duplicados')
     await expect(dialog.getByRole('status').filter({
         hasText: 'resultado de la declaración no está confirmado',
     })).toBeVisible()
-    await expect(dialog.getByRole('button', { name: 'Reintentar con la misma clave' })).toBeVisible()
+    await expect(dialog.getByRole('button', { name: 'Reintentar con la misma clave' })).toBeEnabled()
     await expect(dialog.getByText('Importe declarado')).toBeVisible()
     expect(keys).toEqual([key, key])
 })
