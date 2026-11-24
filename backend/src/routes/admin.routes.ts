@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { authenticate, authorizeRoles } from '../middlewares/auth.middleware';
 import { getClientes, patchClientCompanyApproval } from '../controllers/clientes.controller';
+import { adminClientQueryPolicy } from '../dtos/clients/admin-client-query.dto';
 import { adminProductRouter } from './adminProduct.routes';
 import { adminCategoryRouter } from './adminCategory.routes';
 import { productImportRouter } from './productImport.routes';
@@ -94,7 +95,7 @@ adminRouter.put(
 // operaciones distintas. Ninguna de las dos se dispara desde comprobantes.
 adminRouter.use('/pagos', adminPaymentRouter);
 
-adminRouter.get('/clientes', getClientes);
+adminRouter.get('/clientes', validateDto('query', adminClientQueryPolicy), getClientes);
 adminRouter.patch(
   '/clientes/:id/estado-empresa',
   validateDto('params', clientIdPolicy),

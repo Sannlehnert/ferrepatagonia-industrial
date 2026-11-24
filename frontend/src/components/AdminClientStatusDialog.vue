@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, useId } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
 import AdminClientCreditStatus from '@/components/AdminClientCreditStatus.vue'
 import type { ClientCredit } from '@/composables/useAdminClientCredit'
 import type { AdminClient, CompanyApprovalStatus } from '@/types/adminClient'
@@ -16,6 +16,7 @@ const emit = defineEmits<{ close: []; confirm: []; retry: []; refreshCredit: [] 
 const dialogButtonClass = "box-border min-h-11 min-w-11 cursor-pointer rounded-lg border border-solid border-[#cbd5e1] bg-white px-4 py-2.5 [font-family:inherit] text-sm font-semibold leading-5 text-[#103a5c] enabled:hover:bg-[#f1f5f9] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-[3px] focus-visible:outline-[#145a8d] disabled:cursor-not-allowed disabled:opacity-50"
 const companyBadgeClass = "box-border inline-flex w-44 min-h-7 items-center justify-center gap-[7px] whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold leading-5 before:size-1.5 before:shrink-0 before:rounded-full before:bg-current before:content-['']"
 const dialog = ref<HTMLDialogElement | null>(null)
+const closeButton = ref<HTMLButtonElement | null>(null)
 const titleId = useId()
 const companyState = computed(() => props.client.estadoAprobacionEmpresa === 'APROBADA' ? 'Aprobada'
   : props.client.estadoAprobacionEmpresa === 'RECHAZADA' ? 'Rechazada'
@@ -27,10 +28,16 @@ onMounted(() => {
   fallbackTrigger = trigger?.closest('tr')?.querySelector<HTMLElement>('[data-client-detail]') ?? null
   dialog.value?.showModal()
 })
+watch(() => [props.client.estadoAprobacionEmpresa, props.uncertain, props.busy], async () => {
+  await nextTick()
+  if (typeof document !== 'undefined' && dialog.value?.open && !dialog.value.contains(document.activeElement)) {
+    closeButton.value?.focus({ preventScroll: true })
+  }
+})
 onBeforeUnmount(() => {
   dialog.value?.close()
-  if (trigger?.isConnected) trigger.focus()
-  else if (fallbackTrigger?.isConnected) fallbackTrigger.focus()
+  if (trigger?.isConnected && !trigger.matches(':disabled')) trigger.focus()
+  else if (fallbackTrigger?.isConnected && !fallbackTrigger.matches(':disabled')) fallbackTrigger.focus()
 })
 function close() { if (!props.busy) emit('close') }
 </script>
@@ -43,7 +50,7 @@ function close() { if (!props.busy) emit('close') }
       <h2 :id="titleId" class="m-0 text-[22px] font-semibold leading-[1.3] text-[#0b2438] max-[541px]:text-[20px]">
         {{ target ? (target === 'APROBADA' ? 'Aprobar empresa' : 'Rechazar empresa') : 'Detalle del cliente' }}
       </h2>
-      <button type="button" autofocus :disabled="busy" aria-label="Cerrar detalle del cliente"
+      <button ref="closeButton" type="button" autofocus :disabled="busy" aria-label="Cerrar detalle del cliente"
         :class="dialogButtonClass" @click="close">Cerrar</button>
     </header>
     <div class="p-6 max-[541px]:px-4 max-[541px]:py-5">

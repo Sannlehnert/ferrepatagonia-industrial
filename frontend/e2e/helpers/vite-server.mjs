@@ -102,7 +102,7 @@ async function main() {
   });
 }
 
-main().catch(() => {
-  console.error("No se pudo iniciar el frontend aislado.");
+main().catch((error) => {
+  console.error("No se pudo iniciar el frontend aislado:", error?.stack || error);
   void stop(1);
 });

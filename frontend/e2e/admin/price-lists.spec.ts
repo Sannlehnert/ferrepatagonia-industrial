@@ -23,6 +23,13 @@ test('ADMIN crea, edita y reactiva una lista manteniendo su asignación', async 
     name: 'Guardar cambios',
   })
 
+  const openClient = async () => {
+    await page.goto('/admin/clientes')
+    await page.getByRole('searchbox', { name: 'Buscar clientes' }).fill('Cliente E2E')
+    await expect(client).toBeVisible()
+  }
+
+  await openClient()
   await expect(select).toBeEnabled()
   const originalList = await select.inputValue()
 
@@ -75,7 +82,7 @@ test('ADMIN crea, edita y reactiva una lista manteniendo su asignación', async 
   } finally {
     // Restaurar la asignación incluso si falla una comprobación.
     // Las siguientes pruebas deben recibir el cliente original.
-    await page.goto('/admin/clientes')
+    await openClient()
     await expect(select).toBeEnabled()
 
     if (await select.inputValue() !== originalList) {
