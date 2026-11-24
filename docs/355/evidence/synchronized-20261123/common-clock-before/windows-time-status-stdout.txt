@@ -1,0 +1,10 @@
+Indicador de salto: 3(sin sincronizar)
+Capa: 0 (sin especificar)
+Precisi¢n: -23 (119.209ns por tick)
+Demora de ra¡z: 0.0000000s
+Dispersi¢n de ra¡z: 0.0000000s
+Id. de referencia: 0x00000000 (sin especificar)
+éltima sincronizaci¢n de hora correcta: sin especificar
+Origen: Local CMOS Clock
+Intervalo de sondeo: 10 (1024s)
+

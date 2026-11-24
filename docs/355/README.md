@@ -1,6 +1,17 @@
 # #355 — Acta de regresiones administrativas y persistencia
 
-## Corrección documental posterior a la auditoría de PR #166
+## Corrección final: aceptación estándar en entorno con reloj común
+
+Continuación de `a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1`. La evidencia nueva y su reproducción están en [SYNCHRONIZED.md](SYNCHRONIZED.md). Las ejecuciones originales y los diagnósticos anteriores se conservan como antecedentes, con sus límites propios.
+
+- **Aceptación estándar nueva:** pagos 23/23 sobre `2616f478fe648dfa0ee1ee96b012273173cc9dd5` y 25/25 sobre `d0e18514a46083aa3921acdf70c79dfa35500229`; catálogo original 1/1 y 100 SKU en ambas fases; sonda HTTP ADMIN con **espera explícita 0** aprobada en ambas. Los dos planes finales terminan con exit code 0. Logs completos en [initial-final](evidence/synchronized-20261123/initial-final/execution.json) y [post335-final](evidence/synchronized-20261123/post335-final/execution.json).
+- **Relojes:** se alineó el entorno de prueba ejecutando Node Linux y MariaDB en el mismo reloj de WSL, con SQL dentro del intervalo real de petición Node, entre -1 y 0 ms antes y después. No se cambiaron timestamps, reglas, aserciones, tolerancias ni timeouts, ni se añadieron sleeps. Windows Time denegó su resincronización; **Windows y la exactitud UTC global no quedan corregidos ni certificados**. No se reinició Docker o WSL ni se intervino en presentación/#354.
+- **Colector corregido:** `rerun.cjs` devuelve un estado no cero ante FAIL, BLOCKED o error/incompletitud del colector, conservando logs, manifiestos y checks. [Siete pruebas de contrato aprobadas](evidence/synchronized-20261123/collector-contracts-verified/execution.json), incluidos CLI real fallido y fallo de preparación de npm; los fixtures no cuentan como pruebas de producto.
+- **Procedencia y alcance:** los 19 registros históricos siguen `UNAVAILABLE_ORIGINAL`; no se borran fallos ni diagnósticos. #346 permanece excluida. CI original de develop/PR separado del commit local nuevo, cuyo CI remoto no se ejecutó. Reauditoría de Zahir pendiente.
+
+## Antecedente: corrección documental de a1dadcd posterior a la primera auditoría
+
+El bloque siguiente conserva el estado de aquella corrección, anterior a la aceptación estándar Linux que se documenta arriba. Sus fallos y diagnósticos no se reclasifican como aprobados.
 
 HEAD auditado: `bd3aa81986fa9c83505f7a23f76107b4786756b9`. Revisor técnico: Zahir. Esta corrección conserva los resultados históricos y los extractos existentes, y distingue su procedencia de las nuevas ejecuciones. El detalle reproducible está en [CORRECTION.md](CORRECTION.md).
 

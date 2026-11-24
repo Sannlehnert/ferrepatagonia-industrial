@@ -6,3 +6,4 @@ evidence/correction/artifact-inventory.json whitespace=cr-at-eol
 .gitattributes text eol=lf
 *.md text eol=lf
 tools/*.cjs text eol=lf
+tools/*.sh text eol=lf

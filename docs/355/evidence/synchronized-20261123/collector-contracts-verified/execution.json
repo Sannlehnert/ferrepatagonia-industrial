@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "kind": "collector-contract-tests",
+  "productSuitesExecuted": false,
+  "startingCommit": "a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1",
+  "collectorSha256": "8573b1a6981588cf30b80763c5bbf9ed635cf87bd5a6a0228b0073dca06319c3",
+  "testSha256": "7779f05a01f88a1dc617414db8dcfb4242641656799fc3d39b0fd07213ed4581",
+  "executionSha": "WORKING_COPY_TOOL_CONTRACT_NOT_PRODUCT",
+  "node": "v22.22.2",
+  "platform": "win32",
+  "startedUTC": "2026-11-24T02:42:40.160Z",
+  "logEncoding": "Raw stdout/stderr buffers in arrival order; explicit collector notes only for blocked/spawn-error records.",
+  "results": [
+    {
+      "name": "collector-contract-tests",
+      "executionSha": "WORKING_COPY_TOOL_CONTRACT_NOT_PRODUCT",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355\\docs\\355\\tools\\rerun.test.cjs"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355",
+      "startedUTC": "2026-11-24T02:42:40.168Z",
+      "finishedUTC": "2026-11-24T02:42:41.401Z",
+      "exitCode": 0,
+      "signal": null,
+      "result": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "blockedReason": null,
+      "spawnError": null,
+      "logPath": "collector-contract-tests.txt",
+      "logSha256": "270be89b07e75c3071c3c5548157ef5a36c09a22f536232f00e0a0e85d91dc8f",
+      "bytes": 2249,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    }
+  ],
+  "collectorErrors": [],
+  "finishedUTC": "2026-11-24T02:42:41.402Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "artifactSha256": {}
+}

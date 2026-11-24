@@ -1,0 +1,6 @@
+Seguimiento time.windows.com [40.119.6.228:123].
+Recopilando 3 muestras.
+La hora actual es 23/11/2026 23:27:01.
+23:27:01, +08.0188042s
+23:27:03, +08.0258430s
+23:27:05, +07.9983069s

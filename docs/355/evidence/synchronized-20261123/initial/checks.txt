@@ -1,0 +1,6 @@
+install-backend: PASS; pass=null; fail=0; skip=0; exit=0; log=install-backend.txt; sha256=44a8946dc0a0dd28987bc7aa65f0d01443b6e3c87d83ce34e095383dcd885c78
+install-frontend: PASS; pass=null; fail=0; skip=0; exit=0; log=install-frontend.txt; sha256=5f36c4bafbd52cd65956752138e92035a65532b36c9637e591ce1f709240cba7
+build-backend: PASS; pass=null; fail=0; skip=0; exit=0; log=build-backend.txt; sha256=4602d9dca8c249cc001e3f0e53e3361f4fb90638d1654e2ff555be9b958ae76b
+build-frontend: PASS; pass=null; fail=0; skip=0; exit=0; log=build-frontend.txt; sha256=5a4237a30f3f038b26e95c8ab3c96e90060546d996cc38d0efca0739b02819f1
+payments: FAIL; pass=null; fail=0; skip=0; exit=1; log=payments.txt; sha256=668af9b7f7b71bfe14b88562690bdf6dc9b50d9f80c6cad8e61244d43c3f44df
+catalog-browser: FAIL; pass=0; fail=1; skip=0; exit=1; log=catalog-browser.txt; sha256=914197c8b52402f95ecfb41af532d444c4a63495e45cb50864f23d01e518fe8e

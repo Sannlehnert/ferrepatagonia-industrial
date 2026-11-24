@@ -160,15 +160,17 @@
     "baseline-2616f47/catalog-coverage.csv": "1b07623e8636b152193f78d820b5204c719a2a801791c1b650839b82b6d37937",
     "baseline-2616f47/catalog-summary.json": "1b0725ee91834d1b3ac761039c1b78bc68b72b77397d4aa26d8dd32a72314071",
     "baseline-2616f47/checks.txt": "e087c34c8e3fe5513cb5de1fbff248986973de4452afbe22bbb28a575845498a",
-    "baseline-2616f47/execution.json": "3308e0fcba2d3d3f11238e053aeac7bb20e5e88c3fc2c2ae69981d05439c1bff",
+    "baseline-2616f47/execution.json": "bd162523577742d68810afacacd1f641cb50e6918f38cd86e86ed8827a265f01",
     "catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
     "catalog-coverage.csv": "1b07623e8636b152193f78d820b5204c719a2a801791c1b650839b82b6d37937",
     "catalog-summary.json": "756e9e69e6eb637bc8fa00a3473c0924324eb22b7657dfdd8f3c5b473d82bba6",
     "checks.txt": "16b90cd0c6cab2cd6e55f42f21f801b995804c48750422fc437dbce6999c9008",
     "ci-base.json": "5cd8d0690f55a9b41717f850fd19cb7ffd20c34e554cad23a8d6fecfd05f57fe",
-    "correction/artifact-index.json": "86e3486d294515d76d6a007b37069dbfb22343391ad03ccb2da68f524a5987dc",
+    "correction/artifact-index.json": "06d7ae46306f8c59d8c6fc56a3a1ebb7954b1a6e3eb8d95f475810ca76c32cff",
     "reexecution-20261123/initial/execution.json": "cddd66f341c1bcaa40596e37a3d8bb0e0355bbe9160f864f612b3a68cd91eb0f",
-    "reexecution-20261123/post335/execution.json": "22cd6b8e6f2d8dddea8f5559fdd8f80af1b43164cecc881a7dd09c480ff97e36"
+    "reexecution-20261123/post335/execution.json": "22cd6b8e6f2d8dddea8f5559fdd8f80af1b43164cecc881a7dd09c480ff97e36",
+    "correction/artifact-index-a1dadcd.txt": "86e3486d294515d76d6a007b37069dbfb22343391ad03ccb2da68f524a5987dc",
+    "synchronized-20261123/artifact-index.json": "3ca3f62fbd8a38b15704efea99681e608a8d35dd6246e1edd9c7e7d512e8cf60"
   },
   "kind": "historical-execution-with-unavailable-original-logs",
   "correctedUTC": "2026-11-24T01:11:48.673Z",
@@ -185,7 +187,8 @@
     "unauthenticated": 9,
     "investigation": "correction/original-log-search.json",
     "newExecutionManifest": "reexecution-20261123/post335/execution.json",
-    "note": "PASS and timestamps in results are historical claims whose original logs cannot be authenticated. New standard reruns retain their own actual failures and hashes; they do not replace or authenticate old executions."
+    "note": "PASS and timestamps in results are historical claims whose original logs cannot be authenticated. New standard reruns retain their own actual failures and hashes; they do not replace or authenticate old executions.",
+    "synchronizedStandardManifest": "synchronized-20261123/post335-final/execution.json"
   },
   "originalPRCI": {
     "evidence": "correction/ci-45292237814.json",
@@ -196,5 +199,29 @@
   "correctionCI": {
     "status": "NOT_RUN_NOT_PUSHED",
     "scope": "No remote CI exists for the local documentation correction commit. Reaudit and new CI pending."
+  },
+  "previousCorrectionManifestAtCommit": {
+    "commit": "a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1",
+    "path": "docs/355/evidence/execution.json",
+    "sha256": "ae7e263d40ce3efceeb488d070b061761747bc7c6fb9d210be09df0c1cb5b3a8"
+  },
+  "synchronizedUpdatedUTC": "2026-11-24T02:51:06.239Z",
+  "synchronizedValidation": {
+    "kind": "new-standard-shared-clock-linux",
+    "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+    "manifest": "synchronized-20261123/post335-final/execution.json",
+    "probe": "synchronized-20261123/post335-final/http-admin-probe/execution.json",
+    "explicitProbeWaitMilliseconds": 0,
+    "result": "PASS",
+    "blocksOnly": [
+      "payments",
+      "catalog-browser",
+      "persistence-http-admin-zero"
+    ],
+    "scope": "New standard executions in one Linux clock domain; historical results and dates are not replaced. Windows/global UTC accuracy not certified; #346 excluded."
+  },
+  "latestLocalCorrectionCI": {
+    "status": "NOT_RUN_NOT_PUSHED",
+    "scope": "No remote CI is claimed for this synchronized local correction; earlier develop/PR runs retain their original identities."
   }
 }

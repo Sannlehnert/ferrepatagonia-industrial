@@ -1,0 +1,20 @@
+{
+  "verifiedUTC": "2026-11-24T02:54:22.794Z",
+  "kind": "isolated-resource-cleanup",
+  "rawDockerInventory": "12bed49e1827 demo286-8dedbad6686b4211b6e61cd210223d94 Exited (255) 8 days ago\n0248cad5c2a3 demo286-283dd4ceeeaeedb748f3050ae8228e4c Exited (255) 11 days ago\nf6bd0771aa09 ferrepatagonia-dev-mariadb-1 Up 3 hours (healthy)\n513ec09510ba sad_sutherland Exited (0) 7 weeks ago\n24ebb3ab32e7 studio_gestion_db Exited (0) 7 weeks ago\n9ad2743904cd studio-gestion-db-test-1 Exited (0) 7 weeks ago\n",
+  "ownTestContainersRemaining": [],
+  "ownCatalogVolumesRemaining": [],
+  "clockContainersRemaining": [],
+  "ownManagedImageFilesRemaining": 0,
+  "persistentContainerObserved": "f6bd0771aa09 ferrepatagonia-dev-mariadb-1 remained running and healthy; no SQL connection or data operation performed against it.",
+  "dockerRestarted": false,
+  "wslRestarted": false,
+  "systemPackagesInstalled": false,
+  "retainedForReproduction": [
+    "isolated Git worktrees",
+    "node_modules/build outputs in those worktrees",
+    "private extracted Chromium libraries"
+  ],
+  "removedEmptyOwnedImageDirectories": 2,
+  "scope": "Per-run ownership-checked cleanup assertions plus final Docker inventory; no unrelated container/volume deletion."
+}

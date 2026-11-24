@@ -1,0 +1,3 @@
+Command failed: docker run --rm -d --name cc260-test-74c6fa51e50d44b6880e8e70fa2c2384 --label ferrepatagonia.cc260-test=74c6fa51e50d44b6880e8e70fa2c2384 --tmpfs /var/lib/mysql:rw -p 127.0.0.1::3306 -e MARIADB_ROOT_PASSWORD=587828d5-9da4-45bc-a7fc-11806a81f2eb -e MARIADB_DATABASE=cc260_test_74c6fa51e50d44b6880e8e70fa2c2384 mariadb:11.4
+failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory
+

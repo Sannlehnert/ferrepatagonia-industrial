@@ -60,8 +60,14 @@
     "../reexecution-20261123/post335/state-consistency.txt": "e795d42188f952222896b510795fa057f824730afc03ccecc4d84bb1eabddb13",
     "../../tools/clock.cjs": "913ea405cee005ed8006a659027a985043cbab678e6960768cafed9ce3b1a8ff",
     "../../tools/persist-admin.cjs": "c54ab183aaf3b44ae3ced9997b973bf4b414b518e394ef64028c7ce4451b934f",
-    "../../tools/rerun.cjs": "150e6f40c536aa974bcaa21fc2207e465b82fc6210e053c29243377ae804b9b1",
     "../../tools/search-originals.cjs": "318bee892b2e4c6a4f100291544dcd358477de467b3399192ccc4d82cf5c6904",
-    "../../tools/verify-evidence.cjs": "600343477eaee42ba80b81f09fe8fdaf858517c52cb8218136ee1ec884a37099"
+    "../../tools/verify-evidence.cjs": "600343477eaee42ba80b81f09fe8fdaf858517c52cb8218136ee1ec884a37099",
+    "tool-snapshots/rerun-a1dadcd.cjs": "150e6f40c536aa974bcaa21fc2207e465b82fc6210e053c29243377ae804b9b1"
+  },
+  "archivedToolNote": "The collector executed for these historical captures is preserved byte-for-byte in tool-snapshots/rerun-a1dadcd.cjs; the live tool is corrected in the synchronized follow-up.",
+  "previousIndexSnapshot": {
+    "path": "artifact-index-a1dadcd.txt",
+    "sha256": "86e3486d294515d76d6a007b37069dbfb22343391ad03ccb2da68f524a5987dc",
+    "resolvePathsAtCommit": "a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1"
   }
 }

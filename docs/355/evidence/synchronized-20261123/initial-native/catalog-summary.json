@@ -1,0 +1,26 @@
+{
+  "base": "2616f47 + cambios de integración #313",
+  "criteriaSource": "Capturas de Bruno: HU288 y tareas309–313",
+  "normalInstall": true,
+  "academicCheckout": false,
+  "publication": "Asociación oficial de imágenes y activación ADMIN explícita, solo en base descartable",
+  "checkpoints": [
+    {
+      "phase": "before",
+      "total": 100,
+      "detail": 100,
+      "searchSKU": 100,
+      "searchName": 100,
+      "imageHTTP": 100,
+      "categories": 8,
+      "catalogReferencePrices": 100
+    }
+  ],
+  "afterImport": {
+    "products": 100,
+    "active": 0,
+    "images": 0,
+    "prices": 100,
+    "public": 0
+  }
+}

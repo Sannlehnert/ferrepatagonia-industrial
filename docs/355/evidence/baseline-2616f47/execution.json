@@ -154,10 +154,10 @@
     }
   ],
   "pending": [
-    "Reauditoría de Zahir de la corrección documental",
-    "CI del commit de corrección no ejecutado; sin push",
-    "Relojes Docker/host no sincronizados: nuevos fallos estándar preservados",
-    "#354 y #356 separadas"
+    "Reauditoría independiente de Zahir",
+    "CI del commit local pendiente: sin push",
+    "Hora global Windows no corregida; aceptación limitada al entorno Linux común",
+    "#354, #356 y #346 permanecen separadas"
   ],
   "artifactSha256": {
     "catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
@@ -180,11 +180,38 @@
     "unauthenticated": 10,
     "investigation": "../correction/original-log-search.json",
     "newExecutionManifest": "../reexecution-20261123/initial/execution.json",
-    "note": "PASS and timestamps in results are historical claims whose original logs cannot be authenticated. New standard reruns retain their own actual failures and hashes; they do not replace or authenticate old executions."
+    "note": "PASS and timestamps in results are historical claims whose original logs cannot be authenticated. New standard reruns retain their own actual failures and hashes; they do not replace or authenticate old executions.",
+    "synchronizedStandardManifest": "../synchronized-20261123/initial-final/execution.json"
   },
   "historicalPendingAtExecution": [
     "Revisión cruzada y CI del PR de #355",
     "Integrar #335 y repetir el bloque de su bandeja ADMIN de pagos",
     "Pruebas manuales #354 y release #356 son entregas separadas"
+  ],
+  "previousCorrectionManifestAtCommit": {
+    "commit": "a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1",
+    "path": "docs/355/evidence/baseline-2616f47/execution.json",
+    "sha256": "3308e0fcba2d3d3f11238e053aeac7bb20e5e88c3fc2c2ae69981d05439c1bff"
+  },
+  "synchronizedUpdatedUTC": "2026-11-24T02:51:06.174Z",
+  "synchronizedValidation": {
+    "kind": "new-standard-shared-clock-linux",
+    "executionSha": "2616f478fe648dfa0ee1ee96b012273173cc9dd5",
+    "manifest": "../synchronized-20261123/initial-final/execution.json",
+    "probe": "../synchronized-20261123/initial-final/http-admin-probe/execution.json",
+    "explicitProbeWaitMilliseconds": 0,
+    "result": "PASS",
+    "blocksOnly": [
+      "payments",
+      "catalog-browser",
+      "persistence-http-admin-zero"
+    ],
+    "scope": "New standard executions in one Linux clock domain; historical results and dates are not replaced. Windows/global UTC accuracy not certified; #346 excluded."
+  },
+  "pendingBeforeSynchronizedValidation": [
+    "Reauditoría de Zahir de la corrección documental",
+    "CI del commit de corrección no ejecutado; sin push",
+    "Relojes Docker/host no sincronizados: nuevos fallos estándar preservados",
+    "#354 y #356 separadas"
   ]
 }

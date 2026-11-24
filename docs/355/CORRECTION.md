@@ -1,5 +1,7 @@
 # #355 / PR #166 — Corrección de procedencia y reproducción
 
+**Antecedente de a1dadcd.** Este documento conserva el estado y límites de aquella corrección. La continuación final, con nuevas ejecuciones estándar y el colector corregido, está en [SYNCHRONIZED.md](SYNCHRONIZED.md). Los fallos anteriores y los diagnósticos de 8 s no se borran ni se convierten en PASS; los resultados posteriores tienen sus propios logs y fechas.
+
 Corrección documental del HEAD auditado `bd3aa81986fa9c83505f7a23f76107b4786756b9`, preparada el 23/11/2026 (Argentina; los archivos registran timestamps UTC). Rama local `test/355-admin-regressions-persistence`. Reauditoría: Zahir. No se modifica aplicación, contratos, esquema ni migraciones; los scripts entregados viven únicamente en `docs/355/tools/`.
 
 ## 1. Originales históricos y autenticación

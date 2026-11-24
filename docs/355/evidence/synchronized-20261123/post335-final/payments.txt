@@ -1,0 +1,167 @@
+{"mode":"payments","database":"cc260_test_3af8250fb3d840a481ee9324c894e722","host":"127.0.0.1","port":54381,"container":"cc260-test-3af8250fb3d840a481ee9324c894e722"}
+{"mode":"payments","database":"cc260_test_3af8250fb3d840a481ee9324c894e722","host":"127.0.0.1","port":54381,"container":"cc260-test-3af8250fb3d840a481ee9324c894e722","version":"11.4.13-MariaDB-ubu2404","image":"sha256:70cc072b29b4a89ae07abb2d4da2c64678a7f2dfe092751bb51c87d67dc1338b","migrationApplications":2}
+TAP version 13
+# Subtest: \#333 declaración inicial: PAGO PENDIENTE sin movimientos, imputaciones ni cambio de saldo
+ok 1 - \#333 declaración inicial: PAGO PENDIENTE sin movimientos, imputaciones ni cambio de saldo
+  ---
+  duration_ms: 28346.672458
+  type: 'test'
+  ...
+# Subtest: \#333 declaración idempotente: misma clave y contenido no duplica; contenido distinto se rechaza
+ok 2 - \#333 declaración idempotente: misma clave y contenido no duplica; contenido distinto se rechaza
+  ---
+  duration_ms: 65.877964
+  type: 'test'
+  ...
+# Subtest: \#333 declaraciones simultáneas con la misma clave crean una sola fila
+ok 3 - \#333 declaraciones simultáneas con la misma clave crean una sola fila
+  ---
+  duration_ms: 35.04854
+  type: 'test'
+  ...
+# Subtest: \#333 revisión documental no acredita y el rechazo bloquea la acreditación
+ok 4 - \#333 revisión documental no acredita y el rechazo bloquea la acreditación
+  ---
+  duration_ms: 117.317692
+  type: 'test'
+  ...
+# Subtest: \#333 acreditación autorizada: pago parcial, movimiento único y trazabilidad del actor
+ok 5 - \#333 acreditación autorizada: pago parcial, movimiento único y trazabilidad del actor
+  ---
+  duration_ms: 71.052544
+  type: 'test'
+  ...
+# Subtest: \#333 pago total cancela la deuda sin exceder el importe declarado
+ok 6 - \#333 pago total cancela la deuda sin exceder el importe declarado
+  ---
+  duration_ms: 55.103194
+  type: 'test'
+  ...
+# Subtest: \#333 dos ADMIN concurrentes: una sola acreditación efectiva
+ok 7 - \#333 dos ADMIN concurrentes: una sola acreditación efectiva
+  ---
+  duration_ms: 61.459568
+  type: 'test'
+  ...
+# Subtest: \#333 misma clave concurrente: replay idempotente sin doble movimiento
+ok 8 - \#333 misma clave concurrente: replay idempotente sin doble movimiento
+  ---
+  duration_ms: 53.69682
+  type: 'test'
+  ...
+# database.query.failed
+# Error interno en el flujo de pagos.
+# Subtest: \#333 error SQL en declaración: rollback total y sin PAGO parcial
+ok 9 - \#333 error SQL en declaración: rollback total y sin PAGO parcial
+  ---
+  duration_ms: 29.157262
+  type: 'test'
+  ...
+# database.query.failed
+# Error interno en la gestión administrativa de pagos.
+# Subtest: \#333 error SQL en acreditación: rollback de PAGO y ausencia de movimiento
+ok 10 - \#333 error SQL en acreditación: rollback de PAGO y ausencia de movimiento
+  ---
+  duration_ms: 75.673809
+  type: 'test'
+  ...
+# Subtest: \#333 permisos, sesiones cruzadas y ausencia de datos financieros ajenos
+ok 11 - \#333 permisos, sesiones cruzadas y ausencia de datos financieros ajenos
+  ---
+  duration_ms: 73.109154
+  type: 'test'
+  ...
+# Subtest: \#333 vínculo de comprobante: inexistente, ajeno o con cuenta inconsistente se rechaza
+ok 12 - \#333 vínculo de comprobante: inexistente, ajeno o con cuenta inconsistente se rechaza
+  ---
+  duration_ms: 54.891228
+  type: 'test'
+  ...
+# Subtest: \#333 límite DECIMAL(12,2): máximo exacto aceptado y un centavo superior rechazado
+ok 13 - \#333 límite DECIMAL(12,2): máximo exacto aceptado y un centavo superior rechazado
+  ---
+  duration_ms: 25.130654
+  type: 'test'
+  ...
+# Subtest: \#333 cuenta restringida: cobertura incompleta y libro mixto bloquean la acreditación
+ok 14 - \#333 cuenta restringida: cobertura incompleta y libro mixto bloquean la acreditación
+  ---
+  duration_ms: 100.898552
+  type: 'test'
+  ...
+# Subtest: \#333 cuenta inhabilitada conserva la posibilidad de acreditar el pago de deuda
+ok 15 - \#333 cuenta inhabilitada conserva la posibilidad de acreditar el pago de deuda
+  ---
+  duration_ms: 43.517565
+  type: 'test'
+  ...
+# Subtest: \#333 importes inválidos y campos financieros no permitidos se rechazan sin escrituras
+ok 16 - \#333 importes inválidos y campos financieros no permitidos se rechazan sin escrituras
+  ---
+  duration_ms: 45.025036
+  type: 'test'
+  ...
+# Subtest: \#333 pago en ARS: sin cotización verificada no acredita; con cotización FER17-v1 convierte una sola vez
+ok 17 - \#333 pago en ARS: sin cotización verificada no acredita; con cotización FER17-v1 convierte una sola vez
+  ---
+  duration_ms: 90.81943
+  type: 'test'
+  ...
+# Subtest: \#333 cliente propio inactivo recibe 403 CLIENTE_INACTIVO y no un 404 ambiguo
+ok 18 - \#333 cliente propio inactivo recibe 403 CLIENTE_INACTIVO y no un 404 ambiguo
+  ---
+  duration_ms: 16.68876
+  type: 'test'
+  ...
+# Subtest: \#333 revalida el comprobante en revisión y acreditación antes de mover saldos
+ok 19 - \#333 revalida el comprobante en revisión y acreditación antes de mover saldos
+  ---
+  duration_ms: 95.56104
+  type: 'test'
+  ...
+# Subtest: \#333 cabeceras privadas en /api/admin/pagos incluso ante rechazos tempranos
+ok 20 - \#333 cabeceras privadas en /api/admin/pagos incluso ante rechazos tempranos
+  ---
+  duration_ms: 4.915176
+  type: 'test'
+  ...
+# Subtest: \#333 filtra pagos DEMO_REGISTRADO y libros DEMO o mixtos también fuera de test
+ok 21 - \#333 filtra pagos DEMO_REGISTRADO y libros DEMO o mixtos también fuera de test
+  ---
+  duration_ms: 78.371416
+  type: 'test'
+  ...
+# Subtest: \#333 conversión ARS que redondea a USD 0.00 se rechaza sin escribir
+ok 22 - \#333 conversión ARS que redondea a USD 0.00 se rechaza sin escribir
+  ---
+  duration_ms: 40.20944
+  type: 'test'
+  ...
+# Subtest: \#333 claves de idempotencia son globales entre cuentas y flujos
+ok 23 - \#333 claves de idempotencia son globales entre cuentas y flujos
+  ---
+  duration_ms: 32.018783
+  type: 'test'
+  ...
+# Subtest: \#335 P1-02: carrera concurrente APROBADO vs RECHAZADO devuelve [200, 409] y alinea pedidoId
+ok 24 - \#335 P1-02: carrera concurrente APROBADO vs RECHAZADO devuelve [200, 409] y alinea pedidoId
+  ---
+  duration_ms: 31.182658
+  type: 'test'
+  ...
+# Subtest: \#335 P1-02: comprobante rechazado en /admin/comprobantes bloquea aprobación documental en /revision
+ok 25 - \#335 P1-02: comprobante rechazado en /admin/comprobantes bloquea aprobación documental en /revision
+  ---
+  duration_ms: 28.143938
+  type: 'test'
+  ...
+1..25
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 30047.670012
+CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.
