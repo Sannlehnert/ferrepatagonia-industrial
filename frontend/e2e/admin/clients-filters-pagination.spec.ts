@@ -288,6 +288,102 @@ test('filtros, paginación real, aprobación y contexto de listas en clientes', 
   }
 })
 
+test('S7-346-R01: una respuesta de escritura perdida conserva el borrador de otro cliente', async ({
+  page,
+  session,
+}) => {
+  const prefix = `r01-${randomUUID().slice(0, 8)}`
+  const { connection } = session
+  const clientA = `${prefix} Cliente A`
+  const clientB = `${prefix} Cliente B`
+  const listName = `${prefix} Lista Y`
+  let clientAId = 0
+  let clientBId = 0
+
+  try {
+    const list = await connection.query<{ insertId: bigint }>(`INSERT INTO LISTA_PRECIO
+      (nombre, porcentaje_descuento, activa)
+      VALUES (?, 15.00, 1)`, [listName])
+    const targetListId = Number(list.insertId)
+
+    const insertClient = async (name: string) => {
+      const email = `${name.replaceAll(' ', '-')}@example.test`
+      const result = await connection.query<{ insertId: bigint }>(`INSERT INTO CLIENTE
+        (tipo_cliente, nombre_razon_social, email, es_fiel, activo, id_lista_precio)
+        VALUES ('PARTICULAR', ?, ?, 0, 1, 1)`, [name, email])
+      const id = Number(result.insertId)
+      await connection.query(`INSERT INTO USUARIO
+        (id_cliente, email, password_hash, rol, activo, fecha_creacion)
+        VALUES (?, ?, 'fixture-no-login', 'CLIENTE', 1, '2035-03-01 00:00:00')`, [id, email])
+      return id
+    }
+    clientAId = await insertClient(clientA)
+    clientBId = await insertClient(clientB)
+
+    await signIn(page)
+
+    for (const width of [1280, 360]) {
+      await page.setViewportSize({ width, height: 844 })
+      await connection.query('UPDATE CLIENTE SET id_lista_precio = 1 WHERE id_cliente IN (?, ?)', [
+        clientAId,
+        clientBId,
+      ])
+      await page.goto(`/admin/clientes?busqueda=${encodeURIComponent(prefix)}&tipo=PARTICULAR`)
+
+      const region = clientsRegion(page)
+      await expect(region.locator('tbody tr')).toHaveCount(2)
+      const rowA = region.getByRole('row').filter({ hasText: clientA })
+      const rowB = region.getByRole('row').filter({ hasText: clientB })
+      const selectA = rowA.getByRole('combobox')
+      const selectB = rowB.getByRole('combobox')
+      const targetOption = selectA.locator('option').filter({ hasText: listName })
+      await expect(targetOption).toHaveCount(1)
+      const targetValue = await targetOption.getAttribute('value')
+      expect(targetValue).not.toBeNull()
+
+      // A deja un borrador sin guardar y B guarda el suyo.
+      await selectA.selectOption(targetValue!)
+      await selectB.selectOption(targetValue!)
+
+      const saveBPattern = new RegExp(`/api/admin/clientes/${clientBId}/lista-precio$`)
+      await page.route(saveBPattern, async route => {
+        if (route.request().method() !== 'PUT') return route.continue()
+        await route.fetch()
+        // El servidor confirmó la escritura, pero el navegador pierde la respuesta.
+        await route.abort('failed')
+      })
+
+      try {
+        await rowB.getByRole('button', { name: 'Guardar lista' }).click()
+        await expect(rowB.getByRole('status')).toHaveText('Cambio confirmado con el servidor.')
+      } finally {
+        await page.unroute(saveBPattern)
+      }
+
+      await expect(selectB).toHaveValue(targetValue!)
+      await expect(selectA).toHaveValue(targetValue!)
+      await expect(rowA.getByRole('button', { name: 'Guardar lista' })).toBeEnabled()
+
+      const url = new URL(page.url())
+      expect(url.searchParams.get('busqueda')).toBe(prefix)
+      expect(url.searchParams.get('tipo')).toBe('PARTICULAR')
+
+      const assignments = await connection.query<Array<{ id_cliente: number; id_lista_precio: number }>>(
+        'SELECT id_cliente, id_lista_precio FROM CLIENTE WHERE id_cliente IN (?, ?) ORDER BY id_cliente',
+        [clientAId, clientBId],
+      )
+      expect(assignments).toEqual([
+        { id_cliente: clientAId, id_lista_precio: 1 },
+        { id_cliente: clientBId, id_lista_precio: targetListId },
+      ])
+    }
+  } finally {
+    await connection.query('DELETE FROM USUARIO WHERE email LIKE ?', [`${prefix}%`])
+    await connection.query('DELETE FROM CLIENTE WHERE nombre_razon_social LIKE ?', [`${prefix}%`])
+    await connection.query('DELETE FROM LISTA_PRECIO WHERE nombre = ?', [listName])
+  }
+})
+
 test('una respuesta tardía no reemplaza la búsqueda vigente y los errores se reintentan', async ({
   page,
 }) => {

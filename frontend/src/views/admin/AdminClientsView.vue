@@ -62,9 +62,12 @@ const selectedClient = computed(() =>
     clients.value.find(client => client.id === selectedClientId.value) ?? null,
 )
 
+type PriceListAssignments = Record<number, AdminClientPriceList | null>
+type PriceListSelections = Record<number, number | ''>
+
 const priceLists = ref<AdminPriceListOption[]>([])
-const assignments = ref<Record<number, AdminClientPriceList | null>>({})
-const selections = ref<Record<number, number | ''>>({})
+const assignments = ref<PriceListAssignments>({})
+const selections = ref<PriceListSelections>({})
 const feedback = ref<Record<number, { text: string; error: boolean }>>({})
 const approvalFeedback = ref<Record<number, { text: string; error: boolean }>>({})
 const updatingApprovalClientIds = ref<Record<number, boolean>>({})
@@ -450,6 +453,52 @@ function hasAvailableList(id: number) {
     return priceLists.value.some(list => list.id === id)
 }
 
+function assignmentSelection(assignment: AdminClientPriceList | null | undefined): number | '' {
+    return assignment?.idListaPrecio ?? ''
+}
+
+function mergePriceListSelections({
+    assignments: nextAssignments,
+    lists,
+    previousAssignments,
+    selections: currentSelections,
+    preserveDrafts,
+    reconciledClientId = null,
+    reconciledSelectionAtStart,
+}: {
+    assignments: PriceListAssignments
+    lists: AdminPriceListOption[]
+    previousAssignments: PriceListAssignments
+    selections: PriceListSelections
+    preserveDrafts: boolean
+    reconciledClientId?: number | null
+    reconciledSelectionAtStart?: number | ''
+}): PriceListSelections {
+    const availableLists = new Set(lists.map(list => list.id))
+    const nextSelections: PriceListSelections = {}
+    const ids = new Set([
+        ...Object.keys(nextAssignments).map(Number),
+        ...Object.keys(currentSelections).map(Number),
+    ])
+
+    for (const id of ids) {
+        const current = currentSelections[id]
+        const previous = assignmentSelection(previousAssignments[id])
+        const hasDraft = current !== undefined && current !== previous
+        const availableDraft = hasDraft && (current === '' || availableLists.has(current))
+        const reconciled = id === reconciledClientId
+        const editedDuringReconciliation = reconciled && current !== reconciledSelectionAtStart
+
+        if (preserveDrafts && current !== undefined && availableDraft && (!reconciled || editedDuringReconciliation)) {
+            nextSelections[id] = current
+        } else if (nextAssignments[id] || reconciled) {
+            nextSelections[id] = assignmentSelection(nextAssignments[id])
+        }
+    }
+
+    return nextSelections
+}
+
 function selectedList(id: number) {
     return selections.value[id] || null
 }
@@ -466,29 +515,20 @@ async function loadPriceLists(preserveDrafts = false) {
     if (unmounted || !allowed()) return
     const request = ++priceListsRequest
     const session = identity()
-    const previousAssignments = assignments.value
-    const previousSelections = selections.value
+    const previousAssignments = { ...assignments.value }
     priceListsLoading.value = true
     try {
         const data = await getAdminClientPriceLists()
         if (unmounted || request !== priceListsRequest || session !== identity()) return
         priceLists.value = data.listas
-        const nextAssignments = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item]))
-        const nextSelections: Record<number, number | ''> = Object.fromEntries(
-            data.asignaciones.map(item => [item.idCliente, item.idListaPrecio]),
-        )
-        if (preserveDrafts) {
-            const availableLists = new Set(data.listas.map(list => list.id))
-            for (const [rawId, previousSelection] of Object.entries(previousSelections)) {
-                const id = Number(rawId)
-                const previousAssigned = previousAssignments[id]?.idListaPrecio ?? null
-                if (previousSelection === previousAssigned) continue
-                const selected = previousSelection === '' ? null : Number(previousSelection)
-                if (selected === null || availableLists.has(selected)) {
-                    nextSelections[id] = previousSelection
-                }
-            }
-        }
+        const nextAssignments = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item])) as PriceListAssignments
+        const nextSelections = mergePriceListSelections({
+            assignments: nextAssignments,
+            lists: data.listas,
+            previousAssignments,
+            selections: selections.value,
+            preserveDrafts,
+        })
         assignments.value = nextAssignments
         selections.value = nextSelections
         feedback.value = {}
@@ -505,28 +545,43 @@ async function loadPriceLists(preserveDrafts = false) {
 }
 
 async function reconcilePriceListAssignments(clientId: number) {
+    const request = ++priceListsRequest
     const session = identity()
     const requested = selectedList(clientId)
+    const selectionAtStart = selections.value[clientId]
+    const previousAssignments = { ...assignments.value }
     try {
         const data = await getAdminClientPriceLists()
-        if (session !== identity() || !allowed()) return
+        if (unmounted || request !== priceListsRequest || session !== identity() || !allowed()) return
 
+        const nextAssignments = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item])) as PriceListAssignments
+        const nextSelections = mergePriceListSelections({
+            assignments: nextAssignments,
+            lists: data.listas,
+            previousAssignments,
+            selections: selections.value,
+            preserveDrafts: true,
+            reconciledClientId: clientId,
+            reconciledSelectionAtStart: selectionAtStart,
+        })
         priceLists.value = data.listas
-        assignments.value = Object.fromEntries(data.asignaciones.map(item => [item.idCliente, item]))
-        for (const [id, assignment] of Object.entries(assignments.value)) {
-            if (assignment && Number(id) !== clientId) {
-                selections.value[Number(id)] = assignment.idListaPrecio
-            }
-        }
-        selections.value[clientId] = assignments.value[clientId]?.idListaPrecio ?? ''
+        assignments.value = nextAssignments
+        selections.value = nextSelections
         delete uncertainPriceListClientIds.value[clientId]
+
+        if (selections.value[clientId] !== selectionAtStart) {
+            // La selección cambió mientras consultábamos: la respuesta ya es
+            // obsoleta para este cliente y no debe pisar el nuevo borrador.
+            delete feedback.value[clientId]
+            return
+        }
 
         const applied = requested === (assignments.value[clientId]?.idListaPrecio ?? null)
         feedback.value[clientId] = applied
             ? { text: 'Cambio confirmado con el servidor.', error: false }
             : { text: 'El servidor conserva la asignación anterior.', error: true }
     } catch {
-        if (session !== identity()) return
+        if (unmounted || request !== priceListsRequest || session !== identity() || !allowed()) return
         uncertainPriceListClientIds.value[clientId] = true
         priceListsError.value = 'No pudimos verificar las asignaciones. Recargá las listas antes de volver a guardar.'
         feedback.value[clientId] = {

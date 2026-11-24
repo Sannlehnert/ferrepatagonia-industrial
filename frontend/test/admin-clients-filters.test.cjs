@@ -494,6 +494,296 @@ test('AUD-346-01: loadPriceLists(true) conserva el borrador pendiente en un clie
   assert.equal(state.selections[2], undefined);
 });
 
+const priceLists346 = [
+  { id: 1, nombre: 'Lista X', porcentajeDescuento: '10.00' },
+  { id: 2, nombre: 'Lista Y', porcentajeDescuento: '20.00' },
+  { id: 3, nombre: 'Lista Z', porcentajeDescuento: '30.00' },
+];
+const assigned346 = (idCliente, idListaPrecio, nombre = `Lista ${idListaPrecio}`) => ({
+  idCliente,
+  idListaPrecio,
+  nombre,
+  activa: true,
+});
+
+test('S7-346-R01: reconciliar la lista de B conserva el borrador de A y no escribe sobre A', async t => {
+  let reads = 0;
+  const writes = [];
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      return {
+        listas: priceLists346,
+        asignaciones: reads === 1
+          ? [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X'), assigned346(3, 1, 'Lista X')]
+          : [assigned346(1, 1, 'Lista X'), assigned346(2, 3, 'Lista Z'), assigned346(3, 1, 'Lista X')],
+      };
+    },
+    saveAdminClientPriceList: async (id, idListaPrecio) => {
+      writes.push([id, idListaPrecio]);
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state, route } = await mountView(t, {
+    service,
+    query: { busqueda: 'Cliente', tipo: 'EMPRESA', estadoEmpresa: 'PENDIENTE', page: '2' },
+  });
+
+  // A tiene un borrador sin guardar; B está a punto de guardar el suyo.
+  state.selections[1] = 2;
+  state.selections[2] = 3;
+  state.feedback[3] = { text: 'Aviso independiente de otra fila.', error: true };
+  state.uncertainPriceListClientIds[3] = true;
+
+  await state.savePriceList(2);
+  await settle();
+
+  assert.equal(reads, 2);
+  assert.deepEqual(writes, [[2, 3]]);
+  assert.equal(state.assignments[2].idListaPrecio, 3);
+  assert.equal(state.selections[2], 3);
+  assert.deepEqual(state.feedback[2], {
+    text: 'Cambio confirmado con el servidor.',
+    error: false,
+  });
+  assert.equal(state.selections[1], 2, 'el borrador de A debe conservarse');
+  assert.equal(state.assignments[1].idListaPrecio, 1);
+  assert.equal(state.canSavePriceList(1), true, 'A debe poder guardar su borrador');
+  assert.equal(state.uncertainPriceListClientIds[1], undefined);
+  assert.deepEqual(state.feedback[3], { text: 'Aviso independiente de otra fila.', error: true });
+  assert.equal(state.uncertainPriceListClientIds[3], true);
+  assert.equal(route.route.query.busqueda, 'Cliente');
+  assert.equal(route.route.query.tipo, 'EMPRESA');
+  assert.equal(route.route.query.estadoEmpresa, 'PENDIENTE');
+  assert.equal(route.route.query.page, '2');
+});
+
+test('S7-346-R01: la reconciliación conserva «Sin lista» y actualiza filas sin borrador', async t => {
+  let reads = 0;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      return {
+        listas: priceLists346,
+        asignaciones: reads === 1
+          ? [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X'), assigned346(3, 1, 'Lista X')]
+          : [assigned346(1, 1, 'Lista X'), assigned346(2, 3, 'Lista Z'), assigned346(3, 2, 'Lista Y')],
+      };
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[1] = '';
+  state.selections[2] = 3;
+  state.selections[3] = 1;
+
+  await state.savePriceList(2);
+  await settle();
+
+  assert.equal(state.selections[2], 3);
+  assert.equal(state.selections[1], '', 'el borrador «Sin lista» de A debe conservarse');
+  assert.equal(state.assignments[1].idListaPrecio, 1);
+  assert.equal(state.canSavePriceList(1), true);
+  assert.equal(state.selections[3], 2, 'la fila sin borrador refleja el servidor');
+  assert.equal(state.assignments[3].idListaPrecio, 2);
+  assert.equal(state.canSavePriceList(3), false);
+});
+
+test('S7-346-R01: un borrador hacia una lista desactivada no se restaura al reconciliar', async t => {
+  let reads = 0;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      return {
+        listas: reads === 1
+          ? priceLists346
+          : priceLists346.filter(list => list.id !== 3),
+        asignaciones: reads === 1
+          ? [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')]
+          : [assigned346(1, 1, 'Lista X'), assigned346(2, 2, 'Lista Y')],
+      };
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[1] = 3;
+  state.selections[2] = 2;
+
+  await state.savePriceList(2);
+  await settle();
+
+  assert.equal(state.selections[2], 2);
+  assert.equal(state.selections[1], 1, 'el borrador inválido cae a la asignación vigente');
+  assert.equal(state.assignments[1].idListaPrecio, 1);
+  assert.equal(state.canSavePriceList(1), false);
+});
+
+test('S7-346-R01: si falla la lectura de reconciliación, conserva el borrador de A y bloquea solo a B', async t => {
+  let reads = 0;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      if (reads > 1) throw axiosError(undefined, 'offline');
+      return {
+        listas: priceLists346,
+        asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+      };
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(500, 'detalle interno');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[1] = 2;
+  state.selections[2] = 3;
+  state.feedback[1] = { text: 'Aviso de A.', error: false };
+
+  await state.savePriceList(2);
+  await settle();
+
+  assert.equal(state.selections[1], 2);
+  assert.equal(state.selections[2], 3);
+  assert.equal(state.uncertainPriceListClientIds[2], true);
+  assert.equal(state.uncertainPriceListClientIds[1], undefined);
+  assert.deepEqual(state.feedback[1], { text: 'Aviso de A.', error: false });
+  assert.equal(state.feedback[2].error, true);
+  assert.match(state.priceListsError, /No pudimos verificar las asignaciones/);
+});
+
+test('S7-346-R01: una respuesta tardía de reconciliación no pisa cambios posteriores', async t => {
+  let reads = 0;
+  let resolveReconciliation;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      if (reads === 1) {
+        return {
+          listas: priceLists346,
+          asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+        };
+      }
+      return new Promise(resolve => { resolveReconciliation = resolve; });
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[1] = 2;
+  state.selections[2] = 3;
+  const saving = state.savePriceList(2);
+  await settle();
+
+  // Cambios realizados después de iniciar la lectura de reconciliación.
+  state.selections[1] = 3;
+  state.selections[2] = 2;
+  resolveReconciliation({
+    listas: priceLists346,
+    asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 3, 'Lista Z')],
+  });
+  await saving;
+  await settle();
+
+  assert.equal(state.assignments[2].idListaPrecio, 3, 'la asignación autoritativa de B se actualiza');
+  assert.equal(state.selections[2], 2, 'el cambio posterior de B no se pisa');
+  assert.equal(state.selections[1], 3, 'el cambio posterior de A no se pisa');
+  assert.equal(state.uncertainPriceListClientIds[2], undefined);
+  assert.equal(state.savingClientId, null);
+});
+
+test('S7-346-R01: una reconciliación obsoleta no pisa una recarga posterior', async t => {
+  let reads = 0;
+  let resolveReconciliation;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      if (reads === 1) {
+        return {
+          listas: priceLists346,
+          asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+        };
+      }
+      if (reads === 2) return new Promise(resolve => { resolveReconciliation = resolve; });
+      return {
+        listas: priceLists346,
+        asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 2, 'Lista Y')],
+      };
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state } = await mountView(t, { service });
+
+  state.selections[2] = 3;
+  const saving = state.savePriceList(2);
+  await settle();
+  await state.loadPriceLists(false);
+  await settle();
+
+  resolveReconciliation({
+    listas: priceLists346,
+    asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 3, 'Lista Z')],
+  });
+  await saving;
+  await settle();
+
+  assert.equal(state.assignments[2].idListaPrecio, 2);
+  assert.equal(state.selections[2], 2);
+  assert.equal(state.feedback[2], undefined);
+});
+
+test('S7-346-R01: un cambio de sesión descarta la reconciliación en curso', async t => {
+  let resolveReconciliation;
+  let reads = 0;
+  const service = defaultService({
+    getAdminClientPriceLists: async () => {
+      reads += 1;
+      if (reads === 1) {
+        return {
+          listas: priceLists346,
+          asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 1, 'Lista X')],
+        };
+      }
+      return new Promise(resolve => { resolveReconciliation = resolve; });
+    },
+    saveAdminClientPriceList: async () => {
+      throw axiosError(undefined, 'respuesta perdida');
+    },
+  });
+  const { state, auth } = await mountView(t, { service });
+
+  state.selections[1] = 2;
+  state.selections[2] = 3;
+  const saving = state.savePriceList(2);
+  await settle();
+
+  auth.user = null;
+  auth.sessionVersion = 2;
+  await settle();
+  resolveReconciliation({
+    listas: priceLists346,
+    asignaciones: [assigned346(1, 1, 'Lista X'), assigned346(2, 3, 'Lista Z')],
+  });
+  await saving;
+  await settle();
+
+  assert.deepEqual(state.assignments, {});
+  assert.deepEqual(state.selections, {});
+  assert.deepEqual(state.feedback, {});
+  assert.deepEqual(state.uncertainPriceListClientIds, {});
+  assert.equal(state.priceLists.length, 0);
+});
+
+
 test('AUD-346-02: el debounce de búsqueda preserva el espacio final mientras el input sigue enfocado', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });
   const { state, route } = await mountView(t);
