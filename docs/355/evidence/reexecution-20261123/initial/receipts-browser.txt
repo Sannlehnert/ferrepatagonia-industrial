@@ -1,0 +1,23 @@
+Base E2E preparada: e2e_test_b90c947fad094f23ab869deab003beb1
+Frontend E2E: http://127.0.0.1:56257
+
+Running 10 tests using 1 worker
+
+(node:25140) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › e2e\account\payment-receipts.real.spec.ts:46:1 › particular, empresa y administración recorren los comprobantes reales en pantalla (8.1s)
+  ok  2 [chromium] › e2e\account\payment-receipts.real.spec.ts:98:1 › rechaza archivos inválidos antes de enviarlos (1.6s)
+database.query.failed
+  ok  3 [chromium] › e2e\account\payment-receipts.real.spec.ts:161:1 › permite reintentar la consulta y la carga después de un error (1.5s)
+database.query.failed
+  ok  4 [chromium] › e2e\account\payment-receipts.real.spec.ts:231:1 › muestra la carga y bloquea envíos repetidos a 360 px (1.5s)
+  ok  5 [chromium] › e2e\account\payment-receipts.real.spec.ts:285:1 › descarta una consulta de comprobantes de la sesión anterior (2.1s)
+  ok  6 [chromium] › e2e\account\payment-receipts.real.spec.ts:370:3 › listado y detalle comparten comprobantes persistidos a 1280 px (3.2s)
+  ok  7 [chromium] › e2e\account\payment-receipts.real.spec.ts:370:3 › listado y detalle comparten comprobantes persistidos a 360 px (2.9s)
+  ok  8 [chromium] › e2e\account\payment-receipts.real.spec.ts:475:1 › un error de consulta no se presenta como ausencia de comprobantes (1.1s)
+  ok  9 [chromium] › e2e\account\payment-receipts.real.spec.ts:498:3 › transferencia y comprobante privado en historial: cliente@e2e.test (4.4s)
+  ok 10 [chromium] › e2e\account\payment-receipts.real.spec.ts:498:3 › transferencia y comprobante privado en historial: empresa-cuenta@e2e.test (3.7s)
+
+  10 passed (31.4s)
+10:10:47 [vite] (client) page reload playwright-report/receipts/index.html
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.

@@ -1,0 +1,14 @@
+Base E2E preparada: e2e_test_0f5d935760c54cba99bf90e3ff684b95
+Frontend E2E: http://127.0.0.1:53900
+
+Running 3 tests using 1 worker
+
+(node:22672) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 [chromium] › e2e\account\payment-declaration.real.spec.ts:96:1 › declarar no crea ABONO y el historial no confunde revisión con acreditación (5.3s)
+  ok 2 [chromium] › e2e\account\payment-declaration.real.spec.ts:193:1 › declaración ARS conserva la moneda y no inventa equivalente USD (2.4s)
+  ok 3 [chromium] › e2e\account\payment-declaration.real.spec.ts:224:1 › respuesta perdida y reintento idempotente no duplica el pago ni crea un ABONO (2.4s)
+
+  3 passed (11.3s)
+10:07:06 [vite] (client) page reload playwright-report/payments/index.html
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.

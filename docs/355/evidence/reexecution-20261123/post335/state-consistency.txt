@@ -1,0 +1,98 @@
+Upgrade aditivo #290 + #333 verificado en ambos órdenes (s7-04-2 -> s7-10-2 y s7-10-2 -> s7-04-2): 26 tablas, 13 triggers, backfill APROBADO/RECHAZAR y chk_pago_declaracion unificado.
+{"mode":"state-consistency","version":"11.4.13-MariaDB-ubu2404","database":"s704_test_1411d856af1c4855ad6797db55afef49","host":"127.0.0.1","port":61488,"container":"s704-state-test-1411d856af1c4855ad6797db55afef49","profile":"complete","tables":26,"triggers":13,"views":1}
+TAP version 13
+# Subtest: 1. INV-01 + NEG-05/06/07/08/09/13: comprobantes (PENDIENTE/APROBADO/RECHAZADO) dejan en 0 cambios financieros
+ok 1 - 1. INV-01 + NEG-05/06/07/08/09/13: comprobantes (PENDIENTE/APROBADO/RECHAZADO) dejan en 0 cambios financieros
+  ---
+  duration_ms: 2128.7924
+  type: 'test'
+  ...
+# Subtest: 2. INV-02 + NEG-01/02/03/04: ciclo comercial del pedido sin estado PAGADO y grafo acíclico estricto
+ok 2 - 2. INV-02 + NEG-01/02/03/04: ciclo comercial del pedido sin estado PAGADO y grafo acíclico estricto
+  ---
+  duration_ms: 110.3641
+  type: 'test'
+  ...
+# Subtest: 3. INV-03 + Proyección coherente ADMIN y CLIENTE (TRANSFERENCIA USD/ARS FER17-v1, sin falsos pagados)
+ok 3 - 3. INV-03 + Proyección coherente ADMIN y CLIENTE (TRANSFERENCIA USD/ARS FER17-v1, sin falsos pagados)
+  ---
+  duration_ms: 556.7965
+  type: 'test'
+  ...
+# Subtest: 4. INV-03 + CUENTA_CORRIENTE: acreditación ARS/USD genera ABONO + FIFO y anulación recalcula FIFO y proyección
+ok 4 - 4. INV-03 + CUENTA_CORRIENTE: acreditación ARS/USD genera ABONO + FIFO y anulación recalcula FIFO y proyección
+  ---
+  duration_ms: 311.8989
+  type: 'test'
+  ...
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# Subtest: 5. NEG-10, NEG-11, NEG-12 (triggers SQL), NEG-13 y RBAC (401/403/404) en PAGO y MOVIMIENTO
+ok 5 - 5. NEG-10, NEG-11, NEG-12 (triggers SQL), NEG-13 y RBAC (401/403/404) en PAGO y MOVIMIENTO
+  ---
+  duration_ms: 462.4162
+  type: 'test'
+  ...
+# database.query.failed
+# Subtest: 6. TOCTOU-01 a TOCTOU-05: concurrencia real en MariaDB, orden de locks y revalidación transaccional
+ok 6 - 6. TOCTOU-01 a TOCTOU-05: concurrencia real en MariaDB, orden de locks y revalidación transaccional
+  ---
+  duration_ms: 1138.448
+  type: 'test'
+  ...
+# Subtest: 7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actualizado.v1 y pago.acreditado.v1 post-COMMIT sin filtro canReceiveOrders
+ok 7 - 7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actualizado.v1 y pago.acreditado.v1 post-COMMIT sin filtro canReceiveOrders
+  ---
+  duration_ms: 462.002
+  type: 'test'
+  ...
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# database.query.failed
+# Subtest: 8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO
+ok 8 - 8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO
+  ---
+  duration_ms: 248.5066
+  type: 'test'
+  ...
+# Error interno en la gestión administrativa de pagos.
+# Subtest: 9. R01: fallos SQL/concurrencia en consulta de cotización FER17 NO devuelven 422 COTIZACION_FER17_NO_VERIFICADA y hacen ROLLBACK
+ok 9 - 9. R01: fallos SQL/concurrencia en consulta de cotización FER17 NO devuelven 422 COTIZACION_FER17_NO_VERIFICADA y hacen ROLLBACK
+  ---
+  duration_ms: 99.9995
+  type: 'test'
+  ...
+# Subtest: 10. R03: contrato unificado /api/admin/pagos* (\#317 + \#333), guardia documental 409, idempotencia global y flujo completo con FER17-v1 + Socket.IO
+ok 10 - 10. R03: contrato unificado /api/admin/pagos* (\#317 + \#333), guardia documental 409, idempotencia global y flujo completo con FER17-v1 + Socket.IO
+  ---
+  duration_ms: 1193.793
+  type: 'test'
+  ...
+# Subtest: 11. R05: migración real sobre base previa a \#317 conserva huella histórica \#333 y valida replay estricto sin duplicar ABONO ni Socket.IO
+ok 11 - 11. R05: migración real sobre base previa a \#317 conserva huella histórica \#333 y valida replay estricto sin duplicar ABONO ni Socket.IO
+  ---
+  duration_ms: 7474.0351
+  type: 'test'
+  ...
+1..11
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 16808.4806
+Reaplicación idempotente #290 + #333 verificada: filas de las 26 tablas preservadas intactas.
+CLEANUP OK T-S7-04.2: contenedor eliminado, datos tmpfs, almacenamiento temporal eliminado.

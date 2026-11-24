@@ -1,0 +1,11 @@
+install-backend: PASS; pass=null; fail=0; skip=0; exit=0; log=install-backend.txt; sha256=511c116614d87649d46fb398334bd622c5d4dfaa411d08cf1bc6034319f3ee4b
+install-frontend: PASS; pass=null; fail=0; skip=0; exit=0; log=install-frontend.txt; sha256=0ddf078f3991231f2d59a76eee4cdf3e0397841b8444879440cd6ee331153aeb
+build-backend: PASS; pass=null; fail=0; skip=0; exit=0; log=build-backend.txt; sha256=4602d9dca8c249cc001e3f0e53e3361f4fb90638d1654e2ff555be9b958ae76b
+build-frontend: PASS; pass=null; fail=0; skip=0; exit=0; log=build-frontend.txt; sha256=35d8069cbbef9d04d65a3f571dc15c45790684b06df47a480bb7347e96d1c022
+account-admin: PASS; pass=58; fail=0; skip=0; exit=0; log=account-admin.txt; sha256=51c94e1049a88cfb0686afec5e13b01322dda23ba37b04bc1d8d77124721db89
+payments: FAIL; pass=23; fail=2; skip=0; exit=1; log=payments.txt; sha256=274fcd6841f90fc26f9295ffcfa5a5da0ac12e421d00ec01039f05b5ec16ff85
+state-consistency: PASS; pass=11; fail=0; skip=0; exit=0; log=state-consistency.txt; sha256=e795d42188f952222896b510795fa057f824730afc03ccecc4d84bb1eabddb13
+catalog-browser: FAIL; pass=0; fail=1; skip=0; exit=1; log=catalog-browser.txt; sha256=b9cc9f31796985523ff6a8d91fad92e8749085498eed348bcca66e52e23eda87
+payment-actions: PASS; pass=23; fail=0; skip=0; exit=0; log=payment-actions.txt; sha256=4f7f9e378c401703e3ef37d946c26059f3aa812800e76e01c4da21b23c5b1ab6
+payments-browser: PASS; pass=3; fail=0; skip=0; exit=0; log=payments-browser.txt; sha256=18ac869327311a1eac0957a988021fe3181deff0941822f850b7d2ed1c52730b
+receipts-browser: PASS; pass=10; fail=0; skip=0; exit=0; log=receipts-browser.txt; sha256=3782ce9b15dd7d0054cc9bd782d2be224409ed0abf1b6f3e0f511014978f4f6e

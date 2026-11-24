@@ -1,5 +1,17 @@
 # #355 — Acta de regresiones administrativas y persistencia
 
+## Corrección documental posterior a la auditoría de PR #166
+
+HEAD auditado: `bd3aa81986fa9c83505f7a23f76107b4786756b9`. Revisor técnico: Zahir. Esta corrección conserva los resultados históricos y los extractos existentes, y distingue su procedencia de las nuevas ejecuciones. El detalle reproducible está en [CORRECTION.md](CORRECTION.md).
+
+- **P2:** 0 logs originales recuperados y autenticados de 19 registros históricos. La búsqueda local y los cuatro artefactos recuperables de CI no aportaron originales atribuibles a esas ejecuciones. Las coincidencias del hash genérico del build backend pertenecen a otras tareas y no se relabelaron. Ambos manifiestos marcan cada log histórico como `UNAVAILABLE_ORIGINAL`; sus `PASS` no se presentan como autenticados. Se repitieron todos los bloques en copias de sus SHA exactos y se adjuntan logs completos nuevos: [inicial](evidence/reexecution-20261123/initial/execution.json) y [posterior a #335](evidence/reexecution-20261123/post335/execution.json).
+- **Resultados nuevos estándar:** builds, cartera, estados y bloques E2E correspondientes aprobados; pagos conserva dos fallos por fase y catálogo falla antes del reinicio en este entorno con desfase de relojes. El bootstrap inicial conserva 7 aprobadas y 1 omitida. No se transforman estos fallos en `PASS` históricos ni diagnósticos.
+- **P3 persistencia:** se entrega [la sonda aislada](tools/persist-admin.cjs), su [ejecución estándar fallida](evidence/correction/persistence-standard/execution.json) y un [diagnóstico nuevo con espera explícita de 8 s](evidence/correction/persistence-diagnostic/execution.json). Este último comprueba edición HTTP ADMIN de descripción/stock, reinicios separados y conservación de PRODUCTO, imágenes y carritos usando el mismo contenedor y volumen; no es una ejecución estándar con relojes sincronizados.
+- **P3 CI:** el CI original del PR #166 está aprobado: [run 45292237814](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45292237814). Su checkout fue el merge de prueba `4bc5be1f88843c8fbb10804f5b2f65c69530d87a` de `bd3aa81` con `d0e1851`. El CI de develop es otro run. Ninguno valida el commit local que contiene esta corrección; su CI queda pendiente porque no se hace push.
+- **#346 excluida:** develop seguía en `d0e18514a46083aa3921acdf70c79dfa35500229` al verificar; PR #162 continuaba abierto. No se certifica #346. La matriz de regresiones exigida si se integra figura en [CORRECTION.md](CORRECTION.md).
+
+Las secciones siguientes describen las dos ejecuciones históricas originales. Sus cantidades coinciden con los extractos conservados, pero sus logs originales no pueden autenticarse. Las ejecuciones nuevas tienen sus propios resultados, comandos, fechas y hashes, incluidos los fallos observados.
+
 Historia #305 / HU-S7-19. Responsable: Bruno. Revisión técnica: Zahir.
 
 ## Identificación y alcance
@@ -24,7 +36,7 @@ Se utilizaron copias aisladas de cada SHA, API y Chromium de prueba y MariaDB 11
 | Smoke test ADMIN, importación y cartera | Fase inicial: 49 E2E de CSV/XLSX, importación concurrente/recuperación, imágenes, categorías, clientes, crédito, cartera, dashboard y pedidos. Fase posterior: 58 pruebas MariaDB de cartera y 23 E2E de acciones ADMIN de pagos. | PASS en los bloques ejecutados, con SHA separado por fase |
 | Smoke test de pagos y archivos | Sobre `d0e1851`: 25 pruebas MariaDB de pagos, 11 de estados, 23 E2E de revisión/acreditación, 3 de declaración y 10 de comprobantes. | PASS; dependencia de integración de #335 atendida |
 | Reinicios e integridad de los 100 productos y estado persistido | Catálogo normal reejecutado sobre `d0e1851`: 100 fichas API/Chromium, imágenes, búsquedas, stock, precios, listas 10/20 %, carrito y compra; comparación antes/después de reiniciar API y MariaDB. Bootstrap de cuatro perfiles comprobado en la fase inicial. | PASS dentro de la cobertura descrita |
-| Evidencia verificable, revisión cruzada y CI correspondiente | Acta, comandos, extractos, resultados e integridad por SKU adjuntos. CI de develop separado del futuro CI de esta entrega. | Evidencia local disponible; PR, CI y revisión de Zahir pendientes |
+| Evidencia verificable, revisión cruzada y CI correspondiente | Extractos históricos preservados; logs originales marcados como no autenticables y nuevas ejecuciones completas adjuntas. CI de develop, CI original del PR y CI pendiente de la corrección separados. | Reauditoría de Zahir y CI del nuevo commit pendientes; ver corrección anterior |
 
 El smoke test local de esta entrega queda preparado para revisión. No implica cerrar la historia #305, la prueba manual de #354 ni la release de #356.
 
@@ -32,7 +44,7 @@ El smoke test local de esta entrega queda preparado para revisión. No implica c
 
 ### Fase inicial: 2616f47
 
-Se conserva sin cambios su evidencia en [evidence/baseline-2616f47/execution.json](evidence/baseline-2616f47/execution.json) y [checks.txt](evidence/baseline-2616f47/checks.txt): ambas compilaciones, 58 pruebas de cartera, 23 de aprobación empresarial, 23 de pagos, 11 de estados, 7 de bootstrap con 1 omitida por Windows, 49 E2E ADMIN, 10 de comprobantes y un recorrido integrado de catálogo normal/persistencia.
+Se conservan sus resultados históricos en [evidence/baseline-2616f47/execution.json](evidence/baseline-2616f47/execution.json) y los bytes originales de [checks.txt](evidence/baseline-2616f47/checks.txt): ambas compilaciones, 58 pruebas de cartera, 23 de aprobación empresarial, 23 de pagos, 11 de estados, 7 de bootstrap con 1 omitida por Windows, 49 E2E ADMIN, 10 de comprobantes y un recorrido integrado de catálogo normal/persistencia. El manifiesto ahora anota la falta de autenticación de los logs originales y enlaza la nueva ejecución; la versión original se recupera desde el HEAD auditado identificado en él.
 
 La prueba omitida simula un fallo al escribir credenciales mediante permisos POSIX. El ejecutor la omite en Windows; no se presenta como aprobada. Su condición no afecta la integración de #335.
 
@@ -51,7 +63,7 @@ La prueba omitida simula un fallo al escribir credenciales mediante permisos POS
 | Declaración de pagos / Chromium | 3 PASS |
 | Comprobantes privados / Chromium | 10 PASS |
 
-Resultados y hashes en [evidence/execution.json](evidence/execution.json); extractos de ejecución en [evidence/checks.txt](evidence/checks.txt). No se repitieron las 49 E2E generales de la primera fase: su evidencia conserva su SHA. El delta integrado de #335 cambia pagos, su navegación y ejecutores; los módulos de importación, categorías, clientes y dashboard permanecen iguales entre ambas bases.
+Resultados y hashes históricos en [evidence/execution.json](evidence/execution.json); extractos conservados en [evidence/checks.txt](evidence/checks.txt). Los `logSha256` históricos están marcados como no autenticables, separados de los hashes nuevos respaldados por archivos completos. En esa ejecución histórica posterior no se repitieron las 49 E2E generales de la primera fase: su evidencia conserva su SHA. El delta integrado de #335 cambia pagos, su navegación y ejecutores; los módulos de importación, categorías, clientes y dashboard permanecen iguales entre ambas bases.
 
 ## Comprobaciones de #335 integrada
 
@@ -113,7 +125,7 @@ Los ejecutores completaron la limpieza de sus contenedores, archivos y almacenam
 
 El código de aplicación, esquema y migraciones de las copias de prueba permanecieron intactos. Los resultados identifican el SHA real con Git; la etiqueta histórica `base` del runner de catálogo no sustituye esa identidad.
 
-CI de develop sobre `d0e1851`: [run 45251738522](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45251738522), aprobado. Es evidencia remota de la base integrada, separada de las pruebas locales y del CI del futuro PR de #355. Este último debe registrarse cuando exista y finalice.
+CI de develop sobre `d0e1851`: [run 45251738522](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45251738522), aprobado. CI original del PR #166: [run 45292237814](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45292237814), ambos jobs aprobados; HEAD del PR `bd3aa81986fa9c83505f7a23f76107b4786756b9`, checkout de merge `4bc5be1f88843c8fbb10804f5b2f65c69530d87a` contra `d0e18514a46083aa3921acdf70c79dfa35500229`. Metadatos y extracto de checkout en [evidence/correction](evidence/correction/). Estos CI históricos no validan el nuevo commit documental; su CI no se ejecutó porque se deja sin push.
 
 ## Límites y seguimiento
 
@@ -123,4 +135,4 @@ CI de develop sobre `d0e1851`: [run 45251738522](https://github.com/Sannlehnert/
 - #346 / PR #162 no forma parte del SHA integrado de esta acta. Sus filtros/formularios y las correcciones pendientes de su auditoría deben comprobarse sobre el nuevo develop si se incorporan antes de la release. La ejecución inicial de clientes corresponde a #345 integrada, no a #346.
 - La configuración bancaria y los seguimientos de experiencia de checkout documentados en #313 no se presentan como resueltos por #355.
 - README final y release hacia main corresponden a #356. Si cambia develop, repetir los bloques afectados y registrar el nuevo SHA antes del cierre final de #305.
-- No se publicó, aprobó ni fusionó un PR durante estas pruebas. Quedan crear el PR de esta entrega, obtener su CI y completar la revisión técnica de Zahir antes de cerrar #355.
+- El PR #166 existe y su CI original aprobó. Esta corrección queda en un commit local, sin push, merge ni comentarios. Quedan la reauditoría de Zahir y el CI correspondiente al nuevo commit antes de cerrar #355; los fallos estándar por desfase de relojes siguen explícitos.

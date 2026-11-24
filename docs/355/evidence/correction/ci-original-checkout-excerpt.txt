@@ -1,0 +1,15 @@
+Extracto de checkout de los logs remotos de CI, no un log local histórico de #355.
+job 138103632045: 2026-11-23T23:50:38.4089843Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4bc5be1f88843c8fbb10804f5b2f65c69530d87a:refs/remotes/pull/166/merge
+job 138103632045: 2026-11-23T23:50:39.3950293Z  * [new ref]         4bc5be1f88843c8fbb10804f5b2f65c69530d87a -> pull/166/merge
+job 138103632045: 2026-11-23T23:50:39.4062600Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/166/merge
+job 138103632045: 2026-11-23T23:50:39.5134883Z Note: switching to 'refs/remotes/pull/166/merge'.
+job 138103632045: 2026-11-23T23:50:39.5161150Z HEAD is now at 4bc5be1 Merge bd3aa81986fa9c83505f7a23f76107b4786756b9 into d0e18514a46083aa3921acdf70c79dfa35500229
+job 138103632045: 2026-11-23T23:50:39.5204885Z [command]/usr/bin/git log -1 --format=%H
+job 138103632045: 2026-11-23T23:50:39.5232231Z 4bc5be1f88843c8fbb10804f5b2f65c69530d87a
+job 138103632765: 2026-11-23T23:50:41.2018047Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +4bc5be1f88843c8fbb10804f5b2f65c69530d87a:refs/remotes/pull/166/merge
+job 138103632765: 2026-11-23T23:50:42.0075487Z  * [new ref]         4bc5be1f88843c8fbb10804f5b2f65c69530d87a -> pull/166/merge
+job 138103632765: 2026-11-23T23:50:42.0165058Z [command]/usr/bin/git checkout --progress --force refs/remotes/pull/166/merge
+job 138103632765: 2026-11-23T23:50:42.0942611Z Note: switching to 'refs/remotes/pull/166/merge'.
+job 138103632765: 2026-11-23T23:50:42.0947332Z HEAD is now at 4bc5be1 Merge bd3aa81986fa9c83505f7a23f76107b4786756b9 into d0e18514a46083aa3921acdf70c79dfa35500229
+job 138103632765: 2026-11-23T23:50:42.1002955Z [command]/usr/bin/git log -1 --format=%H
+job 138103632765: 2026-11-23T23:50:42.1020219Z 4bc5be1f88843c8fbb10804f5b2f65c69530d87a
