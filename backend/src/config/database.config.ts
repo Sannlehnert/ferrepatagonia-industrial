@@ -17,7 +17,7 @@ export const dataSource = new ControlledDataSource({
   synchronize: false, dropSchema: false, migrationsRun: false,
   migrations: [], logging: false, logger: new SafeDatabaseLogger(), connectTimeout: 3000,
   enableQueryTimeout: false, maxQueryExecutionTime: 1000,
-  extra: { connectionLimit: 5, decimalNumbers: false, waitForConnections: false, queueLimit: 0 },
+  extra: { connectionLimit: 5, decimalNumbers: false, waitForConnections: true, queueLimit: 25 },
 });
 export async function initializeDatabase(): Promise<void> { await dataSource.initialize(); }
 export async function destroyDatabase(): Promise<void> {

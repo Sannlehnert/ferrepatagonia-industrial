@@ -9,7 +9,11 @@ const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const { createAuthUser } = require('./helpers/auth-user.cjs');
 const { pool } = require('../dist/config/catalog-snapshot.config.js');
 const { dataSource } = require('../dist/config/database.config.js');
-const { destroyPriceVerificationDatabase } = require('../dist/config/price-verification.config.js');
+const {
+  destroyPriceVerificationDatabase,
+  getPriceVerificationDataSource,
+} = require('../dist/config/price-verification.config.js');
+const { env } = require('../dist/config/env.config.js');
 const {
   PriceVerificationError,
   verifyProductPrice,
@@ -779,5 +783,63 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     const result = await verify(persistenceProduct, '88.88', persistenceEvidence);
     assert.equal(result.ok, true);
     assert.equal(result.estadoFer17, 'DEFINIDO');
+  });
+
+  test('P2-02: llamadas concurrentes en frío no fugan conexiones en PROCESSLIST y credenciales inválidas devuelven 503', async () => {
+    const verifierUser = process.env.PRICE_VERIFICATION_DB_USER;
+    const countVerifierConnections = async () => {
+      const [row] = await pool.query(
+        'SELECT COUNT(*) AS total FROM information_schema.PROCESSLIST WHERE USER = ? AND DB = ?',
+        [verifierUser, process.env.DB_NAME],
+      );
+      return Number(row.total);
+    };
+
+    await destroyPriceVerificationDatabase();
+    assert.equal(await countVerifierConnections(), 0);
+
+    const sources = await Promise.all([
+      getPriceVerificationDataSource(),
+      getPriceVerificationDataSource(),
+      getPriceVerificationDataSource(),
+      getPriceVerificationDataSource(),
+    ]);
+    assert.equal(new Set(sources).size, 1);
+    assert.equal(sources[0]?.isInitialized, true);
+    await sources[0].query('SELECT 1');
+    assert.ok(await countVerifierConnections() <= 2);
+
+    await destroyPriceVerificationDatabase();
+    assert.equal(await countVerifierConnections(), 0);
+
+    const originalPassword = env.priceVerification.password;
+    const coldProduct = await createProduct(`T-S7-05-2-BADCRED-${RUN_ID}`, 75);
+    const body = {
+      importe: '75.00',
+      evidencia: `Factura FER-320-BADCRED-${RUN_ID} proveedor Andes`,
+      confirmar: true,
+    };
+    try {
+      env.priceVerification.password = 'wrong-verification-password';
+      const responses = await Promise.all([
+        api('POST', `/api/admin/productos/${coldProduct}/verificar-precio`, body, admin.cookie),
+        api('POST', `/api/admin/productos/${coldProduct}/verificar-precio`, body, admin.cookie),
+        api('POST', `/api/admin/productos/${coldProduct}/verificar-precio`, body, admin.cookie),
+      ]);
+      for (const response of responses) {
+        assert.equal(response.status, 503);
+        assert.equal((await response.json()).code, 'VERIFICACION_NO_DISPONIBLE');
+      }
+      assert.equal(await countVerifierConnections(), 0);
+    } finally {
+      env.priceVerification.password = originalPassword;
+      await destroyPriceVerificationDatabase();
+    }
+
+    assert.equal(await countVerifierConnections(), 0);
+    const recovered = await api('POST', `/api/admin/productos/${coldProduct}/verificar-precio`, body, admin.cookie);
+    assert.equal(recovered.status, 200, JSON.stringify(await recovered.clone().text()));
+    await destroyPriceVerificationDatabase();
+    assert.equal(await countVerifierConnections(), 0);
   });
 });

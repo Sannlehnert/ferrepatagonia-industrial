@@ -76,14 +76,14 @@ export const updateProduct = async (req: Request, res: Response) => {
 export const verifyProductPriceHandler = async (req: Request, res: Response) => {
     res.setHeader('Cache-Control', 'private, no-store');
     res.vary('Cookie');
-    const source = await getPriceVerificationDataSource();
-    if (!source) {
-        return res.status(503).json({
-            code: 'VERIFICACION_NO_CONFIGURADA',
-            message: 'La verificación administrativa de precios no está configurada en este entorno.',
-        });
-    }
     try {
+        const source = await getPriceVerificationDataSource();
+        if (!source) {
+            return res.status(503).json({
+                code: 'VERIFICACION_NO_CONFIGURADA',
+                message: 'La verificación administrativa de precios no está configurada en este entorno.',
+            });
+        }
         const { id } = res.locals.dto.params as { id: number };
         const body = res.locals.dto.body as { importe: string; evidencia: string; confirmar: true };
         if (!req.auth?.id) {

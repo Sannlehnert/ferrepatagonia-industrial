@@ -1103,6 +1103,24 @@ test('S7-09.1 panel administrativo: empresas, solicitudes, cuentas, filtros y pa
   assert.equal(byId.get(withEnabled.clientId).cuentaCorriente.estado, 'HABILITADA');
   assert.equal(byId.get(withEnabled.clientId).cuentaCorriente.plazoDias, 60);
 
+  const detailRoutes = [
+    `/admin/credito/empresas/${withEnabled.clientId}`,
+    `/admin/solicitudes-credito?clienteId=${withEnabled.clientId}&limite=100`,
+    `/admin/credito/eventos?clienteId=${withEnabled.clientId}&limite=100`,
+    `/admin/clientes/${withEnabled.clientId}/cuenta-corriente`,
+    `/admin/clientes/${withEnabled.clientId}/cuenta-corriente/movimientos`,
+    `/admin/clientes/${withEnabled.clientId}/cuenta-corriente/vencimientos`,
+    '/admin/credito/empresas?page=1&limit=10',
+    '/admin/cuentas-corrientes',
+  ];
+  const burst = await Promise.all(
+    [...detailRoutes, ...detailRoutes].map(route => api(route, { token: state.admin.token })),
+  );
+  for (const response of burst) {
+    assert.notEqual(response.status, 500, JSON.stringify(response.body));
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+  }
+
   assert.deepEqual((await list(`${search}&estadoSolicitud=PENDIENTE`)).empresas.map(e => e.clienteId),
     [withPending.clientId]);
   assert.deepEqual((await list(`${search}&estadoSolicitud=SIN_SOLICITUD`)).empresas.map(e => e.clienteId),
