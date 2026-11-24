@@ -484,3 +484,19 @@ modificaron las bases persistentes del responsable.
 
 Commit de la etapa 3: `a3609c9`
 `fix(ui): resolve final responsive and usability findings`.
+
+## Etapa 4
+
+Correcciones finales posteriores a la auditoría independiente:
+
+- [Etapa 4 — Correcciones finales](etapa-4-correcciones-finales.md)
+- [Guía manual breve de los cuatro bloques](guia-manual-correcciones-finales.md)
+
+La etapa 4 corrige D354-11, elimina el enlace redundante del footer (decisión
+que modifica el alcance de #352), reorganiza la experiencia CLIENTE y ADMIN de
+cuenta corriente y agrega diagnóstico y robustez a la carga de comprobantes.
+
+D354-02 continúa **BLOCKED** hasta verificar el archivo real o una reproducción
+equivalente. La comprobación literal del CA-04 de #305 también continúa
+**BLOCKED** hasta disponer del texto original. La evidencia histórica de las
+etapas 1 a 3 no se modificó.
