@@ -24,8 +24,8 @@ async function mount(t, modal=false, overrides={}, props={}) {
  const calls=[];
  const route=vue.reactive({query:{}});
  const navigate=({query})=>{route.query=query;};
- const service={getAdminProductPage:async()=>firstPage(),getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
- const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'../../services/productExportService':{buildProductsWorkbook:()=>new Uint8Array(),collectAdminProductsForExport:async()=>[],downloadProductsWorkbook(){},productsExportFilename:()=>'productos.xlsx'},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
+ const service={getAdminProductPage:async()=>firstPage(),getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),verifyAdminProductPrice:async()=>({}),canonicalPrice:()=>null,...overrides};
+ const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'@/components/AdminPriceVerificationDialog.vue':{default:{}},'../../services/productExportService':{buildProductsWorkbook:()=>new Uint8Array(),collectAdminProductsForExport:async()=>[],downloadProductsWorkbook(){},productsExportFilename:()=>'productos.xlsx'},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
  component.render=()=>null;
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
@@ -248,4 +248,16 @@ test('un error visible bloquea el cierre accidental aunque no haya cambios', asy
  state.requestClose('implicit');
  assert.deepEqual(events,[]);
  assert.ok(state.closeAttemptNotice);
+});
+test('service verify price usa el endpoint ADMIN y canonicaliza importes sin Number', async () => {
+ const calls=[];
+ const api={post:async(...a)=>{calls.push(a);return {data:{data:{productoId:7,precio:'150.50',evidencia:'Factura Andes 42',verificadoEn:'2026-11-24T12:00:00.000Z',estadoFer17:'DEFINIDO',publicado:true,eventoId:'9',replay:false}}}}};
+ const service=load('services/adminProductService.ts',{'@/services/api':api});
+ const result=await service.verifyAdminProductPrice(7,{importe:'150.50',evidencia:'Factura Andes 42',confirmar:true});
+ assert.equal(result.publicado,true);
+ assert.deepEqual(calls,[['/admin/productos/7/verificar-precio',{importe:'150.50',evidencia:'Factura Andes 42',confirmar:true},{signal:undefined}]]);
+ assert.equal(service.canonicalPrice('150.5'),'150.50');
+ assert.equal(service.canonicalPrice('0'),'0.00');
+ assert.equal(service.canonicalPrice(null),null);
+ assert.equal(service.canonicalPrice('1.234'),null);
 });

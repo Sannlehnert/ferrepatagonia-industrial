@@ -225,6 +225,17 @@ async function main(signal) {
 
     const inventory = await assertSchemaInventory(sql => connection.query(sql), 'complete');
 
+    // Credencial separada de mínimo privilegio para la verificación administrativa.
+    // El usuario principal del backend no se usa para escribir evidencia en este flujo.
+    const verifierUser = `price_verifier_${token.slice(0, 12)}`;
+    const verifierPassword = randomUUID();
+    await connection.query(`CREATE USER '${verifierUser}'@'%' IDENTIFIED BY '${verifierPassword}'`);
+    await connection.query(`GRANT SELECT ON ${database}.PRODUCTO TO '${verifierUser}'@'%'`);
+    await connection.query(`GRANT SELECT ON ${database}.USUARIO TO '${verifierUser}'@'%'`);
+    await connection.query(`GRANT SELECT, INSERT, UPDATE ON ${database}.PRECIO_USD_EVIDENCIA TO '${verifierUser}'@'%'`);
+    await connection.query(`GRANT SELECT, INSERT ON ${database}.FER17_PRECIO_EVENTO TO '${verifierUser}'@'%'`);
+    await connection.query(`GRANT SELECT ON ${database}.FER17_AUDITORIA_TRIGGERS TO '${verifierUser}'@'%'`);
+
     console.log(JSON.stringify({
       database, container, port,
       version: (await connection.query('SELECT VERSION() AS version'))[0].version,
@@ -237,6 +248,8 @@ async function main(signal) {
       JWT_SECRET: randomUUID(),
       DB_HOST: '127.0.0.1', DB_NAME: database,
       DB_USER: 'root', DB_PASSWORD: password,
+      PRICE_VERIFICATION_DB_USER: verifierUser,
+      PRICE_VERIFICATION_DB_PASSWORD: verifierPassword,
       PRICE_VERIFICATION_TEST_DATABASE: database,
       PRICE_VERIFICATION_RUN_ID: token,
     };

@@ -9,6 +9,7 @@ const { fetchFromBrowser: fetch } = require('./helpers/browser-request.cjs');
 const { createAuthUser } = require('./helpers/auth-user.cjs');
 const { pool } = require('../dist/config/catalog-snapshot.config.js');
 const { dataSource } = require('../dist/config/database.config.js');
+const { destroyPriceVerificationDatabase } = require('../dist/config/price-verification.config.js');
 const {
   PriceVerificationError,
   verifyProductPrice,
@@ -128,6 +129,7 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
       if (typeof server.closeAllConnections === 'function') server.closeAllConnections();
       await new Promise(resolve => server.close(resolve));
     }
+    await destroyPriceVerificationDatabase();
     await pool.end();
   });
 
@@ -185,6 +187,82 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     assert.equal(history[0].tipo, 'VERIFICACION');
     assert.equal(history[0].precioNuevo, '100.12');
     assert.equal(history[0].evidencia, evidence);
+  });
+
+  test('20. Endpoint ADMIN verifica por servicio autorizado con idempotencia y errores', async () => {
+    const httpProduct = await createProduct(`T-S7-05-2-HTTP-${RUN_ID}`, 180.5);
+    const path = `/api/admin/productos/${httpProduct}/verificar-precio`;
+    const evidence = `Factura HTTP FER-320-${RUN_ID}, folio 0042, proveedor Andes`;
+    const body = { importe: '180.50', evidencia: evidence, confirmar: true };
+
+    const firstResponse = await api('POST', path, body, admin.cookie);
+    assert.equal(firstResponse.status, 200);
+    const first = (await firstResponse.json()).data;
+    assert.equal(first.productoId, httpProduct);
+    assert.equal(first.precio, '180.50');
+    assert.equal(first.evidencia, evidence);
+    assert.equal(first.estadoFer17, 'DEFINIDO');
+    assert.equal(first.publicado, true);
+    assert.equal(first.replay, false);
+    assert.ok(first.eventoId);
+    assert.match(firstResponse.headers.get('cache-control') ?? '', /private.*no-store/);
+    assert.match(firstResponse.headers.get('vary') ?? '', /Cookie/i);
+
+    const beforeRetry = await listPriceHistory(httpProduct);
+    const retryResponse = await api('POST', path, body, admin.cookie);
+    assert.equal(retryResponse.status, 200);
+    const retry = (await retryResponse.json()).data;
+    assert.equal(retry.replay, true);
+    assert.equal(retry.eventoId, first.eventoId);
+    assert.deepEqual(await listPriceHistory(httpProduct), beforeRetry);
+
+    const mismatch = await api('POST', path, {
+      importe: '180.51', evidencia: evidence, confirmar: true,
+    }, admin.cookie);
+    assert.equal(mismatch.status, 409);
+    assert.equal((await mismatch.json()).code, 'IMPORTE_NO_COINCIDE');
+    assert.equal((await evidenceRow(httpProduct)).precio_verificado, '180.50');
+
+    for (const [clientCookie, status] of [[client.cookie, 403], [undefined, 401]]) {
+      const denied = await api('POST', path, body, clientCookie);
+      assert.equal(denied.status, status, await denied.text());
+    }
+    const invalidEvidence = await api('POST', path, {
+      importe: '180.50', evidencia: 'test', confirmar: true,
+    }, admin.cookie);
+    assert.equal(invalidEvidence.status, 400);
+    const missingConfirmation = await api('POST', path, {
+      importe: '180.50', evidencia: evidence, confirmar: false,
+    }, admin.cookie);
+    assert.equal(missingConfirmation.status, 400);
+    const missingProduct = await api('POST',
+      '/api/admin/productos/2147483647/verificar-precio', body, admin.cookie);
+    assert.equal(missingProduct.status, 404);
+  });
+
+  test('21. Usuario de verificación: sin escrituras sobre pagos, cuentas ni DELETE', async () => {
+    const mariadb = require('mariadb');
+    const verifier = await mariadb.createConnection({
+      host: process.env.DB_HOST,
+      port: Number(process.env.DB_PORT),
+      user: process.env.PRICE_VERIFICATION_DB_USER,
+      password: process.env.PRICE_VERIFICATION_DB_PASSWORD,
+      database: process.env.DB_NAME,
+      connectTimeout: 2000,
+    });
+    try {
+      for (const sql of [
+        'UPDATE PAGO SET estado = estado WHERE 1 = 0',
+        'UPDATE PRODUCTO SET stock = stock WHERE 1 = 0',
+        'INSERT INTO CUENTA_CORRIENTE (id_cliente,limite_credito,habilitada) VALUES (1,0,0)',
+        'DELETE FROM PRECIO_USD_EVIDENCIA WHERE 1 = 0',
+        'DELETE FROM FER17_PRECIO_EVENTO WHERE 1 = 0',
+      ]) {
+        await assert.rejects(verifier.query(sql), /denied|permission|privilegio/i, sql);
+      }
+    } finally {
+      await verifier.end();
+    }
   });
 
   test('7. Edición no monetaria: conserva la verificación vigente', async () => {
@@ -305,7 +383,10 @@ describe('T-S7-05.2 — Flujo autorizado de verificación de precios', () => {
     assert.equal(rows[0].evidencia, evidence);
     const history = await listPriceHistory(productId, 200);
     assert.equal(history.filter(event =>
-      event.tipo === 'VERIFICACION' && event.evidencia === evidence).length, 2);
+      event.tipo === 'VERIFICACION' && event.evidencia === evidence).length, 1);
+    assert.equal(results.filter(result => result.replay === false).length, 1);
+    assert.equal(results.filter(result => result.replay === true).length, 1);
+    assert.equal(results[0].eventId, results[1].eventId);
     assert.equal((await priceLine(productId)).estadoPrecio, 'DEFINIDO');
   });
 

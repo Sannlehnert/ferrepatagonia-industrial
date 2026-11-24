@@ -8,6 +8,8 @@ const {
   parsePositiveId,
   validateEvidenceReference,
 } = require('../dist/services/pricing/price-verification.rules.js');
+const { verifyProductPricePolicy } = require('../dist/dtos/products/verify-price.dto.js');
+const { validateDtoInput } = require('../dist/dtos/validation.js');
 
 const rejectsWith = (code, action) => assert.throws(action, error => {
   assert.ok(error instanceof PriceVerificationError);
@@ -103,5 +105,32 @@ test('CLI: ayuda y rechazos estructurados sin NODE_ENV ni configuración de Mari
     assert.equal(status, 1, JSON.stringify(args));
     assert.deepEqual(body, { ok: false, code, message: body.message, eventId: null });
     assert.ok(body.message.length > 0);
+  }
+});
+
+
+test('HTTP ADMIN: DTO de verificación exige importe, evidencia y confirmación', async () => {
+  const valid = await validateDtoInput(verifyProductPricePolicy, {
+    importe: ' 150.00 ',
+    evidencia: ' Factura comercial Andes A-0001, folio 42 ',
+    confirmar: true,
+  });
+  assert.equal(valid.valid, true, JSON.stringify(valid));
+  if (valid.valid) {
+    assert.equal(valid.data.importe, '150.00');
+    assert.equal(valid.data.evidencia, 'Factura comercial Andes A-0001, folio 42');
+    assert.equal(valid.data.confirmar, true);
+  }
+  for (const body of [
+    { importe: 150, evidencia: 'Factura comercial Andes A-0001', confirmar: true },
+    { importe: '0.00', evidencia: 'Factura comercial Andes A-0001', confirmar: true },
+    { importe: '150.00', evidencia: 'ok', confirmar: true },
+    { importe: '150.00', evidencia: 'SINTETICO fixture 42', confirmar: true },
+    { importe: '150.00', evidencia: 'Factura comercial Andes A-0001', confirmar: false },
+    { importe: '150.00', evidencia: 'Factura comercial Andes A-0001' },
+    { importe: '150.00', evidencia: 'Factura comercial Andes A-0001', confirmar: true, adminId: 1 },
+  ]) {
+    const result = await validateDtoInput(verifyProductPricePolicy, body);
+    assert.equal(result.valid, false, JSON.stringify(body));
   }
 });

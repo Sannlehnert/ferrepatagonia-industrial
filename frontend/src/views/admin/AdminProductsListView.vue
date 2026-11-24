@@ -4,6 +4,7 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import ProductFormModal from './ProductFormModal.vue';
+import AdminPriceVerificationDialog from '@/components/AdminPriceVerificationDialog.vue';
 import {
     getAdminProductPage,
     setAdminProductActive,
@@ -61,6 +62,8 @@ const pagingUnavailable = computed(() => isLoading.value || searchPending.value
 
 const isModalOpen = ref(false);
 const selectedProduct = ref<AdminProduct | null>(null);
+const verificationTarget = ref<AdminProduct | null>(null);
+let verificationTrigger: HTMLElement | null = null;
 let modalTrigger: HTMLElement | null = null;
 let restoreModalFocus = false;
 
@@ -260,6 +263,33 @@ const openEditModal = (prod: AdminProduct) => {
         fetchCategorias();
     }
     isModalOpen.value = true;
+};
+
+const canVerifyPrice = (prod: AdminProduct) => Boolean(
+    prod.precio !== null && prod.precio !== undefined && Number(prod.precio) > 0
+    && (prod.estado_precio_base === 'NO_VERIFICADO' || prod.estado_precio_base === 'SINTETICO'),
+);
+
+const openPriceVerification = (prod: AdminProduct, event?: MouseEvent) => {
+    if (actionsDisabled.value || isModalOpen.value) return;
+    verificationTrigger = (event?.currentTarget as HTMLElement | undefined)
+        ?? (searchInput.value?.ownerDocument.activeElement as HTMLElement | null);
+    verificationTarget.value = prod;
+};
+
+const closePriceVerification = async () => {
+    verificationTarget.value = null;
+    await nextTick();
+    if (verificationTrigger?.isConnected) verificationTrigger.focus({ preventScroll: true });
+    verificationTrigger = null;
+};
+
+const handlePriceVerified = async (message: string) => {
+    verificationTarget.value = null;
+    saveMessage.value = message;
+    await fetchProductos();
+    await nextTick();
+    searchInput.value?.focus({ preventScroll: true });
 };
 
 const handleSaved = async (msg: string) => {
@@ -504,7 +534,16 @@ onBeforeUnmount(() => {
                                 >{{ prod.activo ? 'Activo' : 'Inactivo' }}</span>
                             </td>
                             <td class="px-3 py-2">
-                                <div class="flex gap-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <button
+                                        v-if="canVerifyPrice(prod)"
+                                        type="button"
+                                        :disabled="actionsDisabled"
+                                        :aria-label="`Verificar precio de ${prod.nombre}`"
+                                        :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
+                                        class="min-h-11 whitespace-nowrap rounded-md border border-amber-700 bg-white px-3 font-semibold text-amber-900 enabled:hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        @click="openPriceVerification(prod, $event)"
+                                    >Verificar precio</button>
                                     <button
                                         type="button"
                                         :disabled="actionsDisabled"
@@ -571,6 +610,13 @@ onBeforeUnmount(() => {
             @retry-categories="fetchCategorias"
             @close="isModalOpen = false"
             @saved="handleSaved"
+        />
+
+        <AdminPriceVerificationDialog
+            :is-open="verificationTarget !== null"
+            :product="verificationTarget"
+            @close="closePriceVerification"
+            @verified="handlePriceVerified"
         />
     </div>
 </template>

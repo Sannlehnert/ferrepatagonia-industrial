@@ -6,6 +6,8 @@ import {
     saveAdminProduct,
     saveAdminProductWithImage,
     updateAdminProductStock,
+    verifyAdminProductPrice,
+    canonicalPrice,
     type AdminProduct,
     type CategoryOption
 } from '../../services/adminProductService';
@@ -105,6 +107,9 @@ const imageFile = ref<File>();
 const previewUrl = ref('');
 const imageError = ref('');
 const imageInput = ref<HTMLInputElement>();
+const verifyPriceAfterSave = ref(false);
+const priceEvidence = ref('');
+const priceReviewConfirmed = ref(false);
 
 function clearImage(resetInput = true) {
     if (previewUrl.value) URL.revokeObjectURL(previewUrl.value);
@@ -154,7 +159,9 @@ const form = ref({
 const formSnapshot = () => JSON.stringify(form.value);
 // Los cambios se comparan con el estado con el que se abrió el formulario.
 const initialSnapshot = ref('');
-const isDirty = computed(() => Boolean(imageFile.value)
+const hasVerificationDraft = () => verifyPriceAfterSave.value
+    || priceEvidence.value.trim() !== '' || priceReviewConfirmed.value;
+const isDirty = computed(() => Boolean(imageFile.value) || hasVerificationDraft()
     || (initialSnapshot.value !== '' && formSnapshot() !== initialSnapshot.value));
 const hasPendingError = computed(() => Boolean(backendError.value) || uncertain.value
     || Object.keys(fieldErrors.value).length > 0 || Boolean(imageError.value));
@@ -205,6 +212,9 @@ watch(
         uncertain.value = false;
         closeAttemptNotice.value = '';
         fieldErrors.value = {};
+        verifyPriceAfterSave.value = false;
+        priceEvidence.value = '';
+        priceReviewConfirmed.value = false;
 
         if (props.product) {
             const rawPrecio = props.product.precio;
@@ -293,8 +303,40 @@ const validateForm = (): boolean => {
         errors.stock = 'El stock debe ser un entero mayor o igual a 0.';
     }
 
+    if (verifyPriceAfterSave.value) {
+        const price = canonicalPrice(form.value.precio);
+        if (!price || price === '0.00') {
+            errors.precio = 'Para verificar el precio, cargá un importe mayor a cero.';
+        }
+        const evidence = priceEvidence.value.trim();
+        if (evidence.length < 8 || evidence.length > 1000) {
+            errors.precioEvidencia = 'Indicá una referencia de evidencia de entre 8 y 1000 caracteres.';
+        }
+        if (!priceReviewConfirmed.value) {
+            errors.precioConfirmacion = 'Confirmá explícitamente que revisaste el precio y la evidencia.';
+        }
+    }
+
     fieldErrors.value = errors;
     return Object.keys(errors).length === 0;
+};
+
+const verificationErrorMessage = (error: unknown): string => {
+    if (axios.isAxiosError<{ message?: string; code?: string }>(error)) {
+        const code = error.response?.data?.code;
+        const message = error.response?.data?.message;
+        if (code === 'IMPORTE_NO_COINCIDE') {
+            return 'El precio guardado no coincide con el importe revisado.';
+        }
+        if (code === 'VERIFICACION_NO_CONFIGURADA') {
+            return 'La verificación administrativa de precios no está configurada.';
+        }
+        if (code === 'RESULTADO_DESCONOCIDO') {
+            return 'No se pudo confirmar el resultado; reintentá desde la acción Verificar precio.';
+        }
+        if (typeof message === 'string' && message.trim()) return message;
+    }
+    return 'No se pudo verificar el precio. Reintentá desde la acción Verificar precio.';
 };
 
 const handleSubmit = async () => {
@@ -340,15 +382,43 @@ const handleSubmit = async () => {
 
         const data = payload as Parameters<typeof saveAdminProduct>[0];
         if (original && payload.imagen === (original.imagen?.trim() || null)) delete data.imagen;
-        if (imageFile.value) await saveAdminProductWithImage(data, imageFile.value, original?.id_producto);
-        else if (onlyStockChanged) await updateAdminProductStock(original!.id_producto, payload.stock);
-        else await saveAdminProduct(data, original?.id_producto);
+        let savedProduct: AdminProduct | null = null;
+        if (imageFile.value) {
+            savedProduct = await saveAdminProductWithImage(data, imageFile.value, original?.id_producto);
+        } else if (onlyStockChanged) {
+            await updateAdminProductStock(original!.id_producto, payload.stock);
+            savedProduct = original ? { ...original, stock: payload.stock } : null;
+        } else {
+            savedProduct = await saveAdminProduct(data, original?.id_producto);
+        }
+
+        let verificationNotice = '';
+        if (verifyPriceAfterSave.value) {
+            const productId = savedProduct?.id_producto ?? original?.id_producto;
+            const amount = canonicalPrice(savedProduct?.precio ?? payload.precio);
+            if (!productId || !amount || amount === '0.00') {
+                verificationNotice = ' El producto se guardó, pero el precio no permite verificación.';
+            } else {
+                try {
+                    const verified = await verifyAdminProductPrice(productId, {
+                        importe: amount,
+                        evidencia: priceEvidence.value.trim(),
+                        confirmar: true,
+                    });
+                    verificationNotice = verified.publicado
+                        ? ' Precio verificado y publicado por FER-17.'
+                        : ` La evidencia quedó registrada, pero FER-17 no publica el precio (${verified.estadoFer17}).`;
+                } catch (error: unknown) {
+                    verificationNotice = ` El producto se guardó, pero el precio quedó pendiente de verificación: ${verificationErrorMessage(error)}`;
+                }
+            }
+        }
 
         emit(
             'saved',
-            isEditMode.value
+            (isEditMode.value
                 ? `"${payload.nombre}" se actualizó correctamente.`
-                : `"${payload.nombre}" se creó correctamente.`
+                : `"${payload.nombre}" se creó correctamente.`) + verificationNotice
         );
         emit('close');
     } catch (error: unknown) {
@@ -580,6 +650,49 @@ const handleNativeClose = () => {
                         </div>
                     </div>
 
+                    <div class="rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-3">
+                        <label class="flex items-start gap-2 text-sm font-medium text-[#0B2438]">
+                            <input
+                                v-model="verifyPriceAfterSave"
+                                type="checkbox"
+                                :disabled="formDisabled"
+                                class="mt-0.5 h-4 w-4"
+                            />
+                            <span>Verificar este precio al guardar</span>
+                        </label>
+                        <template v-if="verifyPriceAfterSave">
+                            <label for="producto-precio-evidencia" class="mt-3 grid gap-1 text-sm font-semibold text-[#0B2438]">
+                                Evidencia comercial
+                                <textarea
+                                    id="producto-precio-evidencia"
+                                    v-model="priceEvidence"
+                                    rows="3"
+                                    maxlength="1000"
+                                    :disabled="formDisabled"
+                                    aria-describedby="producto-precio-evidencia-ayuda"
+                                    class="box-border w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] disabled:opacity-60"
+                                />
+                                <span id="producto-precio-evidencia-ayuda" class="text-xs font-normal text-[#64748B]">
+                                    Documento, origen y localizador verificable. No se aceptan referencias genéricas, sintéticas ni de demostración.
+                                </span>
+                            </label>
+                            <p v-if="fieldErrors.precioEvidencia" class="mt-1 text-xs text-red-700">{{ fieldErrors.precioEvidencia }}</p>
+                            <label class="mt-3 flex items-start gap-2 text-sm text-[#0B2438]">
+                                <input
+                                    v-model="priceReviewConfirmed"
+                                    type="checkbox"
+                                    :disabled="formDisabled"
+                                    class="mt-0.5 h-4 w-4"
+                                />
+                                <span>Confirmo que revisé manualmente el precio y la evidencia.</span>
+                            </label>
+                            <p v-if="fieldErrors.precioConfirmacion" class="mt-1 text-xs text-red-700">{{ fieldErrors.precioConfirmacion }}</p>
+                            <p class="mt-2 text-xs text-[#64748B]">
+                                El producto se guarda primero. Si la verificación falla, quedará pendiente y podrá reintentarse desde la acción Verificar precio.
+                            </p>
+                        </template>
+                    </div>
+
                     <div>
                         <label for="producto-imagen-archivo" class="block text-xs font-semibold uppercase text-[#64748B] mb-1">
                             Foto del producto (opcional)
@@ -652,7 +765,7 @@ const handleNativeClose = () => {
                         :disabled="formDisabled || Boolean(imageError)"
                         class="box-border min-h-11 border-0 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
-                        {{ isSubmitting ? (imageFile ? 'Subiendo foto...' : 'Guardando...') : (isEditMode ? 'Guardar Cambios' : 'Crear Producto') }}
+                        {{ isSubmitting ? (imageFile ? 'Subiendo foto...' : 'Guardando...') : (isEditMode ? (verifyPriceAfterSave ? 'Guardar y verificar' : 'Guardar Cambios') : (verifyPriceAfterSave ? 'Crear y verificar' : 'Crear Producto')) }}
                     </button>
                 </div>
             </form>

@@ -151,6 +151,44 @@ export async function saveAdminProduct(
     }
 }
 
+export interface PriceVerificationResult {
+    productoId: number
+    precio: string
+    evidencia: string
+    verificadoEn: string
+    estadoFer17: string
+    publicado: boolean
+    eventoId: string
+    replay: boolean
+}
+
+export interface VerifyPricePayload {
+    importe: string
+    evidencia: string
+    confirmar: true
+}
+
+export function canonicalPrice(value: number | string | null | undefined): string | null {
+    if (value === null || value === undefined) return null
+    const text = String(value).trim().replace(',', '.')
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text)
+    if (!match) return null
+    return `${match[1]}.${(match[2] ?? '').padEnd(2, '0')}`
+}
+
+export async function verifyAdminProductPrice(
+    productId: number,
+    payload: VerifyPricePayload,
+    signal?: AbortSignal,
+): Promise<PriceVerificationResult> {
+    const response = await api.post<{ data: PriceVerificationResult }>(
+        `/admin/productos/${productId}/verificar-precio`,
+        payload,
+        { signal },
+    )
+    return response.data.data
+}
+
 export async function saveAdminProductWithImage(
     payload: ProductPayload,
     image: File,

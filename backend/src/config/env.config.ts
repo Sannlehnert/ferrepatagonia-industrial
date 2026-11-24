@@ -24,6 +24,10 @@ export interface BackendEnv {
     password: string;
   };
   storage: StorageConfig;
+  priceVerification: {
+    user: string | null;
+    password: string | null;
+  };
 }
 
 const POSITIVE_INT_PATTERN = /^[1-9][0-9]*$/;
@@ -102,8 +106,15 @@ export function loadEnv(raw: NodeJS.ProcessEnv = process.env): BackendEnv {
     DB_NAME: string;
     DB_USER: string;
     DB_PASSWORD: string;
+    PRICE_VERIFICATION_DB_USER?: string;
+    PRICE_VERIFICATION_DB_PASSWORD?: string;
   };
   const storage = loadStorageConfig(raw);
+  const verificationUser = parsedVerificationText(raw.PRICE_VERIFICATION_DB_USER);
+  const verificationPassword = parsedVerificationText(raw.PRICE_VERIFICATION_DB_PASSWORD);
+  if ((verificationUser === null) !== (verificationPassword === null)) {
+    throw new Error('PRICE_VERIFICATION_DB_USER y PRICE_VERIFICATION_DB_PASSWORD deben configurarse juntos.');
+  }
   return {
     httpSecurity,
     legacyOrderOffset: parsed.LEGACY_ORDER_UTC_OFFSET,
@@ -117,7 +128,17 @@ export function loadEnv(raw: NodeJS.ProcessEnv = process.env): BackendEnv {
       password: parsed.DB_PASSWORD,
     },
     storage,
+    priceVerification: {
+      user: verificationUser,
+      password: verificationPassword,
+    },
   };
+}
+
+function parsedVerificationText(value: string | undefined): string | null {
+  if (value === undefined) return null;
+  const trimmed = String(value).trim();
+  return trimmed === '' ? null : trimmed;
 }
 
 export const env: BackendEnv = loadEnv(process.env);

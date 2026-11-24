@@ -25,13 +25,60 @@ El usuario de aplicación requiere SELECT en evidencias y SELECT/INSERT/UPDATE e
 eventos de lista inactiva (el UPDATE solo resuelve deduplicación), además de los
 permisos existentes. La carga de evidencia/calendario/verificación usa una
 credencial operativa separada; no conceder estas escrituras a CLIENTE ni
-exponerlas en HTTP. La invalidación por cambio de precio y el alta se auditan con
-triggers bajo privilegios de definidor, no con un endpoint de evidencia.
+exponerlas al navegador. Desde #354 existe una excepción autorizada: el endpoint
+`POST /api/admin/productos/:id/verificar-precio` usa un pool MariaDB separado
+configurado con `PRICE_VERIFICATION_DB_USER/PASSWORD`, nunca la credencial
+principal. La invalidación por cambio de precio y el alta se auditan con
+triggers bajo privilegios de definidor.
 
 Para revertir código, conservar estas tablas, triggers y registros: no borrar
 evidencia ni auditoría para un rollback. No se añade DROP ni reversión destructiva
 automática. Una migración incompleta se reintenta; un fallo de consulta falla
 cerrado con 500.
+
+## Verificación administrativa desde la interfaz (#354)
+
+El CLI sigue siendo el procedimiento operativo recomendado para tareas
+masivas o auditorías. Para el trabajo comercial diario,
+
+```http
+POST /api/admin/productos/:id/verificar-precio
+```
+
+permite a un ADMIN activo registrar la misma evidencia y auditoría sin abrir
+una terminal. La identidad del actor se deriva de la sesión; el body solo
+contiene `importe`, `evidencia` y `confirmar: true`.
+
+El endpoint reutiliza `verifyProductPrice`, el lock de producto/evidencia, la
+comparación decimal exacta, el trigger de invalidación y
+`FER17_PRECIO_EVENTO`. La evidencia genérica, sintética o de demostración se
+rechaza. La operación es idempotente por estado: reintentar con el mismo
+precio, referencia y actor devuelve el mismo resultado sin duplicar la
+publicación.
+
+### Credencial separada
+
+Configurar en el backend, nunca en el navegador:
+
+```text
+PRICE_VERIFICATION_DB_USER=<usuario_verificador>
+PRICE_VERIFICATION_DB_PASSWORD=<secreto>
+```
+
+El usuario debe tener, como mínimo:
+
+```sql
+GRANT SELECT ON <db>.PRODUCTO TO '<usuario>'@'<host>';
+GRANT SELECT ON <db>.USUARIO TO '<usuario>'@'<host>';
+GRANT SELECT, INSERT, UPDATE ON <db>.PRECIO_USD_EVIDENCIA TO '<usuario>'@'<host>';
+GRANT SELECT, INSERT ON <db>.FER17_PRECIO_EVENTO TO '<usuario>'@'<host>';
+GRANT SELECT ON <db>.FER17_AUDITORIA_TRIGGERS TO '<usuario>'@'<host>';
+```
+
+`SELECT ... FOR UPDATE` sobre `PRODUCTO` funciona con el permiso `SELECT` en
+MariaDB; no se otorga `UPDATE` sobre productos. No otorgar DDL, DELETE ni
+escrituras sobre pagos, cuentas, movimientos o pedidos. Si las variables faltan, el endpoint responde 503
+controlado y el CLI sigue disponible.
 
 ## Evidencia USD por producto
 

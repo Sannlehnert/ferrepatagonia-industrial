@@ -1,5 +1,5 @@
-import type { EntityManager } from 'typeorm';
-import { inTransaction } from '../../config/database.config';
+import type { DataSource, EntityManager } from 'typeorm';
+import { inTransactionOn } from '../../config/database.config';
 import { dataSource } from '../../config/database.config';
 import { MariaDbPricingSource } from '../../repositories/pricing.source';
 import { PricingError } from './money';
@@ -49,6 +49,7 @@ export interface VerifyPriceSuccess {
   eventId: string;
   estadoFer17: string;
   publicado: boolean;
+  replay: boolean;
 }
 
 export interface VerifyPriceRejected {
@@ -83,7 +84,12 @@ type EvidenceRow = {
   id_admin: number;
   valida: number;
   sintetica: number;
+  verificado_utc: string;
 };
+
+export interface VerifyPriceOptions {
+  dataSource?: DataSource;
+}
 
 async function recordRejection(manager: EntityManager, input: {
   productId: number;
@@ -117,7 +123,10 @@ async function readFer17State(productId: number): Promise<string> {
   }
 }
 
-export async function verifyProductPrice(input: VerifyPriceInput): Promise<VerifyPriceResult> {
+export async function verifyProductPrice(
+  input: VerifyPriceInput,
+  options: VerifyPriceOptions = {},
+): Promise<VerifyPriceResult> {
   const productId = parsePositiveId(input.productId, 'El producto');
   const adminId = parsePositiveId(input.adminId, 'El operador');
   const expectedPrice = normalizeExpectedPrice(input.expectedPrice);
@@ -127,7 +136,8 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
       'La verificación exige confirmación explícita de revisión manual (--confirmar).');
   }
 
-  const verified = await inTransaction(async manager => {
+  const source = options.dataSource ?? dataSource;
+  const verified = await inTransactionOn(source, async manager => {
     const readAdmin = async (lock: boolean): Promise<AdminRow> => {
       const [admin] = await manager.query<AdminRow[]>(
         `SELECT id_usuario,email,rol,activo FROM USUARIO WHERE id_usuario = ?${lock ? ' LOCK IN SHARE MODE' : ''}`,
@@ -148,7 +158,8 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
       [productId],
     );
     const [previous] = product ? await manager.query<EvidenceRow[]>(
-      `SELECT precio_verificado,evidencia,id_admin,valida,sintetica
+      `SELECT precio_verificado,evidencia,id_admin,valida,sintetica,
+        DATE_FORMAT(verificado_utc,'%Y-%m-%dT%H:%i:%s.%fZ') AS verificado_utc
        FROM PRECIO_USD_EVIDENCIA WHERE id_producto = ? FOR UPDATE`,
       [productId],
     ) : [];
@@ -178,6 +189,32 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
         code: 'IMPORTE_NO_COINCIDE',
         message: `El precio actual es ${currentPrice} USD y el importe revisado fue ${expectedPrice} USD.`,
         eventId,
+      };
+    }
+
+    const alreadyVerified = previous?.valida === 1 && previous.sintetica === 0
+      && previous.precio_verificado === currentPrice
+      && previous.evidencia === evidence
+      && Number(previous.id_admin) === adminId;
+    if (alreadyVerified) {
+      const [lastVerification] = await manager.query<Array<{ id_evento: number | string }>>(
+        `SELECT id_evento FROM FER17_PRECIO_EVENTO
+         WHERE id_producto = ? AND tipo = 'VERIFICACION'
+           AND precio_nuevo = ? AND evidencia = ? AND id_admin = ?
+         ORDER BY id_evento DESC LIMIT 1`,
+        [productId, currentPrice, evidence, adminId],
+      );
+      return {
+        ok: true as const,
+        productId,
+        price: currentPrice,
+        evidence,
+        previousEvidence: previous.evidencia,
+        adminId,
+        adminEmail: admin.email,
+        verifiedAt: previous.verificado_utc,
+        eventId: lastVerification ? String(lastVerification.id_evento) : '',
+        replay: true,
       };
     }
 
@@ -213,6 +250,7 @@ export async function verifyProductPrice(input: VerifyPriceInput): Promise<Verif
       adminEmail: admin.email,
       verifiedAt: stored.verifiedAt,
       eventId: String(event.insertId),
+      replay: false,
     };
   // PRODUCTO serializes first attestations of the same product. READ COMMITTED
   // avoids gap locks for missing evidence on unrelated products.

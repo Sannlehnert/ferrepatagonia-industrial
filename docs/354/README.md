@@ -458,6 +458,6 @@ Los resultados de la etapa 1 se conservan en este documento y en
 
 - [Bloque 1 — Carga de comprobantes](etapa-2-bloque-1-comprobantes.md)
 - [Bloque 3 — Exportación Excel de productos](etapa-2-bloque-3-export-productos.md)
-- [Bloque 2 — Verificación administrativa de precios](etapa-2-bloque-2-propuesta-verificacion-precios.md):
-  propuesta de cambio de contrato pendiente de aprobación explícita. No se
-  implementó todavía.
+- [Bloque 2 — Verificación administrativa de precios](etapa-2-bloque-2-verificacion-precios.md):
+  implementación aprobada y validada. Propuesta original en
+  [etapa-2-bloque-2-propuesta-verificacion-precios.md](etapa-2-bloque-2-propuesta-verificacion-precios.md).

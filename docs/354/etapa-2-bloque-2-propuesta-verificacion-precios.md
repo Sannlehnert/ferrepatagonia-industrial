@@ -1,7 +1,7 @@
 # Etapa 2 · Bloque 2 — D354-07 Verificación administrativa de precios
 
-Estado: **propuesta pendiente de aprobación explícita**. No se implementó
-ningún endpoint, cambio de esquema ni cambio de credenciales en esta etapa.
+Estado: **aprobada e implementada**. Ver el resultado en
+[etapa-2-bloque-2-verificacion-precios.md](etapa-2-bloque-2-verificacion-precios.md).
 
 ## 1. Contrato vigente y problema
 

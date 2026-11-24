@@ -224,6 +224,10 @@ async function main() {
       DB_NAME: profile.database,
       DB_USER: 'root',
       DB_PASSWORD: profile.password,
+      // En E2E el pool separado usa la credencial descartable del runner. En
+      // producción debe ser un usuario MariaDB dedicado de mínimo privilegio.
+      PRICE_VERIFICATION_DB_USER: 'root',
+      PRICE_VERIFICATION_DB_PASSWORD: profile.password,
       CCE2E_TEST_PROFILE: JSON.stringify(profile),
       PORT: '3000',
     };

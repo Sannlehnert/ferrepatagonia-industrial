@@ -1,12 +1,13 @@
 import 'reflect-metadata';
 import { createConnection } from 'mysql2/promise';
-import { EntityManager, type QueryRunner } from 'typeorm';
+import { EntityManager, type DataSource, type QueryRunner } from 'typeorm';
 import type { IsolationLevel } from 'typeorm/driver/types/IsolationLevel';
 import { env } from './env.config';
 import { SchemaNamingStrategy } from '../entities/schema-naming.strategy';
 import { activeSchemas } from '../entities/active.schemas';
 import { pool } from './catalog-snapshot.config';
 import { ControlledDataSource, SafeDatabaseLogger, DatabaseOutcomeUnknownError } from './database-policy';
+import { destroyPriceVerificationDatabase } from './price-verification.config';
 
 export const dataSource = new ControlledDataSource({
   type: 'mariadb', connectorPackage: 'mysql2',
@@ -21,7 +22,10 @@ export const dataSource = new ControlledDataSource({
 export async function initializeDatabase(): Promise<void> { await dataSource.initialize(); }
 export async function destroyDatabase(): Promise<void> {
   try { if (dataSource.isInitialized) await dataSource.destroy(); }
-  finally { await pool.end(); }
+  finally {
+    await destroyPriceVerificationDatabase();
+    await pool.end();
+  }
 }
 export async function checkDatabase(): Promise<void> {
   // Fixed infrastructure probe, never business persistence or DDL.
@@ -77,7 +81,14 @@ export async function withCancellableRead<T>(
 // Keep one EntityManager and discard a connection whose rollback cannot be confirmed.
 export async function inTransaction<T>(work: (manager: EntityManager) => Promise<T>,
   options: { isolation?: IsolationLevel; lockWaitSeconds?: number } = {}): Promise<T> {
-  const runner = dataSource.createQueryRunner('master', options.lockWaitSeconds);
+  return inTransactionOn(dataSource, work, options);
+}
+
+export async function inTransactionOn<T>(source: DataSource, work: (manager: EntityManager) => Promise<T>,
+  options: { isolation?: IsolationLevel; lockWaitSeconds?: number } = {}): Promise<T> {
+  const createRunner = source.createQueryRunner.bind(source) as unknown as
+    (mode: 'master', lockWaitSeconds?: number) => QueryRunner;
+  const runner = createRunner('master', options.lockWaitSeconds);
   let connection: { destroy(): void } | undefined;
   let committing = false;
   try {
