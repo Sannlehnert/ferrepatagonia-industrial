@@ -481,3 +481,6 @@ Capturas nuevas:
 
 La rama permanece local, sin push, sin PR y sin merge. No se inició #356 y no se
 modificaron las bases persistentes del responsable.
+
+Commit de la etapa 3: `a3609c9`
+`fix(ui): resolve final responsive and usability findings`.

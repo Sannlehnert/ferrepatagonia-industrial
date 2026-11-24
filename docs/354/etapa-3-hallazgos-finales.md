@@ -3,7 +3,7 @@
 Fecha: 24/11/2026.
 Rama: `fix/354-final-acceptance`.
 Base de la etapa: `efd9675f2420b4b126c170c5c010f034a83a9bf6`.
-Commit local de la etapa: `fix(ui): resolve final responsive and usability findings`.
+Commit local de la etapa: `a3609c9` (`fix(ui): resolve final responsive and usability findings`).
 
 Esta etapa cierra los cuatro hallazgos de interfaz que quedaban fuera de las
 etapas 1 y 2. No se modificaron contratos financieros, reglas de precios ni
@@ -410,3 +410,18 @@ Chromium; en CI no es necesario si se usa `playwright install --with-deps`.
 - `docs/354/evidence/admin-products-responsive-390.png` (nuevo)
 - `docs/354/evidence/admin-products-responsive-768.png` (nuevo)
 - `docs/354/evidence/admin-products-responsive-1280.png` (nuevo)
+
+## 11. Commits locales de la rama
+
+| Etapa | Commit |
+| --- | --- |
+| 1 | `aaa9875` `feat(credit): complete client and admin credit workflow` |
+| 2 · bloque 1 | `71249d0` `fix(receipts): resolve valid file upload and validation issues` |
+| 2 · bloque 3 | `05cd539` `fix(products): correct catalog excel export` |
+| 2 · propuesta | `908f1ed` `docs(pricing): propose admin price verification contract` |
+| 2 · bloque 2 | `efd9675` `feat(pricing): integrate authorized admin price verification` |
+| 3 | `a3609c9` `fix(ui): resolve final responsive and usability findings` |
+
+Estos commits permanecen locales: no se hizo push, no se abrió PR y no se
+realizó merge.
+
