@@ -12,6 +12,12 @@ import {
     type AdminProductPage,
     type CategoryOption
 } from '../../services/adminProductService';
+import {
+    buildProductsWorkbook,
+    collectAdminProductsForExport,
+    downloadProductsWorkbook,
+    productsExportFilename,
+} from '../../services/productExportService';
 
 import { isMutationResultUncertain, adminMutationErrorMessage, uncertainMutationMessage } from '../../services/adminMutationError';
 
@@ -43,6 +49,10 @@ const loadError = ref('');
 const isSessionExpired = ref(false);
 const saveMessage = ref('');
 const actionError = ref('');
+const exportingProducts = ref(false);
+const exportError = ref('');
+const exportMessage = ref('');
+let exportController: AbortController | undefined;
 const processingId = ref<number | null>(null);
 const needsReload = ref(false);
 const actionsDisabled = computed(() => isLoading.value || processingId.value !== null || needsReload.value || Boolean(loadError.value));
@@ -174,6 +184,36 @@ const fetchProductos = async () => {
     }
 };
 
+const exportProducts = async () => {
+    if (exportingProducts.value || isLoading.value || searchPending.value) return;
+    exportController?.abort();
+    const controller = new AbortController();
+    exportController = controller;
+    exportingProducts.value = true;
+    exportError.value = '';
+    exportMessage.value = '';
+    try {
+        const products = await collectAdminProductsForExport(appliedSearch.value, controller.signal);
+        if (controller.signal.aborted) return;
+        if (products.length === 0) {
+            exportMessage.value = 'No hay productos para exportar con el filtro actual.';
+            return;
+        }
+        downloadProductsWorkbook(
+            buildProductsWorkbook(products),
+            productsExportFilename(appliedSearch.value),
+        );
+        exportMessage.value = `Se exportaron ${products.length} productos${appliedSearch.value ? ' del filtro actual' : ''} en Excel.`;
+    } catch (error: unknown) {
+        if (controller.signal.aborted) return;
+        exportError.value = error instanceof Error
+            ? error.message
+            : 'No se pudo exportar el catálogo. Intentá nuevamente.';
+    } finally {
+        if (!controller.signal.aborted) exportingProducts.value = false;
+    }
+};
+
 const fetchCategorias = async () => {
     isLoadingCategories.value = true;
     categoriesError.value = '';
@@ -296,6 +336,7 @@ onBeforeUnmount(() => {
     unmounted = true;
     clearTimeout(searchTimer);
     currentRequest?.abort();
+    exportController?.abort();
 });
 </script>
 
@@ -305,12 +346,22 @@ onBeforeUnmount(() => {
         <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 bg-[#F1F5F9] py-4">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 class="text-2xl font-bold text-[#0B2438]">Catálogo de Productos</h2>
-                <RouterLink
-                    :to="{ name: 'admin-product-import' }"
-                    class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
-                >
-                    Importar desde planilla
-                </RouterLink>
+                <div class="flex flex-wrap items-center gap-2">
+                    <RouterLink
+                        :to="{ name: 'admin-product-import' }"
+                        class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    >
+                        Importar desde planilla
+                    </RouterLink>
+                    <button
+                        type="button"
+                        class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="exportingProducts || isLoading || searchPending"
+                        @click="exportProducts"
+                    >
+                        {{ exportingProducts ? 'Exportando…' : 'Exportar a Excel' }}
+                    </button>
+                </div>
             </div>
             <div class="flex items-center gap-2">
                 <input
@@ -333,6 +384,10 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
+        <p class="mb-4 mt-0 text-sm text-slate-600">
+            La exportación incluye todos los productos que coinciden con la búsqueda activa, no solo la página visible.
+        </p>
+
         <p
             v-if="saveMessage"
             role="status"
@@ -340,6 +395,21 @@ onBeforeUnmount(() => {
         >
             {{ saveMessage }}
         </p>
+
+        <p
+            v-if="exportMessage"
+            role="status"
+            class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 wrap-anywhere"
+        >
+            {{ exportMessage }}
+        </p>
+        <div
+            v-if="exportError"
+            role="alert"
+            class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 wrap-anywhere"
+        >
+            {{ exportError }}
+        </div>
 
         <p v-if="processingId !== null" id="admin-products-lock" role="status" class="mb-4">Actualizando estado del producto. Las acciones están temporalmente deshabilitadas.</p>
         <div v-if="actionError || needsReload" role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">

@@ -11,6 +11,7 @@ export interface ProductRecord {
     nombre: string;
     descripcion: string | null;
     precio: string | null;
+    descuento_especial_pct: string | null;
     stock: number;
     imagen: string | null;
     activo: number | boolean;
@@ -40,7 +41,7 @@ export interface UpdateProductDTO {
 }
 
 // Explicit raw projections preserve DECIMAL strings, numeric flags and JSON keys.
-const fields = ['id_producto', 'id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo', 'fecha_actualizacion'];
+const fields = ['id_producto', 'id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'descuento_especial_pct', 'stock', 'imagen', 'activo', 'fecha_actualizacion'];
 
 function productQuery(manager?: EntityManager) {
     const query = (manager ?? dataSource).getRepository(ProductoSchema).createQueryBuilder('p');
@@ -49,8 +50,15 @@ function productQuery(manager?: EntityManager) {
 }
 
 export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' | 'VERIFICADO' | 'SINTETICO';
-export type AdminProductRow = ProductRecord & { estado_precio_base: AdminBasePriceState };
-type RawAdminProductRow = ProductRecord & { price_verifier: number | null; price_synthetic: number | null };
+export type AdminProductRow = ProductRecord & {
+    estado_precio_base: AdminBasePriceState;
+    precio_verificado: string | null;
+};
+type RawAdminProductRow = ProductRecord & {
+    price_verifier: number | null;
+    price_synthetic: number | null;
+    precio_verificado: string | null;
+};
 
 const adminListQuery = (manager?: EntityManager) => productQuery(manager)
     .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
@@ -60,6 +68,7 @@ const adminListQuery = (manager?: EntityManager) => productQuery(manager)
     .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
     .addSelect('ea.id_usuario', 'price_verifier')
     .addSelect('e.sintetica', 'price_synthetic')
+    .addSelect('e.precio_verificado', 'precio_verificado')
     .orderBy('p.id_producto', 'DESC');
 
 const withBasePriceState = ({ price_verifier, price_synthetic, ...product }: RawAdminProductRow): AdminProductRow => ({

@@ -450,3 +450,13 @@ sus volúmenes.
   ejecutar las verificaciones; no forman parte del cambio.
 - Commit local: `feat(credit): complete client and admin credit workflow`.
 - La rama se conserva para las etapas 2 y 3. No se avanzó a #356.
+
+## Etapa 2
+
+Los resultados de la etapa 1 se conservan en este documento y en
+`docs/354/evidence/`. El detalle de los bloques de la etapa 2 se registra en:
+
+- [Bloque 1 — Carga de comprobantes](etapa-2-bloque-1-comprobantes.md)
+- [Bloque 3 — Exportación Excel de productos](etapa-2-bloque-3-export-productos.md)
+- Bloque 2 — Verificación administrativa de precios: propuesta de cambio de
+  contrato pendiente de aprobación explícita. No se implementó todavía.

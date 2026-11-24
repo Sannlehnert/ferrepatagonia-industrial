@@ -10,6 +10,8 @@ export interface AdminProduct {
     nombre: string;
     descripcion: string | null;
     precio: number | string | null; // <-- Permitir null y string además de number
+    descuento_especial_pct?: number | string | null;
+    precio_verificado?: number | string | null;
     estado_precio_base?: AdminBasePriceState;
     stock: number;
     imagen: string | null;
@@ -71,9 +73,10 @@ export async function getAdminProductPage(
     page: number,
     search: string,
     signal?: AbortSignal,
+    limit = 20,
 ): Promise<AdminProductPage> {
     const { data } = await api.get<AdminProductPage>('/admin/productos', {
-        params: { page, busqueda: search || undefined },
+        params: { page, limit, busqueda: search || undefined },
         signal,
     });
     if (!Array.isArray(data?.data) || !Number.isSafeInteger(data.total) || data.total < 0
