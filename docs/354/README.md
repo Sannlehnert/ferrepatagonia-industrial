@@ -496,7 +496,15 @@ La etapa 4 corrige D354-11, elimina el enlace redundante del footer (decisión
 que modifica el alcance de #352), reorganiza la experiencia CLIENTE y ADMIN de
 cuenta corriente y agrega diagnóstico y robustez a la carga de comprobantes.
 
-D354-02 continúa **BLOCKED** hasta verificar el archivo real o una reproducción
-equivalente. La comprobación literal del CA-04 de #305 también continúa
-**BLOCKED** hasta disponer del texto original. La evidencia histórica de las
-etapas 1 a 3 no se modificó.
+D354-02 quedó **RESUELTO**. La causa confirmada era la resolución del worker:
+con `npm run dev` (`tsx`) se buscaba `receipt-file.worker.js` en el directorio
+fuente, donde solo existe el `.ts`. El fallo se clasificaba incorrectamente como
+`ARCHIVO_DANADO`. El responsable confirmó manualmente que con
+`npm run build` + `npm run start` la carga funcionaba. Ahora el worker se
+resuelve como `.js` en producción y como `.ts` con el cargador de `tsx` en
+desarrollo; los fallos de infraestructura responden `503` y los archivos
+realmente dañados conservan su `422`. Ver
+[Etapa 4 — D354-02](etapa-4-correcciones-finales.md#5-d354-02--rechazo-persistente-de-comprobantes).
+
+La comprobación literal del CA-04 de #305 continúa **BLOCKED** hasta disponer
+del texto original. La evidencia histórica de las etapas 1 a 3 no se modificó.

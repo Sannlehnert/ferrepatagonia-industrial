@@ -1,6 +1,7 @@
 import { constants, existsSync } from 'node:fs';
 import { lstat, open, realpath, stat, unlink } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { readStorageDir } from '../../config/storage-env.config';
 import { isReceiptId, ReceiptError, receiptUnavailable, type ReceiptMime } from './receipt-types';
@@ -41,42 +42,83 @@ function receiptPath(root: string, id: string): string {
   return join(root, id);
 }
 
+// En desarrollo `tsx` ejecuta el código fuente, donde solo existe el worker
+// `.ts`. En producción `tsc` genera el `.js` junto a este módulo. Se resuelve
+// siempre el artefacto adyacente para no depender del directorio de trabajo.
+function receiptWorker() {
+  const compiled = join(__dirname, 'receipt-file.worker.js');
+  if (existsSync(compiled)) return { file: compiled, execArgv: [] };
+
+  const source = join(__dirname, 'receipt-file.worker.ts');
+  if (!existsSync(source)) throw receiptUnavailable();
+  let loader: string;
+  try {
+    loader = require.resolve('tsx');
+  } catch {
+    throw receiptUnavailable();
+  }
+  return { file: source, execArgv: ['--import', pathToFileURL(loader).href] };
+}
+
+type ValidationOutcome =
+  | { status: 'result'; value: ReceiptValidationResult }
+  | { status: 'unavailable' };
+
 export async function validateReceiptContent(bytes: Buffer, mime: ReceiptMime, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   if (!bytes.length) throw new ReceiptError(400, 'ARCHIVO_VACIO', 'Seleccioná un archivo con contenido.');
+  const location = receiptWorker();
   const input = new Uint8Array(bytes);
-  const worker = new Worker(join(__dirname, 'receipt-file.worker.js'), {
-    workerData: { bytes: input, mime },
-    transferList: [input.buffer],
-    env: {},
-    resourceLimits: { maxOldGenerationSizeMb: 96, maxYoungGenerationSizeMb: 16, stackSizeMb: 2 },
-    execArgv: [],
-  });
 
-  const result = await new Promise<ReceiptValidationResult | null>(resolve => {
-    const finish = (value: ReceiptValidationResult | null) => {
+  let worker: Worker;
+  try {
+    worker = new Worker(location.file, {
+      workerData: { bytes: input, mime },
+      transferList: [input.buffer],
+      env: {},
+      resourceLimits: { maxOldGenerationSizeMb: 96, maxYoungGenerationSizeMb: 16, stackSizeMb: 2 },
+      execArgv: location.execArgv,
+    });
+  } catch {
+    console.error('receipt.validation.worker.unavailable');
+    throw receiptUnavailable();
+  }
+
+  const outcome = await new Promise<ValidationOutcome>(resolve => {
+    let settled = false;
+    const finish = (value: ValidationOutcome) => {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       signal.removeEventListener('abort', cancel);
       resolve(value);
     };
-    const cancel = () => finish(null);
-    const timer = setTimeout(cancel, 6000);
+    const unavailable = () => finish({ status: 'unavailable' });
+    const cancel = () => unavailable();
+    const timer = setTimeout(unavailable, 6000);
     worker.once('message', value => {
-      if (value && typeof value === 'object' && value.ok === true) finish({ ok: true });
-      else if (value && typeof value === 'object' && value.ok === false
+      if (value && typeof value === 'object' && value.ok === true) {
+        finish({ status: 'result', value: { ok: true } });
+      } else if (value && typeof value === 'object' && value.ok === false
         && typeof value.code === 'string' && Object.hasOwn(validationMessages, value.code)) {
-        finish({ ok: false, code: value.code as ReceiptValidationFailure });
-      } else finish(null);
+        finish({ status: 'result', value: { ok: false, code: value.code as ReceiptValidationFailure } });
+      } else {
+        unavailable();
+      }
     });
-    worker.once('error', cancel);
-    worker.once('exit', cancel);
+    worker.once('error', unavailable);
+    worker.once('exit', unavailable);
     signal.addEventListener('abort', cancel, { once: true });
   }).finally(() => worker.terminate());
 
   signal.throwIfAborted();
-  if (!result || !result.ok) {
-    const code: ReceiptValidationFailure = result?.code ?? 'ARCHIVO_DANADO';
-    throw new ReceiptError(422, code, validationMessages[code]);
+  if (outcome.status === 'unavailable') {
+    console.error('receipt.validation.worker.failed');
+    throw receiptUnavailable();
+  }
+  const result = outcome.value;
+  if (!result.ok) {
+    throw new ReceiptError(422, result.code, validationMessages[result.code]);
   }
 }
 

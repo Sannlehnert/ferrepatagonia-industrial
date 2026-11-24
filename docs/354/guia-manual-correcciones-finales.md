@@ -117,6 +117,8 @@ node backend/test/helpers/run-e2e.cjs --fer19
 
 ## Cierre
 
-D354-02 no se considera resuelto hasta verificar el archivo problemático o una
-reproducción equivalente. El resto de los bloques se considera PASS según las
-pruebas registradas en `docs/354/etapa-4-correcciones-finales.md`.
+D354-02 quedó resuelto: la causa era la resolución del worker en desarrollo. La
+carga de PDF, JPG y PNG se verifica en desarrollo y producción con
+`npm --prefix backend run test:receipt-worker`, además de la suite integral de
+comprobantes. El resto de los bloques se considera PASS según las pruebas
+registradas en `docs/354/etapa-4-correcciones-finales.md`.

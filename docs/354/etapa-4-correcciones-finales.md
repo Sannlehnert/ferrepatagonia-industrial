@@ -27,7 +27,7 @@ no se hizo merge, no se cerró #354 y no se inició #356.
 | UX de productos y modales | PASS | Sin cambios. |
 | UX de estado comercial e importes | PASS | Se conservó y se reutilizó en la nueva experiencia. |
 | UX de comprobantes a 1024 px | FAIL | Corregido en D354-11. |
-| D354-02 rechazo de comprobantes | PENDIENTE DE VERIFICACIÓN REAL | Se corrigieron causas reproducibles, pero el caso original sigue BLOCKED. |
+| D354-02 rechazo de comprobantes | RESUELTO | Causa confirmada: en desarrollo el worker se buscaba como `.js` en el directorio fuente. Corregido y verificado en ambos modos. |
 | D354-08 enlace Área Empresas | Decisión funcional nueva | Se eliminó el enlace y se documentó el cambio de alcance de #352. |
 | D354-10 experiencia de cuenta corriente | Mejora solicitada | Se reorganizó la experiencia CLIENTE y ADMIN. |
 
@@ -220,13 +220,45 @@ el dashboard conserva su comportamiento autónomo y su botón de actualización.
 
 ## 5. D354-02 — Rechazo persistente de comprobantes
 
-### Estado: BLOCKED
+### Estado: RESUELTO
 
-No se declara resuelto el defecto original. Se corrigieron falsos positivos
-reproducibles y se agregó diagnóstico, pero no se dispone del archivo real que
-el responsable intentó cargar.
+### Causa confirmada
 
-### Hallazgo sobre el mensaje exacto
+`validateReceiptContent` construía siempre el worker con
+`join(__dirname, 'receipt-file.worker.js')`. Con `npm run dev` (`tsx watch`),
+`__dirname` es `backend/src/services/receipts`, donde solo existe
+`receipt-file.worker.ts`; el `.js` únicamente se genera en `backend/dist` al
+compilar. El worker no llegaba a iniciarse.
+
+Además, cualquier ausencia de resultado del worker (error de carga, salida
+anticipada o timeout) se convertía en `ARCHIVO_DANADO`. Por eso un fallo de
+infraestructura de desarrollo se presentaba como un archivo dañado y el
+comprobante válido se rechazaba con HTTP 422.
+
+El responsable verificó manualmente que, con `npm run build` y `npm run start`,
+la carga del comprobante funciona correctamente. Esa prueba confirma que el
+archivo y la validación de contenido son correctos, y que el defecto estaba en
+la resolución del worker durante el desarrollo.
+
+### Corrección
+
+- Se resuelve primero el worker compilado adyacente
+  `receipt-file.worker.js`, usado por `npm run start` y por las pruebas contra
+  `dist`.
+- Si no existe, se resuelve el fuente adyacente `receipt-file.worker.ts` y se
+  ejecuta con el cargador de `tsx`, exclusivamente en ese modo de desarrollo.
+- El worker conserva `env: {}`, la transferencia del búfer, los límites de
+  memoria y el timeout de 6 segundos. No se relajó ninguna validación de
+  seguridad.
+- Un worker ausente, que no inicia, falla, emite una respuesta inválida o
+  agota el tiempo ahora responde `503 COMPROBANTES_NO_DISPONIBLES`, no
+  `422 ARCHIVO_DANADO`. Los archivos realmente dañados siguen respondiendo
+  `422` con `ARCHIVO_DANADO`, `TIPO_INCOMPATIBLE` o
+  `CONTENIDO_NO_PERMITIDO`.
+- El diagnóstico interno registra `receipt.validation.worker.unavailable` o
+  `receipt.validation.worker.failed` sin exponer rutas ni detalles al cliente.
+
+### Contexto histórico del mensaje exacto
 
 El mensaje reportado:
 
@@ -268,37 +300,40 @@ documentos manipulados, MIME incompatible, truncados y archivos mayores a 5 MB.
 
 ### Pruebas ejecutadas
 
-- `backend/test/payment-receipts.test.cjs`: 10/10 con MariaDB 11.4 descartable.
-  Incluye PDF/PNG/JPEG reales, PDF con enlace benigno, OpenAction nombrado,
-  relleno posterior, archivos activos, truncados, suplantados y límites.
+- `backend/test/receipt-worker.test.cjs`, ejecutado en los dos modos:
+  - desarrollo (`tsx`, worker `.ts`): 2/2 correctas;
+  - producción (`dist`, worker `.js`): 2/2 correctas.
+  Cada modo valida la carga de los fixtures reales PDF, JPG y PNG, el rechazo
+  de un PDF truncado como `ARCHIVO_DANADO`, el rechazo de un MIME incompatible
+  y la clasificación de un worker ausente como
+  `503 COMPROBANTES_NO_DISPONIBLES`.
+- `backend/test/payment-receipts.test.cjs`: 10/10 con MariaDB 11.4 descartable,
+  contra el backend compilado. Incluye PDF/PNG/JPEG reales, PDF con enlace
+  benigno, OpenAction nombrado, relleno posterior, archivos activos, truncados,
+  suplantados y límites.
 - Validación directa de 22 archivos representativos (PDF, PNG, JPEG, perfiles de
   color, CMYK, progresivo, metadatos, anotaciones y relleno): 22/22 aceptados.
 - Validación de 134 PDF/imágenes del sistema: 134/134 aceptados.
 - `frontend/test/payment-receipts.test.cjs`: normalización de MIME, códigos
   diferenciados y diagnóstico.
 
-### Cómo obtener el caso real
+### Verificación manual y cierre
 
-Si el rechazo continúa, pedir al responsable:
+La prueba manual del responsable con `npm run build` + `npm run start` cargó el
+comprobante correctamente. La reproducción en desarrollo confirmó que la misma
+carga fallaba antes del cambio por la ruta del worker, no por el archivo. Con la
+corrección, ambos modos aceptan PDF, JPG y PNG.
 
-1. Abrir DevTools → Network antes de adjuntar el archivo.
-2. Repetir la carga.
-3. Registrar:
-   - endpoint exacto de la petición (`/api/pedidos/:id/comprobantes` o
-     `/api/cuenta-corriente/comprobantes`);
-   - método y código HTTP;
-   - respuesta JSON completa, en especial `code` y `message`;
-   - valor de `data-error-code` en el aviso de la pantalla;
-   - formato, tamaño y aplicación que generó el archivo.
-4. Si el código es `CONTENIDO_INVALIDO`, confirmar que el backend desplegado
-   corresponde al commit actual y reconstruirlo. Ese código ya no existe en el
-   backend de esta rama.
-5. Si el código es `ARCHIVO_DANADO`, `TIPO_INCOMPATIBLE` o
-   `CONTENIDO_NO_PERMITIDO`, solicitar una muestra anonimizada o un archivo
-   reproducido con la misma aplicación. No almacenar comprobantes reales en el
-   repositorio.
+La validación automatizada de ambos modos se repite con:
 
-Sin ese dato o una reproducción equivalente, D354-02 permanece BLOCKED.
+```bash
+npm --prefix backend run build
+npm --prefix backend run test:receipt-worker
+```
+
+No se declara aprobado ningún otro caso no ejecutado. Si apareciera un rechazo
+`422` real, se mantiene la guía de diagnóstico por `data-error-code`; si
+apareciera `503`, corresponde revisar el despliegue o el worker, no el archivo.
 
 ## 6. Documentación y CA-04 de #305
 
@@ -319,6 +354,7 @@ Chromium real. No se usaron mocks como sustituto de las pruebas integrales.
 | `npm --prefix backend run type-check` | PASS |
 | `npm --prefix backend run test:unit` | 1421/1421 PASS |
 | `npm --prefix backend run test:dto-source` | 4/4 PASS |
+| `npm --prefix backend run test:receipt-worker` | 4/4 PASS (2 desarrollo + 2 producción) |
 | `npm --prefix backend run test:receipts:isolated` | 10/10 PASS |
 | `npm --prefix backend run test:payments:isolated` | 25/25 PASS |
 | `npm --prefix backend run test:credit-workflow:isolated` | 24/24 PASS |
@@ -373,11 +409,13 @@ fixture. No contienen comprobantes bancarios reales.
 
 ## 9. Riesgos y pendientes
 
-1. **D354-02 BLOCKED:** falta el archivo o la respuesta real para confirmar el
-   caso reportado. No se declara aprobado.
+1. **D354-02 resuelto:** la causa era la resolución del worker en desarrollo.
+   Las pruebas cubren PDF, JPG y PNG en desarrollo y producción. Cualquier
+   rechazo nuevo debe analizarse por código (`422` archivo o `503` worker).
 2. **Compilación desactualizada:** si el mensaje legado reaparece, el backend
    desplegado no corresponde a esta rama. Verificar `CONTENIDO_INVALIDO` en la
-   respuesta y reconstruir.
+   respuesta y reconstruir. En desarrollo, no debe ejecutarse `dist` con
+   `npm run dev` ni el fuente con `npm run start`.
 3. **PDF cifrados o con contraseña:** siguen rechazados por diseño.
 4. **Relleno de imágenes:** solo se admite relleno inerte; cualquier payload
    posterior sigue rechazado.
