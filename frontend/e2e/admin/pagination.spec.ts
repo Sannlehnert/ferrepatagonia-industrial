@@ -69,13 +69,22 @@ test('pagina el listado ADMIN y conserva búsqueda, historial y foco', async ({ 
 
   await page.setViewportSize({ width: 320, height: 800 });
   const region = page.getByRole('region', { name: 'Tabla desplazable de productos' });
-  await expect(region).toHaveAccessibleDescription(/usá las flechas/);
+  await expect(region).toHaveAccessibleDescription(/ficha/);
   await region.focus();
   await expect(region).toBeFocused();
-  await page.keyboard.press('ArrowRight');
-  await expect.poll(() => region.evaluate(el => el.scrollLeft)).toBeGreaterThan(0);
+  const geometry = await region.evaluate(el => ({
+    client: el.clientWidth,
+    scroll: el.scrollWidth,
+  }));
+  expect(geometry.scroll).toBeLessThanOrEqual(geometry.client + 1);
   await page.keyboard.press('Tab');
+  const verify = table.getByRole('button', { name: 'Verificar precio de Producto E2E 25', exact: true });
   const edit = table.getByRole('button', { name: 'Editar Producto E2E 25', exact: true });
+  if (await verify.count()) {
+    await expect(verify).toBeFocused();
+    await expect(verify).toBeInViewport();
+    await page.keyboard.press('Tab');
+  }
   await expect(edit).toBeFocused();
   await expect(edit).toBeInViewport();
   await expect(edit).toHaveAccessibleDescription('SKU: E2E-25');
@@ -83,7 +92,7 @@ test('pagina el listado ADMIN y conserva búsqueda, historial y foco', async ({ 
   const deactivate = table.getByRole('button', { name: 'Desactivar Producto E2E 25', exact: true });
   await expect(deactivate).toBeFocused();
   await expect(deactivate).toBeInViewport();
-  await expect(table.getByRole('cell', { name: 'Activo', exact: true })).toBeVisible();
+  await expect(table.getByText('Activo', { exact: true })).toBeVisible();
 
   await page.route(/\/api\/admin\/productos\?/, route =>
     route.fulfill({ status: 500, json: { message: 'Listado temporalmente inaccesible.' } }), { times: 1 });
@@ -132,10 +141,10 @@ test('canoniza la URL ADMIN sin repetir la consulta efectiva', async ({ page }) 
   const path = '/admin/productos';
   const pagination = page.getByRole('navigation', { name: 'Paginación de productos' });
   const cases = [
-    { query: '?page=0002&busqueda=%20', canonical: '', api: '?page=1', label: 'Página 1 de 2' },
-    { query: '?page=2&page=3&busqueda=x&busqueda=y', canonical: '', api: '?page=1', label: 'Página 1 de 2' },
-    { query: '?page=1000001&busqueda=', canonical: '', api: '?page=1', label: 'Página 1 de 2' },
-    { query: '?page=999', canonical: '?page=2', api: '?page=999', label: 'Página 2 de 2' },
+    { query: '?page=0002&busqueda=%20', canonical: '', api: '?page=1&limit=20', label: 'Página 1 de 2' },
+    { query: '?page=2&page=3&busqueda=x&busqueda=y', canonical: '', api: '?page=1&limit=20', label: 'Página 1 de 2' },
+    { query: '?page=1000001&busqueda=', canonical: '', api: '?page=1&limit=20', label: 'Página 1 de 2' },
+    { query: '?page=999', canonical: '?page=2', api: '?page=999&limit=20', label: 'Página 2 de 2' },
   ];
   for (const { query, canonical, api, label } of cases) {
     const firstRequest = requests.length;
@@ -149,7 +158,7 @@ test('canoniza la URL ADMIN sin repetir la consulta efectiva', async ({ page }) 
   const firstRequest = requests.length;
   await page.reload();
   await expect(pagination).toContainText('Página 2 de 2');
-  expect(requests.slice(firstRequest)).toEqual(['?page=2']);
+  expect(requests.slice(firstRequest)).toEqual(['?page=2&limit=20']);
   await pagination.getByRole('button', { name: 'Anterior' }).click();
   await expect(pagination).toContainText('Página 1 de 2');
   await expect(pagination).toHaveAttribute('aria-busy', 'false');

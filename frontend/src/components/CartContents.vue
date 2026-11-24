@@ -112,7 +112,7 @@ const busy = computed(() =>
           :key="item.id_producto"
           :item="item"
           :busy="busy"
-          :stale="cart.needsSync"
+          :stale="cart.stale"
           @quantity="cart.actualizarCantidad(item.id_producto, $event)"
           @remove="cart.quitarProducto(item.id_producto)"
         />
@@ -121,7 +121,7 @@ const busy = computed(() =>
       <CartSummary
         v-if="cart.items.length"
         :snapshot="cart.cart"
-        :stale="cart.needsSync"
+        :stale="cart.stale"
       />
     </template>
     <AccountOrderCheckout

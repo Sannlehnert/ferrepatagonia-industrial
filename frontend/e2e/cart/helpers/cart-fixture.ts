@@ -10,6 +10,7 @@ export async function mockCart(page: Page) {
     readFailures: 0,
     failCartReadOnRecovery: false,
     readGate: null as Promise<void> | null,
+    mutationGate: null as Promise<void> | null,
     confirmGate: null as Promise<void> | null,
     eligibilityGate: null as Promise<void> | null,
     eligibilityFailures: 0,
@@ -328,6 +329,7 @@ export async function mockCart(page: Page) {
         })
       }
 
+      if (state.mutationGate) await state.mutationGate
       state.quantity = cantidad
       state.writes.push({ method, quantity: cantidad })
       return route.fulfill({ status: 204 })

@@ -380,10 +380,12 @@ seis anchos.
 5. La spec E2E requiere las bibliotecas de Chromium instaladas. En esta
    estación se resolvió con extracción local; CI debe usar
    `playwright install --with-deps`.
-6. No se corrigieron los puntos fuera de alcance de la ETAPA 1/3: verificación
-   administrativa de precios, carga de comprobantes, responsive de productos
-   ADMIN, ubicación de «Nuevo producto», advertencias transitorias del carrito
-   ni enlace «Área Empresas» del footer.
+6. Los puntos fuera de alcance de la ETAPA 1/3 se resolvieron en la ETAPA 3:
+   verificación administrativa de precios (bloque 2 de la etapa 2), carga de
+   comprobantes (bloque 1 de la etapa 2), responsive de productos ADMIN,
+   ubicación de «Nuevo producto», advertencias transitorias del carrito y
+   enlace «Área Empresas» del footer. Ver
+   [etapa-3-hallazgos-finales.md](etapa-3-hallazgos-finales.md).
 7. La solicitud pendiente puede resolverse desde el panel superior o desde el
    detalle de la empresa. Son dos puntos de entrada al mismo servicio
    idempotente; no generan duplicados.
@@ -461,3 +463,21 @@ Los resultados de la etapa 1 se conservan en este documento y en
 - [Bloque 2 — Verificación administrativa de precios](etapa-2-bloque-2-verificacion-precios.md):
   implementación aprobada y validada. Propuesta original en
   [etapa-2-bloque-2-propuesta-verificacion-precios.md](etapa-2-bloque-2-propuesta-verificacion-precios.md).
+
+## Etapa 3
+
+La última etapa cierra los hallazgos de interfaz D354-01, D354-03, D354-06 y
+D354-08. El detalle consolidado de los nueve hallazgos, las regresiones y las
+instrucciones de validación manual está en:
+
+- [Etapa 3 — Hallazgos finales](etapa-3-hallazgos-finales.md)
+
+Capturas nuevas:
+
+- `docs/354/evidence/admin-products-responsive-320.png`
+- `docs/354/evidence/admin-products-responsive-390.png`
+- `docs/354/evidence/admin-products-responsive-768.png`
+- `docs/354/evidence/admin-products-responsive-1280.png`
+
+La rama permanece local, sin push, sin PR y sin merge. No se inició #356 y no se
+modificaron las bases persistentes del responsable.

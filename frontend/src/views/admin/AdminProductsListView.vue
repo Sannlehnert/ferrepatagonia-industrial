@@ -373,15 +373,27 @@ onBeforeUnmount(() => {
 <template>
     <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
         <!-- Barra Superior -->
-        <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 bg-[#F1F5F9] py-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mb-6 flex flex-col gap-4 border-b border-[#E2E8F0] bg-[#F1F5F9] pb-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <h2 class="text-2xl font-bold text-[#0B2438]">Catálogo de Productos</h2>
-                <div class="flex flex-wrap items-center gap-2">
+                <div
+                    role="group"
+                    aria-label="Acciones del catálogo"
+                    class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center lg:justify-end"
+                >
+                    <button
+                        type="button"
+                        @click="openCreateModal"
+                        :disabled="actionsDisabled"
+                        class="col-span-2 box-border min-h-11 rounded-md border-0 bg-[#103A5C] px-6 py-2.5 font-semibold text-white shadow-md transition-colors hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-1"
+                    >
+                        + Nuevo Producto
+                    </button>
                     <RouterLink
                         :to="{ name: 'admin-product-import' }"
                         class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
-                        Importar desde planilla
+                        Importar productos
                     </RouterLink>
                     <button
                         type="button"
@@ -393,7 +405,7 @@ onBeforeUnmount(() => {
                     </button>
                 </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <input
                     ref="searchInput"
                     v-model="searchQuery"
@@ -401,7 +413,7 @@ onBeforeUnmount(() => {
                     maxlength="200"
                     placeholder="Buscar por Nombre o SKU..."
                     aria-label="Buscar productos por nombre o SKU"
-                    class="box-border min-h-11 w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
+                    class="box-border min-h-11 w-full min-w-0 flex-1 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm sm:max-w-72"
                 >
                 <button
                     v-if="searchQuery || appliedSearch"
@@ -486,7 +498,8 @@ onBeforeUnmount(() => {
 
         <template v-else-if="result && result.data.length">
             <p id="admin-products-scroll" class="mb-2 text-sm text-slate-700">
-                Si no ves todas las columnas, desplazá la tabla hacia los lados. Con teclado, enfocá la tabla y usá las flechas.
+                <span class="lg:hidden">Cada producto se muestra como una ficha con todos sus datos y acciones.</span>
+                <span class="hidden lg:inline">Si no ves todas las columnas, desplazá la tabla hacia los lados. Con teclado, enfocá la tabla y usá las flechas.</span>
             </p>
             <p id="admin-products-price" class="mb-3 text-sm text-slate-700">
                 Los importes base son de uso interno. El listado no informa su verificación comercial.
@@ -500,7 +513,7 @@ onBeforeUnmount(() => {
                 @focusin="revealTableControl"
                 class="relative mb-6 w-full min-w-0 overflow-x-auto rounded-md border border-slate-300 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             >
-                <table class="w-full min-w-[48rem] border-collapse text-left text-sm text-[#0B2438]" aria-describedby="admin-products-price">
+                <table class="products-table w-full border-collapse text-left text-sm text-[#0B2438] lg:min-w-[48rem]" aria-describedby="admin-products-price">
                     <caption class="sr-only">Productos del catálogo</caption>
                     <thead class="border-b border-slate-300 bg-slate-100">
                         <tr>
@@ -521,23 +534,24 @@ onBeforeUnmount(() => {
                                     <span class="wrap-anywhere">{{ prod.nombre }}</span>
                                 </div>
                             </th>
-                            <td class="px-3 py-2 wrap-anywhere">
+                            <td class="px-3 py-2 wrap-anywhere" data-label="SKU">
                                 <span :id="`product-sku-${prod.id_producto}`"><span class="sr-only">SKU: </span>{{ prod.codigo }}</span>
                             </td>
-                            <td class="px-3 py-2 wrap-anywhere">{{ prod.categoria_nombre || 'Sin categoría informada' }}</td>
-                            <td class="px-3 py-2 text-right tabular-nums">{{ prod.stock }}</td>
-                            <td class="px-3 py-2 whitespace-nowrap text-right tabular-nums">{{ formatPrice(prod.precio) }}</td>
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2 wrap-anywhere" data-label="Categoría">{{ prod.categoria_nombre || 'Sin categoría informada' }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums" data-label="Stock">{{ prod.stock }}</td>
+                            <td class="px-3 py-2 whitespace-nowrap text-right tabular-nums" data-label="Precio base (USD)">{{ formatPrice(prod.precio) }}</td>
+                            <td class="px-3 py-2" data-label="Estado">
                                 <span
                                     class="rounded-full px-2 py-1 font-semibold"
                                     :class="prod.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'"
                                 >{{ prod.activo ? 'Activo' : 'Inactivo' }}</span>
                             </td>
-                            <td class="px-3 py-2">
-                                <div class="flex flex-wrap gap-2">
+                            <td class="px-3 py-2" data-label="">
+                                <div class="row-actions flex flex-wrap gap-2">
                                     <button
                                         v-if="canVerifyPrice(prod)"
                                         type="button"
+                                        data-action="verify"
                                         :disabled="actionsDisabled"
                                         :aria-label="`Verificar precio de ${prod.nombre}`"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
@@ -587,14 +601,6 @@ onBeforeUnmount(() => {
                         @click="changePage(1)">Siguiente</button>
                 </nav>
             </div>
-            <button
-                type="button"
-                @click="openCreateModal"
-                :disabled="actionsDisabled"
-                class="box-border min-h-11 border-0 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
-            >
-                + Nuevo Producto
-            </button>
         </div>
 
         <ProductFormModal
@@ -620,3 +626,84 @@ onBeforeUnmount(() => {
         />
     </div>
 </template>
+
+<style scoped>
+/*
+ * En pantallas menores a lg, cada fila de la tabla se presenta como una ficha.
+ * Se conserva el mismo DOM y la semántica de tabla para lectores de pantalla y
+ * para no duplicar controles ni acciones.
+ */
+@media (max-width: 1023px) {
+    .products-table {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .products-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .products-table tbody {
+        display: block;
+    }
+
+    .products-table tbody tr {
+        display: block;
+        padding: .875rem 1rem;
+    }
+
+    .products-table tbody th[scope="row"] {
+        display: block;
+        padding: 0 0 .625rem;
+    }
+
+    .products-table tbody td {
+        display: grid;
+        grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr);
+        align-items: baseline;
+        gap: .75rem;
+        padding: .3rem 0;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .products-table tbody td::before {
+        content: attr(data-label);
+        color: #475569;
+        font-size: .8125rem;
+        font-weight: 600;
+    }
+
+    .products-table tbody td[data-label=""] {
+        display: block;
+        padding-top: .75rem;
+    }
+
+    .products-table tbody td[data-label=""]::before {
+        content: none;
+    }
+
+    .products-table .row-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .products-table .row-actions > button {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .products-table .row-actions > [data-action="verify"] {
+        grid-column: 1 / -1;
+    }
+}
+</style>

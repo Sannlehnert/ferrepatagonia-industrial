@@ -108,7 +108,6 @@ const transferReceiptPath = computed(() =>
 watch(
   [eligibilityKey, showTotal],
   ([, hasVerifiableTotal]) => {
-    if (!hasLockedAttempt.value) selected.value = 'TRANSFERENCIA'
     eligibilityFeedback.value = ''
     if (hasVerifiableTotal) {
       void order.loadEligibility(eligibilityKey.value ?? '')
@@ -130,6 +129,9 @@ watch(
   ([transferLoading, transferEligible, creditLoading, creditEligible]) => {
     if (creditLoading) eligibilityFeedback.value = ''
     if (hasLockedAttempt.value || transferLoading || creditLoading) return
+    // No pisa una elección explícita del cliente cuando solo se refrescaron
+    // los totales. Solo cambia de modalidad si la elegida dejó de estar
+    // disponible y la otra sí puede usarse.
     if (selected.value === 'TRANSFERENCIA' && transferEligible === false && creditEligible) {
       selected.value = 'CUENTA_CORRIENTE'
     } else if (selected.value === 'CUENTA_CORRIENTE' && !creditEligible && transferEligible) {

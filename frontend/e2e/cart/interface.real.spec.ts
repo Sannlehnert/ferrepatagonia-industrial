@@ -1,5 +1,13 @@
 import { test, expect } from '@playwright/test'
 
+type CartWarningBrowser = typeof globalThis & {
+  __cartWarnings?: string[]
+  document: { body: { innerText: string } }
+  MutationObserver: new (callback: () => void) => {
+    observe(target: unknown, options: Record<string, boolean>): void
+  }
+}
+
 test('API real: agrega desde catálogo y conserva el carrito al recargar', async ({
   page,
 }) => {
@@ -102,6 +110,46 @@ test('API real: agrega desde catálogo y conserva el carrito al recargar', async
       },
     ],
   })
+
+  // D354-06: una actualización de cantidad exitosa contra el backend real no
+  // debe mostrar advertencias de resincronización en ningún instante.
+  await page.evaluate(() => {
+    const browser = globalThis as CartWarningBrowser
+    const phrases = [
+      'Volvé a consultar el carrito',
+      'Stock y precio pendientes de confirmar.',
+    ]
+    const seen: string[] = []
+    browser.__cartWarnings = seen
+    const scan = () => {
+      const text = browser.document.body.innerText
+      for (const phrase of phrases) {
+        if (text.includes(phrase) && !seen.includes(phrase)) seen.push(phrase)
+      }
+    }
+    new browser.MutationObserver(scan).observe(browser.document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    })
+    scan()
+  })
+  const update = page.waitForResponse(request =>
+    new URL(request.url()).pathname === '/api/carrito/items/24' &&
+    request.request().method() === 'PATCH')
+  await page.getByRole('button', {
+    name: 'Aumentar cantidad de Producto E2E 24',
+  }).click()
+  expect((await update).status()).toBe(204)
+  await expect(quantity).toHaveValue('3')
+  const updatedSummary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(updatedSummary).toContainText('USD 334.80')
+  await expect(page.getByText('Volvé a consultar el carrito', { exact: false })).toHaveCount(0)
+  await expect(page.getByText('Stock y precio pendientes de confirmar.', { exact: true }))
+    .toHaveCount(0)
+  expect(await page.evaluate(() =>
+    (globalThis as CartWarningBrowser).__cartWarnings ?? [],
+  )).toEqual([])
 
   await page.getByRole('button', {
     name: 'Eliminar Producto E2E 24 del carrito',
