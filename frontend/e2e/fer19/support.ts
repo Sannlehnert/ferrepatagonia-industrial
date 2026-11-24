@@ -44,6 +44,7 @@ export async function adminAccounts(page: Page) {
   await page.getByRole('link', { name: 'Cuentas corrientes', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(adminScreen + '$'))
   await expect(page.getByRole('heading', { name: 'Cuentas corrientes', exact: true })).toBeVisible()
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
 }
 
 export function privateResponse(response: APIResponse | Response, status: number) {

@@ -196,6 +196,15 @@ onBeforeRouteLeave(() => cuenta.clear())
                 {{ creditMessage(resumen) }}
             </p>
 
+            <p v-if="resumen.estado === 'HABILITADA' && resumen.estadoCredito === 'DISPONIBLE'"
+                class="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+                Para comprar a cuenta corriente, agregá productos al carrito y elegí
+                “Cuenta corriente” al confirmar. La elegibilidad se revalida en cada compra.
+                <a href="/catalogo" class="font-semibold text-[#103A5C] underline">
+                    Explorar catálogo
+                </a>
+            </p>
+
             <p v-if="resumen.origen === 'DEMO'" role="note"
                 class="mb-5 rounded-md border border-amber-300 bg-amber-50 p-4">
                 Datos de demostración. No representan una cuenta real.

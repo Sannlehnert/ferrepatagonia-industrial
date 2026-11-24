@@ -131,6 +131,8 @@ for (const width of [1280, 768, 360]) {
 
       await page.goto('/admin/cuentas-corrientes')
 
+      await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
+
       const requests = page.locator('section').filter({
         has: page.getByRole('heading', {
           name: 'Solicitudes de crédito pendientes',
@@ -340,6 +342,8 @@ test('recupera una aprobación con respuesta perdida usando la misma clave', asy
 
   await page.goto('/admin/cuentas-corrientes')
 
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
+
   const requests = page.locator('section').filter({
     has: page.getByRole('heading', {
       name: 'Solicitudes de crédito pendientes',
@@ -411,6 +415,8 @@ test('conserva el formulario al rechazar un límite inferior a la deuda', async 
   expect(login.ok()).toBe(true)
 
   await page.goto('/admin/cuentas-corrientes')
+
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await page.getByLabel('ID de cliente', { exact: true }).fill(String(clientId))
   await page.getByRole('button', { name: 'Consultar cliente por ID' }).click()
 

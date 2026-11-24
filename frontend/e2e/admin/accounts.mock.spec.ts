@@ -44,6 +44,7 @@ for (const width of [1280, 360]) {
       await login(page)
       const urls = await fixture(page)
       await page.goto('/admin/cuentas-corrientes')
+      await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Consultar cliente 1', exact: true })).toBeVisible()
       await page.getByLabel('ID de cliente', { exact: true }).fill('2')
       await page.getByRole('combobox', { name: 'Habilitación', exact: true }).selectOption('false')
@@ -72,6 +73,7 @@ test('UI interceptada: 409 limpia datos y permite reiniciar; error no se vuelve 
   const options = { error: 409 }
   await fixture(page, options)
   await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Reiniciá desde la primera página')
   await expect(page.getByText('No hay cuentas para estos filtros.')).toHaveCount(0)
   options.error = 0
@@ -80,12 +82,14 @@ test('UI interceptada: 409 limpia datos y permite reiniciar; error no se vuelve 
 })
 test('UI interceptada: revisiones incompatibles no presentan detalle confirmado', async ({ page }) => {
   await login(page); await fixture(page, { mismatch: true }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await page.getByRole('button', { name: 'Consultar cliente 1', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Reiniciá desde la primera página')
   await expect(page.getByText('Datos DEMO ·', { exact: true })).toHaveCount(0)
 })
 test('UI interceptada: lista vacía y consulta directa SIN_CUENTA', async ({ page }) => {
   await login(page); await fixture(page, { empty: true, absent: true }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await expect(page.getByText('No hay cuentas para estos filtros.')).toBeVisible()
   await page.getByLabel('ID de cliente', { exact: true }).fill('5')
   await page.getByRole('button', { name: 'Consultar cliente por ID' }).click()
@@ -93,6 +97,7 @@ test('UI interceptada: lista vacía y consulta directa SIN_CUENTA', async ({ pag
 })
 test('UI interceptada: cobertura insuficiente no equivale a vacío completo', async ({ page }) => {
   await login(page); await fixture(page, { empty: true }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await page.getByLabel('ID de cliente', { exact: true }).fill('1')
   await page.getByRole('button', { name: 'Consultar cliente por ID' }).click()
   await expect(page.getByText('Sin movimientos acreditados para mostrar. La información es incompleta.')).toBeVisible()

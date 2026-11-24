@@ -25,6 +25,7 @@ for (const width of [1280, 360]) {
         await expect(sidebar).toHaveAttribute('aria-expanded', 'true')
       }
       await page.getByRole('link', { name: 'Cuentas corrientes', exact: true }).click()
+      await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
       const table = page.getByRole('table').first()
       await expect(table.getByRole('row')).toHaveCount(26)
       await expect(table).toContainText('DEMO')
