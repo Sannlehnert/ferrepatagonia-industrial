@@ -1,0 +1,6 @@
+{
+  "containerRemoved": true,
+  "volumeRemoved": true,
+  "ownedImagesRemoved": true,
+  "sourceFilesUntouchedByTest": true
+}

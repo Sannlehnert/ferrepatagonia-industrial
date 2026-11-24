@@ -1,0 +1,9 @@
+# Evidence hashes refer to exact captured bytes, including CRLF and any BOM.
+evidence/** -text
+# Tool output intentionally retains emitted blank lines/spaces and CRLF bytes.
+evidence/**/*.txt whitespace=cr-at-eol,-blank-at-eol,-blank-at-eof
+evidence/correction/artifact-inventory.json whitespace=cr-at-eol
+.gitattributes text eol=lf
+*.md text eol=lf
+tools/*.cjs text eol=lf
+tools/*.sh text eol=lf

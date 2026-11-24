@@ -1,0 +1,56 @@
+{
+  "kind": "clock-domain-diagnosis",
+  "windows": {
+    "source": "Local CMOS Clock",
+    "synchronization": "not synchronized according to Windows Time status",
+    "resyncResult": "OS_ACCESS_DENIED_0x80070005",
+    "clockChanged": false
+  },
+  "linux": {
+    "reportedNtpSynchronized": true,
+    "kernelClocksource": "tsc",
+    "wslBootId": "c33da070-4418-414a-b022-32ae3196ed16",
+    "dockerBootId": "c33da070-4418-414a-b022-32ae3196ed16",
+    "sameKernel": true,
+    "nodeRuntime": "/home/santi/.nvm/versions/node/v22.22.2/bin/node"
+  },
+  "sourceObservation": "Boot IDs obtained by read-only cat in Ubuntu and a --rm MariaDB-image container; clock offsets are independently measured in before and common-clock-aligned-*.",
+  "causalScope": "The proven cause of these test failures is the mismatch between the Node-Windows and SQL-WSL clock domains. The historical event that initiated clock drift is not established.",
+  "procedure": "Use the already NTP-synchronized Linux clock for both Node and MariaDB in isolated worktrees; no system clock override or record timestamp changes.",
+  "globalWindowsTimeFixed": false,
+  "dockerOrWslRestarted": false,
+  "commands": [
+    {
+      "executable": "wsl.exe",
+      "args": [
+        "-d",
+        "Ubuntu-24.04",
+        "--",
+        "timedatectl",
+        "timesync-status"
+      ],
+      "exitCode": 4294967295,
+      "stdoutPath": "wsl-timesync-status-stdout.txt",
+      "stdoutSha256": "ea126d13bd1e8209523e3e05645bd469adfe867dd10e426bc6397dca8b033711",
+      "stderrPath": "wsl-timesync-status-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "executable": "wsl.exe",
+      "args": [
+        "-d",
+        "Ubuntu-24.04",
+        "--",
+        "timedatectl",
+        "timesync-status"
+      ],
+      "exitCode": 0,
+      "stdoutPath": "wsl-timesync-authorized-stdout.txt",
+      "stdoutSha256": "598a5cb27a57011449d02366babd1b66cd4cecdd6881843e80003034e39798b7",
+      "stderrPath": "wsl-timesync-authorized-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "absoluteUtcAccuracyCertified": false,
+  "ntpStatusCaveat": "systemd reports NTPSynchronized=yes, but the supplementary timesync-status reports +8.074607s; only relative Node-Linux/MariaDB alignment is certified, not zero absolute NTP error."
+}

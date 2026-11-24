@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 2,
+  "kind": "new-standard-execution",
+  "phase": "post335",
+  "selection": "standard-synchronized-final",
+  "wrapperSha256": "57a44838c7f0904907cf79095287fc839ac8732ad335c56a60fdd6dea8a9a99f",
+  "collectorSha256": "8573b1a6981588cf30b80763c5bbf9ed635cf87bd5a6a0228b0073dca06319c3",
+  "npm": "10.9.7",
+  "clockStrategy": "Node Linux in the already NTP-synchronized WSL kernel shared by Docker/MariaDB; no clock overrides.",
+  "environment": {
+    "DOCKER_HOST": "unix:///mnt/wsl/docker-desktop/shared-sockets/host-services/docker.proxy.sock",
+    "PLAYWRIGHT_BROWSERS_PATH": "/home/santi/.cache/ms-playwright",
+    "LD_LIBRARY_PATH": "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/sync355-browserlibs/runtime/usr/lib/x86_64-linux-gnu"
+  },
+  "explicitProbeWaitMilliseconds": 0,
+  "productionCodeChanged": false,
+  "originalTestsChanged": false,
+  "assertionsChanged": false,
+  "timeoutsChanged": false,
+  "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "node": "v22.22.2",
+  "platform": "linux",
+  "startedUTC": "2026-11-24T02:37:33.658Z",
+  "logEncoding": "Raw stdout/stderr buffers in arrival order; explicit collector notes only for blocked/spawn-error records.",
+  "results": [
+    {
+      "name": "payments",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "/home/santi/.nvm/versions/node/v22.22.2/bin/node",
+        "backend/test/helpers/run-cuenta-corriente-mariadb.cjs",
+        "payments"
+      ],
+      "cwd": "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/sync355-linux-post335",
+      "startedUTC": "2026-11-24T02:37:33.664Z",
+      "finishedUTC": "2026-11-24T02:38:15.155Z",
+      "exitCode": 0,
+      "signal": null,
+      "result": "PASS",
+      "passed": 25,
+      "skipped": 0,
+      "failed": 0,
+      "blockedReason": null,
+      "spawnError": null,
+      "logPath": "payments.txt",
+      "logSha256": "cad1565d15fe7414a7270ee7660ae1ae4dc2ea069bed17b2bb0dece5b97e7217",
+      "bytes": 6637,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "catalog-browser",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "/home/santi/.nvm/versions/node/v22.22.2/bin/node",
+        "backend/test/helpers/run-catalog-presentation-browser.cjs"
+      ],
+      "cwd": "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/sync355-linux-post335",
+      "startedUTC": "2026-11-24T02:38:15.160Z",
+      "finishedUTC": "2026-11-24T02:42:17.699Z",
+      "exitCode": 0,
+      "signal": null,
+      "result": "PASS",
+      "passed": 1,
+      "skipped": 0,
+      "failed": 0,
+      "blockedReason": null,
+      "spawnError": null,
+      "logPath": "catalog-browser.txt",
+      "logSha256": "bf56a261c0ef08c6d78688d46c748f0f429628ba5f2d66fb0b244f68114dc311",
+      "bytes": 903,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "persistence-http-admin-zero",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "/home/santi/.nvm/versions/node/v22.22.2/bin/node",
+        "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/correction-355/docs/355/tools/persist-admin.cjs",
+        "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/sync355-linux-post335",
+        "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/correction-355/docs/355/evidence/synchronized-20261123/post335-final/http-admin-probe",
+        "0"
+      ],
+      "cwd": "/mnt/c/Users/santi/.codex/.chatgpt-projects/g-p-6ad2bb061ed081919f828743ce783346/sync355-linux-post335",
+      "startedUTC": "2026-11-24T02:42:17.724Z",
+      "finishedUTC": "2026-11-24T02:46:51.479Z",
+      "exitCode": 0,
+      "signal": null,
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "failed": 0,
+      "blockedReason": null,
+      "spawnError": null,
+      "logPath": "persistence-http-admin-zero.txt",
+      "logSha256": "a72a8406e8e4233ac959cd8b4832457bd087ca01d165c7dde8ad0d7b957078de",
+      "bytes": 282,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    }
+  ],
+  "collectorErrors": [],
+  "sourceStatusAfter": "",
+  "finishedUTC": "2026-11-24T02:46:52.671Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "artifactSha256": {
+    "catalog-browser.txt": "bf56a261c0ef08c6d78688d46c748f0f429628ba5f2d66fb0b244f68114dc311",
+    "catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
+    "catalog-coverage.csv": "1b07623e8636b152193f78d820b5204c719a2a801791c1b650839b82b6d37937",
+    "catalog-summary.json": "6f0061870015a13e6194d4294c7758b7fe50d04d90ac2b292ed68483c5ee4134"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "verifiedUTC": "2026-11-24T01:15:33.965Z",
+  "source": "docker ps -a --format '{{.ID}} {{.Names}}'; docker volume ls --filter label=ferrepatagonia.audit313; docker ps --filter label=ferrepatagonia.audit355-clock",
+  "rawOutput": "12bed49e1827 demo286-8dedbad6686b4211b6e61cd210223d94\n0248cad5c2a3 demo286-283dd4ceeeaeedb748f3050ae8228e4c\nf6bd0771aa09 ferrepatagonia-dev-mariadb-1\n513ec09510ba sad_sutherland\n24ebb3ab32e7 studio_gestion_db\n9ad2743904cd studio-gestion-db-test-1\n",
+  "exitCode": 0,
+  "ownTestContainerNamesRemaining": [],
+  "ownProbeVolumesRemaining": [],
+  "clockContainersRemaining": [],
+  "scope": "Per-run cleanup assertions and final inventory. Unrelated containers, including other projects created during the task, were preserved; no assertion of an unchanged global inventory."
+}

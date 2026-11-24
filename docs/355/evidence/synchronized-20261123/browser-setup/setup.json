@@ -1,0 +1,36 @@
+{
+  "kind": "private-browser-runtime-dependencies",
+  "systemPackagesInstalled": false,
+  "servicesRestarted": false,
+  "packages": [
+    {
+      "name": "libnspr4",
+      "version": "2:4.35-1.1build1"
+    },
+    {
+      "name": "libnss3",
+      "version": "2:3.98-1ubuntu0.3"
+    },
+    {
+      "name": "libasound2t64",
+      "version": "1.2.11-1ubuntu0.3"
+    }
+  ],
+  "downloadedArchiveHashes": [
+    {
+      "file": "libasound2t64_1.2.11-1ubuntu0.3_amd64.deb",
+      "sha256": "5d17bfb5683eb99f1be951fe48e1be5bf3c52391913b6b74a8aecf9b4f5e779f"
+    },
+    {
+      "file": "libnspr4_2%3a4.35-1.1build1_amd64.deb",
+      "sha256": "e579e72d091f6c7a13f5a756c31065b15aae5b81840d61b069355aa2283c07b4"
+    },
+    {
+      "file": "libnss3_2%3a3.98-1ubuntu0.3_amd64.deb",
+      "sha256": "e11fdf8c09a068d0f0c3fd90ed971253dfed7227cc20d3d487fd615d4771f1bb"
+    }
+  ],
+  "source": "Ubuntu noble/noble-updates signed APT metadata; apt-get download followed by dpkg-deb -x, no dpkg installation.",
+  "privateLibraryPath": "sync355-browserlibs/runtime/usr/lib/x86_64-linux-gnu",
+  "chromiumSmoke": "PASS: Chromium 156.0.8078.4 opens about:blank with the standard Playwright launch."
+}

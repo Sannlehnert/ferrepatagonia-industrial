@@ -1,0 +1,195 @@
+{
+  "generatedUTC": "2026-11-24T02:27:05.742Z",
+  "observerPlatform": "linux",
+  "observerNode": "v22.22.2",
+  "clocksChanged": false,
+  "measurements": [
+    {
+      "name": "observer-node",
+      "epochMs": 1795487225742,
+      "utc": "2026-11-24T02:27:05.742Z"
+    },
+    {
+      "name": "windows",
+      "epochMs": 1795487221043,
+      "observerBefore": 1795487225742,
+      "observerAfter": 1795487226169,
+      "offsetMinMs": -5126,
+      "offsetMaxMs": -4699,
+      "offsetMidpointMs": -4912.5
+    },
+    {
+      "name": "wsl",
+      "epochMs": 1795487233958,
+      "observerBefore": 1795487233888,
+      "observerAfter": 1795487233988,
+      "offsetMinMs": -30,
+      "offsetMaxMs": 70,
+      "offsetMidpointMs": 20
+    },
+    {
+      "name": "docker",
+      "epochMs": 1795487234629,
+      "observerBefore": 1795487234195,
+      "observerAfter": 1795487234867,
+      "offsetMinMs": -238,
+      "offsetMaxMs": 434,
+      "offsetMidpointMs": 98
+    },
+    {
+      "name": "mariadb-0",
+      "epochMs": 1795487240466,
+      "observerBefore": 1795487240466,
+      "observerAfter": 1795487240467,
+      "offsetMinMs": -1,
+      "offsetMaxMs": 0,
+      "offsetMidpointMs": -0.5
+    },
+    {
+      "name": "mariadb-1",
+      "epochMs": 1795487240467,
+      "observerBefore": 1795487240467,
+      "observerAfter": 1795487240467,
+      "offsetMinMs": 0,
+      "offsetMaxMs": 0,
+      "offsetMidpointMs": 0
+    },
+    {
+      "name": "mariadb-2",
+      "epochMs": 1795487240467,
+      "observerBefore": 1795487240467,
+      "observerAfter": 1795487240467,
+      "offsetMinMs": 0,
+      "offsetMaxMs": 0,
+      "offsetMidpointMs": 0
+    }
+  ],
+  "commands": [
+    {
+      "name": "windows-date",
+      "executable": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()"
+      ],
+      "before": 1795487225742,
+      "after": 1795487226169,
+      "exitCode": 0,
+      "stdoutPath": "windows-date-stdout.txt",
+      "stdoutSha256": "8f5925a3716fd7f5b29735a7c9fb1fa55da0e9244b0ca65e4600eea81cc60eb4",
+      "stderrPath": "windows-date-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "windows-time-status",
+      "executable": "w32tm.exe",
+      "args": [
+        "/query",
+        "/status"
+      ],
+      "before": 1795487226177,
+      "after": 1795487226231,
+      "exitCode": 0,
+      "stdoutPath": "windows-time-status-stdout.txt",
+      "stdoutSha256": "f68951a11f84eeb6c2d0d9ca4a5af33398e988fbfafbab2c1bd7e666338fa7c5",
+      "stderrPath": "windows-time-status-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "windows-ntp-reference",
+      "executable": "w32tm.exe",
+      "args": [
+        "/stripchart",
+        "/computer:time.windows.com",
+        "/dataonly",
+        "/samples:3"
+      ],
+      "before": 1795487226237,
+      "after": 1795487233882,
+      "exitCode": 0,
+      "stdoutPath": "windows-ntp-reference-stdout.txt",
+      "stdoutSha256": "e06e23e890c421bbadcb9739f47e9d43cee022350416a30d74953395bd9b6f85",
+      "stderrPath": "windows-ntp-reference-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "wsl-date",
+      "executable": "wsl.exe",
+      "args": [
+        "-d",
+        "Ubuntu-24.04",
+        "--",
+        "date",
+        "-u",
+        "+%s%3N"
+      ],
+      "before": 1795487233888,
+      "after": 1795487233988,
+      "exitCode": 0,
+      "stdoutPath": "wsl-date-stdout.txt",
+      "stdoutSha256": "853d8c66ed51eddaa1597954467dfdb0b5e26334831a91ae9ced6a996edd4cd5",
+      "stderrPath": "wsl-date-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "wsl-time-source",
+      "executable": "wsl.exe",
+      "args": [
+        "-d",
+        "Ubuntu-24.04",
+        "--",
+        "sh",
+        "-lc",
+        "timedatectl show -p NTPSynchronized -p NTP -p Timezone; cat /sys/devices/system/clocksource/clocksource0/current_clocksource"
+      ],
+      "before": 1795487233995,
+      "after": 1795487234187,
+      "exitCode": 0,
+      "stdoutPath": "wsl-time-source-stdout.txt",
+      "stdoutSha256": "efd056353d302f65056a8ef6794cf72bd24482bb2becc5153799fb970aa9cf43",
+      "stderrPath": "wsl-time-source-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "docker-date",
+      "executable": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "--name",
+        "audit355-clock-d1c80640-7471-48cc-a6a8-efbadade7f16",
+        "--label",
+        "ferrepatagonia.audit355-clock=audit355-clock-d1c80640-7471-48cc-a6a8-efbadade7f16",
+        "--entrypoint",
+        "date",
+        "mariadb:11.4",
+        "-u",
+        "+%s%3N"
+      ],
+      "before": 1795487234195,
+      "after": 1795487234867,
+      "exitCode": 0,
+      "stdoutPath": "docker-date-stdout.txt",
+      "stdoutSha256": "9fcc97fb9f1f888342965537f66f72ac501b09034a153bd06ad9fe4cbc5a4511",
+      "stderrPath": "docker-date-stderr.txt",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "mariadb": {
+    "container": "cc258-test-349f649ab26a435f85d46536243c6a00",
+    "containerId": "5705a12a2428346b31cab77f07b1181adcc3105cbd9ff0ee8fb3f509abfabefa",
+    "database": "e2e_test_349f649ab26a435f85d46536243c6a00",
+    "storage": "tmpfs",
+    "persistentDatabaseUsed": false,
+    "lastRow": {
+      "epoch": "1795487240467",
+      "utc": "2026-11-24T02:27:20.467000Z",
+      "version": "11.4.13-MariaDB-ubu2404",
+      "systemZone": "UTC",
+      "sessionZone": "+00:00"
+    }
+  },
+  "ownedMariaDBRemoved": true,
+  "finishedUTC": "2026-11-24T02:27:21.399Z"
+}

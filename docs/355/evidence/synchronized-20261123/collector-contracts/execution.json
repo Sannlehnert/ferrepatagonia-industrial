@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "kind": "collector-contract-tests",
+  "productSuitesExecuted": false,
+  "startingCommit": "a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1",
+  "collectorSha256": "3ae5c955e8dfae6e78d6d59592c93cdb1522d0d51031d7f5d06ab91b3ed75a6e",
+  "testSha256": "2ab14feb721ec30b2c6cd23be808e33b9e825b9e630937c22364b874d5b4e803",
+  "executionSha": "WORKING_COPY_TOOL_CONTRACT_NOT_PRODUCT",
+  "node": "v22.22.2",
+  "platform": "win32",
+  "startedUTC": "2026-11-24T02:28:20.795Z",
+  "logEncoding": "Raw stdout/stderr buffers in arrival order; explicit collector notes only for blocked/spawn-error records.",
+  "results": [
+    {
+      "name": "collector-contract-tests",
+      "executionSha": "WORKING_COPY_TOOL_CONTRACT_NOT_PRODUCT",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355\\docs\\355\\tools\\rerun.test.cjs"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355",
+      "startedUTC": "2026-11-24T02:28:20.801Z",
+      "finishedUTC": "2026-11-24T02:28:22.035Z",
+      "exitCode": 0,
+      "signal": null,
+      "result": "PASS",
+      "passed": 6,
+      "skipped": 0,
+      "failed": 0,
+      "blockedReason": null,
+      "spawnError": null,
+      "logPath": "collector-contract-tests.txt",
+      "logSha256": "8ae30f5f41ee0350fd6764281209d358347a3699aac25d1ecad68ce99cf4f2ac",
+      "bytes": 2039,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    }
+  ],
+  "collectorErrors": [],
+  "finishedUTC": "2026-11-24T02:28:22.036Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "artifactSha256": {},
+  "sourceRevisionNote": "Earlier six-case local test-file revision not separately archived; superseded for acceptance by collector-contracts-verified. Raw run log is preserved.",
+  "supersededForAcceptanceBy": "../collector-contracts-verified/execution.json"
+}

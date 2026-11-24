@@ -1,0 +1,36 @@
+TAP version 13
+# 313: carga y asociación de 100 imágenes por ADMIN completadas; activación explícita de los 100 productos.
+# Subtest: 313: catálogo autónomo de 100, listas 10/20, carrito y persistencia
+not ok 1 - 313: catálogo autónomo de 100, listas 10/20, carrito y persistencia
+  ---
+  duration_ms: 48140.8003
+  type: 'test'
+  location: 'C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-baseline\\backend\\test\\catalog-presentation.mariadb.test.cjs:71:1'
+  failureType: 'testCodeFailure'
+  error: |-
+    Expected values to be strictly equal:
+    
+    false !== true
+    
+  code: 'ERR_ASSERTION'
+  name: 'AssertionError'
+  expected: true
+  actual: false
+  operator: 'strictEqual'
+  stack: |-
+    checkApi (C:\Users\santi\.codex\.chatgpt-projects\g-p-6ad2bb061ed081919f828743ce783346\correction-355-baseline\backend\test\catalog-presentation.mariadb.test.cjs:210:50)
+    process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    async TestContext.<anonymous> (C:\Users\santi\.codex\.chatgpt-projects\g-p-6ad2bb061ed081919f828743ce783346\correction-355-baseline\backend\test\catalog-presentation.mariadb.test.cjs:237:5)
+    async Test.run (node:internal/test_runner/test:1054:7)
+    async startSubtestAfterBootstrap (node:internal/test_runner/harness:296:3)
+  ...
+# CLEANUP313 OK: contenedor y volumen propios eliminados.
+1..1
+# tests 1
+# suites 0
+# pass 0
+# fail 1
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 50133.8904

@@ -1,0 +1,210 @@
+[T-S7-03.1] Creando MariaDB descartable aislada (s7-03-1-audit-a131ffcaa2da4906bde7bbbcaa309145)...
+[T-S7-03.1] MariaDB admin_products_test_a131ffcaa2da4906bde7bbbcaa309145 escuchando en 127.0.0.1:61250
+[T-S7-03.1] Instalación completa verificada: { profile: 'complete', tables: 26, triggers: 13, views: 1 }
+[T-S7-03.1] Ejecutando company-approval-audit.test.cjs...
+TAP version 13
+# Subtest: T-S7-03.1 — Registro empresarial y autorización comercial
+    # Subtest: A — Empresa recién registrada
+        # Subtest: 345: estadoEsperado opcional compara bajo bloqueo y conserva consumidores existentes
+        ok 1 - 345: estadoEsperado opcional compara bajo bloqueo y conserva consumidores existentes
+          ---
+          duration_ms: 440.7263
+          type: 'test'
+          ...
+        # Subtest: A.1 Registro público EMPRESA crea PENDIENTE, sin cuenta corriente ni crédito
+        ok 2 - A.1 Registro público EMPRESA crea PENDIENTE, sin cuenta corriente ni crédito
+          ---
+          duration_ms: 296.3081
+          type: 'test'
+          ...
+        # Subtest: A.2 Registro público PARTICULAR deja estado_aprobacion_empresa en NULL
+        ok 3 - A.2 Registro público PARTICULAR deja estado_aprobacion_empresa en NULL
+          ---
+          duration_ms: 304.4183
+          type: 'test'
+          ...
+        # Subtest: A.3 La empresa pendiente inicia sesión y consulta SIN_CUENTA sin operaciones de crédito
+        ok 4 - A.3 La empresa pendiente inicia sesión y consulta SIN_CUENTA sin operaciones de crédito
+          ---
+          duration_ms: 530.7068
+          type: 'test'
+          ...
+        1..4
+    ok 1 - A — Empresa recién registrada
+      ---
+      duration_ms: 1573.0587
+      type: 'suite'
+      ...
+    # Subtest: B — Empresa pendiente con cuenta corriente habilitada
+        # Subtest: B.1 La elegibilidad se rechaza por aprobación, no por producto/stock/precio
+        ok 1 - B.1 La elegibilidad se rechaza por aprobación, no por producto/stock/precio
+          ---
+          duration_ms: 11.4607
+          type: 'test'
+          ...
+        # Subtest: B.2 Confirmar pedido a crédito devuelve 403 EMPRESA_NO_HABILITADA sin efectos persistentes
+        ok 2 - B.2 Confirmar pedido a crédito devuelve 403 EMPRESA_NO_HABILITADA sin efectos persistentes
+          ---
+          duration_ms: 26.1094
+          type: 'test'
+          ...
+        1..2
+    ok 2 - B — Empresa pendiente con cuenta corriente habilitada
+      ---
+      duration_ms: 539.4893
+      type: 'suite'
+      ...
+    # Subtest: C — Empresa aprobada sin crédito
+        # Subtest: C.1 El ADMIN aprueba la empresa y la aprobación NO habilita crédito
+        ok 1 - C.1 El ADMIN aprueba la empresa y la aprobación NO habilita crédito
+          ---
+          duration_ms: 14.019
+          type: 'test'
+          ...
+        # Subtest: C.2 Empresa aprobada sin cuenta no es elegible (CUENTA_NO_HABILITADA)
+        ok 2 - C.2 Empresa aprobada sin cuenta no es elegible (CUENTA_NO_HABILITADA)
+          ---
+          duration_ms: 9.4047
+          type: 'test'
+          ...
+        # Subtest: C.3 Confirmar pedido a crédito devuelve 403 CUENTA_NO_HABILITADA y no crea pedido
+        ok 3 - C.3 Confirmar pedido a crédito devuelve 403 CUENTA_NO_HABILITADA y no crea pedido
+          ---
+          duration_ms: 21.6397
+          type: 'test'
+          ...
+        1..3
+    ok 3 - C — Empresa aprobada sin crédito
+      ---
+      duration_ms: 538.7417
+      type: 'suite'
+      ...
+    # Subtest: D — Empresa aprobada con crédito habilitado
+        # Subtest: D.1 La elegibilidad autorizada calcula total y crédito disponible
+        ok 1 - D.1 La elegibilidad autorizada calcula total y crédito disponible
+          ---
+          duration_ms: 30.6784
+          type: 'test'
+          ...
+        # Subtest: D.2 La confirmación autorizada persiste pedido, cargo, stock y saldo
+        ok 2 - D.2 La confirmación autorizada persiste pedido, cargo, stock y saldo
+          ---
+          duration_ms: 106.4042
+          type: 'test'
+          ...
+        1..2
+    ok 4 - D — Empresa aprobada con crédito habilitado
+      ---
+      duration_ms: 658.4588
+      type: 'suite'
+      ...
+    # Subtest: E — Empresa rechazada
+        # Subtest: E.1 El ADMIN rechaza una empresa previamente aprobada
+        ok 1 - E.1 El ADMIN rechaza una empresa previamente aprobada
+          ---
+          duration_ms: 13.0421
+          type: 'test'
+          ...
+        # Subtest: E.2 Con cuenta y crédito vigentes, la empresa rechazada no puede comprar a crédito
+        ok 2 - E.2 Con cuenta y crédito vigentes, la empresa rechazada no puede comprar a crédito
+          ---
+          duration_ms: 31.5717
+          type: 'test'
+          ...
+        # Subtest: E.3 La empresa rechazada conserva acceso a su historial de pedidos
+        ok 3 - E.3 La empresa rechazada conserva acceso a su historial de pedidos
+          ---
+          duration_ms: 18.1666
+          type: 'test'
+          ...
+        1..3
+    ok 5 - E — Empresa rechazada
+      ---
+      duration_ms: 598.3622
+      type: 'suite'
+      ...
+    # Subtest: F — Permisos y manipulación
+        # Subtest: F.1 Sin sesión, los endpoints administrativos responden 401
+        ok 1 - F.1 Sin sesión, los endpoints administrativos responden 401
+          ---
+          duration_ms: 3.4186
+          type: 'test'
+          ...
+        # Subtest: F.2 Un CLIENTE no puede autoaprobarse (403) y su estado permanece PENDIENTE
+        ok 2 - F.2 Un CLIENTE no puede autoaprobarse (403) y su estado permanece PENDIENTE
+          ---
+          duration_ms: 5.6729
+          type: 'test'
+          ...
+        # Subtest: F.3 Un CLIENTE no puede modificar el estado de otra empresa (403)
+        ok 3 - F.3 Un CLIENTE no puede modificar el estado de otra empresa (403)
+          ---
+          duration_ms: 4.2456
+          type: 'test'
+          ...
+        # Subtest: F.4 Un CLIENTE no puede habilitarse crédito por endpoints administrativos
+        ok 4 - F.4 Un CLIENTE no puede habilitarse crédito por endpoints administrativos
+          ---
+          duration_ms: 12.894
+          type: 'test'
+          ...
+        # Subtest: F.5 El ADMIN recibe 400 ante IDs inválidos, estados inválidos o campos ajenos
+        ok 5 - F.5 El ADMIN recibe 400 ante IDs inválidos, estados inválidos o campos ajenos
+          ---
+          duration_ms: 11.0572
+          type: 'test'
+          ...
+        # Subtest: F.6 El ADMIN no puede aprobar una cuenta PARTICULAR (400)
+        ok 6 - F.6 El ADMIN no puede aprobar una cuenta PARTICULAR (400)
+          ---
+          duration_ms: 298.7583
+          type: 'test'
+          ...
+        # Subtest: F.7 El endpoint administrativo no expone una vía para habilitar crédito (ADMIN: 404)
+        ok 7 - F.7 El endpoint administrativo no expone una vía para habilitar crédito (ADMIN: 404)
+          ---
+          duration_ms: 5.5118
+          type: 'test'
+          ...
+        1..7
+    ok 6 - F — Permisos y manipulación
+      ---
+      duration_ms: 844.5689
+      type: 'suite'
+      ...
+    # Subtest: G — Condiciones de carrera entre cotización y confirmación
+        # Subtest: G.1 Una cotización emitida antes del rechazo administrativo no permite confirmar
+        ok 1 - G.1 Una cotización emitida antes del rechazo administrativo no permite confirmar
+          ---
+          duration_ms: 663.9053
+          type: 'test'
+          ...
+        # Subtest: G.2 Una cotización emitida antes de inhabilitar la cuenta no permite confirmar
+        ok 2 - G.2 Una cotización emitida antes de inhabilitar la cuenta no permite confirmar
+          ---
+          duration_ms: 581.6197
+          type: 'test'
+          ...
+        1..2
+    ok 7 - G — Condiciones de carrera entre cotización y confirmación
+      ---
+      duration_ms: 1245.776
+      type: 'suite'
+      ...
+    1..7
+ok 1 - T-S7-03.1 — Registro empresarial y autorización comercial
+  ---
+  duration_ms: 6081.5245
+  type: 'suite'
+  ...
+1..1
+# tests 23
+# suites 8
+# pass 23
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 7241.5602
+[T-S7-03.1] Suite finalizada con código 0.
+[T-S7-03.1] Eliminando contenedor descartable s7-03-1-audit-a131ffcaa2da4906bde7bbbcaa309145...

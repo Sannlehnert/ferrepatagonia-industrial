@@ -1,0 +1,432 @@
+{
+  "searchedUTC": "2026-11-24T01:07:21.039Z",
+  "roots": [
+    "project-workspace",
+    "original-checkout",
+    "codex-dot-tmp",
+    "codex-tmp",
+    "codex-attachments",
+    "current-process-temp"
+  ],
+  "scanned": 9781,
+  "errors": [],
+  "matchedUniqueHashes": [
+    "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+  ],
+  "matches": [
+    {
+      "root": "project-workspace",
+      "file": "audit-218-final-evidence/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-218-evidence/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-241-readonly/audit-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-214-review2-evidence-20261027/combined-backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-214-review2-evidence-20261027/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-214-final-evidence/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-214-evidence-20261027/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-317-evidence/build-pr155.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-317-evidence/build-head.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-352-pr140/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-216-20261028/evidence/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-352-evidence/logs/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-341-abada300/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-220-evidence-20261028/integration-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-220-evidence-20261028/develop-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-220-evidence-20261028/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "tools-310/backend-integrated-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "sprint6-269-combined-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-271-pr93-readonly/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-262-pr81-work/audit-final-back-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-262-pr81-work/back-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-244-integrated/merged-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-244-readonly/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-340-independent/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "release-256-work/256-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-249-readonly/audit-249-evidence/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-252-pr80-20261109/back-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "release-256-evidence/transfer-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "release-256-evidence/256-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/pr40/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-328-339-20261120/develop-build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/develop/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/pr39/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-328-339-20261120/entrega/registros/develop-build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/pr38/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-pr37-integration-20261022/evidence/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-s7-double-20261120/B-339/backend-build-B.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/pr37/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-pr94-277-20261110/with273-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-pr60-readonly/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-sprint4-independent/pr36/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-pr94-277-20261110/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit4-pr60/integration/integration-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-s7-double-20261120/A-323/backend-build-A.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-253/nov09-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-253/nov09-admin78-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit4-pr60/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit3-pr60/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidencia-pr119-349/build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-pr43/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-285/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "corrections-218-evidence/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-284/integrado-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-260/client-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-260/build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-260/baseline-rebuild.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-258/integration-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "evidence-258/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "hotfix-252-h04/build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "audit-v2-197/build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "fix-214-evidence/backend-build.txt",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "fix-220-evidence-20261028/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "final-247-logs/harness-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "final-247-logs/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "hotfix-252-e2e/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "fix-262-pr81-work/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "implement-258/evidence-258/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "implement-243/243-backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "implement-241/241-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "implement-340/backend-build-post-340.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "pr115-final-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "pr115-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-pr60/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-341-17809dc/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-310-final-evidence/backend-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-244-20261107/fix-build.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-244-integrated-20261107/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-244-20261107/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-252-integrado-20261109/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-252-20261109/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    },
+    {
+      "root": "project-workspace",
+      "file": "reaudit-262-pr81-work/build-backend.log",
+      "sha256": "f49beb086bf15f2b2657bdc98ccec6586856bab31732cc098a20b9f21c5ea924"
+    }
+  ],
+  "recoveredOriginalExecutionLogs": 0,
+  "unauthenticatedHistoricalRecords": 19,
+  "interpretation": "Only generic backend-build output matches. Its copies belong to other tasks, so neither #355 execution can be authenticated from them. They were not relabeled as recovered originals. No claim about inaccessible hosts or deleted files.",
+  "remoteInventory": "artifact-inventory.json"
+}

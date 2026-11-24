@@ -1,0 +1,11 @@
+{
+  "command": ["w32tm", "/resync", "/rediscover"],
+  "exitCode": 1,
+  "observedWindowsError": "0x80070005",
+  "result": "OS_ACCESS_DENIED",
+  "observationSource": "Command tool response during this correction; not represented as an archived raw OS stdout log.",
+  "windowsClockAdjusted": false,
+  "dockerRestarted": false,
+  "wslRestarted": false,
+  "alternative": "Run Node 22.22.2 natively in the already NTP-synchronized WSL kernel shared by Docker/MariaDB; measure its offset directly. Windows/Node-Windows remain explicitly outside that aligned execution environment."
+}

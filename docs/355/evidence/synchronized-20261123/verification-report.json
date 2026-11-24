@@ -1,0 +1,21 @@
+{
+  "result": "PASS",
+  "jsonFiles": 66,
+  "preservedPriorEvidenceFiles": 66,
+  "previousIndexSnapshotPreserved": true,
+  "historicalUnauthenticatedRecords": 19,
+  "verifiedLogRecords": 60,
+  "artifactHashChecks": 290,
+  "verifiedClockCommandStreams": 40,
+  "csvFiles": 7,
+  "uniqueSkusPerCsv": 100,
+  "standardPayments": {
+    "initial": "23/23",
+    "post335": "25/25"
+  },
+  "standardCatalogBothPhases": "PASS",
+  "standardHttpAdminZeroWaitBothPhases": "PASS",
+  "clockSqlSamplesWithinNodeRequestIntervals": true,
+  "collectorContracts": "7/7",
+  "functionalDiffEmpty": true
+}
