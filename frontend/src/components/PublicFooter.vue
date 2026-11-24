@@ -1,7 +1,7 @@
 
 <script setup lang="ts">
-import { computed, nextTick } from 'vue'
-import { isNavigationFailure, NavigationFailureType, RouterLink, useRouter, type NavigationFailure } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
 import PublicBrand from './PublicBrand.vue'
 import { getNavigableMenu, publicMenu } from '@/config/menu'
 import { getPermissionsForRole } from '@/config/permissions'
@@ -9,21 +9,7 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
-const emit = defineEmits<{ navigate: [] }>()
 const year = new Date().getFullYear()
-
-async function navigateToBusiness(
-  event: MouseEvent,
-  navigate: (event: MouseEvent) => Promise<void | NavigationFailure>,
-) {
-  if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return
-  const failure = await navigate(event)
-  if (failure && !isNavigationFailure(failure, NavigationFailureType.duplicated)) return
-  await nextTick()
-  if (router.currentRoute.value.name === 'home' && router.currentRoute.value.hash === '#empresas') {
-    emit('navigate')
-  }
-}
 
 const institutional = computed(() =>
   getNavigableMenu(publicMenu, getPermissionsForRole(auth.rol))
@@ -73,6 +59,14 @@ const accountLinks = computed(() => {
           <ul>
             <li>
               <RouterLink
+                :to="{ name: 'home' }"
+                class="fp-focus"
+              >
+                Inicio
+              </RouterLink>
+            </li>
+            <li>
+              <RouterLink
                 :to="{ name: 'catalogo' }"
                 class="fp-focus"
               >
@@ -101,31 +95,6 @@ const accountLinks = computed(() => {
                 class="fp-focus"
               >
                 {{ link.label }}
-              </RouterLink>
-            </li>
-          </ul>
-        </nav>
-
-        <nav aria-labelledby="footer-access-title">
-          <h2 id="footer-access-title">Tienda</h2>
-          <ul>
-            <li>
-              <RouterLink
-                :to="{ name: 'home', hash: '#empresas' }"
-                custom
-                v-slot="{ href, navigate }"
-              >
-                <a :href="href" class="fp-focus" @click="navigateToBusiness($event, navigate)">
-                  Área empresas
-                </a>
-              </RouterLink>
-            </li>
-            <li>
-              <RouterLink
-                :to="{ name: 'home' }"
-                class="fp-focus"
-              >
-                Inicio
               </RouterLink>
             </li>
           </ul>
