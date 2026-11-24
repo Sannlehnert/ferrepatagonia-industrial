@@ -163,7 +163,7 @@ watch(() => [identity(), auth.loggingIn, auth.loggingOut], () => {
   if (allowed()) void load(1)
 }, { flush: 'sync' })
 
-defineExpose({ refresh: () => { void load(currentPage.value) } })
+defineExpose({ refresh: () => load(currentPage.value) })
 
 onMounted(() => { void load(1) })
 </script>
@@ -303,7 +303,7 @@ onMounted(() => { void load(1) })
 .credit-companies header { margin-bottom: 16px; }
 .credit-companies h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; }
 .credit-companies header p { margin: 0; line-height: 1.6; color: #475569; }
-.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: end; gap: 14px; margin: 16px 0; }
+.filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); align-items: start; gap: 14px; margin: 16px 0; }
 .filters label { display: grid; gap: 6px; font-size: 14px; font-weight: 600; }
 .credit-companies :is(button, input, select) { min-height: 44px; max-width: 100%; font: inherit; font-size: 14px; }
 .credit-companies :is(input, select) { width: 100%; border: 1px solid #cbd5e1; border-radius: 6px; background: white; color: #0b2438; padding: 8px 12px; }

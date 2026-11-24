@@ -25,9 +25,11 @@ const props = defineProps<{
     isReloading?: boolean;
 }>();
 
+type SaveTone = 'success' | 'warning';
+
 const emit = defineEmits<{
     (e: 'close'): void;
-    (e: 'saved', message: string): void;
+    (e: 'saved', message: string, tone?: SaveTone): void;
     (e: 'retry-categories'): void;
     (e: 'uncertain'): void;
     (e: 'reload'): void;
@@ -393,11 +395,13 @@ const handleSubmit = async () => {
         }
 
         let verificationNotice = '';
+        let saveTone: SaveTone = 'success';
         if (verifyPriceAfterSave.value) {
             const productId = savedProduct?.id_producto ?? original?.id_producto;
             const amount = canonicalPrice(savedProduct?.precio ?? payload.precio);
             if (!productId || !amount || amount === '0.00') {
                 verificationNotice = ' El producto se guardó, pero el precio no permite verificación.';
+                saveTone = 'warning';
             } else {
                 try {
                     const verified = await verifyAdminProductPrice(productId, {
@@ -405,11 +409,15 @@ const handleSubmit = async () => {
                         evidencia: priceEvidence.value.trim(),
                         confirmar: true,
                     });
-                    verificationNotice = verified.publicado
-                        ? ' Precio verificado y publicado por FER-17.'
-                        : ` La evidencia quedó registrada, pero FER-17 no publica el precio (${verified.estadoFer17}).`;
+                    if (verified.publicado) {
+                        verificationNotice = ' Precio verificado y publicado por FER-17.';
+                    } else {
+                        verificationNotice = ` La evidencia quedó registrada, pero FER-17 no publica el precio (${verified.estadoFer17}).`;
+                        saveTone = 'warning';
+                    }
                 } catch (error: unknown) {
                     verificationNotice = ` El producto se guardó, pero el precio quedó pendiente de verificación: ${verificationErrorMessage(error)}`;
+                    saveTone = 'warning';
                 }
             }
         }
@@ -418,7 +426,8 @@ const handleSubmit = async () => {
             'saved',
             (isEditMode.value
                 ? `"${payload.nombre}" se actualizó correctamente.`
-                : `"${payload.nombre}" se creó correctamente.`) + verificationNotice
+                : `"${payload.nombre}" se creó correctamente.`) + verificationNotice,
+            saveTone
         );
         emit('close');
     } catch (error: unknown) {
@@ -520,7 +529,7 @@ const handleNativeClose = () => {
                     @click="requestClose()"
                     :disabled="isSubmitting || isReloading"
                     aria-label="Cerrar formulario"
-                    class="box-border min-h-11 min-w-11 flex items-center justify-center border-0 bg-transparent text-[#64748B] hover:text-[#0B2438] text-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 min-w-11 flex items-center justify-center cursor-pointer border-0 bg-transparent font-[inherit] text-[#64748B] hover:text-[#0B2438] text-2xl focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     ×
                 </button>
@@ -541,7 +550,7 @@ const handleNativeClose = () => {
                 <div class="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
                     <div v-if="uncertain || mutationBlocked" role="alert" class="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
                         <p class="wrap-anywhere">{{ uncertainMutationMessage }}</p>
-                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 border-0 bg-transparent underline disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
+                        <button type="button" :disabled="isReloading" @click="emit('reload')" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">{{ isReloading ? 'Recargando...' : 'Recargar listado' }}</button>
                     </div>
                     <div
                         v-if="backendError && !uncertain"
@@ -552,7 +561,7 @@ const handleNativeClose = () => {
                         <button
                             type="button"
                             aria-label="Descartar error"
-                            class="box-border -my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 items-center justify-center border-0 bg-transparent font-bold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                            class="box-border -my-2 -mr-2 flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent font-[inherit] font-bold focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             @click="backendError = ''"
                         >✕</button>
                     </div>
@@ -563,7 +572,7 @@ const handleNativeClose = () => {
                             v-model="form.nombre"
                             type="text"
                             :disabled="formDisabled"
-                            class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                            class="box-border min-h-11 w-full bg-white border border-solid rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             :class="fieldErrors.nombre ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                         >
                         <p v-if="fieldErrors.nombre" class="text-xs text-red-700 mt-1">{{ fieldErrors.nombre }}</p>
@@ -576,7 +585,7 @@ const handleNativeClose = () => {
                                 v-model="form.codigo"
                                 type="text"
                                 :disabled="formDisabled"
-                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438] font-mono"
+                                class="box-border min-h-11 w-full bg-white border border-solid rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] font-mono focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 :class="fieldErrors.codigo ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                             <p v-if="fieldErrors.codigo" class="text-xs text-red-700 mt-1 wrap-anywhere">{{ fieldErrors.codigo }}</p>
@@ -589,7 +598,7 @@ const handleNativeClose = () => {
                             </div>
                             <div v-if="categoriesError" role="alert" class="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
                                 <p class="wrap-anywhere">{{ categoriesError }}</p>
-                                <button type="button" @click="emit('retry-categories')" class="mt-1 min-h-11 px-1 inline-flex items-center font-semibold underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
+                                <button type="button" @click="emit('retry-categories')" class="mt-1 box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 inline-flex items-center font-[inherit] font-semibold underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
                                     Reintentar
                                 </button>
                             </div>
@@ -597,7 +606,7 @@ const handleNativeClose = () => {
                                 v-if="!isLoadingCategories"
                                 v-model.number="form.id_categoria"
                                 :disabled="formDisabled || availableCategories.length === 0"
-                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                                class="box-border min-h-11 w-full bg-white border border-solid rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 :class="fieldErrors.id_categoria ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                                 <option value="" disabled>Seleccioná una categoría</option>
@@ -618,7 +627,7 @@ const handleNativeClose = () => {
                                 min="0"
                                 step="0.01"
                                 :disabled="formDisabled"
-                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                                class="box-border min-h-11 w-full bg-white border border-solid rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 :class="fieldErrors.precio ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                             <p
@@ -643,7 +652,7 @@ const handleNativeClose = () => {
                                 min="0"
                                 step="1"
                                 :disabled="formDisabled"
-                                class="box-border min-h-11 w-full bg-white border rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                                class="box-border min-h-11 w-full bg-white border border-solid rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 :class="fieldErrors.stock ? 'border-[#EF4444]' : 'border-[#E2E8F0]'"
                             >
                             <p v-if="fieldErrors.stock" class="text-xs text-red-700 mt-1">{{ fieldErrors.stock }}</p>
@@ -651,12 +660,12 @@ const handleNativeClose = () => {
                     </div>
 
                     <div class="rounded-md border border-[#E2E8F0] bg-[#F8FAFC] p-3">
-                        <label class="flex items-start gap-2 text-sm font-medium text-[#0B2438]">
+                        <label class="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-[#0B2438]">
                             <input
                                 v-model="verifyPriceAfterSave"
                                 type="checkbox"
                                 :disabled="formDisabled"
-                                class="mt-0.5 h-4 w-4"
+                                class="box-border h-5 w-5 shrink-0 cursor-pointer accent-[#103A5C] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             />
                             <span>Verificar este precio al guardar</span>
                         </label>
@@ -670,19 +679,19 @@ const handleNativeClose = () => {
                                     maxlength="1000"
                                     :disabled="formDisabled"
                                     aria-describedby="producto-precio-evidencia-ayuda"
-                                    class="box-border w-full rounded-md border border-[#CBD5E1] bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] disabled:opacity-60"
+                                    class="box-border w-full rounded-md border border-solid border-[#CBD5E1] bg-white px-3 py-2 font-[inherit] text-sm font-normal text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-60"
                                 />
                                 <span id="producto-precio-evidencia-ayuda" class="text-xs font-normal text-[#64748B]">
                                     Documento, origen y localizador verificable. No se aceptan referencias genéricas, sintéticas ni de demostración.
                                 </span>
                             </label>
                             <p v-if="fieldErrors.precioEvidencia" class="mt-1 text-xs text-red-700">{{ fieldErrors.precioEvidencia }}</p>
-                            <label class="mt-3 flex items-start gap-2 text-sm text-[#0B2438]">
+                            <label class="mt-3 flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[#0B2438]">
                                 <input
                                     v-model="priceReviewConfirmed"
                                     type="checkbox"
                                     :disabled="formDisabled"
-                                    class="mt-0.5 h-4 w-4"
+                                    class="box-border h-5 w-5 shrink-0 cursor-pointer accent-[#103A5C] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                                 />
                                 <span>Confirmo que revisé manualmente el precio y la evidencia.</span>
                             </label>
@@ -704,7 +713,7 @@ const handleNativeClose = () => {
                             accept="image/jpeg,image/png,image/webp"
                             :disabled="formDisabled"
                             aria-describedby="producto-imagen-ayuda"
-                            class="box-border min-h-11 w-full min-w-0 rounded-md border border-[#E2E8F0] bg-white px-2 py-2 text-sm text-[#0B2438]"
+                            class="box-border min-h-11 w-full min-w-0 cursor-pointer rounded-md border border-solid border-[#E2E8F0] bg-white px-2 py-2 font-[inherit] text-sm text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                             @change="selectImage"
                         >
                         <p id="producto-imagen-ayuda" class="mt-1 text-xs text-[#64748B]">JPEG, PNG o WebP, hasta 5 MiB.</p>
@@ -712,7 +721,7 @@ const handleNativeClose = () => {
                         <img v-if="previewUrl" :src="previewUrl" alt="Vista previa de la foto"
                             class="mt-2 h-28 max-w-full rounded-md object-contain" @error="rejectPreview">
                         <button v-if="imageFile || imageError" type="button" :disabled="formDisabled" @click="clearImage()"
-                            class="min-h-11 border-0 bg-transparent text-sm text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">Quitar selección</button>
+                            class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] text-sm text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">Quitar selección</button>
                         <ProductThumbnail v-if="product?.imagen" :image="product.imagen" alt="Foto actual del producto"
                             image-class="mt-2 block h-20 max-w-full rounded-md object-contain" />
                         <label for="producto-imagen-url" class="mt-2 block text-xs font-semibold uppercase text-[#64748B] mb-1">URL de Imagen (Opcional)</label>
@@ -722,7 +731,7 @@ const handleNativeClose = () => {
                             type="text"
                             placeholder="https://..."
                             :disabled="formDisabled || Boolean(imageFile)"
-                            class="box-border min-h-11 w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438]"
+                            class="box-border min-h-11 w-full bg-white border border-solid border-[#E2E8F0] rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         >
                     </div>
 
@@ -732,20 +741,20 @@ const handleNativeClose = () => {
                             v-model="form.descripcion"
                             rows="3"
                             :disabled="formDisabled"
-                            class="box-border min-h-11 w-full bg-white border border-[#E2E8F0] rounded-md px-3 py-2 text-sm text-[#0B2438] resize-none"
+                            class="box-border min-h-11 w-full bg-white border border-solid border-[#E2E8F0] rounded-md px-3 py-2 font-[inherit] text-sm text-[#0B2438] resize-none focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                         ></textarea>
                     </div>
 
-                    <div class="flex items-center gap-3 pt-1">
-                        <input
-                            id="producto-activo"
-                            v-model="form.activo"
-                            type="checkbox"
-                            :disabled="formDisabled"
-                            class="w-4 h-4 text-[#103A5C] border-[#CBD5E1] rounded"
-                        >
-                        <label for="producto-activo" class="text-sm font-medium text-[#0B2438] cursor-pointer">
-                            Producto Activo (visible en el catálogo público)
+                    <div class="pt-1">
+                        <label for="producto-activo" class="inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium text-[#0B2438]">
+                            <input
+                                id="producto-activo"
+                                v-model="form.activo"
+                                type="checkbox"
+                                :disabled="formDisabled"
+                                class="box-border h-5 w-5 shrink-0 cursor-pointer accent-[#103A5C] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                            >
+                            <span>Producto Activo (visible en el catálogo público)</span>
                         </label>
                     </div>
                 </div>
@@ -756,14 +765,14 @@ const handleNativeClose = () => {
                         type="button"
                         @click="requestClose()"
                         :disabled="isSubmitting || isReloading"
-                        class="box-border min-h-11 px-5 py-2 text-sm font-semibold text-[#64748B] bg-white border border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                        class="box-border min-h-11 cursor-pointer px-5 py-2 font-[inherit] text-sm font-semibold text-[#64748B] bg-white border border-solid border-[#E2E8F0] rounded-md hover:bg-[#F1F5F9] disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
                         Cancelar
                     </button>
                     <button
                         type="submit"
                         :disabled="formDisabled || Boolean(imageError)"
-                        class="box-border min-h-11 border-0 px-6 py-2 text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                        class="box-border min-h-11 cursor-pointer border-0 px-6 py-2 font-[inherit] text-sm font-semibold text-white bg-[#103A5C] rounded-md hover:bg-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
                         {{ isSubmitting ? (imageFile ? 'Subiendo foto...' : 'Guardando...') : (isEditMode ? (verifyPriceAfterSave ? 'Guardar y verificar' : 'Guardar Cambios') : (verifyPriceAfterSave ? 'Crear y verificar' : 'Crear Producto')) }}
                     </button>

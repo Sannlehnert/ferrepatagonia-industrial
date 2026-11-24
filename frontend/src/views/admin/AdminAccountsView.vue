@@ -26,9 +26,10 @@ const historyRead = usePrivateAccountRead<{
   events: AdminCreditEvent[]
 }>(identity, allowed)
 const activeTab = ref<'empresas' | 'contable'>('empresas')
-const companyListRef = ref<{ refresh: () => void } | null>(null)
+const companyListRef = ref<{ refresh: () => Promise<void> | void } | null>(null)
 const clientInput = ref(''), enabledInput = ref(''), selected = ref<number | null>(null), validation = ref('')
 let filters: AccountFilters = {}
+let detailSequence = 0
 const selectedCompany = computed(() => companyRead.data.value)
 const creditRequests = computed(() => historyRead.data.value?.requests ?? [])
 const creditEvents = computed(() => historyRead.data.value?.events ?? [])
@@ -92,6 +93,7 @@ function requestStatusText(value: string | null | undefined): string {
 }
 
 function accountStatusText(): string {
+  if (detail.error.value) return 'No se pudo consultar la cuenta corriente.'
   if (!summary.value) return 'Consultando la cuenta corriente…'
   if (summary.value.estado === 'SIN_CUENTA') return 'Sin cuenta corriente asignada.'
   return summary.value.estado === 'HABILITADA'
@@ -100,6 +102,7 @@ function accountStatusText(): string {
 }
 
 function eligibilityText(): string {
+  if (detail.error.value) return 'No se pudo determinar la elegibilidad.'
   if (!summary.value) return 'Se determina al consultar la cuenta corriente.'
   if (summary.value.estado === 'SIN_CUENTA') return 'No hay una cuenta corriente para operar a crédito.'
   if (summary.value.estadoCredito === 'DISPONIBLE') return 'Crédito disponible según la cuenta. Cada compra se revalida.'
@@ -113,44 +116,50 @@ function loadCompany(clientId: number) {
 
 function loadHistory(clientId: number) {
   return historyRead.load(async signal => {
-    const [requests, events] = await Promise.all([
-      listAdminCreditRequests({ clienteId: clientId, limite: 100 }, signal),
-      listAdminCreditEvents({ clienteId: clientId, limite: 100 }, signal),
-    ])
+    const requests = await listAdminCreditRequests({ clienteId: clientId, limite: 100 }, signal)
+    const events = await listAdminCreditEvents({ clienteId: clientId, limite: 100 }, signal)
     return { requests: requests.items, events: events.items }
   })
 }
 
-function onCreditUpdated(clientId: number, message: string) {
+async function onCreditUpdated(clientId: number, message: string) {
   if (!allowed() || selected.value !== clientId) return
-
-  void loadDetail(clientId)
-  void loadCompany(clientId)
-  void loadHistory(clientId)
-  companyListRef.value?.refresh()
   creditFeedback.value = message
-  void list.load(signal => getAdminAccounts(filters, signal))
+  await loadDetail(clientId, undefined, undefined, { preserveFeedback: true })
+  if (!allowed() || selected.value !== clientId) return
+  if (activeTab.value === 'empresas') {
+    await companyListRef.value?.refresh()
+  } else {
+    await list.load(signal => getAdminAccounts(filters, signal))
+  }
 }
 
 function onCreditResolved(message: string) {
   if (selected.value === null) return
-  onCreditUpdated(selected.value, message)
+  void onCreditUpdated(selected.value, message)
 }
 
 function retryHistory() {
   if (selected.value !== null) void loadHistory(selected.value)
 }
 
-function loadDetail(clientId: number, kind?: 'movimientos' | 'vencimientos', cursor?: string) {
-  creditFeedback.value = ''
+async function loadDetail(
+  clientId: number,
+  kind?: 'movimientos' | 'vencimientos',
+  cursor?: string,
+  options: { preserveFeedback?: boolean } = {},
+) {
+  const current = ++detailSequence
+  if (!options.preserveFeedback) creditFeedback.value = ''
   const changed = selected.value !== clientId
   selected.value = clientId
-  if (changed || kind === undefined) {
-    void loadCompany(clientId)
-    void loadHistory(clientId)
+  const refreshContext = changed || kind === undefined
+  if (changed) {
+    companyRead.reset()
+    historyRead.reset()
   }
   const previous = selectedData.value
-  return detail.load(async signal => {
+  await detail.load(async signal => {
     // La recarga del listado también consulta la BD; evitar ráfagas de autenticación y lecturas.
     const summary = await getAdminAccount(clientId, signal)
     const movements = await getAdminAccountDetail(clientId, 'movimientos', kind === 'movimientos' ? cursor : undefined, signal)
@@ -161,8 +170,13 @@ function loadDetail(clientId: number, kind?: 'movimientos' | 'vencimientos', cur
       (cursor && kind && previous && (kind === 'movimientos' ? previous.movements.corte !== movements.corte : previous.dues.corte !== dues.corte))) throw outdated()
     return { summary, movements, dues }
   })
+  if (!refreshContext || current !== detailSequence || selected.value !== clientId || !allowed()) return
+  await loadCompany(clientId)
+  if (current !== detailSequence || selected.value !== clientId || !allowed()) return
+  await loadHistory(clientId)
 }
 watch(() => [identity(), auth.loggingOut, auth.loggingIn], () => {
+  detailSequence += 1
   creditFeedback.value = ''
   list.reset(); detail.reset(); companyRead.reset(); historyRead.reset()
   selected.value = null

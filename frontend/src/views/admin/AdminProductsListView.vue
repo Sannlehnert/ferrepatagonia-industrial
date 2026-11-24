@@ -47,8 +47,11 @@ const tableRegion = ref<HTMLElement | null>(null);
 const reloadButton = ref<HTMLButtonElement | null>(null);
 const isLoading = ref(true);
 const loadError = ref('');
+type SaveTone = 'success' | 'warning';
+
 const isSessionExpired = ref(false);
 const saveMessage = ref('');
+const saveTone = ref<SaveTone>('success');
 const actionError = ref('');
 const exportingProducts = ref(false);
 const exportError = ref('');
@@ -247,6 +250,7 @@ const openCreateModal = () => {
     if (actionsDisabled.value || isModalOpen.value) return;
     modalTrigger = searchInput.value?.ownerDocument.activeElement as HTMLElement | null;
     saveMessage.value = '';
+    saveTone.value = 'success';
     selectedProduct.value = null;
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
         fetchCategorias();
@@ -258,6 +262,7 @@ const openEditModal = (prod: AdminProduct) => {
     if (actionsDisabled.value || isModalOpen.value) return;
     modalTrigger = searchInput.value?.ownerDocument.activeElement as HTMLElement | null;
     saveMessage.value = '';
+    saveTone.value = 'success';
     selectedProduct.value = { ...prod };
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
         fetchCategorias();
@@ -286,13 +291,15 @@ const closePriceVerification = async () => {
 
 const handlePriceVerified = async (message: string) => {
     verificationTarget.value = null;
+    saveTone.value = 'success';
     saveMessage.value = message;
     await fetchProductos();
     await nextTick();
     searchInput.value?.focus({ preventScroll: true });
 };
 
-const handleSaved = async (msg: string) => {
+const handleSaved = async (msg: string, tone: SaveTone = 'success') => {
+    saveTone.value = tone;
     saveMessage.value = msg;
     needsReload.value = true;
     await fetchProductos();
@@ -318,9 +325,11 @@ const toggleStatus = async (prod: AdminProduct, event?: MouseEvent) => {
     processingId.value = prod.id_producto;
     actionError.value = '';
     saveMessage.value = '';
+    saveTone.value = 'success';
     try {
         await setAdminProductActive(prod.id_producto, !deactivate);
         needsReload.value = true;
+        saveTone.value = 'success';
         saveMessage.value = `"${prod.nombre}" se ${deactivate ? 'desactivó' : 'activó'} correctamente.`;
         await fetchProductos();
     } catch (error: unknown) {
@@ -385,19 +394,19 @@ onBeforeUnmount(() => {
                         type="button"
                         @click="openCreateModal"
                         :disabled="actionsDisabled"
-                        class="col-span-2 box-border min-h-11 rounded-md border-0 bg-[#103A5C] px-6 py-2.5 font-semibold text-white shadow-md transition-colors hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-1"
+                        class="col-span-2 box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#103A5C] px-6 py-2.5 font-[inherit] font-semibold text-white shadow-md transition-colors hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-1"
                     >
                         + Nuevo Producto
                     </button>
                     <RouterLink
                         :to="{ name: 'admin-product-import' }"
-                        class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                        class="box-border flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-solid border-[#103A5C] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     >
                         Importar productos
                     </RouterLink>
                     <button
                         type="button"
-                        class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+                        class="box-border flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-solid border-[#103A5C] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                         :disabled="exportingProducts || isLoading || searchPending"
                         @click="exportProducts"
                     >
@@ -413,12 +422,12 @@ onBeforeUnmount(() => {
                     maxlength="200"
                     placeholder="Buscar por Nombre o SKU..."
                     aria-label="Buscar productos por nombre o SKU"
-                    class="box-border min-h-11 w-full min-w-0 flex-1 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm sm:max-w-72"
+                    class="box-border min-h-11 w-full min-w-0 flex-1 bg-white border border-solid border-[#E2E8F0] rounded-md px-4 py-2 font-[inherit] text-sm text-[#0B2438] placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] shadow-sm sm:max-w-72"
                 >
                 <button
                     v-if="searchQuery || appliedSearch"
                     type="button"
-                    class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="clearSearch"
                 >
                     Limpiar búsqueda
@@ -433,7 +442,10 @@ onBeforeUnmount(() => {
         <p
             v-if="saveMessage"
             role="status"
-            class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 wrap-anywhere"
+            class="mb-4 rounded-md border border-solid p-3 text-sm wrap-anywhere"
+            :class="saveTone === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'"
         >
             {{ saveMessage }}
         </p>
@@ -456,7 +468,7 @@ onBeforeUnmount(() => {
         <p v-if="processingId !== null" id="admin-products-lock" role="status" class="mb-4">Actualizando estado del producto. Las acciones están temporalmente deshabilitadas.</p>
         <div v-if="actionError || needsReload" role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
             <p class="wrap-anywhere">{{ actionError || 'Recargá el listado para confirmar los datos antes de modificar productos.' }}</p>
-            <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
+            <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
         </div>
 
         <!-- Estado de Carga -->
@@ -475,7 +487,7 @@ onBeforeUnmount(() => {
                 <button
                     v-if="isSessionExpired"
                     type="button"
-                    class="box-border min-h-11 border-0 bg-[#103A5C] text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 cursor-pointer border-0 bg-[#103A5C] text-white font-[inherit] text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="router.push('/login')"
                 >
                     Iniciar sesión
@@ -483,7 +495,7 @@ onBeforeUnmount(() => {
                 <button
                     v-else
                     type="button"
-                    class="box-border min-h-11 bg-white border border-red-300 text-red-700 text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 cursor-pointer bg-white border border-solid border-red-300 text-red-700 font-[inherit] text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="fetchProductos"
                 >
                     Reintentar
@@ -555,7 +567,7 @@ onBeforeUnmount(() => {
                                         :disabled="actionsDisabled"
                                         :aria-label="`Verificar precio de ${prod.nombre}`"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 whitespace-nowrap rounded-md border border-amber-700 bg-white px-3 font-semibold text-amber-900 enabled:hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="box-border min-h-11 cursor-pointer whitespace-nowrap rounded-md border border-solid border-amber-700 bg-white px-3 font-[inherit] font-semibold text-amber-900 enabled:hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                                         @click="openPriceVerification(prod, $event)"
                                     >Verificar precio</button>
                                     <button
@@ -564,7 +576,7 @@ onBeforeUnmount(() => {
                                         :aria-label="`Editar ${prod.nombre}`"
                                         :data-product-edit="prod.id_producto"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 whitespace-nowrap rounded-md border border-[#103A5C] bg-white px-3 font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="box-border min-h-11 cursor-pointer whitespace-nowrap rounded-md border border-solid border-[#103A5C] bg-white px-3 font-[inherit] font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                                         @click="openEditModal(prod)"
                                     >Editar</button>
                                     <button
@@ -573,7 +585,7 @@ onBeforeUnmount(() => {
                                         :data-product-status="prod.id_producto"
                                         :aria-label="`${prod.activo ? 'Desactivar' : 'Activar'} ${prod.nombre}`"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 whitespace-nowrap rounded-md border bg-white px-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="box-border min-h-11 cursor-pointer whitespace-nowrap rounded-md border border-solid bg-white px-3 font-[inherit] font-semibold focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                                         :class="prod.activo ? 'border-red-700 text-red-800 enabled:hover:bg-red-50' : 'border-emerald-700 text-emerald-800 enabled:hover:bg-emerald-50'"
                                         @click="toggleStatus(prod, $event)"
                                     >{{ prod.activo ? 'Desactivar' : 'Activar' }}</button>
@@ -592,11 +604,11 @@ onBeforeUnmount(() => {
             <div v-if="result" class="text-sm text-slate-700 font-medium">
                 <span v-if="!isLoading && !loadError">Mostrando {{ result.data.length }} de {{ result.total }} productos</span>
                 <nav v-if="result.totalPages > 0" aria-label="Paginación de productos" :aria-busy="isLoading" class="flex flex-wrap items-center gap-3">
-                    <button ref="previousPageButton" type="button" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 aria-disabled:opacity-50"
+                    <button ref="previousPageButton" type="button" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:opacity-50"
                         :disabled="result.page <= 1" :aria-disabled="pagingUnavailable || undefined"
                         @click="changePage(-1)">Anterior</button>
                     <span>Página {{ result.page }} de {{ result.totalPages }}</span>
-                    <button ref="nextPageButton" type="button" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 aria-disabled:opacity-50"
+                    <button ref="nextPageButton" type="button" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:opacity-50"
                         :disabled="result.page >= result.totalPages" :aria-disabled="pagingUnavailable || undefined"
                         @click="changePage(1)">Siguiente</button>
                 </nav>

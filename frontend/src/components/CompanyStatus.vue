@@ -6,6 +6,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { CuentaCorrienteConsulta } from '@/types/cuentaCorriente'
 import { approvalMessage, creditMessage } from '@/utils/companyStatus'
 
+const props = defineProps<{ refreshVersion?: number }>()
 const auth = useAuthStore()
 const identity = () => `${auth.user?.id}:${auth.sessionVersion}`
 const allowed = () => auth.rol === 'CLIENTE' && auth.user?.tipo_cliente === 'EMPRESA'
@@ -69,6 +70,10 @@ async function readStatus(signal: AbortSignal) {
 }
 
 watch([identity, allowed], () => void load(readStatus), { immediate: true })
+watch(() => props.refreshVersion, (next, previous) => {
+  if (next === undefined || next === previous || !allowed()) return
+  void refresh()
+})
 
 async function refresh() {
   if (refreshing.value) return

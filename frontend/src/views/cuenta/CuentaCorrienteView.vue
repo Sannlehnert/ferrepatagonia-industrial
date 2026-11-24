@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { onBeforeRouteLeave } from 'vue-router'
+import { RouterLink, onBeforeRouteLeave } from 'vue-router'
 import CompanyStatus from '@/components/CompanyStatus.vue'
 import CreditRequestPanel from '@/components/CreditRequestPanel.vue'
 import PaymentDeclarationForm from '@/components/PaymentDeclarationForm.vue'
@@ -156,7 +156,7 @@ onBeforeRouteLeave(() => cuenta.clear())
             </button>
         </header>
 
-        <CompanyStatus class="mb-6" />
+        <CompanyStatus :refresh-version="creditRefreshVersion" class="mb-6" />
         <CreditRequestPanel :refresh-version="creditRefreshVersion" />
 
         <p v-if="cuenta.consultaCargando || cuenta.movimientosCargando || cuenta.vencimientosCargando" role="status"
@@ -200,9 +200,12 @@ onBeforeRouteLeave(() => cuenta.clear())
                 class="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
                 Para comprar a cuenta corriente, agregá productos al carrito y elegí
                 “Cuenta corriente” al confirmar. La elegibilidad se revalida en cada compra.
-                <a href="/catalogo" class="font-semibold text-[#103A5C] underline">
+                <RouterLink
+                    :to="{ name: 'catalogo' }"
+                    class="inline-flex min-h-[44px] items-center font-semibold text-[#103A5C] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                >
                     Explorar catálogo
-                </a>
+                </RouterLink>
             </p>
 
             <p v-if="resumen.origen === 'DEMO'" role="note"

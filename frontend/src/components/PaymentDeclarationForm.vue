@@ -80,6 +80,9 @@ const canReview = computed(() =>
     monto.value.trim().length > 0,
 )
 
+const PAYMENT_AMOUNT_PATTERN = /^(?:0|[1-9]\d*)\.\d{2}$/
+const hasFormattedPaymentAmount = computed(() => PAYMENT_AMOUNT_PATTERN.test(monto.value.trim()))
+
 const uncertaintyActive = computed(() => uncertain.value && reviewed.value !== null)
 const reviewValue = computed(() => reviewed.value?.payload ?? null)
 const reviewReceipt = computed(() => reviewed.value?.receipt ?? null)
@@ -484,8 +487,8 @@ onBeforeUnmount(() => {
                     :disabled="!canReview">
                     Revisar declaración
                 </button>
-                <p class="m-0 text-sm text-slate-600">
-                    {{ formatPaymentMoney(monto.trim() || null, moneda) }}
+                <p v-if="hasFormattedPaymentAmount" class="m-0 text-sm text-slate-600">
+                    {{ formatPaymentMoney(monto.trim(), moneda) }}
                 </p>
             </div>
         </form>

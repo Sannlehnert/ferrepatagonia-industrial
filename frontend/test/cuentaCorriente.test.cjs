@@ -147,7 +147,15 @@ function loadAccountView(account) {
             formatInstant,
             formatUsd,
         },
-        'vue-router': { onBeforeRouteLeave: () => {} },
+        'vue-router': {
+            onBeforeRouteLeave: () => {},
+            RouterLink: {
+                props: ['to'],
+                render() {
+                    return h('a', { href: '/catalogo' }, this.$slots.default?.())
+                },
+            },
+        },
     }
 
     new Function('require', 'module', 'exports', output)(

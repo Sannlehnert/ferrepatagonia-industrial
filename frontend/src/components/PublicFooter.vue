@@ -197,6 +197,7 @@ ul {
 nav a {
   display: inline-flex;
   align-items: center;
+  min-width: 44px;
   min-height: 44px;
   border-radius: 3px;
   color: #d9e8f4;
