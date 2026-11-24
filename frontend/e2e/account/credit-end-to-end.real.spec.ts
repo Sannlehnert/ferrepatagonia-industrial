@@ -145,9 +145,12 @@ test('recorrido integral: empresa, solicitud, aprobación, habilitación y compr
 
     // 9. La empresa consulta su crédito habilitado.
     await page.getByRole('button', { name: 'Actualizar', exact: true }).click()
-    await expect(page.getByText(
-      'La cuenta corriente está habilitada y el crédito está disponible. Cada compra está sujeta a validación.',
-    )).toBeVisible()
+    const availableCreditMessage =
+      'La cuenta corriente está habilitada y el crédito está disponible. Cada compra está sujeta a validación.'
+    await expect(
+      page.getByRole('region', { name: 'Estado comercial' }).getByText(availableCreditMessage),
+    ).toBeVisible()
+    await expect(page.getByRole('status').filter({ hasText: availableCreditMessage })).toBeVisible()
     await expect(page.getByText('Crédito disponible (USD)')).toBeVisible()
     const clientSummary = await json<{
       data: {
