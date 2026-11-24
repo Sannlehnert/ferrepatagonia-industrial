@@ -146,6 +146,51 @@ function accountDetail(company: AdminCreditCompany): string {
   return `${limit} · ${term}${account.origen === 'DEMO' ? ' · Datos DEMO' : ''}`
 }
 
+function requestFilterLabel(value: CreditCompanyRequestFilter): string {
+  if (value === 'PENDIENTE') return 'Pendiente'
+  if (value === 'APROBADA') return 'Aprobada'
+  if (value === 'RECHAZADA') return 'Rechazada'
+  return 'Sin solicitud'
+}
+
+function accountFilterLabel(value: CreditCompanyAccountFilter): string {
+  if (value === 'HABILITADA') return 'Habilitada'
+  if (value === 'INHABILITADA') return 'Inhabilitada'
+  return 'Sin cuenta'
+}
+
+function primaryAction(company: AdminCreditCompany): string {
+  if (company.solicitudCredito?.estado === 'PENDIENTE') return 'Revisar solicitud'
+  if (company.estadoAprobacionEmpresa !== 'APROBADA') return 'Consultar historial'
+  if (!company.cuentaCorriente) return 'Gestionar cuenta'
+  if (company.cuentaCorriente.estado === 'INHABILITADA'
+    && company.solicitudCredito?.estado === 'APROBADA') return 'Habilitar cuenta'
+  if (company.cuentaCorriente.estado === 'HABILITADA') return 'Gestionar cuenta'
+  return 'Consultar historial'
+}
+
+function approvalTone(value: CreditCompanyApproval | null): string {
+  if (value === 'APROBADA') return 'bg-green-100 text-green-800'
+  if (value === 'PENDIENTE') return 'bg-amber-100 text-amber-900'
+  if (value === 'RECHAZADA') return 'bg-red-100 text-red-800'
+  return 'bg-slate-100 text-slate-700'
+}
+
+function requestTone(company: AdminCreditCompany): string {
+  const state = company.solicitudCredito?.estado
+  if (state === 'APROBADA') return 'bg-green-100 text-green-800'
+  if (state === 'PENDIENTE') return 'bg-amber-100 text-amber-900'
+  if (state === 'RECHAZADA') return 'bg-red-100 text-red-800'
+  return 'bg-slate-100 text-slate-700'
+}
+
+function accountTone(company: AdminCreditCompany): string {
+  if (!company.cuentaCorriente) return 'bg-slate-100 text-slate-700'
+  return company.cuentaCorriente.estado === 'HABILITADA'
+    ? 'bg-green-100 text-green-800'
+    : 'bg-amber-100 text-amber-900'
+}
+
 function select(company: AdminCreditCompany) {
   if (!allowed()) return
   emit('select', company)
@@ -199,21 +244,21 @@ onMounted(() => { void load(1) })
         Estado comercial
         <select id="credit-company-approval" v-model="approval" aria-label="Estado comercial">
           <option value="">Todos</option>
-          <option v-for="value in APPROVALS" :key="value" :value="value">{{ value }}</option>
+          <option v-for="value in APPROVALS" :key="value" :value="value">{{ approvalLabel(value) }}</option>
         </select>
       </label>
       <label for="credit-company-request">
         Estado de solicitud
         <select id="credit-company-request" v-model="requestState" aria-label="Estado de solicitud">
           <option value="">Todas</option>
-          <option v-for="value in REQUESTS" :key="value" :value="value">{{ value }}</option>
+          <option v-for="value in REQUESTS" :key="value" :value="value">{{ requestFilterLabel(value) }}</option>
         </select>
       </label>
       <label for="credit-company-account">
         Cuenta corriente
         <select id="credit-company-account" v-model="accountState" aria-label="Cuenta corriente">
           <option value="">Todas</option>
-          <option v-for="value in ACCOUNTS" :key="value" :value="value">{{ value }}</option>
+          <option v-for="value in ACCOUNTS" :key="value" :value="value">{{ accountFilterLabel(value) }}</option>
         </select>
       </label>
       <div class="filter-actions">
@@ -253,25 +298,26 @@ onMounted(() => { void load(1) })
             <dl class="states">
               <div>
                 <dt>Aprobación empresarial</dt>
-                <dd>{{ approvalLabel(company.estadoAprobacionEmpresa) }}</dd>
+                <dd><span class="badge" :class="approvalTone(company.estadoAprobacionEmpresa)">{{ approvalLabel(company.estadoAprobacionEmpresa) }}</span></dd>
               </div>
               <div>
                 <dt>Solicitud de crédito</dt>
-                <dd>{{ requestLabel(company) }}</dd>
+                <dd><span class="badge" :class="requestTone(company)">{{ requestLabel(company) }}</span></dd>
                 <p class="small">{{ requestDetail(company) }}</p>
               </div>
               <div>
                 <dt>Cuenta corriente</dt>
-                <dd>{{ accountLabel(company) }}</dd>
+                <dd><span class="badge" :class="accountTone(company)">{{ accountLabel(company) }}</span></dd>
                 <p class="small">{{ accountDetail(company) }}</p>
               </div>
             </dl>
             <button
               type="button"
+              class="primary-action"
               :aria-label="`Ver detalle de ${company.nombreRazonSocial}`"
               @click="select(company)"
             >
-              Ver detalle
+              {{ primaryAction(company) }}
             </button>
           </li>
         </ul>
@@ -323,6 +369,9 @@ onMounted(() => { void load(1) })
 .states { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin: 0; }
 .states dt { font-size: 12px; color: #475569; font-weight: 600; }
 .states dd { margin: 3px 0 0; font-weight: 600; }
+.badge { display: inline-flex; border-radius: 999px; padding: 2px 8px; font-size: 12px; line-height: 1.5; }
+.primary-action { align-self: center; white-space: nowrap; }
+.company-card > .primary-action { justify-self: start; }
 .notice { background: #f4f7fa; border-radius: 8px; padding: 16px; }
 .notice p { margin: 0 0 10px; }
 .pagination { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }

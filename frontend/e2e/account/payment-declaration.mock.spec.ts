@@ -205,7 +205,7 @@ async function signIn(page: Page) {
 
 async function openAccount(page: Page) {
     await page.goto('/mi-cuenta/cuenta-corriente')
-    await expect(page.getByRole('heading', { name: 'Cuenta corriente', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Mi cuenta corriente', exact: true })).toBeVisible()
 }
 
 function declaration(page: Page) {

@@ -140,6 +140,7 @@ function loadAccountView(account) {
         '@/services/paymentReceiptService': { accountReceiptsPath: '/cuenta-corriente/comprobantes' },
         '@/services/realtime': { onRealtime() {} },
         '@/utils/companyStatus': loadTypeScript('utils/companyStatus.ts'),
+        '@/utils/creditExperience': loadTypeScript('utils/creditExperience.ts'),
         '@/utils/payment': loadTypeScript('utils/payment.ts'),
         '@/utils/cuentaCorriente': {
             coverageMessage: () => '',

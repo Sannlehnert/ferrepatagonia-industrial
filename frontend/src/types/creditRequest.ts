@@ -18,3 +18,10 @@ export interface CreateCreditRequestPayload {
     plazoDias: 30 | 60
     observaciones?: string
 }
+
+export interface CreditRequestSnapshot {
+    requests: CreditRequest[]
+    loading: boolean
+    pending: boolean
+    canRequest: boolean
+}

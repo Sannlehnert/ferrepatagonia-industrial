@@ -156,6 +156,11 @@ async function submitDecision() {
     <h3 class="font-semibold">
       {{ action === 'approve' ? 'Aprobar' : 'Rechazar' }} solicitud #{{ request.id }}
     </h3>
+    <p class="mt-1 text-sm leading-6 text-slate-600">
+      {{ action === 'approve'
+        ? 'La aprobación autoriza un límite y un plazo. No habilita la cuenta corriente; la habilitación se gestiona por separado.'
+        : 'El rechazo requiere un motivo. La empresa podrá presentar una nueva solicitud cuando corresponda.' }}
+    </p>
 
     <fieldset ref="fields" :disabled="submitting || retrySameRequest" class="mt-3 grid gap-3">
       <template v-if="action === 'approve'">

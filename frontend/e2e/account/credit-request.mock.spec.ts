@@ -15,6 +15,14 @@ async function setup(page: Page) {
   await expect(page).toHaveURL(/\/mi-cuenta$/)
 }
 
+async function openCreditRequestForm(page: Page) {
+  const disclosure = page.getByText('Solicitar una revisión de límite', { exact: true })
+  const amount = page.getByLabel('Monto solicitado (USD)')
+  await expect(disclosure.or(amount).first()).toBeVisible()
+  if (await disclosure.isVisible()) await disclosure.click()
+  await expect(amount).toBeVisible()
+}
+
 async function fillRequest(page: Page, amount = '1000') {
   await page.getByLabel('Monto solicitado (USD)').fill(amount)
   await page.getByLabel('Observaciones (opcional)').fill('Prueba')
@@ -27,6 +35,7 @@ for (const width of [360, 768, 1280]) {
     await page.route('**/api/cuenta-corriente/solicitudes**', route =>
       route.fulfill({ json: { data: { items: [], siguienteAntesDeId: null } } }))
     await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
     const amount = page.getByLabel('Monto solicitado (USD)')
     const term = page.getByLabel('Plazo solicitado')
     const notes = page.getByLabel('Observaciones (opcional)')
@@ -105,6 +114,7 @@ test('controles deshabilitados y reintento de consulta mantienen estilos explíc
     await expect(retry).toHaveCSS('outline-color', 'rgb(20, 90, 141)')
     failRead = false
     await retry.click()
+    await openCreditRequestForm(page)
     const refresh = page.getByRole('button', { name: 'Actualizar', exact: true })
     await expect(refresh).toBeEnabled()
     await page.route('**/api/cuenta-corriente', async route => {
@@ -169,6 +179,7 @@ for (const outcome of ['success', 'failure'] as const) {
     })
     try {
       await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
       await fillRequest(page)
       await page.getByRole('button', { name: 'Solicitar crédito', exact: true }).click()
       await posting
@@ -215,6 +226,7 @@ for (const status of [400, 422]) {
         : route.fulfill({ status: 201, json: { data: { solicitud: request(303) } } })
     })
     await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
     await fillRequest(page)
     await page.getByRole('button', { name: 'Solicitar crédito', exact: true }).click()
     await expect(page.getByRole('alert').filter({ hasText: 'Corregí los datos.' })).toBeVisible()
@@ -246,6 +258,7 @@ test('no reutiliza un intento incierto de otra sesión', async ({ page }) => {
       : route.fulfill({ status: 201, json: { data: { solicitud: request(707) } } })
   })
   await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
   await fillRequest(page)
   await page.getByRole('button', { name: 'Solicitar crédito', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Reintentar envío' })).toBeVisible()
@@ -274,6 +287,7 @@ test('reconcilia un conflicto de solicitud pendiente', async ({ page }) => {
     return route.fulfill({ status: 409, json: { code: 'SOLICITUD_PENDIENTE', message: 'Ya existe una solicitud pendiente.' } })
   })
   await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
   await fillRequest(page)
   await page.getByRole('button', { name: 'Solicitar crédito', exact: true }).click()
   await expect(page.getByText('Solicitud #404 · Pendiente')).toBeVisible()
@@ -300,6 +314,7 @@ for (const status of [503, 409, 'network'] as const) {
       return route.fulfill({ status, json: { code: status === 409 ? 'CONFLICTO_CONCURRENCIA' : 'RESULTADO_DESCONOCIDO' } })
     })
     await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
     await fillRequest(page)
     await page.getByRole('button', { name: 'Solicitar crédito', exact: true }).click()
     await expect(page.getByLabel('Monto solicitado (USD)')).toBeDisabled()
@@ -330,6 +345,7 @@ test('una consulta anterior al envío no reemplaza la solicitud recién creada',
   })
   try {
     await page.goto('/mi-cuenta/cuenta-corriente')
+    await openCreditRequestForm(page)
     await fillRequest(page)
     await page.route('**/api/cuenta-corriente/solicitudes', async route => {
       if (route.request().method() !== 'POST') return route.fallback()

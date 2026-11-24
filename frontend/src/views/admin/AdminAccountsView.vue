@@ -195,11 +195,15 @@ onMounted(() => {
 
 <template>
   <section v-if="allowed()" class="accounts" aria-labelledby="accounts-title">
-    <header>
-      <h1 id="accounts-title">Cuentas corrientes</h1>
-      <p>Gestión administrativa de crédito comercial y consulta contable en USD.</p>
+    <header class="accounts-header">
+      <div>
+        <p class="eyebrow">Crédito comercial</p>
+        <h1 id="accounts-title">Gestión de crédito y cuentas corrientes</h1>
+        <p>Revisá solicitudes, habilitá cuentas y consultá la situación financiera de cada empresa.</p>
+      </div>
+      <a href="#solicitudes-pendientes" class="header-action">Revisar solicitudes pendientes</a>
     </header>
-    <AdminCreditRequests />
+    <AdminCreditRequests id="solicitudes-pendientes" />
 
     <div class="tabs" role="tablist" aria-label="Secciones de cuentas corrientes">
       <button
@@ -281,13 +285,22 @@ onMounted(() => {
         No se pudo cargar la identidad comercial de la empresa.
       </p>
 
+      <nav class="detail-nav" aria-label="Secciones del detalle de la empresa">
+        <a href="#resumen-empresa">Resumen</a>
+        <a href="#solicitudes-empresa">Solicitudes y decisiones</a>
+        <a href="#configuracion-credito">Configuración de crédito</a>
+        <a href="#movimientos-empresa">Movimientos y vencimientos</a>
+        <a href="#auditoria-empresa">Auditoría</a>
+      </nav>
+
+      <h3 id="resumen-empresa" class="section-title">Resumen financiero y comercial</h3>
       <div v-if="selectedCompany" class="concepts" aria-label="Situación comercial de la empresa">
         <article>
-          <h3>Aprobación empresarial</h3>
+          <h4>Aprobación empresarial</h4>
           <p>{{ approvalText(selectedCompany.estadoAprobacionEmpresa) }}</p>
         </article>
         <article>
-          <h3>Solicitud de crédito</h3>
+          <h4>Solicitud de crédito</h4>
           <p>{{ requestStatusText(latestRequest?.estado) }}</p>
           <p v-if="latestRequest" class="small">
             Última solicitud #{{ latestRequest.id }} · {{ accountMoney(latestRequest.montoSolicitado) }}
@@ -295,11 +308,11 @@ onMounted(() => {
           </p>
         </article>
         <article>
-          <h3>Habilitación de la cuenta</h3>
+          <h4>Habilitación de la cuenta</h4>
           <p>{{ accountStatusText() }}</p>
         </article>
         <article>
-          <h3>Elegibilidad de compra</h3>
+          <h4>Elegibilidad de compra</h4>
           <p>{{ eligibilityText() }}</p>
         </article>
       </div>
@@ -312,24 +325,39 @@ onMounted(() => {
       <template v-else-if="summary">
         <p v-if="summary.estado === 'SIN_CUENTA'" role="status">El cliente no tiene cuenta corriente asignada.</p>
         <template v-else>
-          <p><strong v-if="summary.origen === 'DEMO'">Datos DEMO · </strong>{{ summary.estado }} · Cobertura {{ summary.cobertura }} · Crédito {{ summary.estadoCredito }}</p>
+          <div class="status-chips">
+            <span class="chip">{{ summary.estado === 'HABILITADA' ? 'Cuenta habilitada' : 'Cuenta inhabilitada' }}</span>
+            <span class="chip">Cobertura {{ summary.cobertura }}</span>
+            <span class="chip">Crédito {{ summary.estadoCredito }}</span>
+            <span v-if="summary.origen === 'DEMO'" class="chip demo">DEMO</span>
+          </div>
           <p v-if="summary.estado === 'INHABILITADA'">Cuenta inhabilitada. El historial sigue disponible para consulta.</p>
           <dl class="summary">
-            <div><dt>Saldo</dt><dd>{{ accountMoney(summary.saldo) }}</dd></div><div><dt>Límite</dt><dd>{{ accountMoney(summary.limite) }}</dd></div>
-            <div><dt>Utilizado</dt><dd>{{ accountMoney(summary.utilizado) }}</dd></div><div><dt>Disponible</dt><dd>{{ accountMoney(summary.disponible) }}</dd></div>
+            <div><dt>Saldo</dt><dd>{{ accountMoney(summary.saldo) }}</dd></div>
+            <div><dt>Límite</dt><dd>{{ accountMoney(summary.limite) }}</dd></div>
+            <div><dt>Utilizado</dt><dd>{{ accountMoney(summary.utilizado) }}</dd></div>
+            <div><dt>Disponible</dt><dd>{{ accountMoney(summary.disponible) }}</dd></div>
             <div><dt>Plazo actual</dt><dd>{{ summary.plazoDias ? `${summary.plazoDias} días` : 'No acreditado' }}</dd></div>
-            <div><dt>Deuda vencida</dt><dd>{{ accountMoney(summary.deudaVencidaTotal) }}</dd></div>
-            <div><dt>Vencida a 30 días</dt><dd>{{ accountMoney(summary.deudaVencida30Dias) }}</dd></div>
-            <div><dt>Vencida a 60 días</dt><dd>{{ accountMoney(summary.deudaVencida60Dias) }}</dd></div>
-            <div><dt>Por vencer</dt><dd>{{ accountMoney(summary.deudaPorVencerTotal) }}</dd></div>
           </dl>
+          <details class="summary-detail">
+            <summary>Detalle de deuda</summary>
+            <dl class="summary">
+              <div><dt>Deuda vencida</dt><dd>{{ accountMoney(summary.deudaVencidaTotal) }}</dd></div>
+              <div><dt>Vencida a 30 días</dt><dd>{{ accountMoney(summary.deudaVencida30Dias) }}</dd></div>
+              <div><dt>Vencida a 60 días</dt><dd>{{ accountMoney(summary.deudaVencida60Dias) }}</dd></div>
+              <div><dt>Por vencer</dt><dd>{{ accountMoney(summary.deudaPorVencerTotal) }}</dd></div>
+            </dl>
+          </details>
+
+          <h3 id="configuracion-credito" class="section-title">Configuración de crédito</h3>
           <AdminCreditAccountControls
             :key="`${identity()}:${selected}`"
             :client-id="selected"
             :account="summary"
             @updated="onCreditUpdated"
           />
-          <h3>Movimientos</h3>
+          <h3 id="movimientos-empresa" class="section-title">Movimientos y vencimientos</h3>
+          <h4>Movimientos</h4>
           <template v-if="movements && movements.estado !== 'SIN_CUENTA'">
             <p v-if="movements.cobertura !== 'COMPLETA'">Historial incompleto: no acredita el saldo total.</p>
             <p v-if="!movements.items.length" role="status">{{ movements.cobertura === 'COMPLETA' ? 'Sin movimientos.' : 'Sin movimientos acreditados para mostrar. La información es incompleta.' }}</p>
@@ -339,7 +367,7 @@ onMounted(() => {
             </table></div>
             <button v-if="movements.siguienteCursor" @click="loadDetail(selected, 'movimientos', movements.siguienteCursor)">Siguiente página de movimientos</button>
           </template>
-          <h3>Vencimientos</h3>
+          <h4>Vencimientos</h4>
           <template v-if="dues && dues.estado !== 'SIN_CUENTA'">
             <p v-if="dues.cobertura !== 'COMPLETA'">Vencimientos con cobertura {{ dues.cobertura }}. Los importes no acreditados permanecen desconocidos.</p>
             <p v-if="!dues.items.length" role="status">{{ dues.cobertura === 'COMPLETA' ? 'Sin vencimientos abiertos.' : 'Sin fechas acreditadas para mostrar.' }}</p>
@@ -361,7 +389,7 @@ onMounted(() => {
           <button type="button" @click="retryHistory">Reintentar historial</button>
         </div>
         <template v-else-if="historyRead.data.value">
-          <h4>Solicitudes</h4>
+          <h4 id="solicitudes-empresa">Solicitudes</h4>
           <p v-if="!creditRequests.length" role="status">Sin solicitudes registradas.</p>
           <ul v-else class="history-list">
             <li v-for="request in creditRequests" :key="request.id">
@@ -385,7 +413,7 @@ onMounted(() => {
               />
             </li>
           </ul>
-          <h4>Auditoría</h4>
+          <h4 id="auditoria-empresa">Auditoría de crédito</h4>
           <p v-if="!creditEvents.length" role="status">Sin eventos de crédito registrados.</p>
           <ul v-else class="history-list">
             <li v-for="event in creditEvents" :key="event.id">
@@ -411,6 +439,21 @@ onMounted(() => {
 
 <style scoped>
 .accounts { color: #0b2438; min-width: 0; } h1 { font-size: 28px; font-weight: 600; } header { margin-bottom: 24px; } p { margin: 12px 0; line-height: 1.6; }
+.accounts-header { display: flex; flex-wrap: wrap; align-items: start; justify-content: space-between; gap: 16px; }
+.eyebrow { margin: 0 0 4px; color: #475569; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.header-action { display: inline-flex; align-items: center; min-height: 44px; border-radius: 8px; background: #145a8d; color: white; padding: 8px 16px; font-weight: 600; text-decoration: none; }
+.header-action:focus-visible { outline: 2px solid #145a8d; outline-offset: 3px; }
+.detail-nav { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 20px; }
+.detail-nav a { display: inline-flex; align-items: center; min-height: 44px; border: 1px solid #cbd5e1; border-radius: 999px; padding: 6px 14px; color: #103a5c; font-size: 14px; font-weight: 600; text-decoration: none; background: white; }
+.detail-nav a:hover { background: #f1f5f9; }
+.detail-nav a:focus-visible { outline: 2px solid #145a8d; outline-offset: 2px; }
+.section-title { margin: 28px 0 12px; padding-top: 8px; border-top: 1px solid #e2e8f0; font-size: 20px; font-weight: 600; }
+.status-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.chip { display: inline-flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 999px; background: #f8fafc; padding: 3px 10px; font-size: 13px; font-weight: 600; }
+.chip.demo { border-color: #fde68a; background: #fffbeb; color: #78350f; }
+.summary-detail { margin: 12px 0; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+.summary-detail summary { cursor: pointer; font-weight: 600; }
+.summary-detail summary:focus-visible { outline: 2px solid #145a8d; outline-offset: 3px; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 24px 0; } label { display: grid; gap: 6px; }
 input, select, button { min-height: 44px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; max-width: 100%; }
 button { cursor: pointer; background: #145a8d; color: white; } button:focus-visible, input:focus-visible, select:focus-visible, .table-wrap:focus-visible { outline: 2px solid #145a8d; outline-offset: 3px; }
@@ -428,7 +471,7 @@ table { width: 100%; border-collapse: collapse; text-align: left; } th, td { pad
 .muted { color: #64748b; }
 .concepts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0 20px; }
 .concepts article { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #f8fafc; }
-.concepts h3 { margin: 0 0 6px; font-size: 14px; font-weight: 700; }
+.concepts h4 { margin: 0 0 6px; font-size: 14px; font-weight: 700; }
 .concepts p { margin: 0; font-size: 14px; }
 .concepts .small { margin-top: 4px; color: #475569; font-size: 13px; }
 .history { margin-top: 28px; border-top: 1px solid #e2e8f0; padding-top: 16px; }
