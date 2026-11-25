@@ -1,0 +1,32 @@
+# Instalación limpia #356 — 25/11/2026
+
+Entorno descartable: contenedor ferrepatagonia-356-clean, volumen propio,
+puerto 3318, base ferrepatagonia_dev vacía. Node 22.22.2 / npm 10.9.7.
+MariaDB 11.4.13-MariaDB-ubu2404.
+
+Secuencia: schema.sql + 6 migraciones + 8 categorías + import maestro +
+100 imágenes ADMIN + publicación ADMIN.
+
+Resultado SQL:
+26 tablas base
+13 triggers
+1 vista FER17_AUDITORIA_TRIGGERS
+8 categorías activas
+100 productos activos
+100 SKU únicos
+100 productos con imagen
+100 productos con precio positivo
+100 evidencias sintéticas
+0 productos ajenos al catálogo maestro
+
+Importación: 100 insertados, 0 conservados.
+Imágenes: 100 asociadas, 0 pendientes.
+Publicación: 100 publicados.
+
+Smoke antes del reinicio: 17 comprobaciones PASS.
+Smoke después de reiniciar API y MariaDB: 8 comprobaciones PASS.
+Modo compilado: health 200, comprobante 201, imagen 200, preview 200 y proxy 200.
+
+Adaptación de entorno: bind mounts de Docker Desktop/WSL no disponibles; en la
+copia descartable se usó un volumen nombrado para /scripts poblado con
+`docker compose cp`. El compose.yml de la rama no se modificó.

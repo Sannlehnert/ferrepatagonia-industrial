@@ -32,7 +32,7 @@ preparado, sin reabrir tareas aprobadas ni agregar funcionalidades.
 | CI push de `develop` | run [45528732034](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45528732034), SHA `e46843c`, SUCCESS |
 | Último CI de `main` | run [43469542261](https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/43469542261), SHA `4a1b12d`, SUCCESS |
 | PR abiertos al inicio | 0 |
-| Protección de ramas | No consultable con API anónima (HTTP 401). No se intentó push ni se eludió ninguna restricción. |
+| Protección de ramas | No consultable con API anónima (HTTP 401). No se intentó push ni se eludió ninguna restricción. Ver [`evidence/github-status.json`](evidence/github-status.json). |
 
 `develop` tenía **493 commits exclusivos** y `main` **8 commits exclusivos** al
 inicio. Las ramas estaban divergidas.
@@ -164,7 +164,8 @@ Resultado:
 
 Evidencia: [`evidence/final-sql.txt`](evidence/final-sql.txt),
 [`evidence/catalog-api.json`](evidence/catalog-api.json),
-[`evidence/price-sample.json`](evidence/price-sample.json).
+[`evidence/price-sample.json`](evidence/price-sample.json),
+[`evidence/clean-install-summary.txt`](evidence/clean-install-summary.txt).
 
 Después del smoke quedaron 3 pedidos y 3 comprobantes en la base descartable,
 sin productos adicionales: `productos_total = 100`, `productos_activos = 100`.
