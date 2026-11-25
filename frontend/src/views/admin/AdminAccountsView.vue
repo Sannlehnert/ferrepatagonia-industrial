@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import axios from 'axios'
 import AdminCreditAccountControls from '@/components/AdminCreditAccountControls.vue'
 import AdminCreditCompanies from '@/components/AdminCreditCompanies.vue'
@@ -27,9 +27,28 @@ const historyRead = usePrivateAccountRead<{
 }>(identity, allowed)
 const activeTab = ref<'empresas' | 'contable'>('empresas')
 const companyListRef = ref<{ refresh: () => Promise<void> | void } | null>(null)
+const detailSectionRef = ref<HTMLElement | null>(null)
+const highlightDetail = ref(false)
 const clientInput = ref(''), enabledInput = ref(''), selected = ref<number | null>(null), validation = ref('')
 let filters: AccountFilters = {}
 let detailSequence = 0
+let highlightTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearHighlightTimer() {
+  if (highlightTimer !== null) {
+    clearTimeout(highlightTimer)
+    highlightTimer = null
+  }
+}
+
+function triggerDetailHighlight() {
+  clearHighlightTimer()
+  highlightDetail.value = true
+  highlightTimer = setTimeout(() => {
+    highlightDetail.value = false
+    highlightTimer = null
+  }, 1200)
+}
 const selectedCompany = computed(() => companyRead.data.value)
 const creditRequests = computed(() => historyRead.data.value?.requests ?? [])
 const creditEvents = computed(() => historyRead.data.value?.events ?? [])
@@ -49,9 +68,24 @@ function message(error: unknown) {
   if (status === 401 || status === 403) return 'La sesión actual no permite consultar estas cuentas.'
   return 'No pudimos consultar las cuentas. Intentá nuevamente.'
 }
-function loadList(cursor?: string) {
+function resetDetailState() {
+  detailSequence += 1
+  clearHighlightTimer()
+  highlightDetail.value = false
+  creditFeedback.value = ''
   detail.reset()
+  companyRead.reset()
+  historyRead.reset()
   selected.value = null
+}
+
+function closeDetail() {
+  resetDetailState()
+  window.scrollTo?.({ top: 0, behavior: 'smooth' })
+}
+
+function loadList(cursor?: string) {
+  resetDetailState()
   return list.load(signal => getAdminAccounts({ ...filters, cursor }, signal))
 }
 function applyFilters() {
@@ -59,7 +93,7 @@ function applyFilters() {
   const raw = clientInput.value.trim()
   if (raw && (!/^[1-9]\d{0,9}$/.test(raw) || Number(raw) > 2147483647)) {
     validation.value = 'Ingresá un ID de cliente entero entre 1 y 2147483647.'
-    list.reset(); detail.reset(); selected.value = null
+    list.reset(); resetDetailState()
     return
   }
   filters = { ...(raw ? { clienteId: Number(raw) } : {}),
@@ -70,7 +104,7 @@ function lookupClient() {
   const raw = clientInput.value.trim()
   if (!/^[1-9]\d{0,9}$/.test(raw) || Number(raw) > 2147483647) {
     validation.value = 'Ingresá un ID de cliente entero entre 1 y 2147483647.'
-    detail.reset(); selected.value = null
+    resetDetailState()
     return
   }
   validation.value = ''
@@ -152,11 +186,18 @@ async function loadDetail(
   const current = ++detailSequence
   if (!options.preserveFeedback) creditFeedback.value = ''
   const changed = selected.value !== clientId
+  const shouldScrollAndHighlight = kind === undefined && !options.preserveFeedback
   selected.value = clientId
   const refreshContext = changed || kind === undefined
   if (changed) {
     companyRead.reset()
     historyRead.reset()
+  }
+  if (shouldScrollAndHighlight) {
+    triggerDetailHighlight()
+    await nextTick()
+    if (current !== detailSequence || selected.value !== clientId || !allowed()) return
+    detailSectionRef.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   }
   const previous = selectedData.value
   await detail.load(async signal => {
@@ -176,10 +217,8 @@ async function loadDetail(
   await loadHistory(clientId)
 }
 watch(() => [identity(), auth.loggingOut, auth.loggingIn], () => {
-  detailSequence += 1
-  creditFeedback.value = ''
-  list.reset(); detail.reset(); companyRead.reset(); historyRead.reset()
-  selected.value = null
+  list.reset()
+  resetDetailState()
   clientInput.value = ''; enabledInput.value = ''; filters = {}; validation.value = ''
   if (allowed() && activeTab.value === 'contable') void loadList()
 }, { flush: 'sync' })
@@ -190,6 +229,9 @@ watch(activeTab, tab => {
 })
 onMounted(() => {
   if (activeTab.value === 'contable') void loadList()
+})
+onUnmounted(() => {
+  clearHighlightTimer()
 })
 </script>
 
@@ -270,20 +312,37 @@ onMounted(() => {
         <button v-if="accounts.siguienteCursor" @click="loadList(accounts.siguienteCursor)">Siguiente página de cuentas</button>
       </template>
     </section>
-    <section v-if="selected" aria-labelledby="account-detail-title" class="detail">
-      <h2 id="account-detail-title">Cliente {{ selected }}</h2>
-      <div v-if="selectedCompany" class="company-summary">
-        <p class="company-name">{{ selectedCompany.nombreRazonSocial }}</p>
-        <p>
-          ID #{{ selectedCompany.clienteId }}
-          <span v-if="selectedCompany.cuit"> · CUIT {{ selectedCompany.cuit }}</span>
-          <span> · {{ selectedCompany.email }}</span>
-          <span> · {{ selectedCompany.activo ? 'Empresa activa' : 'Empresa inactiva' }}</span>
-        </p>
+    <section
+      v-if="selected"
+      ref="detailSectionRef"
+      aria-labelledby="account-detail-title"
+      class="detail rounded-xl transition-all duration-300"
+      :class="{ 'ring-2 ring-[#145A8D]': highlightDetail }"
+    >
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0 flex-1">
+          <h2 id="account-detail-title" class="m-0">Cliente {{ selected }}</h2>
+          <div v-if="selectedCompany" class="company-summary">
+            <p class="company-name">{{ selectedCompany.nombreRazonSocial }}</p>
+            <p>
+              ID #{{ selectedCompany.clienteId }}
+              <span v-if="selectedCompany.cuit"> · CUIT {{ selectedCompany.cuit }}</span>
+              <span> · {{ selectedCompany.email }}</span>
+              <span> · {{ selectedCompany.activo ? 'Empresa activa' : 'Empresa inactiva' }}</span>
+            </p>
+          </div>
+          <p v-else-if="companyRead.error.value && !detail.error.value" class="muted">
+            No se pudo cargar la identidad comercial de la empresa.
+          </p>
+        </div>
+        <button
+          type="button"
+          class="detail-close box-border inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-[8px] border border-solid border-slate-300 bg-white px-3.5 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+          @click="closeDetail"
+        >
+          Cerrar detalle
+        </button>
       </div>
-      <p v-else-if="companyRead.error.value && !detail.error.value" class="muted">
-        No se pudo cargar la identidad comercial de la empresa.
-      </p>
 
       <nav class="detail-nav" aria-label="Secciones del detalle de la empresa">
         <a href="#resumen-empresa">Resumen</a>
@@ -455,8 +514,8 @@ onMounted(() => {
 .summary-detail summary { cursor: pointer; font-weight: 600; }
 .summary-detail summary:focus-visible { outline: 2px solid #145a8d; outline-offset: 3px; }
 .filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; margin: 24px 0; } label { display: grid; gap: 6px; }
-input, select, button { min-height: 44px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; max-width: 100%; }
-button { cursor: pointer; background: #145a8d; color: white; } button:focus-visible, input:focus-visible, select:focus-visible, .table-wrap:focus-visible { outline: 2px solid #145a8d; outline-offset: 3px; }
+input, select, button:not(.detail-close) { min-height: 44px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 8px 12px; max-width: 100%; }
+button:not(.detail-close) { cursor: pointer; background: #145a8d; color: white; } button:not(.detail-close):focus-visible, input:focus-visible, select:focus-visible, .table-wrap:focus-visible { outline: 2px solid #145a8d; outline-offset: 3px; }
 .notice { background: #f4f7fa; padding: 20px; border-radius: 8px; } .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 8px; margin: 16px 0; }
 table { width: 100%; border-collapse: collapse; text-align: left; } th, td { padding: 16px; border-bottom: 1px solid #e2e8f0; vertical-align: top; } th { background: #f4f7fa; } td { overflow-wrap: anywhere; min-width: 110px; }
 .detail { margin-top: 32px; border-top: 1px solid #cbd5e1; padding-top: 16px; } .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin: 24px 0; } dt { color: #475569; } dd { margin: 8px 0; font-weight: 600; }
