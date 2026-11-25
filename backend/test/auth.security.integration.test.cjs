@@ -105,14 +105,22 @@ for (const kind of ['absent', 'invalid', 'expired', 'without exp', 'HS384', 'wro
   });
   assert.equal(await productSnapshot(), before);
 });
-test('real identity pool saturation produces controlled 500 and recovers', async t => {
+test('real identity pool saturation produces controlled 503 with Retry-After and recovers', async t => {
   const before = await productSnapshot();
   const runners = Array.from({ length: 5 }, () => dataSource.createQueryRunner());
   try {
     await Promise.all(runners.map(r => r.connect()));
-    for (const route of routes) await t.test(route.method + ' ' + route.path, async () => {
-      const response = await send(route, admin.cookie);
-      assert.equal(response.status, 500); assert.deepEqual(response.body, { message: 'Error interno del servidor.' });
+    const results = await Promise.all(routes.map(async route => ({
+      route,
+      response: await send(route, admin.cookie),
+    })));
+    for (const { route, response } of results) await t.test(route.method + ' ' + route.path, async () => {
+      assert.equal(response.status, 503);
+      assert.equal(response.headers.get('retry-after'), '1');
+      assert.deepEqual(response.body, {
+        code: 'SERVICIO_NO_DISPONIBLE',
+        message: 'El servicio está temporalmente ocupado. Intentá nuevamente en unos instantes.',
+      });
       assert.equal(response.headers.get('set-cookie'), null);
     });
   } finally { await Promise.all(runners.map(r => r.release())); }

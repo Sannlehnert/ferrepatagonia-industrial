@@ -1,4 +1,5 @@
 import type { Request, RequestHandler, Response } from 'express';
+import { isTransientDatabaseError } from '../config/database-policy';
 import { authPassport, authReadSignal } from '../config/passport.config';
 import type { Role, SessionUser } from '../types/auth';
 
@@ -14,6 +15,14 @@ export async function authenticateRequest(req: Request, res: Response, signal?: 
   if (res.destroyed) return false;
   if (error) {
     if (signal) throw error;
+    if (isTransientDatabaseError(error)) {
+      res.setHeader('Retry-After', '1');
+      res.status(503).json({
+        code: 'SERVICIO_NO_DISPONIBLE',
+        message: 'El servicio está temporalmente ocupado. Intentá nuevamente en unos instantes.',
+      });
+      return false;
+    }
     res.status(500).json({ message: 'Error interno del servidor.' });
     return false;
   }

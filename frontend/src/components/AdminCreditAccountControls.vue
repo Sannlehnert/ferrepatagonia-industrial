@@ -140,6 +140,12 @@ async function submit() {
   <section class="credit-controls my-4 rounded-lg border border-slate-200 bg-white p-4">
     <h3 class="font-semibold">Gestión de crédito</h3>
 
+    <p v-if="!action" class="mt-2 text-sm leading-6 text-slate-600">
+      {{ account.estado === 'INHABILITADA'
+        ? 'Habilitar requiere una solicitud aprobada y un límite acreditado. No modifica el saldo ni acredita pagos.'
+        : 'Deshabilitar suspende nuevas compras a crédito. El historial y la deuda existente se conservan.' }}
+      El límite no puede quedar por debajo del crédito ya utilizado.
+    </p>
     <div v-if="!action" class="mt-3 flex flex-wrap gap-2">
       <button
         ref="primaryTrigger"

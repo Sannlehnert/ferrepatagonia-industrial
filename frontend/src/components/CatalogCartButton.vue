@@ -55,7 +55,7 @@ const message = computed(() => {
 
   if (
     cart.loadError ||
-    (cart.needsSync && !cart.loading)
+    cart.stale
   ) {
     return 'Volvé a consultar el carrito antes de agregar.'
   }

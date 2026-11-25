@@ -98,7 +98,7 @@ test('declarar no crea ABONO y el historial no confunde revisión con acreditaci
     await page.route('**/socket.io/**', route => route.abort())
     await signIn(page, 'empresa-cuenta@e2e.test')
     await page.goto('/mi-cuenta/cuenta-corriente')
-    await expect(page.getByRole('heading', { name: 'Cuenta corriente', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Mi cuenta corriente', exact: true })).toBeVisible()
     await expect(page.getByRole('region', { name: 'Resumen financiero' })).toBeVisible()
 
     const before = (await (await page.request.get('/api/cuenta-corriente')).json()).data

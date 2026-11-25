@@ -4,6 +4,7 @@ import { ref, computed, nextTick, onMounted, onBeforeUnmount, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 import axios from 'axios';
 import ProductFormModal from './ProductFormModal.vue';
+import AdminPriceVerificationDialog from '@/components/AdminPriceVerificationDialog.vue';
 import {
     getAdminProductPage,
     setAdminProductActive,
@@ -12,6 +13,12 @@ import {
     type AdminProductPage,
     type CategoryOption
 } from '../../services/adminProductService';
+import {
+    buildProductsWorkbook,
+    collectAdminProductsForExport,
+    downloadProductsWorkbook,
+    productsExportFilename,
+} from '../../services/productExportService';
 
 import { isMutationResultUncertain, adminMutationErrorMessage, uncertainMutationMessage } from '../../services/adminMutationError';
 
@@ -40,9 +47,16 @@ const tableRegion = ref<HTMLElement | null>(null);
 const reloadButton = ref<HTMLButtonElement | null>(null);
 const isLoading = ref(true);
 const loadError = ref('');
+type SaveTone = 'success' | 'warning';
+
 const isSessionExpired = ref(false);
 const saveMessage = ref('');
+const saveTone = ref<SaveTone>('success');
 const actionError = ref('');
+const exportingProducts = ref(false);
+const exportError = ref('');
+const exportMessage = ref('');
+let exportController: AbortController | undefined;
 const processingId = ref<number | null>(null);
 const needsReload = ref(false);
 const actionsDisabled = computed(() => isLoading.value || processingId.value !== null || needsReload.value || Boolean(loadError.value));
@@ -51,6 +65,8 @@ const pagingUnavailable = computed(() => isLoading.value || searchPending.value
 
 const isModalOpen = ref(false);
 const selectedProduct = ref<AdminProduct | null>(null);
+const verificationTarget = ref<AdminProduct | null>(null);
+let verificationTrigger: HTMLElement | null = null;
 let modalTrigger: HTMLElement | null = null;
 let restoreModalFocus = false;
 
@@ -174,6 +190,36 @@ const fetchProductos = async () => {
     }
 };
 
+const exportProducts = async () => {
+    if (exportingProducts.value || isLoading.value || searchPending.value) return;
+    exportController?.abort();
+    const controller = new AbortController();
+    exportController = controller;
+    exportingProducts.value = true;
+    exportError.value = '';
+    exportMessage.value = '';
+    try {
+        const products = await collectAdminProductsForExport(appliedSearch.value, controller.signal);
+        if (controller.signal.aborted) return;
+        if (products.length === 0) {
+            exportMessage.value = 'No hay productos para exportar con el filtro actual.';
+            return;
+        }
+        downloadProductsWorkbook(
+            buildProductsWorkbook(products),
+            productsExportFilename(appliedSearch.value),
+        );
+        exportMessage.value = `Se exportaron ${products.length} productos${appliedSearch.value ? ' del filtro actual' : ''} en Excel.`;
+    } catch (error: unknown) {
+        if (controller.signal.aborted) return;
+        exportError.value = error instanceof Error
+            ? error.message
+            : 'No se pudo exportar el catálogo. Intentá nuevamente.';
+    } finally {
+        if (!controller.signal.aborted) exportingProducts.value = false;
+    }
+};
+
 const fetchCategorias = async () => {
     isLoadingCategories.value = true;
     categoriesError.value = '';
@@ -204,6 +250,7 @@ const openCreateModal = () => {
     if (actionsDisabled.value || isModalOpen.value) return;
     modalTrigger = searchInput.value?.ownerDocument.activeElement as HTMLElement | null;
     saveMessage.value = '';
+    saveTone.value = 'success';
     selectedProduct.value = null;
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
         fetchCategorias();
@@ -215,6 +262,7 @@ const openEditModal = (prod: AdminProduct) => {
     if (actionsDisabled.value || isModalOpen.value) return;
     modalTrigger = searchInput.value?.ownerDocument.activeElement as HTMLElement | null;
     saveMessage.value = '';
+    saveTone.value = 'success';
     selectedProduct.value = { ...prod };
     if (categorias.value.length === 0 && !isLoadingCategories.value) {
         fetchCategorias();
@@ -222,7 +270,36 @@ const openEditModal = (prod: AdminProduct) => {
     isModalOpen.value = true;
 };
 
-const handleSaved = async (msg: string) => {
+const canVerifyPrice = (prod: AdminProduct) => Boolean(
+    prod.precio !== null && prod.precio !== undefined && Number(prod.precio) > 0
+    && (prod.estado_precio_base === 'NO_VERIFICADO' || prod.estado_precio_base === 'SINTETICO'),
+);
+
+const openPriceVerification = (prod: AdminProduct, event?: MouseEvent) => {
+    if (actionsDisabled.value || isModalOpen.value) return;
+    verificationTrigger = (event?.currentTarget as HTMLElement | undefined)
+        ?? (searchInput.value?.ownerDocument.activeElement as HTMLElement | null);
+    verificationTarget.value = prod;
+};
+
+const closePriceVerification = async () => {
+    verificationTarget.value = null;
+    await nextTick();
+    if (verificationTrigger?.isConnected) verificationTrigger.focus({ preventScroll: true });
+    verificationTrigger = null;
+};
+
+const handlePriceVerified = async (message: string) => {
+    verificationTarget.value = null;
+    saveTone.value = 'success';
+    saveMessage.value = message;
+    await fetchProductos();
+    await nextTick();
+    searchInput.value?.focus({ preventScroll: true });
+};
+
+const handleSaved = async (msg: string, tone: SaveTone = 'success') => {
+    saveTone.value = tone;
     saveMessage.value = msg;
     needsReload.value = true;
     await fetchProductos();
@@ -248,9 +325,11 @@ const toggleStatus = async (prod: AdminProduct, event?: MouseEvent) => {
     processingId.value = prod.id_producto;
     actionError.value = '';
     saveMessage.value = '';
+    saveTone.value = 'success';
     try {
         await setAdminProductActive(prod.id_producto, !deactivate);
         needsReload.value = true;
+        saveTone.value = 'success';
         saveMessage.value = `"${prod.nombre}" se ${deactivate ? 'desactivó' : 'activó'} correctamente.`;
         await fetchProductos();
     } catch (error: unknown) {
@@ -296,23 +375,46 @@ onBeforeUnmount(() => {
     unmounted = true;
     clearTimeout(searchTimer);
     currentRequest?.abort();
+    exportController?.abort();
 });
 </script>
 
 <template>
     <div class="admin-products p-4 md:p-8 max-w-7xl mx-auto flex flex-col min-w-0 w-full bg-[#F1F5F9]">
         <!-- Barra Superior -->
-        <div class="flex flex-col gap-3 md:flex-row md:justify-between md:items-center mb-6 bg-[#F1F5F9] py-4">
-            <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="mb-6 flex flex-col gap-4 border-b border-[#E2E8F0] bg-[#F1F5F9] pb-4">
+            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <h2 class="text-2xl font-bold text-[#0B2438]">Catálogo de Productos</h2>
-                <RouterLink
-                    :to="{ name: 'admin-product-import' }"
-                    class="box-border flex min-h-11 items-center justify-center rounded-md border border-[#103A5C] bg-white px-4 py-2 text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                <div
+                    role="group"
+                    aria-label="Acciones del catálogo"
+                    class="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center lg:justify-end"
                 >
-                    Importar desde planilla
-                </RouterLink>
+                    <button
+                        type="button"
+                        @click="openCreateModal"
+                        :disabled="actionsDisabled"
+                        class="col-span-2 box-border min-h-11 cursor-pointer rounded-md border-0 bg-[#103A5C] px-6 py-2.5 font-[inherit] font-semibold text-white shadow-md transition-colors hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 sm:col-span-1"
+                    >
+                        + Nuevo Producto
+                    </button>
+                    <RouterLink
+                        :to="{ name: 'admin-product-import' }"
+                        class="box-border flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-solid border-[#103A5C] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#103A5C] no-underline hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    >
+                        Importar productos
+                    </RouterLink>
+                    <button
+                        type="button"
+                        class="box-border flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-solid border-[#103A5C] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="exportingProducts || isLoading || searchPending"
+                        @click="exportProducts"
+                    >
+                        {{ exportingProducts ? 'Exportando…' : 'Exportar a Excel' }}
+                    </button>
+                </div>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex flex-wrap items-center gap-2">
                 <input
                     ref="searchInput"
                     v-model="searchQuery"
@@ -320,12 +422,12 @@ onBeforeUnmount(() => {
                     maxlength="200"
                     placeholder="Buscar por Nombre o SKU..."
                     aria-label="Buscar productos por nombre o SKU"
-                    class="box-border min-h-11 w-full min-w-0 md:w-72 bg-white border border-[#E2E8F0] rounded-md px-4 py-2 text-sm text-[#0B2438] placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-[#103A5C] shadow-sm"
+                    class="box-border min-h-11 w-full min-w-0 flex-1 bg-white border border-solid border-[#E2E8F0] rounded-md px-4 py-2 font-[inherit] text-sm text-[#0B2438] placeholder:text-slate-600 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] shadow-sm sm:max-w-72"
                 >
                 <button
                     v-if="searchQuery || appliedSearch"
                     type="button"
-                    class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="clearSearch"
                 >
                     Limpiar búsqueda
@@ -333,18 +435,40 @@ onBeforeUnmount(() => {
             </div>
         </div>
 
+        <p class="mb-4 mt-0 text-sm text-slate-600">
+            La exportación incluye todos los productos que coinciden con la búsqueda activa, no solo la página visible.
+        </p>
+
         <p
             v-if="saveMessage"
             role="status"
-            class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 wrap-anywhere"
+            class="mb-4 rounded-md border border-solid p-3 text-sm wrap-anywhere"
+            :class="saveTone === 'warning'
+                ? 'border-amber-200 bg-amber-50 text-amber-900'
+                : 'border-emerald-200 bg-emerald-50 text-emerald-800'"
         >
             {{ saveMessage }}
         </p>
 
+        <p
+            v-if="exportMessage"
+            role="status"
+            class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 wrap-anywhere"
+        >
+            {{ exportMessage }}
+        </p>
+        <div
+            v-if="exportError"
+            role="alert"
+            class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 wrap-anywhere"
+        >
+            {{ exportError }}
+        </div>
+
         <p v-if="processingId !== null" id="admin-products-lock" role="status" class="mb-4">Actualizando estado del producto. Las acciones están temporalmente deshabilitadas.</p>
         <div v-if="actionError || needsReload" role="alert" class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-700">
             <p class="wrap-anywhere">{{ actionError || 'Recargá el listado para confirmar los datos antes de modificar productos.' }}</p>
-            <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
+            <button ref="reloadButton" type="button" :disabled="isLoading || processingId !== null" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50" @click="fetchProductos">Recargar listado</button>
         </div>
 
         <!-- Estado de Carga -->
@@ -363,7 +487,7 @@ onBeforeUnmount(() => {
                 <button
                     v-if="isSessionExpired"
                     type="button"
-                    class="box-border min-h-11 border-0 bg-[#103A5C] text-white text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 cursor-pointer border-0 bg-[#103A5C] text-white font-[inherit] text-sm font-semibold px-4 py-2 rounded-md hover:bg-[#145A8D] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="router.push('/login')"
                 >
                     Iniciar sesión
@@ -371,7 +495,7 @@ onBeforeUnmount(() => {
                 <button
                     v-else
                     type="button"
-                    class="box-border min-h-11 bg-white border border-red-300 text-red-700 text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+                    class="box-border min-h-11 cursor-pointer bg-white border border-solid border-red-300 text-red-700 font-[inherit] text-sm font-semibold px-4 py-2 rounded-md hover:bg-red-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                     @click="fetchProductos"
                 >
                     Reintentar
@@ -386,7 +510,8 @@ onBeforeUnmount(() => {
 
         <template v-else-if="result && result.data.length">
             <p id="admin-products-scroll" class="mb-2 text-sm text-slate-700">
-                Si no ves todas las columnas, desplazá la tabla hacia los lados. Con teclado, enfocá la tabla y usá las flechas.
+                <span class="lg:hidden">Cada producto se muestra como una ficha con todos sus datos y acciones.</span>
+                <span class="hidden lg:inline">Si no ves todas las columnas, desplazá la tabla hacia los lados. Con teclado, enfocá la tabla y usá las flechas.</span>
             </p>
             <p id="admin-products-price" class="mb-3 text-sm text-slate-700">
                 Los importes base son de uso interno. El listado no informa su verificación comercial.
@@ -400,7 +525,7 @@ onBeforeUnmount(() => {
                 @focusin="revealTableControl"
                 class="relative mb-6 w-full min-w-0 overflow-x-auto rounded-md border border-slate-300 bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             >
-                <table class="w-full min-w-[48rem] border-collapse text-left text-sm text-[#0B2438]" aria-describedby="admin-products-price">
+                <table class="products-table w-full border-collapse text-left text-sm text-[#0B2438] lg:min-w-[48rem]" aria-describedby="admin-products-price">
                     <caption class="sr-only">Productos del catálogo</caption>
                     <thead class="border-b border-slate-300 bg-slate-100">
                         <tr>
@@ -421,27 +546,37 @@ onBeforeUnmount(() => {
                                     <span class="wrap-anywhere">{{ prod.nombre }}</span>
                                 </div>
                             </th>
-                            <td class="px-3 py-2 wrap-anywhere">
+                            <td class="px-3 py-2 wrap-anywhere" data-label="SKU">
                                 <span :id="`product-sku-${prod.id_producto}`"><span class="sr-only">SKU: </span>{{ prod.codigo }}</span>
                             </td>
-                            <td class="px-3 py-2 wrap-anywhere">{{ prod.categoria_nombre || 'Sin categoría informada' }}</td>
-                            <td class="px-3 py-2 text-right tabular-nums">{{ prod.stock }}</td>
-                            <td class="px-3 py-2 whitespace-nowrap text-right tabular-nums">{{ formatPrice(prod.precio) }}</td>
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2 wrap-anywhere" data-label="Categoría">{{ prod.categoria_nombre || 'Sin categoría informada' }}</td>
+                            <td class="px-3 py-2 text-right tabular-nums" data-label="Stock">{{ prod.stock }}</td>
+                            <td class="px-3 py-2 whitespace-nowrap text-right tabular-nums" data-label="Precio base (USD)">{{ formatPrice(prod.precio) }}</td>
+                            <td class="px-3 py-2" data-label="Estado">
                                 <span
                                     class="rounded-full px-2 py-1 font-semibold"
                                     :class="prod.activo ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-800'"
                                 >{{ prod.activo ? 'Activo' : 'Inactivo' }}</span>
                             </td>
-                            <td class="px-3 py-2">
-                                <div class="flex gap-2">
+                            <td class="px-3 py-2" data-label="">
+                                <div class="row-actions flex flex-wrap gap-2">
+                                    <button
+                                        v-if="canVerifyPrice(prod)"
+                                        type="button"
+                                        data-action="verify"
+                                        :disabled="actionsDisabled"
+                                        :aria-label="`Verificar precio de ${prod.nombre}`"
+                                        :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
+                                        class="box-border min-h-11 cursor-pointer whitespace-nowrap rounded-md border border-solid border-amber-700 bg-white px-3 font-[inherit] font-semibold text-amber-900 enabled:hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
+                                        @click="openPriceVerification(prod, $event)"
+                                    >Verificar precio</button>
                                     <button
                                         type="button"
                                         :disabled="actionsDisabled"
                                         :aria-label="`Editar ${prod.nombre}`"
                                         :data-product-edit="prod.id_producto"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 whitespace-nowrap rounded-md border border-[#103A5C] bg-white px-3 font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="box-border min-h-11 cursor-pointer whitespace-nowrap rounded-md border border-solid border-[#103A5C] bg-white px-3 font-[inherit] font-semibold text-[#103A5C] enabled:hover:bg-slate-100 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                                         @click="openEditModal(prod)"
                                     >Editar</button>
                                     <button
@@ -450,7 +585,7 @@ onBeforeUnmount(() => {
                                         :data-product-status="prod.id_producto"
                                         :aria-label="`${prod.activo ? 'Desactivar' : 'Activar'} ${prod.nombre}`"
                                         :aria-describedby="`product-sku-${prod.id_producto}${actionsDisabled ? ' admin-products-lock' : ''}`"
-                                        class="min-h-11 whitespace-nowrap rounded-md border bg-white px-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50"
+                                        class="box-border min-h-11 cursor-pointer whitespace-nowrap rounded-md border border-solid bg-white px-3 font-[inherit] font-semibold focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50"
                                         :class="prod.activo ? 'border-red-700 text-red-800 enabled:hover:bg-red-50' : 'border-emerald-700 text-emerald-800 enabled:hover:bg-emerald-50'"
                                         @click="toggleStatus(prod, $event)"
                                     >{{ prod.activo ? 'Desactivar' : 'Activar' }}</button>
@@ -469,23 +604,15 @@ onBeforeUnmount(() => {
             <div v-if="result" class="text-sm text-slate-700 font-medium">
                 <span v-if="!isLoading && !loadError">Mostrando {{ result.data.length }} de {{ result.total }} productos</span>
                 <nav v-if="result.totalPages > 0" aria-label="Paginación de productos" :aria-busy="isLoading" class="flex flex-wrap items-center gap-3">
-                    <button ref="previousPageButton" type="button" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 aria-disabled:opacity-50"
+                    <button ref="previousPageButton" type="button" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:opacity-50"
                         :disabled="result.page <= 1" :aria-disabled="pagingUnavailable || undefined"
                         @click="changePage(-1)">Anterior</button>
                     <span>Página {{ result.page }} de {{ result.totalPages }}</span>
-                    <button ref="nextPageButton" type="button" class="min-h-11 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 aria-disabled:opacity-50"
+                    <button ref="nextPageButton" type="button" class="box-border min-h-11 min-w-11 cursor-pointer border-0 bg-transparent px-2 font-[inherit] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:cursor-not-allowed disabled:opacity-50 aria-disabled:opacity-50"
                         :disabled="result.page >= result.totalPages" :aria-disabled="pagingUnavailable || undefined"
                         @click="changePage(1)">Siguiente</button>
                 </nav>
             </div>
-            <button
-                type="button"
-                @click="openCreateModal"
-                :disabled="actionsDisabled"
-                class="box-border min-h-11 border-0 bg-[#103A5C] text-white font-semibold py-2.5 px-6 rounded-md hover:bg-[#145A8D] transition-colors shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] disabled:opacity-50 w-full sm:w-auto"
-            >
-                + Nuevo Producto
-            </button>
         </div>
 
         <ProductFormModal
@@ -502,5 +629,93 @@ onBeforeUnmount(() => {
             @close="isModalOpen = false"
             @saved="handleSaved"
         />
+
+        <AdminPriceVerificationDialog
+            :is-open="verificationTarget !== null"
+            :product="verificationTarget"
+            @close="closePriceVerification"
+            @verified="handlePriceVerified"
+        />
     </div>
 </template>
+
+<style scoped>
+/*
+ * En pantallas menores a lg, cada fila de la tabla se presenta como una ficha.
+ * Se conserva el mismo DOM y la semántica de tabla para lectores de pantalla y
+ * para no duplicar controles ni acciones.
+ */
+@media (max-width: 1023px) {
+    .products-table {
+        display: block;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .products-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .products-table tbody {
+        display: block;
+    }
+
+    .products-table tbody tr {
+        display: block;
+        padding: .875rem 1rem;
+    }
+
+    .products-table tbody th[scope="row"] {
+        display: block;
+        padding: 0 0 .625rem;
+    }
+
+    .products-table tbody td {
+        display: grid;
+        grid-template-columns: minmax(7rem, 38%) minmax(0, 1fr);
+        align-items: baseline;
+        gap: .75rem;
+        padding: .3rem 0;
+        text-align: left;
+        white-space: normal;
+    }
+
+    .products-table tbody td::before {
+        content: attr(data-label);
+        color: #475569;
+        font-size: .8125rem;
+        font-weight: 600;
+    }
+
+    .products-table tbody td[data-label=""] {
+        display: block;
+        padding-top: .75rem;
+    }
+
+    .products-table tbody td[data-label=""]::before {
+        content: none;
+    }
+
+    .products-table .row-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .products-table .row-actions > button {
+        width: 100%;
+        white-space: normal;
+    }
+
+    .products-table .row-actions > [data-action="verify"] {
+        grid-column: 1 / -1;
+    }
+}
+</style>

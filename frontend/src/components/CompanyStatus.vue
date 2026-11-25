@@ -6,15 +6,31 @@ import { useAuthStore } from '@/stores/auth'
 import type { CuentaCorrienteConsulta } from '@/types/cuentaCorriente'
 import { approvalMessage, creditMessage } from '@/utils/companyStatus'
 
+const props = defineProps<{
+  refreshVersion?: number
+  controlled?: boolean
+  summary?: CuentaCorrienteConsulta | null
+  summaryLoading?: boolean
+  summaryError?: boolean
+  summaryDemoBlocked?: boolean
+}>()
+const emit = defineEmits<{ refresh: [] }>()
 const auth = useAuthStore()
 const identity = () => `${auth.user?.id}:${auth.sessionVersion}`
-const allowed = () => auth.rol === 'CLIENTE' && auth.user?.tipo_cliente === 'EMPRESA'
+const canShow = () => auth.rol === 'CLIENTE' && auth.user?.tipo_cliente === 'EMPRESA'
   && !auth.loggingIn && !auth.loggingOut
-const { data, loading, error, load } = usePrivateAccountRead<{
+const allowed = () => !props.controlled && canShow()
+const { data, loading: readLoading, error: readError, load } = usePrivateAccountRead<{
   summary: CuentaCorrienteConsulta
   hasDemo: boolean
 }>(identity, allowed)
-const demoDataBlocked = computed(() => data.value?.hasDemo && !import.meta.env.DEV)
+const localDemoBlocked = computed(() => Boolean(data.value?.hasDemo && !import.meta.env.DEV))
+const summary = computed(() => props.controlled ? props.summary ?? null : data.value?.summary ?? null)
+const loading = computed(() => props.controlled ? Boolean(props.summaryLoading) : readLoading.value)
+const failed = computed(() => props.controlled ? Boolean(props.summaryError) : Boolean(readError.value))
+const demoDataBlocked = computed(() => props.controlled
+  ? Boolean(props.summaryDemoBlocked)
+  : localDemoBlocked.value)
 const refreshing = ref(false)
 const sessionError = ref('')
 
@@ -34,44 +50,54 @@ const approvalBadge = computed(() => {
 })
 
 const creditBadge = computed(() => {
-  const summary = data.value?.summary
-  if (!summary || summary.estado === 'SIN_CUENTA') {
+  const account = summary.value
+  if (!account || account.estado === 'SIN_CUENTA') {
     return { label: 'Sin cuenta', classes: BADGE_CLASSES.neutral }
   }
-  if (summary.estado === 'INHABILITADA') {
+  if (account.estado === 'INHABILITADA') {
     return { label: 'Inhabilitada', classes: BADGE_CLASSES.warning }
   }
-  if (summary.estadoCredito === 'DISPONIBLE') {
+  if (account.estadoCredito === 'DISPONIBLE') {
     return { label: 'Disponible', classes: BADGE_CLASSES.positive }
   }
-  if (summary.estadoCredito === 'BLOQUEADO') {
+  if (account.estadoCredito === 'BLOQUEADO') {
     return { label: 'Bloqueado', classes: BADGE_CLASSES.danger }
   }
   return { label: 'No determinable', classes: BADGE_CLASSES.neutral }
 })
 
 async function readStatus(signal: AbortSignal) {
-  const summary = await getCuentaCorriente(signal)
-  if (summary.estado === 'SIN_CUENTA') return { summary, hasDemo: false }
+  const current = await getCuentaCorriente(signal)
+  if (current.estado === 'SIN_CUENTA') return { summary: current, hasDemo: false }
   const [movements, dues] = await Promise.all([
     getCuentaCorrienteMovimientos(),
     getCuentaCorrienteVencimientos(),
   ])
   if (!('items' in movements) || !('items' in dues) ||
-      movements.revision !== summary.revision || dues.revision !== summary.revision) {
+      movements.revision !== current.revision || dues.revision !== current.revision) {
     throw new Error('No coinciden las revisiones de la cuenta corriente.')
   }
   return {
-    summary,
-    hasDemo: summary.origen === 'DEMO' || movements.items.some(item => item.origen === 'DEMO')
+    summary: current,
+    hasDemo: current.origen === 'DEMO' || movements.items.some(item => item.origen === 'DEMO')
       || dues.items.some(item => item.origen === 'DEMO'),
   }
 }
 
-watch([identity, allowed], () => void load(readStatus), { immediate: true })
+watch([identity, allowed], () => {
+  void load(readStatus)
+}, { immediate: true })
+watch(() => props.refreshVersion, (next, previous) => {
+  if (props.controlled || next === undefined || next === previous || !allowed()) return
+  void refresh()
+})
 
 async function refresh() {
   if (refreshing.value) return
+  if (props.controlled) {
+    emit('refresh')
+    return
+  }
   refreshing.value = true
   sessionError.value = ''
   try {
@@ -85,7 +111,7 @@ async function refresh() {
 </script>
 
 <template>
-  <section v-if="allowed()" aria-labelledby="company-status-title" class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 shadow-sm space-y-3">
+  <section v-if="canShow()" aria-labelledby="company-status-title" class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 shadow-sm space-y-3">
     <h2 id="company-status-title" class="m-0 text-lg font-bold text-[#0B2438]">Estado comercial</h2>
     <div class="space-y-2">
       <div class="flex flex-wrap items-center gap-2">
@@ -95,17 +121,17 @@ async function refresh() {
         <p class="m-0 text-sm text-[#0B2438]">{{ approvalMessage(auth.user?.estadoAprobacionEmpresa) }}</p>
       </div>
       <p v-if="loading" role="status" class="m-0 text-sm text-slate-600">Consultando el estado de la cuenta corriente…</p>
-      <p v-else-if="error" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
+      <p v-else-if="failed" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
         No se pudo consultar el estado de la cuenta corriente.
       </p>
       <p v-else-if="demoDataBlocked" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
         Se recibió información de demostración y no se mostrará fuera del entorno de pruebas.
       </p>
-      <div v-else-if="data" class="flex flex-wrap items-center gap-2">
+      <div v-else-if="summary" class="flex flex-wrap items-center gap-2">
         <span class="inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold border" :class="creditBadge.classes">
           {{ creditBadge.label }}
         </span>
-        <p class="m-0 text-sm text-[#0B2438]">{{ creditMessage(data.summary) }}</p>
+        <p class="m-0 text-sm text-[#0B2438]">{{ creditMessage(summary) }}</p>
       </div>
       <p v-if="sessionError" role="alert" class="m-0 rounded-[8px] border border-solid border-[#FECACA] bg-[#FEE2E2]/60 px-3 py-2 text-sm font-medium text-red-800">
         {{ sessionError }}
@@ -114,10 +140,10 @@ async function refresh() {
     <button
       type="button"
       class="box-border min-h-[44px] cursor-pointer rounded-[8px] border border-solid border-[#CBD5E1] bg-white px-4 py-2 font-[inherit] text-sm font-semibold text-[#0B2438] hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] transition-colors"
-      :disabled="refreshing"
+      :disabled="refreshing || loading"
       @click="refresh"
     >
-      {{ refreshing ? 'Actualizando…' : 'Actualizar estado comercial' }}
+      {{ refreshing || loading ? 'Actualizando estado…' : 'Actualizar estado comercial' }}
     </button>
   </section>
 </template>

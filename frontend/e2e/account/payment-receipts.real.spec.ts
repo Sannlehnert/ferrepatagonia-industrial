@@ -17,21 +17,29 @@ async function signIn(page: Page, email: string) {
   await expect(logout.or(menu)).toBeVisible()
 }
 
-async function upload(region: Locator) {
-  await region.getByLabel(/Archivo \(PDF/).setInputFiles({
-    name: 'transferencia.png', mimeType: 'image/png', buffer: png,
-  })
+type UploadFile = { name: string; mimeType: string; buffer: Buffer }
+
+async function upload(
+  region: Locator,
+  file: UploadFile = { name: 'transferencia.png', mimeType: 'image/png', buffer: png },
+) {
+  await region.getByLabel(/Archivo \(PDF/).setInputFiles(file)
   await region.getByRole('button', { name: 'Adjuntar comprobante' }).click()
   await expect(region.getByText(/Comprobante recibido/)).toBeVisible()
   await expect(region.getByText('Pendiente de revisión')).toBeVisible()
 }
 
-async function download(page: Page, row: Locator) {
+async function download(
+  page: Page,
+  row: Locator,
+  extension: 'pdf' | 'jpg' | 'png' = 'png',
+  expected: Buffer = png,
+) {
   const pending = page.waitForEvent('download')
   await row.getByRole('link', { name: 'Descargar comprobante' }).click()
   const file = await pending
-  expect(file.suggestedFilename()).toMatch(/^comprobante-[0-9a-f-]+\.png$/)
-  expect(await readFile(await file.path())).toEqual(png)
+  expect(file.suggestedFilename()).toMatch(new RegExp(`^comprobante-[0-9a-f-]+\\.${extension}$`))
+  expect(await readFile(await file.path())).toEqual(expected)
 }
 
 async function openOrder(page: Page, beforeDetail?: () => Promise<unknown>) {
@@ -44,12 +52,23 @@ async function openOrder(page: Page, beforeDetail?: () => Promise<unknown>) {
 }
 
 test('particular, empresa y administración recorren los comprobantes reales en pantalla', async ({ page, browser }) => {
+  const realPdf = await readFile(new URL(
+    '../../../backend/test/fixtures/receipts/comprobante-transferencia.pdf',
+    import.meta.url,
+  ))
+  const realJpg = await readFile(new URL(
+    '../../../backend/test/fixtures/receipts/comprobante-transferencia.jpg',
+    import.meta.url,
+  ))
+
   await signIn(page, 'cliente@e2e.test')
   const particular = await openOrder(page)
-  await upload(particular)
+  await upload(particular, {
+    name: 'comprobante-transferencia.pdf', mimeType: 'application/pdf', buffer: realPdf,
+  })
   const privatePath = await particular.getByRole('link', { name: 'Descargar comprobante' }).getAttribute('href')
   expect(privatePath).toMatch(/^\/api\/pedidos\/\d+\/comprobantes\//)
-  await download(page, particular)
+  await download(page, particular, 'pdf', realPdf)
 
   const company = await browser.newPage()
   await signIn(company, 'empresa-cuenta@e2e.test')
@@ -58,9 +77,11 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   const account = company.getByRole('region', { name: 'Comprobantes de pago' })
   const before = (await (await company.request.get('/api/cuenta-corriente')).json()).data
   expect(before.saldo).toBe('84.00')
-  await upload(account)
-  await expect(account.getByText(/Saldo general de cuenta corriente · PNG/)).toBeVisible()
-  await download(company, account)
+  await upload(account, {
+    name: 'comprobante-transferencia.jpg', mimeType: 'image/jpeg', buffer: realJpg,
+  })
+  await expect(account.getByText(/Saldo general de cuenta corriente · JPG/)).toBeVisible()
+  await download(company, account, 'jpg', realJpg)
   await account.getByRole('link', { name: 'Mis pedidos' }).click()
   await expect(company).toHaveURL(/\/mi-cuenta\/pedidos$/)
   await company.getByRole('button', { name: /^Ver detalle de PED-/ }).click()
@@ -76,8 +97,8 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   const adminReceipts = admin.getByRole('region', { name: 'Comprobantes de pago' })
   await expect(adminReceipts.getByRole('listitem')).toHaveCount(3)
   const particularRow = adminReceipts.getByRole('listitem').filter({ hasText: 'Cliente E2E · Cliente 1' })
-  await expect(particularRow).toContainText(/Pedido PED-\d+ · PNG/)
-  await download(admin, particularRow)
+  await expect(particularRow).toContainText(/Pedido PED-\d+ · PDF/)
+  await download(admin, particularRow, 'pdf', realPdf)
   const [reviewRequest] = await Promise.all([
     admin.waitForRequest(request =>
       new URL(request.url()).pathname.endsWith('/revision') && request.method() === 'PATCH'),
@@ -94,6 +115,63 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   await company.close()
   await admin.close()
 });
+
+test('a 1024 px los metadatos del comprobante conservan ancho útil y las acciones quedan debajo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await signIn(page, 'admin@e2e.test')
+  await page.goto('/admin/comprobantes')
+  const region = page.getByRole('region', { name: 'Comprobantes de pago' })
+  const pending = region.getByRole('listitem').filter({
+    has: page.getByRole('link', { name: 'Descargar comprobante' }),
+    hasText: 'Pendiente de revisión',
+  }).first()
+  await expect(pending).toBeVisible()
+  await expect(pending.getByRole('link', { name: 'Descargar comprobante' })).toBeVisible()
+  await expect(pending.getByRole('button', { name: 'Aprobar comprobante' })).toBeVisible()
+  await expect(pending.getByRole('button', { name: 'Rechazar comprobante' })).toBeVisible()
+
+  // El menú lateral ADMIN en 1024 px es persistente; se comprueba su presencia.
+  await expect(page.getByRole('complementary', { name: 'Panel administrativo' })).toBeVisible()
+
+  const metadata = pending.getByTestId('receipt-metadata')
+  const actions = pending.getByTestId('receipt-actions')
+  const metadataBox = await metadata.boundingBox()
+  const actionsBox = await actions.boundingBox()
+  expect(metadataBox).not.toBeNull()
+  expect(actionsBox).not.toBeNull()
+  if (process.env.E2E_RECEIPT_CAPTURE) {
+    await page.screenshot({
+      path: `../docs/354/evidence/receipts-1024-${process.env.E2E_RECEIPT_CAPTURE}.png`,
+      fullPage: true,
+    })
+  }
+  // La medición es efectiva: no alcanza con que existan clases responsive.
+  expect(metadataBox!.width).toBeGreaterThanOrEqual(300)
+  expect(actionsBox!.y).toBeGreaterThanOrEqual(metadataBox!.y + metadataBox!.height - 1)
+  expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+  for (const width of [320, 360, 390, 768, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    const boxes = await pending.evaluate(element => {
+      const metadata = element.querySelector('[data-testid="receipt-metadata"]')
+      const actions = element.querySelector('[data-testid="receipt-actions"]')
+      if (!metadata || !actions) return null
+      return {
+        metadata: metadata.getBoundingClientRect(),
+        actions: actions.getBoundingClientRect(),
+      }
+    })
+    expect(boxes, `medición a ${width} px`).not.toBeNull()
+    expect(boxes!.metadata.width, `metadatos a ${width} px`).toBeGreaterThan(0)
+    // Los nombres, fechas, estados y referencias no quedan aplastados.
+    expect(boxes!.metadata.width, `legibilidad a ${width} px`).toBeGreaterThanOrEqual(
+      width >= 768 ? 280 : 180,
+    )
+    expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+  }
+})
 
 test('rechaza archivos inválidos antes de enviarlos', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
@@ -225,7 +303,7 @@ test('permite reintentar la consulta y la carga después de un error', async ({
   })).toBeVisible()
   await expect(region.getByRole('link', {
     name: 'Descargar comprobante',
-  })).toBeVisible()
+  }).first()).toBeVisible()
 })
 
 test('muestra la carga y bloquea envíos repetidos a 360 px', async ({ page }) => {
@@ -414,7 +492,7 @@ for (const width of [1280, 360]) {
     const receiptId = (await saved.json()).data.id
     const href = `${path}/${receiptId}`
     await expect(receipts.getByText('Comprobante recibido. La acreditación del pago se gestiona por separado.')).toBeVisible()
-    await expect(receipts.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await expect(receipts.getByText('Pendiente de revisión', { exact: true }).first()).toBeVisible()
     await expect(row.getByText(hasApproved ? 'Aprobado' : 'Pendiente de revisión', { exact: true })).toBeVisible()
 
     const downloaded = page.waitForEvent('download')

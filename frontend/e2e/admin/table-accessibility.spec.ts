@@ -144,7 +144,13 @@ test('P2-01/P2-02: datos extremos sin overflow global ni etiquetas fragmentadas'
         }));
         expect(overflow.overflowX).toBe('auto');
         expect(overflow.page).toBeLessThanOrEqual(width);
-        if (width < 1280) expect(overflow.scroll).toBeGreaterThan(overflow.client);
+        if (width < 1024) {
+            // En móvil/tablet cada fila es una ficha: no hay scroll horizontal.
+            expect(overflow.scroll).toBeLessThanOrEqual(overflow.client + 1);
+        } else {
+            // La tabla de escritorio conserva el desplazamiento interno.
+            expect(overflow.scroll).toBeGreaterThanOrEqual(overflow.client);
+        }
         const reached = await region.evaluate(el => {
             el.scrollLeft = el.scrollWidth;
             const bounds = el.getBoundingClientRect();
@@ -201,7 +207,13 @@ test('P2-01/P2-02: datos extremos sin overflow global ni etiquetas fragmentadas'
         };
         await region.evaluate(el => { el.scrollLeft = 0; });
         await region.focus();
+        const verify = region.getByRole('button', { name: `Verificar precio de ${longName}`, exact: true });
         await page.keyboard.press('Tab');
+        if (await verify.count()) {
+            await expect(verify).toBeFocused();
+            await check('Verificar precio');
+            await page.keyboard.press('Tab');
+        }
         await expect(edit).toBeFocused();
         await check('Editar');
         await page.keyboard.press('Tab');
@@ -214,6 +226,11 @@ test('P2-01/P2-02: datos extremos sin overflow global ni etiquetas fragmentadas'
         await page.keyboard.press('Shift+Tab');
         await expect(edit).toBeFocused();
         await check('Editar');
+        if (await verify.count()) {
+            await page.keyboard.press('Shift+Tab');
+            await expect(verify).toBeFocused();
+            await check('Verificar precio');
+        }
 
         // 6. Los textos largos se ajustan dentro de su celda.
         const wrapping = await region.evaluate((el, name) => {

@@ -140,6 +140,7 @@ function loadAccountView(account) {
         '@/services/paymentReceiptService': { accountReceiptsPath: '/cuenta-corriente/comprobantes' },
         '@/services/realtime': { onRealtime() {} },
         '@/utils/companyStatus': loadTypeScript('utils/companyStatus.ts'),
+        '@/utils/creditExperience': loadTypeScript('utils/creditExperience.ts'),
         '@/utils/payment': loadTypeScript('utils/payment.ts'),
         '@/utils/cuentaCorriente': {
             coverageMessage: () => '',
@@ -147,7 +148,15 @@ function loadAccountView(account) {
             formatInstant,
             formatUsd,
         },
-        'vue-router': { onBeforeRouteLeave: () => {} },
+        'vue-router': {
+            onBeforeRouteLeave: () => {},
+            RouterLink: {
+                props: ['to'],
+                render() {
+                    return h('a', { href: '/catalogo' }, this.$slots.default?.())
+                },
+            },
+        },
     }
 
     new Function('require', 'module', 'exports', output)(

@@ -24,6 +24,7 @@ const {
   creditRequestIdPolicy,
 } = require('../dist/dtos/credit/credit-workflow.dto');
 const { validateDtoInput } = require('../dist/dtos/validation');
+const { parseAdminCreditCompanyQuery } = require('../dist/dtos/credit/admin-credit-companies.dto');
 
 test('T-S7-09.1 montos USD exactos con BigInt, sin notación numérica', () => {
   assert.equal(parseCreditAmount('0.01', false), 1n);
@@ -148,5 +149,33 @@ test('T-S7-09.1 consultas rechazan filtros desconocidos y repetidos', () => {
     { limite: 50, tipo: 'LIMITE_MODIFICADO', solicitudId: 4 });
   for (const tipo of ['lower', 'EVENTO_AJENO', '', 'LIMITE_MODIFICADO%20']) {
     assert.throws(() => parseCreditEventListQuery(`/eventos?tipo=${tipo}`), error => error.status === 400);
+  }
+});
+
+test('T-S7-09.1 consulta administrativa de empresas valida filtros y paginación', () => {
+  assert.deepEqual(parseAdminCreditCompanyQuery('/empresas'), { page: 1, limit: 20 });
+  assert.deepEqual(
+    parseAdminCreditCompanyQuery('/empresas?busqueda=%20Metalurgica%20Sur%20&estadoEmpresa=aprobada&estadoSolicitud=pendiente&cuenta=inhabilitada&page=2&limit=10'),
+    {
+      page: 2, limit: 10, busqueda: 'Metalurgica Sur', estadoEmpresa: 'APROBADA',
+      estadoSolicitud: 'PENDIENTE', cuenta: 'INHABILITADA',
+    },
+  );
+  assert.deepEqual(
+    parseAdminCreditCompanyQuery('/empresas?estadoSolicitud=SIN_SOLICITUD&cuenta=SIN_CUENTA'),
+    { page: 1, limit: 20, estadoSolicitud: 'SIN_SOLICITUD', cuenta: 'SIN_CUENTA' },
+  );
+  for (const url of [
+    '/empresas?page=0', '/empresas?page=1000001', '/empresas?page=1.5', '/empresas?limit=0',
+    '/empresas?limit=101', '/empresas?limit=01', '/empresas?busqueda=', '/empresas?busqueda=%20%20',
+    '/empresas?busqueda=a%00b', '/empresas?estadoEmpresa=OTRA', '/empresas?estadoSolicitud=OTRA',
+    '/empresas?cuenta=OTRA', '/empresas?tipo=EMPRESA', '/empresas?page=1&page=2',
+    '/empresas?busqueda=abc&busqueda=def',
+  ]) {
+    assert.throws(
+      () => parseAdminCreditCompanyQuery(url),
+      error => error.status === 400 && error.code === 'SOLICITUD_INVALIDA',
+      url,
+    );
   }
 });

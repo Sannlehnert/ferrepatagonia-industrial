@@ -25,9 +25,18 @@ import {
   rejectCreditRequest,
 } from '../services/credit/credit-workflow.service';
 import {
+  getAdminCreditCompany,
+  listAdminCreditCompanies,
+} from '../services/credit/admin-credit-companies.service';
+import { parseAdminCreditCompanyQuery } from '../dtos/credit/admin-credit-companies.dto';
+import {
   claveIdempotenciaRequerida,
   CreditWorkflowError,
 } from '../services/credit/credit-workflow.errors';
+import {
+  accountSourceUnavailable,
+  isAccountSourceUnavailable,
+} from '../services/adminAccount.errors';
 
 function requireIdempotencyKey(req: Request): string {
   const key = normalizeIdempotencyKey(req.get('Idempotency-Key'));
@@ -175,6 +184,35 @@ export const putCreditLimit: RequestHandler = async (req, res) => {
     respond(res, 200, result.data, result.eventoId || undefined, result.replay);
   } catch (error) {
     fail(res, error, 'No se pudo modificar el límite de crédito.');
+  }
+};
+
+function failCreditCompany(res: Response, error: unknown, fallback: string): void {
+  if (isAccountSourceUnavailable(error)) {
+    const unavailable = accountSourceUnavailable();
+    res.status(unavailable.status).json({ message: unavailable.message, code: unavailable.code });
+    return;
+  }
+  fail(res, error, fallback);
+}
+
+export const getAdminCreditCompanies: RequestHandler = async (req, res) => {
+  try {
+    const query = parseAdminCreditCompanyQuery(req.originalUrl);
+    const data = await listAdminCreditCompanies(req.auth!, query);
+    respond(res, 200, data);
+  } catch (error) {
+    failCreditCompany(res, error, 'No se pudieron consultar las empresas para gestión de crédito.');
+  }
+};
+
+export const getAdminCreditCompanyById: RequestHandler = async (req, res) => {
+  try {
+    const { clienteId } = res.locals.dto.params as { clienteId: number };
+    const data = await getAdminCreditCompany(req.auth!, clienteId);
+    respond(res, 200, data);
+  } catch (error) {
+    failCreditCompany(res, error, 'No se pudo consultar la empresa para gestión de crédito.');
   }
 };
 

@@ -12,7 +12,7 @@ const { childProfile, connectOwned } = require('./helpers/cc260-disposable.cjs')
 const { fetchFromBrowser } = require('./helpers/browser-request.cjs');
 
 let session, database, db, server, base, signToken;
-let particular, other, company, admin, pdf, png, jpg;
+let particular, other, company, admin, pdf, png, jpg, realPdf, realPng, realJpg;
 const storage = process.env.RECEIPT_STORAGE_DIR;
 
 async function insert(sql, params = []) {
@@ -64,6 +64,10 @@ before(async () => {
   const pixels = { create: { width: 10, height: 10, channels: 3, background: 'white' } };
   png = await sharp(pixels).png().toBuffer();
   jpg = await sharp(pixels).jpeg({ progressive: true }).toBuffer();
+  const fixture = name => readFile(join(__dirname, 'fixtures/receipts', name));
+  realPdf = await fixture('comprobante-transferencia.pdf');
+  realPng = await fixture('comprobante-transferencia.png');
+  realJpg = await fixture('comprobante-transferencia.jpg');
 });
 
 after(async () => {
@@ -275,6 +279,71 @@ test('rechaza archivos vacíos, grandes, truncados, activos o suplantados y ruta
   assert.deepEqual(traversal, missing);
   await body(await request(path + '?clienteId=' + particular.clientId, other.auth), 400);
   assert.deepEqual(await readdir(storage), prior);
+});
+
+test('acepta PDF/PNG/JPG reales y distingue dañado, incompatible y contenido no permitido', async () => {
+  const client = await newClient('PARTICULAR');
+  const path = orderPath(client);
+  const before = await financialState();
+
+  const savedPdf = (await body(await upload(path, client.auth, realPdf, 'application/pdf'), 201)).data;
+  const savedPng = (await body(await upload(path, client.auth, realPng, 'image/png'), 201)).data;
+  const savedJpg = (await body(await upload(path, client.auth, realJpg, 'image/jpeg'), 201)).data;
+  assert.deepEqual([savedPdf.tipoMime, savedPng.tipoMime, savedJpg.tipoMime],
+    ['application/pdf', 'image/png', 'image/jpeg']);
+  assert.deepEqual(await readFile(join(storage, savedPdf.id)), realPdf);
+  assert.deepEqual(await readFile(join(storage, savedPng.id)), realPng);
+  assert.deepEqual(await readFile(join(storage, savedJpg.id)), realJpg);
+  const pdfDownload = await request(path + '/' + savedPdf.id, client.auth);
+  assertDownloadHeaders(pdfDownload, 'application/pdf', realPdf.length, 'pdf');
+  assert.deepEqual(Buffer.from(await pdfDownload.arrayBuffer()), realPdf);
+
+  // Variantes legítimas de generadores móviles: relleno posterior al marcador
+  // final de la imagen y OpenAction con destino interno nombrado.
+  const paddedPng = Buffer.concat([realPng, Buffer.from('\r\n\u0000')]);
+  const paddedJpg = Buffer.concat([realJpg, Buffer.from('\n\u0000')]);
+  const namedOpenAction = await PDFDocument.create();
+  const namedPage = namedOpenAction.addPage();
+  namedOpenAction.catalog.set(PDFName.of('OpenAction'), PDFName.of('FitPage'));
+  namedOpenAction.catalog.set(PDFName.of('Dests'), namedOpenAction.context.obj({
+    FitPage: [namedPage.ref, { Type: 'Fit' }],
+  }));
+  for (const [bytes, mime] of [
+    [paddedPng, 'image/png'],
+    [paddedJpg, 'image/jpeg'],
+    [Buffer.from(await namedOpenAction.save()), 'application/pdf'],
+  ]) {
+    await body(await upload(path, client.auth, bytes, mime), 201);
+  }
+
+  const openAction = await PDFDocument.create();
+  openAction.addPage();
+  openAction.catalog.set(PDFName.of('OpenAction'), openAction.context.obj({
+    Type: 'Action', S: 'URI', URI: 'https://example.test/verificar',
+  }));
+  const activePdf = await PDFDocument.create();
+  activePdf.addPage();
+  activePdf.addJavaScript('malicious', 'app.alert(1)');
+
+  const cases = [
+    [realPng, 'application/pdf', 422, 'TIPO_INCOMPATIBLE'],
+    [realPdf.subarray(0, -14), 'application/pdf', 422, 'ARCHIVO_DANADO'],
+    [Buffer.from(await openAction.save()), 'application/pdf', 422, 'CONTENIDO_NO_PERMITIDO'],
+    [Buffer.from(await activePdf.save()), 'application/pdf', 422, 'CONTENIDO_NO_PERMITIDO'],
+    [realJpg.subarray(0, -2), 'image/jpeg', 422, 'ARCHIVO_DANADO'],
+    [realPng, 'image/jpeg', 422, 'TIPO_INCOMPATIBLE'],
+    [Buffer.alloc(0), 'application/pdf', 400, 'ARCHIVO_VACIO'],
+    [Buffer.alloc(5 * 1024 * 1024 + 1), 'application/pdf', 413, 'ARCHIVO_DEMASIADO_GRANDE'],
+    [realPdf, 'application/octet-stream', 415, 'TIPO_NO_PERMITIDO'],
+  ];
+  for (const [bytes, mime, status, code] of cases) {
+    const failure = await body(await upload(path, client.auth, bytes, mime), status);
+    assert.equal(failure.code, code);
+    assert.equal(typeof failure.message, 'string');
+    assert.ok(failure.message.length > 0);
+  }
+
+  assert.deepEqual(await financialState(), before);
 });
 
 test('un fallo SQL limpia el archivo y las cargas simultáneas idénticas se deduplican', async () => {

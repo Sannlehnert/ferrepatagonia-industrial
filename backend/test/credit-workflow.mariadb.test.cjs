@@ -1024,6 +1024,186 @@ test('S7-09.1 checkout exige cuenta habilitada, empresa aprobada y precio FER-17
   assert.equal((await ledger.calcularEstadoCuenta(accountId)).credito_disponible, '430.00');
 });
 
+test('S7-09.1 panel administrativo: empresas, solicitudes, cuentas, filtros y paginación', async () => {
+  const token = randomUUID().replaceAll('-', '').slice(0, 10);
+  const companies = [];
+  async function company(suffix) {
+    const user = await createUser('CLIENTE', {
+      estadoEmpresa: 'APROBADA',
+      nombre: `Empresa ${token} ${suffix}`,
+    });
+    await db.dataSource.query(
+      'UPDATE CLIENTE SET cuit = ? WHERE id_cliente = ?',
+      [`30-${token.slice(0, 8)}-${companies.length + 1}`, user.clientId],
+    );
+    companies.push(user);
+    return user;
+  }
+  async function decide(path, body) {
+    return api(path, {
+      method: 'POST', token: state.admin.token, key: idem(), body,
+    });
+  }
+  async function createRequest(user) {
+    const created = await requestFor(user, '800.00', 30);
+    assert.equal(created.status, 201, JSON.stringify(created.body));
+    return created.body.data.solicitud.id;
+  }
+
+  const withoutAccount = await company('Sin Cuenta');
+  const withPending = await company('Pendiente');
+  const withRejected = await company('Rechazada');
+  const withApproved = await company('Aprobada');
+  const withEnabled = await company('Habilitada');
+
+  const pendingId = await createRequest(withPending);
+  const rejectedId = await createRequest(withRejected);
+  const rejected = await decide(`/admin/solicitudes-credito/${rejectedId}/rechazar`, {
+    motivo: 'Antecedentes comerciales insuficientes',
+  });
+  assert.equal(rejected.status, 200, JSON.stringify(rejected.body));
+
+  const approvedId = await createRequest(withApproved);
+  const approved = await decide(`/admin/solicitudes-credito/${approvedId}/aprobar`, {
+    limiteAutorizado: '700.00', plazoDias: 30,
+    evidencia: `ACTA-${token}`, motivo: 'Aprobación de prueba',
+  });
+  assert.equal(approved.status, 200, JSON.stringify(approved.body));
+  assert.equal(approved.body.data.cuenta.habilitada, false);
+
+  const enabledId = await createRequest(withEnabled);
+  await decide(`/admin/solicitudes-credito/${enabledId}/aprobar`, {
+    limiteAutorizado: '900.00', plazoDias: 60,
+    evidencia: `ACTA-${token}`, motivo: 'Aprobación de prueba',
+  });
+  const enabled = await api(`/admin/clientes/${withEnabled.clientId}/cuenta-corriente/habilitar`, {
+    method: 'POST', token: state.admin.token, key: idem(),
+    body: { evidencia: `ACTA-HABILITACION-${token}` },
+  });
+  assert.equal(enabled.status, 200, JSON.stringify(enabled.body));
+
+  const list = async query => {
+    const response = await api(`/admin/credito/empresas?${query}`, { token: state.admin.token });
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+    assert.match(response.headers.get('cache-control') ?? '', /private.*no-store/);
+    assert.match(response.headers.get('vary') ?? '', /Cookie/i);
+    return response.body.data;
+  };
+  const search = `busqueda=${encodeURIComponent(token)}&limit=50`;
+  const all = await list(search);
+  assert.equal(all.paginacion.total, 5, JSON.stringify(all));
+  const byId = new Map(all.empresas.map(item => [item.clienteId, item]));
+  assert.equal(byId.get(withoutAccount.clientId).cuentaCorriente, null);
+  assert.equal(byId.get(withoutAccount.clientId).solicitudCredito, null);
+  assert.equal(byId.get(withPending.clientId).solicitudCredito.estado, 'PENDIENTE');
+  assert.equal(byId.get(withPending.clientId).cuentaCorriente, null);
+  assert.equal(byId.get(withRejected.clientId).solicitudCredito.estado, 'RECHAZADA');
+  assert.equal(byId.get(withApproved.clientId).cuentaCorriente.estado, 'INHABILITADA');
+  assert.equal(byId.get(withApproved.clientId).cuentaCorriente.limite, '700.00');
+  assert.equal(byId.get(withEnabled.clientId).cuentaCorriente.estado, 'HABILITADA');
+  assert.equal(byId.get(withEnabled.clientId).cuentaCorriente.plazoDias, 60);
+
+  const detailRoutes = [
+    `/admin/credito/empresas/${withEnabled.clientId}`,
+    `/admin/solicitudes-credito?clienteId=${withEnabled.clientId}&limite=100`,
+    `/admin/credito/eventos?clienteId=${withEnabled.clientId}&limite=100`,
+    `/admin/clientes/${withEnabled.clientId}/cuenta-corriente`,
+    `/admin/clientes/${withEnabled.clientId}/cuenta-corriente/movimientos`,
+    `/admin/clientes/${withEnabled.clientId}/cuenta-corriente/vencimientos`,
+    '/admin/credito/empresas?page=1&limit=10',
+    '/admin/cuentas-corrientes',
+  ];
+  const burst = await Promise.all(
+    [...detailRoutes, ...detailRoutes].map(route => api(route, { token: state.admin.token })),
+  );
+  for (const response of burst) {
+    assert.notEqual(response.status, 500, JSON.stringify(response.body));
+    assert.equal(response.status, 200, JSON.stringify(response.body));
+  }
+
+  assert.deepEqual((await list(`${search}&estadoSolicitud=PENDIENTE`)).empresas.map(e => e.clienteId),
+    [withPending.clientId]);
+  assert.deepEqual((await list(`${search}&estadoSolicitud=SIN_SOLICITUD`)).empresas.map(e => e.clienteId),
+    [withoutAccount.clientId]);
+  assert.deepEqual((await list(`${search}&cuenta=INHABILITADA`)).empresas.map(e => e.clienteId),
+    [withApproved.clientId]);
+  assert.deepEqual((await list(`${search}&cuenta=HABILITADA`)).empresas.map(e => e.clienteId),
+    [withEnabled.clientId]);
+  assert.deepEqual((await list(`${search}&cuenta=SIN_CUENTA`)).empresas.map(e => e.clienteId).sort((a, b) => a - b),
+    [withoutAccount.clientId, withPending.clientId, withRejected.clientId].sort((a, b) => a - b));
+  assert.deepEqual((await list(`${search}&estadoSolicitud=RECHAZADA&cuenta=SIN_CUENTA`)).empresas
+    .map(e => e.clienteId), [withRejected.clientId]);
+
+  const cuit = `30-${token.slice(0, 8)}-4`;
+  assert.deepEqual((await list(`busqueda=${encodeURIComponent(cuit)}`)).empresas.map(e => e.clienteId),
+    [withApproved.clientId]);
+  assert.deepEqual((await list(`busqueda=${encodeURIComponent(withEnabled.email)}`)).empresas
+    .map(e => e.clienteId), [withEnabled.clientId]);
+  assert.deepEqual((await list(`busqueda=${encodeURIComponent('#' + withRejected.clientId)}`)).empresas
+    .map(e => e.clienteId), [withRejected.clientId]);
+
+  const firstPage = await list(`busqueda=${encodeURIComponent(token)}&limit=2&page=1`);
+  assert.equal(firstPage.paginacion.total, 5);
+  assert.equal(firstPage.paginacion.totalPages, 3);
+  assert.equal(firstPage.empresas.length, 2);
+  const secondPage = await list(`busqueda=${encodeURIComponent(token)}&limit=2&page=2`);
+  assert.equal(secondPage.empresas.length, 2);
+  assert.deepEqual(secondPage.paginacion, { page: 2, limit: 2, total: 5, totalPages: 3 });
+  const thirdPage = await list(`busqueda=${encodeURIComponent(token)}&limit=2&page=3`);
+  assert.equal(thirdPage.empresas.length, 1);
+  assert.deepEqual(
+    [...firstPage.empresas, ...secondPage.empresas, ...thirdPage.empresas].map(e => e.clienteId),
+    all.empresas.map(e => e.clienteId),
+  );
+  const clamped = await list(`busqueda=${encodeURIComponent(token)}&limit=2&page=99`);
+  assert.equal(clamped.paginacion.page, 3);
+  assert.equal(clamped.empresas.length, 1);
+
+  const detail = await api(`/admin/credito/empresas/${withEnabled.clientId}`, {
+    token: state.admin.token,
+  });
+  assert.equal(detail.status, 200);
+  assert.equal(detail.body.data.empresa.nombreRazonSocial, `Empresa ${token} Habilitada`);
+  assert.equal(detail.body.data.empresa.cuentaCorriente.estado, 'HABILITADA');
+
+  const missing = await api('/admin/credito/empresas/2147483647', { token: state.admin.token });
+  assert.equal(missing.status, 404);
+  assert.equal(missing.body.code, 'CLIENTE_NO_ENCONTRADO');
+  const asClient = await api('/admin/credito/empresas', { token: withPending.token });
+  assert.equal(asClient.status, 403);
+  const anonymous = await api('/admin/credito/empresas');
+  assert.equal(anonymous.status, 401);
+  for (const query of ['page=0', 'limit=101', 'estadoSolicitud=OTRA', 'cuenta=SI', 'tipo=EMPRESA',
+    'page=1&page=2']) {
+    const invalid = await api(`/admin/credito/empresas?${query}`, { token: state.admin.token });
+    assert.equal(invalid.status, 400, query);
+    assert.equal(invalid.body.code, 'SOLICITUD_INVALIDA');
+  }
+  assert.equal((await api(`/admin/credito/empresas/${withRejected.clientId}`, {
+    token: withRejected.token,
+  })).status, 403);
+
+  // Un libro DEMO no se presenta como cuenta real fuera del perfil de pruebas.
+  const demo = await company('Demo');
+  await db.dataSource.query(`INSERT INTO CUENTA_CORRIENTE
+    (id_cliente, limite_credito, habilitada, cobertura, plazo_dias, moneda_limite,
+     evidencia_limite, evidencia_plazo, evidencia_cobertura, cobertura_desde_utc, origen_datos)
+    VALUES (?, 100.00, 1, 'COMPLETA', 30, 'USD', 'DEMO', 'DEMO', 'DEMO', UTC_TIMESTAMP(3), 'DEMO')`,
+  [demo.clientId]);
+  const demoToken = `busqueda=${encodeURIComponent('Empresa ' + token + ' Demo')}`;
+  assert.equal((await list(demoToken)).empresas[0].cuentaCorriente.estado, 'HABILITADA');
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'development';
+  try {
+    const hidden = await list(demoToken);
+    assert.equal(hidden.empresas[0].cuentaCorriente, null);
+    assert.deepEqual((await list(`${demoToken}&cuenta=SIN_CUENTA`)).empresas.map(e => e.clienteId),
+      [demo.clientId]);
+  } finally {
+    process.env.NODE_ENV = previousNodeEnv;
+  }
+});
+
 test('S7-09.1 persistencia tras reinicio del pool de datos', async () => {
   const requestId = state.requestId;
   const accountId = state.accountId;

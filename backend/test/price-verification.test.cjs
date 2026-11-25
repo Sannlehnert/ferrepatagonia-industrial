@@ -1,13 +1,33 @@
-const { test } = require('node:test');
+const { after, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { spawnSync } = require('node:child_process');
+const { randomBytes } = require('node:crypto');
 const path = require('node:path');
+
+process.env.JWT_SECRET ||= randomBytes(32).toString('hex');
+process.env.DB_HOST ||= '127.0.0.1';
+process.env.DB_NAME ||= 'price_verification_unit';
+process.env.DB_USER ||= 'unit';
+process.env.DB_PASSWORD ||= 'unit';
+
 const {
   PriceVerificationError,
   normalizeExpectedPrice,
   parsePositiveId,
   validateEvidenceReference,
 } = require('../dist/services/pricing/price-verification.rules.js');
+const { verifyProductPricePolicy } = require('../dist/dtos/products/verify-price.dto.js');
+const { validateDtoInput } = require('../dist/dtos/validation.js');
+const { env } = require('../dist/config/env.config.js');
+const { ControlledDataSource } = require('../dist/config/database-policy.js');
+const priceVerificationConfig = require('../dist/config/price-verification.config.js');
+const { verifyProductPriceHandler } = require('../dist/controllers/adminProduct.controller.js');
+const { pool } = require('../dist/config/catalog-snapshot.config.js');
+
+after(async () => {
+  await priceVerificationConfig.destroyPriceVerificationDatabase();
+  await pool.end();
+});
 
 const rejectsWith = (code, action) => assert.throws(action, error => {
   assert.ok(error instanceof PriceVerificationError);
@@ -103,5 +123,146 @@ test('CLI: ayuda y rechazos estructurados sin NODE_ENV ni configuración de Mari
     assert.equal(status, 1, JSON.stringify(args));
     assert.deepEqual(body, { ok: false, code, message: body.message, eventId: null });
     assert.ok(body.message.length > 0);
+  }
+});
+
+
+test('HTTP ADMIN: DTO de verificación exige importe, evidencia y confirmación', async () => {
+  const valid = await validateDtoInput(verifyProductPricePolicy, {
+    importe: ' 150.00 ',
+    evidencia: ' Factura comercial Andes A-0001, folio 42 ',
+    confirmar: true,
+  });
+  assert.equal(valid.valid, true, JSON.stringify(valid));
+  if (valid.valid) {
+    assert.equal(valid.data.importe, '150.00');
+    assert.equal(valid.data.evidencia, 'Factura comercial Andes A-0001, folio 42');
+    assert.equal(valid.data.confirmar, true);
+  }
+  for (const body of [
+    { importe: 150, evidencia: 'Factura comercial Andes A-0001', confirmar: true },
+    { importe: '0.00', evidencia: 'Factura comercial Andes A-0001', confirmar: true },
+    { importe: '150.00', evidencia: 'ok', confirmar: true },
+    { importe: '150.00', evidencia: 'SINTETICO fixture 42', confirmar: true },
+    { importe: '150.00', evidencia: 'Factura comercial Andes A-0001', confirmar: false },
+    { importe: '150.00', evidencia: 'Factura comercial Andes A-0001' },
+    { importe: '150.00', evidencia: 'Factura comercial Andes A-0001', confirmar: true, adminId: 1 },
+  ]) {
+    const result = await validateDtoInput(verifyProductPricePolicy, body);
+    assert.equal(result.valid, false, JSON.stringify(body));
+  }
+});
+
+function createResponseRecorder() {
+  return {
+    headers: {},
+    varyHeaders: [],
+    statusCode: 200,
+    body: undefined,
+    setHeader(name, value) { this.headers[name.toLowerCase()] = value; },
+    vary(field) { this.varyHeaders.push(field); },
+    status(code) { this.statusCode = code; return this; },
+    json(payload) { this.body = payload; return this; },
+  };
+}
+
+test('P2-02: getPriceVerificationDataSource serializa llamadas concurrentes en frío y limpia fallos', async t => {
+  const original = { ...env.priceVerification };
+  await priceVerificationConfig.destroyPriceVerificationDatabase();
+  env.priceVerification.user = 'verifier';
+  env.priceVerification.password = 'secret';
+  try {
+    let initCalls = 0;
+    let destroyCalls = 0;
+    let gate = Promise.withResolvers();
+    let failInit = false;
+
+    t.mock.method(ControlledDataSource.prototype, 'initialize', async function () {
+      initCalls += 1;
+      await gate.promise;
+      if (failInit) throw Object.assign(new Error('Access denied'), { code: 'ER_ACCESS_DENIED_ERROR' });
+      this.isInitialized = true;
+      return this;
+    });
+    t.mock.method(ControlledDataSource.prototype, 'destroy', async function () {
+      destroyCalls += 1;
+      this.isInitialized = false;
+    });
+
+    // 1. Llamadas concurrentes en frío comparten una única inicialización.
+    const pending = [
+      priceVerificationConfig.getPriceVerificationDataSource(),
+      priceVerificationConfig.getPriceVerificationDataSource(),
+      priceVerificationConfig.getPriceVerificationDataSource(),
+    ];
+    gate.resolve();
+    const sources = await Promise.all(pending);
+    assert.equal(initCalls, 1);
+    assert.equal(new Set(sources).size, 1);
+    assert.equal(sources[0].isInitialized, true);
+
+    await priceVerificationConfig.destroyPriceVerificationDatabase();
+    assert.equal(destroyCalls, 1);
+
+    // 2. Fallo de inicialización concurrente limpia el intento y permite recuperarse luego.
+    failInit = true;
+    gate = Promise.withResolvers();
+    const failing = [
+      priceVerificationConfig.getPriceVerificationDataSource(),
+      priceVerificationConfig.getPriceVerificationDataSource(),
+    ];
+    gate.resolve();
+    const settled = await Promise.allSettled(failing);
+    assert.equal(initCalls, 2);
+    assert.equal(settled.every(entry => entry.status === 'rejected'), true);
+
+    failInit = false;
+    gate = Promise.withResolvers();
+    gate.resolve();
+    const recovered = await priceVerificationConfig.getPriceVerificationDataSource();
+    assert.equal(initCalls, 3);
+    assert.equal(recovered.isInitialized, true);
+  } finally {
+    await priceVerificationConfig.destroyPriceVerificationDatabase();
+    env.priceVerification.user = original.user;
+    env.priceVerification.password = original.password;
+  }
+});
+
+test('P2-02: verifyProductPriceHandler devuelve 503 controlado ante falta de config o fallo de inicialización', async t => {
+  const original = { ...env.priceVerification };
+  await priceVerificationConfig.destroyPriceVerificationDatabase();
+  const makeRequest = () => ({ auth: { id: 1, rol: 'ADMIN' } });
+  const makeRes = () => createResponseRecorder();
+  const makeLocals = () => ({
+    dto: {
+      params: { id: 1 },
+      body: { importe: '100.00', evidencia: 'Factura Andes 001-123 folio 9', confirmar: true },
+    },
+  });
+
+  try {
+    env.priceVerification.user = null;
+    env.priceVerification.password = null;
+    const unconfiguredRes = makeRes();
+    unconfiguredRes.locals = makeLocals();
+    await verifyProductPriceHandler(makeRequest(), unconfiguredRes);
+    assert.equal(unconfiguredRes.statusCode, 503);
+    assert.equal(unconfiguredRes.body.code, 'VERIFICACION_NO_CONFIGURADA');
+
+    env.priceVerification.user = 'bad_verifier';
+    env.priceVerification.password = 'bad_secret';
+    t.mock.method(ControlledDataSource.prototype, 'initialize', async () => {
+      throw Object.assign(new Error('Access denied for user'), { code: 'ER_ACCESS_DENIED_ERROR' });
+    });
+    const unavailableRes = makeRes();
+    unavailableRes.locals = makeLocals();
+    await verifyProductPriceHandler(makeRequest(), unavailableRes);
+    assert.equal(unavailableRes.statusCode, 503);
+    assert.equal(unavailableRes.body.code, 'VERIFICACION_NO_DISPONIBLE');
+  } finally {
+    await priceVerificationConfig.destroyPriceVerificationDatabase();
+    env.priceVerification.user = original.user;
+    env.priceVerification.password = original.password;
   }
 });

@@ -205,3 +205,35 @@ test('login emite JWT verificable sin cambiar sus datos públicos', async (t) =>
     await pool.end();
   }
 });
+
+test('authenticate devuelve 503 con Retry-After ante saturación del pool o indisponibilidad transitoria', async t => {
+  const transientErrors = [
+    new Error('No connections available.'),
+    new Error('Queue limit reached.'),
+    new Error('Pool is closed.'),
+    Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:3307'), { code: 'ECONNREFUSED' }),
+    Object.assign(new Error('Too many connections'), { driverError: { code: 'ER_CON_COUNT_ERROR', errno: 1040 } }),
+    Object.assign(new Error('Statement timeout'), { cause: { driverError: { errno: 1969 } } }),
+  ];
+
+  for (const failure of transientErrors) {
+    t.mock.method(users, 'findUsuarioById', async () => { throw failure; });
+    const response = await request(signToken({ id: 7, rol: 'ADMIN' }), '/admin');
+    assert.equal(response.status, 503, failure.message);
+    assert.equal(response.headers.get('retry-after'), '1', failure.message);
+    const body = await response.json();
+    assert.equal(body.code, 'SERVICIO_NO_DISPONIBLE');
+    assert.match(body.message, /temporalmente ocupado/);
+    assert.doesNotMatch(JSON.stringify(body), /ECONNREFUSED|Queue limit|No connections|ER_CON_COUNT_ERROR/);
+  }
+});
+
+test('authenticate conserva 500 para errores no transitorios de base de datos', async t => {
+  t.mock.method(users, 'findUsuarioById', async () => {
+    throw Object.assign(new Error('Duplicate entry'), { code: 'ER_DUP_ENTRY', errno: 1062 });
+  });
+  const response = await request(signToken({ id: 7, rol: 'ADMIN' }), '/admin');
+  assert.equal(response.status, 500);
+  assert.equal(response.headers.get('retry-after'), null);
+  assert.deepEqual(await response.json(), { message: 'Error interno del servidor.' });
+});

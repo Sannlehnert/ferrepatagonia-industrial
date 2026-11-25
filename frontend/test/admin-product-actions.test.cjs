@@ -24,8 +24,8 @@ async function mount(t, modal=false, overrides={}, props={}) {
  const calls=[];
  const route=vue.reactive({query:{}});
  const navigate=({query})=>{route.query=query;};
- const service={getAdminProductPage:async()=>firstPage(),getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),...overrides};
- const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
+ const service={getAdminProductPage:async()=>firstPage(),getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async(...a)=>calls.push(['status',...a]),updateAdminProductStock:async(...a)=>calls.push(['stock',...a]),saveAdminProduct:async(...a)=>calls.push(['save',...a]),verifyAdminProductPrice:async()=>({}),canonicalPrice:()=>null,...overrides};
+ const component=load('views/admin/'+(modal?'ProductFormModal.vue':'AdminProductsListView.vue'),{'../../services/adminProductService':service,'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{default:{}},'@/components/ProductThumbnail.vue':{default:{}},'@/components/AdminPriceVerificationDialog.vue':{default:{}},'../../services/productExportService':{buildProductsWorkbook:()=>new Uint8Array(),collectAdminProductsForExport:async()=>[],downloadProductsWorkbook(){},productsExportFilename:()=>'productos.xlsx'},'vue-router':{useRoute:()=>route,useRouter:()=>({push:navigate,replace:navigate})}}).default;
  component.render=()=>null;
  const events=[];
  const app=renderer.createApp(component, modal?{isOpen:true,product:{...product},categories:[],onSaved:(...a)=>events.push(['saved',...a]),onClose:()=>events.push(['close']),onUncertain:()=>events.push(['uncertain']),...props}:props);
@@ -248,4 +248,117 @@ test('un error visible bloquea el cierre accidental aunque no haya cambios', asy
  state.requestClose('implicit');
  assert.deepEqual(events,[]);
  assert.ok(state.closeAttemptNotice);
+});
+test('service verify price usa el endpoint ADMIN y canonicaliza importes sin Number', async () => {
+ const calls=[];
+ const api={post:async(...a)=>{calls.push(a);return {data:{data:{productoId:7,precio:'150.50',evidencia:'Factura Andes 42',verificadoEn:'2026-11-24T12:00:00.000Z',estadoFer17:'DEFINIDO',publicado:true,eventoId:'9',replay:false}}}}};
+ const service=load('services/adminProductService.ts',{'@/services/api':api});
+ const result=await service.verifyAdminProductPrice(7,{importe:'150.50',evidencia:'Factura Andes 42',confirmar:true});
+ assert.equal(result.publicado,true);
+ assert.deepEqual(calls,[['/admin/productos/7/verificar-precio',{importe:'150.50',evidencia:'Factura Andes 42',confirmar:true},{signal:undefined}]]);
+ assert.equal(service.canonicalPrice('150.5'),'150.50');
+ assert.equal(service.canonicalPrice('0'),'0.00');
+ assert.equal(service.canonicalPrice(null),null);
+ assert.equal(service.canonicalPrice('1.234'),null);
+});
+test('P2-03: guardar con verificación fallida o no publicada emite tono warning y éxito usa success', async t => {
+ const overrides={
+  saveAdminProduct:async data=>({...product,...data,precio:'150.50'}),
+  canonicalPrice:value=>value===null||value===undefined?null:'150.50',
+  verifyAdminProductPrice:async()=>{throw httpError(503);},
+ };
+ const failed=await mount(t,true,overrides);
+ failed.state.form.precio='150.50';
+ failed.state.verifyPriceAfterSave=true;
+ failed.state.priceEvidence='Lista oficial proveedor Andes folio 18';
+ failed.state.priceReviewConfirmed=true;
+ await failed.state.handleSubmit();
+ assert.equal(failed.events[0][0],'saved');
+ assert.match(failed.events[0][1],/pendiente de verificación/);
+ assert.equal(failed.events[0][2],'warning');
+ assert.equal(failed.events[1][0],'close');
+
+ const unpublished=await mount(t,true,{...overrides,verifyAdminProductPrice:async()=>({publicado:false,estadoFer17:'NO_VERIFICADO'})});
+ unpublished.state.form.precio='150.50';
+ unpublished.state.verifyPriceAfterSave=true;
+ unpublished.state.priceEvidence='Lista oficial proveedor Andes folio 18';
+ unpublished.state.priceReviewConfirmed=true;
+ await unpublished.state.handleSubmit();
+ assert.equal(unpublished.events[0][2],'warning');
+
+ const verified=await mount(t,true,{...overrides,verifyAdminProductPrice:async()=>({publicado:true,estadoFer17:'DEFINIDO'})});
+ verified.state.form.precio='150.50';
+ verified.state.verifyPriceAfterSave=true;
+ verified.state.priceEvidence='Lista oficial proveedor Andes folio 18';
+ verified.state.priceReviewConfirmed=true;
+ await verified.state.handleSubmit();
+ assert.equal(verified.events[0][2],'success');
+});
+test('P2-03: AdminProductsListView renderiza banner ámbar para warning y verde para success', async t => {
+ const createNode=tag=>({tag,props:{},children:[],parent:null,value:'',style:{},ownerDocument:{activeElement:null,body:null},addEventListener(){},removeEventListener(){},focus(){},matches(){return false;},querySelector(){return null;}});
+ const domRenderer=vue.createRenderer({
+  createElement:tag=>createNode(tag),
+  createText:text=>({tag:'#text',text,parent:null}),
+  createComment:()=>({tag:'#comment',parent:null}),
+  insert(el,parent,anchor){
+   el.parent=parent;
+   const idx=anchor?parent.children.indexOf(anchor):-1;
+   if(idx>=0)parent.children.splice(idx,0,el);
+   else parent.children.push(el);
+  },
+  remove(el){
+   if(!el.parent)return;
+   const idx=el.parent.children.indexOf(el);
+   if(idx>=0)el.parent.children.splice(idx,1);
+   el.parent=null;
+  },
+  setText(node,text){node.text=text;},
+  setElementText(el,text){el.children=[{tag:'#text',text,parent:el}];},
+  patchProp(el,key,_prev,next){el.props[key]=next;},
+  parentNode:el=>el.parent,
+  nextSibling:el=>{
+   if(!el.parent)return null;
+   const idx=el.parent.children.indexOf(el);
+   return idx>=0?el.parent.children[idx+1]||null:null;
+  },
+ });
+ const filename=path.resolve(__dirname,'../src/views/admin/AdminProductsListView.vue');
+ const source=compileScript(parse(fs.readFileSync(filename,'utf8'),{filename}).descriptor,{id:'p203-view-test',inlineTemplate:true}).content;
+ const code=ts.transpileModule(source,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText;
+ const m={exports:{}};
+ const route=vue.reactive({query:{}});
+ let formEmit=null;
+ const ProductFormStub=vue.defineComponent({
+  setup(_p,{emit}){formEmit=emit;return()=>null;},
+ });
+ const mocks={'../../services/adminProductService':{getAdminProductPage:async()=>firstPage(),getAdminProducts:async()=>[{...product}],getActiveCategories:async()=>[{id_categoria:2,nombre:'Herramientas'}],setAdminProductActive:async()=>{},updateAdminProductStock:async()=>{},saveAdminProduct:async()=>{},verifyAdminProductPrice:async()=>({}),canonicalPrice:()=>null},'../../services/adminMutationError':errors,'@/types/pricing':require('../src/types/pricing.ts'),'./ProductFormModal.vue':{__esModule:true,default:ProductFormStub},'@/components/ProductThumbnail.vue':{__esModule:true,default:{render:()=>null}},'@/components/AdminPriceVerificationDialog.vue':{__esModule:true,default:{render:()=>null}},'../../services/productExportService':{buildProductsWorkbook:()=>new Uint8Array(),collectAdminProductsForExport:async()=>[],downloadProductsWorkbook(){},productsExportFilename:()=>'productos.xlsx'},'vue-router':{useRoute:()=>route,useRouter:()=>({push(){},replace(){}}),RouterLink:{props:['to'],render(){return vue.h('a',{},this.$slots.default?.());}}}};
+ new Function('require','module','exports',code)(n=>n in mocks?mocks[n]:require(n),m,m.exports);
+ const root=createNode('div');
+ const app=domRenderer.createApp(m.exports.default);
+ app.mount(root);
+ t.after(()=>app.unmount());
+ await settle();
+ const findBanner=node=>{
+  if(node.tag==='p'&&node.props?.role==='status'&&String(node.props?.class||'').includes('mb-4 rounded-md border'))return node;
+  for(const child of node.children||[]){const hit=findBanner(child);if(hit)return hit;}
+  return null;
+ };
+ assert.ok(formEmit);
+ formEmit('saved','El producto se guardó, pero el precio quedó pendiente de verificación.','warning');
+ await settle();
+ const warningBanner=findBanner(root);
+ assert.ok(warningBanner);
+ assert.match(warningBanner.props.class,/border-amber-200/);
+ assert.match(warningBanner.props.class,/bg-amber-50/);
+ assert.match(warningBanner.props.class,/text-amber-900/);
+ assert.doesNotMatch(warningBanner.props.class,/bg-emerald-50/);
+
+ formEmit('saved','"Taladro" se creó correctamente.','success');
+ await settle();
+ const successBanner=findBanner(root);
+ assert.ok(successBanner);
+ assert.match(successBanner.props.class,/border-emerald-200/);
+ assert.match(successBanner.props.class,/bg-emerald-50/);
+ assert.match(successBanner.props.class,/text-emerald-800/);
+ assert.doesNotMatch(successBanner.props.class,/bg-amber-50/);
 });

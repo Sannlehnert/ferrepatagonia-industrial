@@ -57,9 +57,10 @@ test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ pa
   await expect(page).toHaveURL(/\/$/)
 })
 
-test('Área Empresas lleva a ingreso y registro de empresa con teclado y desde el footer', async ({ page }) => {
+test('Área Empresas lleva a ingreso y registro de empresa con teclado desde el encabezado', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('contentinfo').getByRole('link', { name: 'Área empresas' }).click()
+  await page.getByRole('navigation', { name: 'Menú principal' })
+    .getByRole('link', { name: 'Empresas', exact: true }).click()
   await expect(page).toHaveURL(/\/#empresas$/)
   await expect(business(page)).toBeFocused()
 
@@ -122,24 +123,17 @@ test('el acceso de empresas permanece visible al cargar contenido en móvil', as
 })
 
 for (const width of [360, 1280]) {
-  test('Área Empresas desde el footer conserva la navegación por teclado a ' + width + ' px', async ({ page }) => {
+  test('el pie no duplica Área Empresas y conserva los accesos de cuenta a ' + width + ' px', async ({ page }) => {
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/catalogo')
-    const footerLink = page.getByRole('contentinfo').getByRole('link', { name: 'Área empresas' })
-    await footerLink.focus()
-    await page.keyboard.press('Enter')
-    await expect(page).toHaveURL(/\/#empresas$/)
-    await expect(business(page)).toBeFocused()
+    const footer = page.getByRole('contentinfo')
+    await expect(footer.getByRole('link', { name: 'Área empresas' })).toHaveCount(0)
+    await expect(footer.getByRole('link', { name: 'Inicio', exact: true })).toBeVisible()
 
-    await footerLink.focus()
+    await footer.getByRole('link', { name: 'Crear cuenta', exact: true }).focus()
     await page.keyboard.press('Enter')
-    await expect(business(page)).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
-    await page.keyboard.press('Tab')
-    await expect(business(page).getByRole('link', { name: 'Registrá tu empresa' })).toBeFocused()
-    await page.keyboard.press('Enter')
-    await expect(page).toHaveURL(/\/registro\?tipo=empresa$/)
+    await expect(page).toHaveURL(/\/registro$/)
+    await expect(page.getByRole('heading', { name: 'Crear cuenta', exact: true })).toBeVisible()
   })
 }
 

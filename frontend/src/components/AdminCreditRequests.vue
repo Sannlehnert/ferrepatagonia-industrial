@@ -43,6 +43,9 @@ onMounted(() => { void loadRequests() })
 <template>
   <section class="credit-requests my-6 rounded-lg border border-slate-200 bg-white p-4">
     <h2 class="text-lg font-semibold">Solicitudes de crédito pendientes</h2>
+    <p class="mt-1 text-sm text-slate-600">
+      Resolvé primero las solicitudes en revisión. Aprobar una solicitud autoriza un límite, pero no habilita la cuenta.
+    </p>
     <p v-if="feedback" role="status" class="mt-3 text-emerald-800">
       {{ feedback }}
     </p>

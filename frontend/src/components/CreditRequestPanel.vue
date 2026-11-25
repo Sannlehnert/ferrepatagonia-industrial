@@ -8,10 +8,19 @@ import {
     isDefinitiveCreditRequestRejection,
     isPendingCreditRequestConflict,
 } from '@/services/creditRequestService'
-import type { CreateCreditRequestPayload, CreditRequest } from '@/types/creditRequest'
+import type {
+    CreateCreditRequestPayload,
+    CreditRequest,
+    CreditRequestSnapshot,
+} from '@/types/creditRequest'
+import type { CuentaCorrienteConsulta } from '@/types/cuentaCorriente'
 import { formatInstant, formatUsd } from '@/utils/cuentaCorriente'
 
-const props = defineProps<{ refreshVersion: number }>()
+const props = defineProps<{
+    refreshVersion: number
+    account?: CuentaCorrienteConsulta | null
+}>()
+const emit = defineEmits<{ state: [snapshot: CreditRequestSnapshot] }>()
 const auth = useAuthStore()
 const requests = ref<CreditRequest[]>([])
 const loading = ref(false)
@@ -32,6 +41,18 @@ const canRequest = computed(() => auth.rol === 'CLIENTE' && !auth.loggingIn && !
     isCompany.value && approvalStatus.value === 'APROBADA')
 const identity = () => `${auth.user?.id ?? ''}:${auth.sessionVersion}:${canRequest.value}`
 const pendingRequest = computed(() => requests.value.some(request => request.estado === 'PENDIENTE'))
+const hasAccount = computed(() => Boolean(
+    props.account && props.account.estado !== 'SIN_CUENTA',
+))
+const requestGuidance = computed(() => {
+    if (!hasAccount.value) {
+        return 'Enviá el monto y plazo que necesitás. La solicitud queda pendiente de evaluación y no habilita crédito automáticamente.'
+    }
+    if (props.account?.estado === 'HABILITADA') {
+        return 'Ya tenés una cuenta habilitada. Una nueva solicitud solo puede revisar el límite; no cambia el saldo ni se habilita automáticamente.'
+    }
+    return 'Tu cuenta existe pero está inhabilitada. Una nueva solicitud no la habilita por sí sola; la habilitación se gestiona por separado.'
+})
 
 async function loadRequests() {
     const currentLoad = ++loadId
@@ -70,6 +91,15 @@ watch(
 )
 
 watch(() => props.refreshVersion, () => void loadRequests())
+
+watch([requests, loading, pendingRequest, canRequest], () => {
+    emit('state', {
+        requests: requests.value,
+        loading: loading.value,
+        pending: pendingRequest.value,
+        canRequest: canRequest.value,
+    })
+}, { deep: true, immediate: true })
 
 onBeforeUnmount(() => {
     loadId += 1
@@ -148,8 +178,8 @@ async function submitRequest() {
 </script>
 
 <template>
-    <section v-if="isCompany" aria-labelledby="credit-request-title"
-        class="mb-6 rounded-lg border border-slate-200 bg-white p-5">
+    <section v-if="isCompany" id="solicitud-credito" aria-labelledby="credit-request-title"
+        class="mb-6 scroll-mt-24 rounded-lg border border-slate-200 bg-white p-5">
         <h2 id="credit-request-title" class="m-0 mb-2 text-xl font-semibold">Solicitud de crédito</h2>
         <template v-if="approvalStatus !== 'APROBADA'">
             <p v-if="approvalStatus === 'PENDIENTE'" role="status" class="m-0 text-slate-700">
@@ -166,9 +196,7 @@ async function submitRequest() {
             </p>
         </template>
         <template v-else>
-            <p class="mb-4 text-slate-600">
-                Enviá el monto y plazo que necesitás. La solicitud queda pendiente de evaluación y no habilita crédito automáticamente.
-            </p>
+            <p class="mb-4 text-slate-600">{{ requestGuidance }}</p>
             <p v-if="submitError" role="alert"
                 class="mb-4 rounded-md border border-red-200 bg-red-50 p-3 text-red-800">
                 {{ submitError }}
@@ -206,7 +234,11 @@ async function submitRequest() {
                     class="mb-4 rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900">
                     Ya hay una solicitud pendiente. Podrás enviar otra cuando se resuelva.
                 </p>
-                <form v-else class="grid gap-4 sm:grid-cols-2" @submit.prevent="submitRequest">
+                <details v-else class="rounded-md border border-slate-200" :open="!hasAccount">
+                    <summary class="cursor-pointer list-none px-4 py-3 font-semibold text-[#0B2438] focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]">
+                        {{ hasAccount ? 'Solicitar una revisión de límite' : 'Solicitar crédito' }}
+                    </summary>
+                    <form class="grid gap-4 border-t border-slate-200 p-4 sm:grid-cols-2" @submit.prevent="submitRequest">
                     <p v-if="retrySubmission" role="status" class="m-0 text-sm text-slate-700 sm:col-span-2">
                         El resultado del envío no está confirmado. Reintentá con los mismos datos para evitar solicitudes duplicadas.
                     </p>
@@ -250,7 +282,8 @@ async function submitRequest() {
                             El envío no garantiza aprobación ni habilitación de la cuenta.
                         </p>
                     </div>
-                </form>
+                    </form>
+                </details>
             </template>
         </template>
     </section>

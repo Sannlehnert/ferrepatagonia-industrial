@@ -19,6 +19,11 @@ export function createCartStore(transport: CartTransport) {
     const loadError = ref('')
     const operationError = ref('')
     const needsSync = ref(false)
+    // `needsSync` también es true mientras una escritura o una relectura está en
+    // curso. La interfaz solo debe advertir cuando ya no hay una operación activa
+    // que pueda resolver el estado; de lo contrario, una actualización exitosa
+    // muestra una advertencia transitoria falsa.
+    const stale = computed(() => needsSync.value && !loading.value && operation.value === null)
     const stockNeedsValidation = computed(() => !cart.value || needsSync.value)
     const pricesNeedValidation = computed(() => !cart.value || needsSync.value)
     const checksPending = ref(0)
@@ -192,7 +197,7 @@ export function createCartStore(transport: CartTransport) {
     })
 
     return {
-      cart, items, loading, operation, loadError, operationError, needsSync,
+      cart, items, loading, operation, loadError, operationError, needsSync, stale,
       pricesNeedValidation, stockNeedsValidation,
       cargarCarrito, reconciliarPedidoConfirmado, limpiarEstado,
       agregarProducto: (productoId: number, cantidad: number) => mutate({ type: 'add', productoId, cantidad }),

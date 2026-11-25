@@ -15,6 +15,8 @@ import { validateDto } from '../middlewares/validate-dto.middleware';
 import { adminAccountHandler } from '../controllers/adminAccount.controller';
 import { getAdminDashboardMetrics } from '../controllers/adminDashboard.controller';
 import {
+    getAdminCreditCompanies,
+    getAdminCreditCompanyById,
     getAdminCreditEvents,
     getAdminCreditRequestById,
     getAdminCreditRequests,
@@ -70,6 +72,12 @@ adminRouter.post(
     validateDto('params', creditRequestIdPolicy),
     validateDto('body', rejectCreditRequestPolicy),
     postRejectCreditRequest,
+);
+adminRouter.get('/credito/empresas', getAdminCreditCompanies);
+adminRouter.get(
+    '/credito/empresas/:clienteId',
+    validateDto('params', creditClientIdPolicy),
+    getAdminCreditCompanyById,
 );
 adminRouter.get('/credito/eventos', getAdminCreditEvents);
 adminRouter.post(

@@ -116,7 +116,7 @@
 
 .fp-action--primary { color: white; background: var(--fp-blue); }
 .fp-action--primary:hover { background: var(--fp-blue-strong); }
-.fp-action--plain { color: var(--fp-blue); }
+.fp-action--plain { color: var(--fp-blue); background: transparent; }
 .fp-action--plain:hover { background: #e9f2f9; }
 .fp-action--amber { color: var(--fp-navy); background: var(--fp-amber-light); }
 .fp-action--amber:hover { background: #ffd17a; }

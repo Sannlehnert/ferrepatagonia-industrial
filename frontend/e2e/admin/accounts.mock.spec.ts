@@ -2,7 +2,8 @@ import { test, expect, type Page } from '@playwright/test'
 
 // Financial DTOs intercepted: UI tests only. They do not certify the #260 integration.
 const ctx = { corte: '2026-11-07T20:00:00.000Z', revision: 'demo-fixture' }
-const account = (clienteId = 1) => ({ clienteId, cuentaId: clienteId, estado: 'INHABILITADA', origen: 'DEMO', moneda: 'USD', plazoDias: 60,
+type Origin = 'DEMO' | 'REAL'
+const account = (clienteId = 1, origin: Origin = 'DEMO') => ({ clienteId, cuentaId: clienteId, estado: 'INHABILITADA', origen: origin, moneda: 'USD', plazoDias: 60,
   saldo: null, limite: '1000.00', utilizado: null, disponible: '0.00', deudaVencidaTotal: null,
   deudaVencida30Dias: null, deudaVencida60Dias: null, deudaPorVencerTotal: null, cobertura: 'NO_ACREDITADA', estadoCredito: 'BLOQUEADO' })
 async function login(page: Page) {
@@ -12,7 +13,8 @@ async function login(page: Page) {
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
   await expect(page).toHaveURL(/\/admin\/dashboard$/)
 }
-async function fixture(page: Page, options: { error?: number; mismatch?: boolean; empty?: boolean; absent?: boolean } = {}) {
+async function fixture(page: Page, options: { error?: number; mismatch?: boolean; empty?: boolean; absent?: boolean; origin?: Origin } = {}) {
+  const origin = options.origin ?? 'DEMO'
   const urls: string[] = []
   await page.route('**/api/admin/**', async route => {
     const url = new URL(route.request().url())
@@ -22,20 +24,25 @@ async function fixture(page: Page, options: { error?: number; mismatch?: boolean
     let data: object
     if (url.pathname === '/api/admin/cuentas-corrientes') {
       const next = url.searchParams.has('cursor')
-      data = { ...ctx, items: options.empty ? [] : [account(next ? 3 : 1), ...next ? [] : [account(2)]], siguienteCursor: options.empty || next ? null : 'demo-list-next' }
+      data = { ...ctx, items: options.empty ? [] : [account(next ? 3 : 1, origin), ...next ? [] : [account(2, origin)]], siguienteCursor: options.empty || next ? null : 'demo-list-next' }
     } else if (options.absent) data = { ...ctx, estado: 'SIN_CUENTA' }
     else if (url.pathname.endsWith('/movimientos')) data = { ...ctx, estado: 'INHABILITADA', cobertura: 'PARCIAL', items: options.empty ? [] : [{
       id: url.searchParams.has('cursor') ? '2' : '1', fechaOperacion: '2026-10-01T15:00:00.000Z', concepto: 'Cargo de prueba', tipo: 'CARGO', importe: '125.00',
-      saldoResultante: null, moneda: 'USD', estado: 'ANULADO', referencia: { pedidoId: 1 }, plazoDias: 30, venceEl: '2026-10-31', origen: 'DEMO',
+      saldoResultante: null, moneda: 'USD', estado: 'ANULADO', referencia: { pedidoId: 1 }, plazoDias: 30, venceEl: '2026-10-31', origen: origin,
     }], siguienteCursor: options.empty || url.searchParams.has('cursor') ? null : 'demo-movements-next' }
     else if (url.pathname.endsWith('/vencimientos')) data = { ...ctx, revision: options.mismatch ? 'different' : ctx.revision,
       estado: 'INHABILITADA', cobertura: 'PARCIAL', items: options.empty ? [] : [{ movimientoId: '3', venceEl: '2026-11-07', plazoDias: 60,
-        moneda: 'USD', pendiente: null, estado: 'NO_DETERMINABLE', origen: 'DEMO' }], siguienteCursor: null }
-    else data = { ...ctx, ...account() }
+        moneda: 'USD', pendiente: null, estado: 'NO_DETERMINABLE', origen: origin }], siguienteCursor: null }
+    else data = { ...ctx, ...account(1, origin) }
     return route.fulfill({ json: { data } })
   })
   return urls
 }
+const accountDetail = (page: Page, clientId: number) =>
+  page.getByRole('region', { name: `Cliente ${clientId}`, exact: true })
+// El indicador de procedencia vive entre los chips del resumen, no en el listado ni en las tablas.
+const demoIndicator = (page: Page, clientId = 1) =>
+  accountDetail(page, clientId).locator('.status-chips').getByText('DEMO', { exact: true })
 
 for (const width of [1280, 360]) {
   test.describe(`consultas UI interceptadas ${width}px`, () => {
@@ -44,6 +51,7 @@ for (const width of [1280, 360]) {
       await login(page)
       const urls = await fixture(page)
       await page.goto('/admin/cuentas-corrientes')
+      await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
       await expect(page.getByRole('button', { name: 'Consultar cliente 1', exact: true })).toBeVisible()
       await page.getByLabel('ID de cliente', { exact: true }).fill('2')
       await page.getByRole('combobox', { name: 'Habilitación', exact: true }).selectOption('false')
@@ -52,7 +60,7 @@ for (const width of [1280, 360]) {
       expect(urls.at(-1)).toContain('clienteId=2')
       await page.getByRole('button', { name: 'Consultar cliente 1', exact: true }).click()
       await expect(page.getByText('Cuenta inhabilitada. El historial sigue disponible para consulta.')).toBeVisible()
-      await expect(page.getByText('Datos DEMO ·', { exact: true })).toBeVisible()
+      await expect(demoIndicator(page)).toBeVisible()
       await expect(page.getByText('No acreditado', { exact: true }).first()).toBeVisible()
       await expect(page.getByRole('region', { name: 'Movimientos', exact: true })).toContainText('CARGO / ANULADO')
       await expect(page.getByRole('region', { name: 'Vencimientos', exact: true })).toContainText('NO_DETERMINABLE')
@@ -72,6 +80,7 @@ test('UI interceptada: 409 limpia datos y permite reiniciar; error no se vuelve 
   const options = { error: 409 }
   await fixture(page, options)
   await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Reiniciá desde la primera página')
   await expect(page.getByText('No hay cuentas para estos filtros.')).toHaveCount(0)
   options.error = 0
@@ -80,12 +89,22 @@ test('UI interceptada: 409 limpia datos y permite reiniciar; error no se vuelve 
 })
 test('UI interceptada: revisiones incompatibles no presentan detalle confirmado', async ({ page }) => {
   await login(page); await fixture(page, { mismatch: true }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await page.getByRole('button', { name: 'Consultar cliente 1', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Reiniciá desde la primera página')
-  await expect(page.getByText('Datos DEMO ·', { exact: true })).toHaveCount(0)
+  await expect(demoIndicator(page)).toHaveCount(0)
+})
+test('UI interceptada: una cuenta real no muestra el indicador DEMO', async ({ page }) => {
+  await login(page); await fixture(page, { origin: 'REAL' }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
+  await page.getByRole('button', { name: 'Consultar cliente 1', exact: true }).click()
+  const detail = accountDetail(page, 1)
+  await expect(detail.locator('.status-chips')).toContainText('Cobertura NO_ACREDITADA')
+  await expect(demoIndicator(page)).toHaveCount(0)
 })
 test('UI interceptada: lista vacía y consulta directa SIN_CUENTA', async ({ page }) => {
   await login(page); await fixture(page, { empty: true, absent: true }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await expect(page.getByText('No hay cuentas para estos filtros.')).toBeVisible()
   await page.getByLabel('ID de cliente', { exact: true }).fill('5')
   await page.getByRole('button', { name: 'Consultar cliente por ID' }).click()
@@ -93,6 +112,7 @@ test('UI interceptada: lista vacía y consulta directa SIN_CUENTA', async ({ pag
 })
 test('UI interceptada: cobertura insuficiente no equivale a vacío completo', async ({ page }) => {
   await login(page); await fixture(page, { empty: true }); await page.goto('/admin/cuentas-corrientes')
+  await page.getByRole('tab', { name: 'Consulta contable', exact: true }).click()
   await page.getByLabel('ID de cliente', { exact: true }).fill('1')
   await page.getByRole('button', { name: 'Consultar cliente por ID' }).click()
   await expect(page.getByText('Sin movimientos acreditados para mostrar. La información es incompleta.')).toBeVisible()
