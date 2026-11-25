@@ -67,6 +67,11 @@ function actionHint(payment: AdminPayment) {
   if (payment.estado === 'RECHAZADO') return 'Pago rechazado. El expediente está cerrado.'
   if (payment.estado === 'ANULADO') return 'Pago anulado. No admite nuevas acciones.'
   if (payment.cuentaCorrienteId === null || payment.pedidoId !== null) {
+    if (payment.declaranteUsuarioId === null && payment.comprobanteId === null) {
+      return 'Pago directo registrado por administración: pendiente de acreditación. No requiere revisión documental de cuenta corriente.'
+    }
+    if (payment.estadoDocumental === 'PENDIENTE') return 'Pago directo con comprobante pendiente de revisión documental.'
+    if (payment.estadoDocumental === 'APROBADO') return 'Pago directo con documento aprobado y pendiente de acreditación.'
     return 'Pago directo sobre pedido: no corresponde revisión documental de cuenta corriente.'
   }
   if (!payment.comprobanteId) return 'Sin comprobante asociado: no se puede aprobar ni acreditar.'

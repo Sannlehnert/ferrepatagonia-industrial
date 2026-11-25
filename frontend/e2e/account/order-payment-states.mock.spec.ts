@@ -260,6 +260,9 @@ for (const width of [360, 768, 1280]) {
     await page.setViewportSize({ width, height: 900 })
     await page.route('**/socket.io/**', route => route.abort())
     await page.route(/\/api\/auth\/me(?:\?.*)?$/, route => route.fulfill({ json: { user: adminUser } }))
+    await page.route(/\/api\/admin\/pagos(?:\?.*)?$/, route => route.fulfill({
+      json: { data: { items: [], paginaSiguiente: null } },
+    }))
 
     const adminOrders = [
       {

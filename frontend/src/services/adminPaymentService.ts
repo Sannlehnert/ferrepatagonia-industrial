@@ -42,6 +42,22 @@ export interface AdminPaymentPage {
   paginaSiguiente: number | null
 }
 
+export const PAYMENT_METHOD_TRANSFER = 'TRANSFERENCIA'
+
+export interface CreateAdminOrderPaymentInput {
+  pedidoId: number
+  monto: string
+  moneda: PaymentCurrency
+  metodoPago: string
+  referencia?: string
+  observaciones?: string
+}
+
+export interface CreateAdminPaymentResult {
+  payment: AdminPayment
+  replay: boolean
+}
+
 export const DOCUMENT_LABELS: Record<DocumentState, string> = {
   PENDIENTE: 'Pendiente de revisión',
   APROBADO: 'Documento aprobado',
@@ -139,12 +155,23 @@ export function canReview(payment: AdminPayment): boolean {
 }
 
 export function canAccredit(payment: AdminPayment): boolean {
-  return payment.estado === 'PENDIENTE'
-    && payment.estadoDocumental === 'APROBADO'
-    && Boolean(payment.comprobanteId)
-    && (payment.moneda === 'USD' || payment.moneda === 'ARS')
-    && MONEY.test(payment.monto)
-    && payment.monto !== '0.00'
+  if (payment.estado !== 'PENDIENTE'
+    || (payment.moneda !== 'USD' && payment.moneda !== 'ARS')
+    || !MONEY.test(payment.monto)
+    || payment.monto === '0.00') return false
+
+  const directOrder = payment.cuentaCorrienteId === null && payment.pedidoId !== null
+  if (!directOrder && payment.cuentaCorrienteId === null) return false
+
+  // El backend solo exige revisión documental para pagos declarados por cliente
+  // (con usuario declarante o comprobante asociado). Un pago directo registrado
+  // por ADMIN sobre un pedido TRANSFERENCIA no tiene comprobante vinculado y se
+  // acredita contra la cobertura del pedido, sin ABONO de cuenta corriente.
+  const declaredByClient = payment.declaranteUsuarioId !== null
+    || payment.comprobanteId !== null
+  if (directOrder && !declaredByClient) return true
+
+  return payment.estadoDocumental === 'APROBADO' && Boolean(payment.comprobanteId)
 }
 
 export function formatPaymentMoney(value: string, currency: PaymentCurrency | null): string {
@@ -252,10 +279,19 @@ export function mapPaymentError(code: string | undefined, status: number | undef
   if (code === 'CONFLICTO_CONCURRENCIA') {
     return 'La operación encontró un cambio concurrente. Consultá el estado antes de reintentar.'
   }
-  if (code === 'CLAVE_IDEMPOTENCIA_REQUERIDA') return 'Falta la clave de idempotencia. No se envió la acreditación.'
+  if (code === 'CLAVE_IDEMPOTENCIA_REQUERIDA') return 'Falta la clave de idempotencia. No se envió la operación.'
   if (code === 'CLAVE_IDEMPOTENCIA_REUTILIZADA') {
     return 'La clave de idempotencia ya fue usada con otros datos. Consultá el estado del pago.'
   }
+  if (code === 'PEDIDO_NO_ENCONTRADO') return 'No se encontró el pedido indicado. Recargá el detalle antes de reintentar.'
+  if (code === 'MODALIDAD_PAGO_INCOMPATIBLE') {
+    return 'Solo se admiten pagos directos sobre pedidos con modalidad TRANSFERENCIA.'
+  }
+  if (code === 'MONEDA_PEDIDO_NO_ACREDITADA') {
+    return 'El pedido no tiene una moneda USD verificada para acreditar el pago directo.'
+  }
+  if (code === 'DESTINO_PAGO_INVALIDO') return 'El destino del pago no es válido para una operación administrativa.'
+  if (code === 'CUENTA_DEMO') return 'La cuenta DEMO no admite pagos reales.'
   if (status === 401) return 'La sesión expiró. Iniciá sesión nuevamente.'
   if (status === 403) return 'La sesión actual no tiene permisos de administración.'
   if (status === 404) return 'No se encontró el pago indicado.'
@@ -268,6 +304,68 @@ export async function listAdminPayments(pagina: number, signal: AbortSignal): Pr
     signal,
   })
   return decodeAdminPaymentPage(response.data.data)
+}
+
+export async function listAdminPaymentsForOrder(
+  pedidoId: number,
+  signal: AbortSignal,
+): Promise<AdminPaymentPage> {
+  const response = await api.get<{ data: unknown }>('/admin/pagos', {
+    params: { pagina: 1, pedidoId },
+    signal,
+  })
+  return decodeAdminPaymentPage(response.data.data)
+}
+
+export async function createAdminOrderPayment(
+  input: CreateAdminOrderPaymentInput,
+  idempotencyKey: string,
+  signal: AbortSignal,
+): Promise<CreateAdminPaymentResult> {
+  if (!isUuidV4(idempotencyKey)) throw new Error('La clave de idempotencia no es un UUID v4.')
+  if (!Number.isSafeInteger(input.pedidoId) || input.pedidoId < 1) {
+    throw new Error('El pedido indicado no es válido.')
+  }
+  if (!MONEY.test(input.monto) || input.monto === '0.00') {
+    throw new Error('El importe recibido debe ser mayor a cero con hasta dos decimales.')
+  }
+  if (input.moneda !== 'USD' && input.moneda !== 'ARS') {
+    throw new Error('La moneda del pago debe ser USD o ARS.')
+  }
+  const metodoPago = input.metodoPago.trim()
+  if (!metodoPago) throw new Error('El método de pago es obligatorio.')
+
+  const referencia = input.referencia?.trim()
+  const observaciones = input.observaciones?.trim()
+  const response = await api.post<{ data: unknown; meta?: { replay?: boolean } }>(
+    '/admin/pagos',
+    {
+      pedidoId: input.pedidoId,
+      cuentaCorrienteId: null,
+      monto: input.monto,
+      moneda: input.moneda,
+      metodoPago,
+      estado: 'PENDIENTE',
+      ...(referencia ? { comprobante: referencia } : {}),
+      ...(observaciones ? { observaciones } : {}),
+    },
+    { signal, headers: { 'Idempotency-Key': idempotencyKey } },
+  )
+  return {
+    payment: decodeAdminPayment(response.data.data),
+    replay: response.data.meta?.replay === true,
+  }
+}
+
+export function paymentRegistrationNotice(payment: AdminPayment): string {
+  return `Pago #${payment.id} registrado por el servidor en estado ${payment.estado} por ${formatPaymentMoney(payment.monto, payment.moneda)}. No se acreditó automáticamente.`
+}
+
+export function findPaymentByIdempotencyKey(
+  page: AdminPaymentPage,
+  idempotencyKey: string,
+): AdminPayment | null {
+  return page.items.find(payment => payment.claveIdempotencia === idempotencyKey) ?? null
 }
 
 export async function getAdminPayment(paymentId: number, signal: AbortSignal): Promise<AdminPayment> {
