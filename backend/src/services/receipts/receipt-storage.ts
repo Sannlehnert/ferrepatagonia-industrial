@@ -2,7 +2,7 @@ import { constants, existsSync } from 'node:fs';
 import { lstat, open, realpath, stat, unlink } from 'node:fs/promises';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { Worker } from 'node:worker_threads';
+import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { readStorageDir } from '../../config/storage-env.config';
 import { isReceiptId, ReceiptError, receiptUnavailable, type ReceiptMime } from './receipt-types';
 import type { ReceiptValidationFailure, ReceiptValidationResult } from './receipt-file.worker';
@@ -60,6 +60,15 @@ function receiptWorker() {
   return { file: source, execArgv: ['--import', pathToFileURL(loader).href] };
 }
 
+// Punto de extensión mínimo para probar los fallos operativos del worker sin
+// alterar la resolución real usada en desarrollo y producción.
+export const receiptWorkerRuntime = {
+  resolveWorker: receiptWorker,
+  createWorker(file: string, options: WorkerOptions): Worker {
+    return new Worker(file, options);
+  },
+};
+
 type ValidationOutcome =
   | { status: 'result'; value: ReceiptValidationResult }
   | { status: 'unavailable' };
@@ -67,12 +76,12 @@ type ValidationOutcome =
 export async function validateReceiptContent(bytes: Buffer, mime: ReceiptMime, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   if (!bytes.length) throw new ReceiptError(400, 'ARCHIVO_VACIO', 'Seleccioná un archivo con contenido.');
-  const location = receiptWorker();
+  const location = receiptWorkerRuntime.resolveWorker();
   const input = new Uint8Array(bytes);
 
   let worker: Worker;
   try {
-    worker = new Worker(location.file, {
+    worker = receiptWorkerRuntime.createWorker(location.file, {
       workerData: { bytes: input, mime },
       transferList: [input.buffer],
       env: {},

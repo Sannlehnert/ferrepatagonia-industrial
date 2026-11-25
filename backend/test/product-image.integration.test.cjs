@@ -127,6 +127,16 @@ test('fotos ADMIN con API y MariaDB reales', async t => {
             assert.equal(denied.status, 503);
             assert.equal((await denied.json()).code, 'PRODUCT_IMAGE_REJECTED');
             assert.deepEqual(await readdir(receipts), []);
+            const deniedGet = await fetch(origin + created.imagen);
+            assert.equal(deniedGet.status, 503);
+            assert.equal(deniedGet.headers.get('cache-control'), 'no-store');
+            const deniedGetText = await deniedGet.text();
+            assert.equal(JSON.parse(deniedGetText).code, 'PRODUCT_IMAGE_REJECTED');
+            assert.equal(deniedGetText.includes(receipts), false);
+            const deniedHead = await fetch(origin + created.imagen, { method: 'HEAD' });
+            assert.equal(deniedHead.status, 503);
+            assert.equal(deniedHead.headers.get('cache-control'), 'no-store');
+            assert.equal(await deniedHead.text(), '');
             await stop();
             await start();
             assert.equal((await fetch(origin + created.imagen)).status, 200);

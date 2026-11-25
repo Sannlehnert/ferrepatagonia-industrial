@@ -1,0 +1,37 @@
+
+> ferrepatagonia-backend@0.1.0 precio:historial
+> node scripts/verify-product-price.cjs --historial --producto 1 --json
+
+{
+  "producto": 1,
+  "eventos": [
+    {
+      "idEvento": "101",
+      "productId": 1,
+      "tipo": "VERIFICACION",
+      "precioAnterior": "1.68",
+      "precioNuevo": "1.68",
+      "evidencia": "CATALOGO #309 REFERENCIA USD SHA256:d9da36a0b87e82653cbd29de8038d43f96b93200bbe332703114cd677c1592c9 SKU:FP-DEMO-ABR-DISCO-LIJA-100-MM",
+      "evidenciaAnterior": null,
+      "adminId": 1,
+      "adminEmail": "admin.local@s7.test",
+      "ocurridoUtc": "2026-11-25T02:05:56.021000Z",
+      "resultado": "APLICADO",
+      "motivo": "REFERENCIA_CATALOGO"
+    },
+    {
+      "idEvento": "1",
+      "productId": 1,
+      "tipo": "ALTA",
+      "precioAnterior": null,
+      "precioNuevo": "1.68",
+      "evidencia": null,
+      "evidenciaAnterior": null,
+      "adminId": null,
+      "adminEmail": null,
+      "ocurridoUtc": "2026-11-25T02:05:17.203000Z",
+      "resultado": "APLICADO",
+      "motivo": null
+    }
+  ]
+}
