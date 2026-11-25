@@ -1,0 +1,75 @@
+Base E2E preparada: e2e_test_81e23e26807e4ac1b785be89938947d4
+(node:26252) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Frontend E2E: http://127.0.0.1:53915
+
+Running 49 tests using 1 worker
+
+(node:26036) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › e2e\admin\accounts.real.spec.ts:17:5 › ADMIN con ledger real a 1280px › lista, filtra, pagina, consulta el ledger, recupera errores y cambia de sesión (6.5s)
+  ok  2 [chromium] › e2e\admin\accounts.real.spec.ts:17:5 › ADMIN con ledger real a 360px › lista, filtra, pagina, consulta el ledger, recupera errores y cambia de sesión (3.7s)
+  ok  3 [chromium] › e2e\admin\categories-context-form.real.spec.ts:36:3 › formulario contextual de categorías › crea y edita en modal conservando foco, lista y posición de scroll (1.5s)
+  ok  4 [chromium] › e2e\admin\categories-context-form.real.spec.ts:125:3 › errores y envíos duplicados del formulario de categorías › conserva el borrador ante rechazo y bloquea un segundo envío en vuelo (1.4s)
+  ok  5 [chromium] › e2e\admin\categories-context-form.real.spec.ts:224:3 › robustez del cierre y geometría del formulario contextual › Escape repetido conserva el borrador, el scroll y restaura el foco del listado (1.2s)
+  ok  6 [chromium] › e2e\admin\categories-context-form.real.spec.ts:274:3 › robustez del cierre y geometría del formulario contextual › Escape repetido no cierra durante un guardado en curso ni pierde el borrador (1.2s)
+  ok  7 [chromium] › e2e\admin\categories-context-form.real.spec.ts:332:3 › robustez del cierre y geometría del formulario contextual › un resultado incierto bloquea Escape y la recarga mantiene la alerta visible en móvil (1.3s)
+  ok  8 [chromium] › e2e\admin\categories-context-form.real.spec.ts:443:3 › robustez del cierre y geometría del formulario contextual › errores largos, alertas y controles no desbordan en móvil ni escritorio (1.4s)
+  ok  9 [chromium] › e2e\admin\categories-context-form.real.spec.ts:615:3 › P3-01 altura extrema del formulario de categorías › mantiene footer, acciones y alertas accesibles y conserva el borrador (2.0s)
+  ok 10 [chromium] › e2e\admin\categories-context-form.real.spec.ts:765:3 › P3-02 herencia tipográfica en categorías › controles nativos de lista, formulario y desactivación heredan la tipografía (1.4s)
+  ok 11 [chromium] › e2e\admin\categories-deactivation.real.spec.ts:98:3 › diálogo de desactivación de categorías › conserva scroll y foco al cancelar y confirmar por teclado (1.6s)
+  ok 12 [chromium] › e2e\admin\categories-deactivation.real.spec.ts:160:3 › diálogo de desactivación de categorías › desactiva, autocierra aviso a los 4s, oculta de /catalogo y reactiva en 1 clic conservando scroll y foco (11.5s)
+  ok 13 [chromium] › e2e\admin\categories-deactivation.real.spec.ts:226:3 › diálogo de desactivación de categorías › el cierre nativo sincroniza el estado Vue y restaura foco y scroll (1.3s)
+  ok 14 [chromium] › e2e\admin\categories-deactivation.real.spec.ts:261:3 › errores y envíos duplicados al desactivar categorías › bloquea un segundo envío y conserva el diálogo ante un rechazo (1.3s)
+  ok 15 [chromium] › e2e\admin\categories-deactivation.real.spec.ts:318:3 › errores y envíos duplicados al desactivar categorías › ante una respuesta perdida exige recargar y reconcilia el listado (1.4s)
+  ok 16 [chromium] › e2e\admin\categories-deactivation.real.spec.ts:400:3 › geometría y cadenas largas del diálogo de desactivación › descripción y error largo no desbordan a seis viewports y el diálogo se recupera (1.9s)
+  ok 17 [chromium] › e2e\admin\categories.real.spec.ts:4:1 › ADMIN crea, edita y desactiva una categoría desde el panel (1.4s)
+  ok 18 [chromium] › e2e\admin\client-status.real.spec.ts:24:3 › registro empresarial y crédito independientes a 1280px (4.9s)
+  ok 19 [chromium] › e2e\admin\client-status.real.spec.ts:24:3 › registro empresarial y crédito independientes a 768px (4.1s)
+  ok 20 [chromium] › e2e\admin\client-status.real.spec.ts:24:3 › registro empresarial y crédito independientes a 360px (3.3s)
+  ok 21 [chromium] › e2e\admin\client-status.real.spec.ts:131:1 › verifica una respuesta perdida y recupera una consulta de crédito fallida (2.1s)
+  ok 22 [chromium] › e2e\admin\client-status.real.spec.ts:177:1 › cada empresa publica su crédito y permite reintentar aunque otra consulta no responda (16.0s)
+  ok 23 [chromium] › e2e\admin\client-status.real.spec.ts:218:1 › un particular no puede consultar ni aprobar clientes desde ADMIN (818ms)
+10:08:15 [vite] ws proxy error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+10:08:15 [vite] ws proxy socket error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+  ok 24 [chromium] › e2e\admin\client-status.real.spec.ts:235:1 › estadoEsperado rechaza una aprobación retenida si se confirmó otro estado tras recargar (17.3s)
+  ok 25 [chromium] › e2e\admin\client-status.real.spec.ts:272:1 › S7-345-06: fallo antes del backend se recupera verificando y permite decidir de nuevo (1.4s)
+  ok 26 [chromium] › e2e\admin\client-status.real.spec.ts:296:1 › S7-345-03: una verificación sin respuesta vence y permite cerrar y reintentar (16.6s)
+  ok 27 [chromium] › e2e\admin\client-status.real.spec.ts:334:1 › S7-345-04: aprobar una fila no borra ni reinicia el crédito ya visible de las demás (2.5s)
+  ok 28 [chromium] › e2e\admin\credit-controls.real.spec.ts:93:5 › Controles ADMIN de crédito a 1280px › aprueba, administra la cuenta y rechaza otra solicitud (4.5s)
+  ok 29 [chromium] › e2e\admin\credit-controls.real.spec.ts:93:5 › Controles ADMIN de crédito a 768px › aprueba, administra la cuenta y rechaza otra solicitud (4.5s)
+  ok 30 [chromium] › e2e\admin\credit-controls.real.spec.ts:93:5 › Controles ADMIN de crédito a 360px › aprueba, administra la cuenta y rechaza otra solicitud (6.3s)
+  ok 31 [chromium] › e2e\admin\credit-controls.real.spec.ts:294:1 › recupera una aprobación con respuesta perdida usando la misma clave (2.1s)
+  ok 32 [chromium] › e2e\admin\credit-controls.real.spec.ts:397:1 › conserva el formulario al rechazar un límite inferior a la deuda (1.4s)
+  ok 33 [chromium] › e2e\admin\dashboard-orders.real.spec.ts:53:1 › vista previa ADMIN: 24 pedidos con artículos, cards y paginación, exclusivamente en base descartable (6.0s)
+  ok 34 [chromium] › e2e\admin\dashboard-orders.real.spec.ts:120:1 › dashboard y filtros corresponden a los registros reales de la API y MariaDB (2.2s)
+  ok 35 [chromium] › e2e\admin\dashboard-orders.real.spec.ts:176:1 › una respuesta de métricas de la sesión anterior no reaparece al volver a ingresar (1.7s)
+  ok 36 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:74:3 › última página filtrada vuelve a una página válida con respuesta confirmada (1.7s)
+  ok 37 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:74:3 › última página filtrada vuelve a una página válida con respuesta perdida (1.6s)
+  ok 38 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:131:1 › un PATCH tardío actualiza por REST la página filtrada y deja intacto el pedido abierto (1.6s)
+  ok 39 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:172:1 › un PATCH pendiente al cerrar sesión no repuebla el listado ni inicia otra consulta (1.4s)
+  ok 40 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:197:1 › si la red pierde la respuesta después del commit, el listado se reconcilia sin repetir el PATCH (1.4s)
+  ok 41 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:235:1 › R01-A: un cambio comercial externo actualiza la fila y el modal abierto conservando filtros activos (1.6s)
+  ok 42 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:266:1 › R01-B: guardar estado propio no dispara consultas GET duplicadas por su propio evento Socket.IO (1.7s)
+  ok 43 [chromium] › e2e\admin\orders-reconciliation.real.spec.ts:297:1 › R01-C: una transición externa posterior dentro de los 1.500 ms actualiza la fila y el modal abierto sin recargar (1.7s)
+  ok 44 [chromium] › e2e\admin\product-images.real.spec.ts:34:1 › alta y reemplazo con vista previa, estado de carga y catálogo a 360 px (4.0s)
+  ok 45 [chromium] › e2e\admin\product-images.real.spec.ts:123:1 › Home carga la foto y el cambio de sesión protege el endpoint ADMIN (2.0s)
+  ok 46 [chromium] › e2e\admin\product-import.real.spec.ts:9:1 › recupera el resultado de una importación confirmada sin duplicar productos (1.5s)
+  ok 47 [chromium] › e2e\admin\product-import.real.spec.ts:86:1 › dos confirmaciones simultáneas conservan un único resultado para el lote (1.0s)
+10:09:46 [vite] ws proxy error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+10:09:46 [vite] ws proxy socket error:
+Error: read ECONNRESET
+    at TCP.onStreamRead (node:internal/stream_base_commons:216:20)
+  ok 48 [chromium] › e2e\admin\product-import.real.spec.ts:157:1 › un reporte que devuelve 404 permite dejar de seguir el lote sin reconfirmar (1.5s)
+  ok 49 [chromium] › e2e\admin\product-import.real.spec.ts:219:1 › previsualiza y confirma un XLSX válido conservando el SKU con ceros (1.1s)
+
+  49 passed (2.8m)
+10:09:48 [vite] (client) page reload playwright-report/index.html
+10:09:48 [vite] (client) page reload playwright-report/index.html
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.

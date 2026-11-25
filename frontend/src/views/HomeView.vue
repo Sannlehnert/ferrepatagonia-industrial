@@ -1,35 +1,49 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import CommerceIcon from '@/components/CommerceIcon.vue'
 import HomeHero from '@/components/HomeHero.vue'
 import HomeCategories from '@/components/HomeCategories.vue'
 import HomeRecommended from '@/components/HomeRecommended.vue'
-import { getCuentaCorriente } from '@/services/cuentaCorrienteService'
 import { useAuthStore } from '@/stores/auth'
-import type { CuentaCorrienteConsulta } from '@/types/cuentaCorriente'
+import { approvalMessage } from '@/utils/companyStatus'
 
 const auth = useAuthStore()
+const route = useRoute()
+const home = ref<HTMLElement | null>(null)
+const businessSection = ref<HTMLElement | null>(null)
+let homeResizeObserver: ResizeObserver | null = null
+
+function keepBusinessSectionInView() {
+  const section = businessSection.value
+  const activeElement = document.activeElement
+  if (
+    route.hash === '#empresas' &&
+    section &&
+    activeElement instanceof Node &&
+    section.contains(activeElement)
+  ) {
+    section.scrollIntoView({ block: 'start', behavior: 'instant' })
+  }
+}
+
+function observeBusinessAnchor(hash: string) {
+  if (!home.value || !homeResizeObserver) return
+  if (hash === '#empresas') homeResizeObserver.observe(home.value)
+  else homeResizeObserver.unobserve(home.value)
+}
+
+watch(() => route.hash, observeBusinessAnchor, { flush: 'post' })
+
+onMounted(() => {
+  if (!home.value) return
+  homeResizeObserver = new ResizeObserver(keepBusinessSectionInView)
+  observeBusinessAnchor(route.hash)
+})
+
+onBeforeUnmount(() => homeResizeObserver?.disconnect())
+
 const company = computed(() => auth.rol === 'CLIENTE' && auth.user?.tipo_cliente === 'EMPRESA')
-const accountStatus = ref<CuentaCorrienteConsulta['estado'] | null>(null)
-
-watch(
-  [company, () => auth.sessionVersion],
-  async ([isCompany], _previous, onCleanup) => {
-    accountStatus.value = null
-    if (!isCompany) return
-
-    const controller = new AbortController()
-    onCleanup(() => controller.abort())
-    try {
-      const summary = await getCuentaCorriente(controller.signal)
-      if (!controller.signal.aborted) accountStatus.value = summary.estado
-    } catch {
-      // El acceso a la cuenta sigue disponible si el resumen no pudo verificarse.
-    }
-  },
-  { immediate: true },
-)
-
 const business = computed(() => {
   if (auth.rol === 'ADMIN') {
     return {
@@ -39,19 +53,10 @@ const business = computed(() => {
     }
   }
   if (company.value) {
-    if (accountStatus.value === 'HABILITADA') {
-      return {
-        route: 'cuenta-corriente',
-        label: 'Ver cuenta corriente',
-        description: 'Tu cuenta corriente está habilitada. Consultá su estado y movimientos desde tu cuenta.',
-      }
-    }
     return {
-      route: 'cuenta-corriente',
-      label: 'Consultar estado de cuenta',
-      description: accountStatus.value === 'INHABILITADA'
-        ? 'Tu cuenta corriente está inhabilitada. Podés consultar su estado desde tu cuenta.'
-        : 'Las condiciones comerciales para empresas se evalúan por separado. Consultá el estado de tu cuenta corriente.',
+      route: 'cuenta-dashboard',
+      label: 'Consultar estado comercial',
+      description: approvalMessage(auth.user?.estadoAprobacionEmpresa),
     }
   }
   if (auth.rol === 'CLIENTE') {
@@ -70,12 +75,12 @@ const business = computed(() => {
 </script>
 
 <template>
-  <main class="home" aria-labelledby="home-title">
+  <main ref="home" class="home" aria-labelledby="home-title">
     <HomeHero :business-route="business.route" :business-label="business.label" />
     <HomeCategories />
     <HomeRecommended />
 
-    <section id="empresas" tabindex="-1" class="fp-section business" aria-labelledby="business-title">
+    <section id="empresas" ref="businessSection" tabindex="-1" class="fp-section business" aria-labelledby="business-title">
       <div class="fp-shell business-panel">
           <div class="business-lead">
             <p class="fp-kicker">Atención comercial</p>
@@ -100,7 +105,7 @@ const business = computed(() => {
 
 <style scoped>
 .home { background: var(--fp-bg); }
-.business { background: #f7eddb; border-top: 1px solid #ead9ba; }
+.business { scroll-margin-block-start: 1rem; background: #f7eddb; border-top: 1px solid #ead9ba; }
 .business-panel {
   display: grid;
   gap: 1.25rem;

@@ -1,0 +1,5 @@
+--------------
+CREATE TABLE should_fail(id INT)
+--------------
+
+ERROR 1142 (42000) at line 1: CREATE command denied to user 'ferre_precio_verificador'@'localhost' for table `ferrepatagonia_dev`.`should_fail`

@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { childProfile, connectOwned } = require("./cc260-disposable.cjs");
 const { seedAdminAccounts } = require("./admin-account-fixture.cjs");
+const { seedPaymentActions } = require("./payment-actions-fixture.cjs");
 const { seedDemo } = require("../../../database/fixtures/fer19-demo.cjs");
 
 // El ejecutor deberá proporcionar una base exclusiva para esta ejecución.
@@ -66,6 +67,7 @@ async function main() {
     : await connectOwned(childProfile("E2E"), "E2E");
   let fixture;
   let fer19Fixture;
+  let paymentActions;
   let academicCheckout;
   try {
     await initializeDatabase();
@@ -77,8 +79,11 @@ async function main() {
     } else if (process.env.E2E_DEMO_CATALOG === '1') {
       const { issueAcademicCheckout } = require('../../dist/services/orders/academic-checkout');
       academicCheckout = await issueAcademicCheckout(session.profile);
-    } else if (process.env.E2E_RECEIPTS !== "1") {
+    } else if (process.env.E2E_RECEIPTS !== "1" && process.env.E2E_PAYMENTS !== "1") {
       fixture = await seedAdminAccounts(session, { browser: true });
+      if (process.env.E2E_PAYMENT_ACTIONS === "1") {
+        paymentActions = await seedPaymentActions(session);
+      }
     }
   } finally {
     await session.connection.end();
@@ -110,6 +115,7 @@ async function main() {
       port: address.port,
       adminAccounts: fixture && Object.fromEntries(Object.entries(fixture.accounts).map(([key, account]) => [key, account.clientId])),
       fer19Fixture,
+      paymentActions,
     });
   });
 }

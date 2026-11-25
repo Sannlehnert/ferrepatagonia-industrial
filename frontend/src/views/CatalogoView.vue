@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import ProductPrices from '@/components/ProductPrices.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
+import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
 import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import axios from 'axios'
 import CatalogFilters from '@/components/CatalogFilters.vue'
 import { getCatalog, getCatalogCategories } from '@/services/catalogService'
@@ -12,6 +13,11 @@ import {
   MAX_PAGINA_CATALOGO,
   normalizarQueryPagina,
 } from '@/utils/catalogPagination'
+import {
+  CATALOG_ORDER_OPTIONS,
+  normalizarQueryOrden,
+  type CatalogOrder,
+} from '@/utils/catalogOrder'
 import type {
   CatalogProduct,
   CatalogPagination,
@@ -19,16 +25,31 @@ import type {
   CatalogCategory,
 } from '@/types/catalog'
 import CatalogCartButton from '@/components/CatalogCartButton.vue'
+import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
 
 const LIMITE = 12
 const route = useRoute()
 const router = useRouter()
 
 const productos = ref<CatalogProduct[]>([])
+const failedImages = ref<Record<number, string>>({})
 const pagination = ref<CatalogPagination | null>(null)
 const total = ref(0)
 const cargando = ref(true)
 const error = ref<string | null>(null)
+
+function imageHasFailed(product: CatalogProduct): boolean {
+  return Boolean(product.imagen && failedImages.value[product.id] === product.imagen)
+}
+
+function markImageFailed(product: CatalogProduct): void {
+  if (!product.imagen) return
+  failedImages.value = { ...failedImages.value, [product.id]: product.imagen }
+}
+
+function imageNoticeId(productId: number): string {
+  return `catalog-product-image-note-${productId}`
+}
 
 // Número entero positivo a partir de un parámetro de la URL, o undefined
 function entero(v: unknown): number | undefined {
@@ -40,6 +61,15 @@ function entero(v: unknown): number | undefined {
 // Categoría y página viven en la URL: /catalogo?categoria=5&page=2
 const categoriaId = computed(() => entero(route.query.categoria))
 const pagina = computed(() => normalizarQueryPagina(route.query).pagina)
+const orden = computed(() => normalizarQueryOrden(route.query).orden)
+
+// Cambiar el orden reinicia la paginación y conserva búsqueda y categoría.
+function cambiarOrden(event: Event) {
+  const value = (event.target as HTMLSelectElement).value as CatalogOrder
+  const query: LocationQueryRaw = { ...route.query, orden: value }
+  delete query.page
+  return router.push({ name: 'catalogo', query: normalizarQueryOrden(query).query })
+}
 
 const busqueda = computed(() => {
   const value = route.query.busqueda
@@ -62,6 +92,17 @@ function aplicarFiltros(filters: CatalogFiltersValue) {
   if (filters.categoryId !== null) {
     query.categoria = String(filters.categoryId)
   }
+
+  return router.push({ name: 'catalogo', query })
+}
+
+function limpiarFiltros() {
+  const query = { ...route.query }
+
+  delete query.page
+  delete query.busqueda
+  delete query.categoria
+  delete query.orden
 
   return router.push({ name: 'catalogo', query })
 }
@@ -139,10 +180,11 @@ async function cargar() {
   error.value = null
 
   const paginaNormalizada = normalizarQueryPagina(route.query)
-  if (!paginaNormalizada.esCanonica) {
+  const ordenNormalizado = normalizarQueryOrden(paginaNormalizada.query)
+  if (!paginaNormalizada.esCanonica || !ordenNormalizado.esCanonica) {
     await router.replace({
       name: 'catalogo',
-      query: paginaNormalizada.query,
+      query: ordenNormalizado.query,
     })
     return
   }
@@ -159,6 +201,7 @@ async function cargar() {
         limit: LIMITE,
         categoria: categoriaId.value,
         busqueda: busqueda.value,
+        ...(orden.value !== 'predeterminado' ? { orden: orden.value } : {}),
       },
       actual.signal,
     )
@@ -197,7 +240,7 @@ async function cargar() {
 }
 
 // Observar el valor crudo permite normalizar incluso abc → 0 o page=1.
-watch([categoriaId, () => route.query.page, busqueda], cargar)
+watch([categoriaId, () => route.query.page, busqueda, () => route.query.orden], cargar)
 refreshOnStock(ids => cargando.value || productos.value.some(product => ids.has(product.id)), () => void cargar())
 onMounted(() => {
   void cargar()
@@ -212,39 +255,78 @@ onBeforeUnmount(() => {
 
 <template>
   <main class="fp-shell py-6 sm:py-9">
-    <p class="m-0 mb-2 text-xs text-slate-500">
-      Inicio /
-      <RouterLink v-if="categoriaId" class="fp-focus text-[var(--fp-blue)]" :to="{ name: 'catalogo' }">Catálogo</RouterLink>
-      <template v-else>Catálogo</template>
-      <template v-if="categoriaId"> / {{ nombreCategoria }}</template>
-    </p>
+    <nav aria-label="Ruta de navegación" class="mb-2 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+      <RouterLink
+        :to="{ name: 'home' }"
+        class="box-border inline-flex min-h-11 min-w-11 items-center justify-center px-1 fp-focus text-[var(--fp-blue)]"
+      >Inicio</RouterLink>
+      <span aria-hidden="true">/</span>
+      <template v-if="categoriaId">
+        <RouterLink
+          custom
+          :to="{ name: 'catalogo', query: { ...route.query, categoria: undefined, page: undefined } }"
+          v-slot="{ href, navigate }"
+        >
+          <a
+            :href="href"
+            class="box-border inline-flex min-h-11 min-w-11 items-center justify-center px-1 fp-focus text-[var(--fp-blue)]"
+            @click="navigate"
+          >Catálogo</a>
+        </RouterLink>
+        <span aria-hidden="true">/</span>
+        <span aria-current="page" class="text-slate-700 [overflow-wrap:anywhere]">{{ nombreCategoria }}</span>
+      </template>
+      <span v-else aria-current="page" class="text-slate-700">Catálogo</span>
+    </nav>
 
-    <header class="mb-5 flex flex-col items-start justify-between gap-4 min-[801px]:flex-row">
-      <div>
-        <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
-        <p class="fp-section-copy">{{ total }} productos</p>
-      </div>
-      <!-- El backend todavía no soporta orden: se muestra pero deshabilitado -->
-      <select class="box-border rounded-md border border-slate-200 bg-white px-3 py-2 text-sm" disabled aria-label="Ordenar productos">
-        <option>Ordenar: Relevancia</option>
-      </select>
+    <header class="mb-5">
+      <h1 class="fp-section-title [overflow-wrap:anywhere]">{{ nombreCategoria ?? 'Catálogo' }}</h1>
+      <p class="fp-section-copy">{{ total }} productos</p>
     </header>
 
-    <div class="grid grid-cols-1 items-start gap-5 min-[801px]:grid-cols-[190px_minmax(0,1fr)]">
-      <aside class="min-h-0 rounded-[var(--fp-radius-panel)] border border-[var(--fp-line)] bg-white p-4 min-[801px]:min-h-[260px]" aria-label="Filtros">
-        <h2 class="m-0 text-base">Filtros</h2>
+    <section
+      aria-label="Filtros y orden del catálogo"
+      class="mb-6 rounded-xl border border-slate-200 bg-[#F8FAFC] p-4"
+    >
+      <CatalogFilters
+        :model-value="filtrosAplicados"
+        :categories="listaCategorias"
+        :categories-loading="cargandoCategorias"
+        :categories-error="errorCategorias"
+        @apply="aplicarFiltros"
+        @clear="limpiarFiltros"
+        @retry-categories="cargarCategorias"
+      >
+        <template #order>
+          <div class="w-full shrink-0 min-[801px]:w-72">
+            <label for="catalog-order" class="mb-1.5 block text-sm font-medium text-[var(--fp-navy)]">
+              Ordenar por
+            </label>
+            <select
+              id="catalog-order"
+              :value="orden"
+              class="fp-focus box-border min-h-11 w-full rounded-md border border-[var(--fp-control-line)] bg-white px-3 py-2 text-base text-[var(--fp-navy)] sm:text-sm"
+              :aria-describedby="orden.startsWith('precio_') ? 'catalog-order-help' : undefined"
+              @change="cambiarOrden"
+            >
+              <option v-for="option in CATALOG_ORDER_OPTIONS" :key="option.value" :value="option.value">
+                {{ option.label }}
+              </option>
+            </select>
+          </div>
+        </template>
+      </CatalogFilters>
 
-        <CatalogFilters
-          :model-value="filtrosAplicados"
-          :categories="listaCategorias"
-          :categories-loading="cargandoCategorias"
-          :categories-error="errorCategorias"
-          @apply="aplicarFiltros"
-          @retry-categories="cargarCategorias"
-        />
-      </aside>
+      <p
+        v-if="orden.startsWith('precio_')"
+        id="catalog-order-help"
+        class="m-0 mt-2 w-full text-xs text-slate-500"
+      >
+        El orden usa el precio público del catálogo; tu precio personalizado no modifica la posición.
+      </p>
+    </section>
 
-      <section>
+    <section>
         <ProductPrices :products="productos" :catalog-loading="cargando" v-slot="pricing">
         <p v-if="cargando" class="fp-state" role="status">Cargando productos...</p>
 
@@ -266,42 +348,53 @@ onBeforeUnmount(() => {
             v-if="busqueda || categoriaId"
             type="button"
             class="fp-action fp-action--primary fp-focus mt-2"
-            @click="aplicarFiltros({ search: '', categoryId: null })"
+            @click="limpiarFiltros"
           >
             Limpiar filtros
           </button>
         </div>
 
         <ul v-else class="grid min-w-0 grid-cols-[repeat(auto-fill,minmax(min(100%,210px),1fr))] gap-4 m-0 list-none p-0 [@media(max-width:560px)]:grid-cols-2 [@media(max-width:560px)]:gap-3">
-          <li v-for="p in productos" :key="p.id" class="box-border flex min-w-0 flex-col rounded-lg border border-slate-200 bg-white p-4 [@media(max-width:560px)]:p-3">
-            <div class="mb-3 grid h-[140px] place-items-center overflow-hidden rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]">
-              <ProductThumbnail :image="p.imagen" :alt="p.nombre" image-class="h-full min-h-0 w-full object-contain">
-                <span aria-hidden="true">Sin imagen</span>
-              </ProductThumbnail>
+          <li v-for="p in productos" :key="p.id" class="box-border grid min-w-0 row-span-7 grid-rows-subgrid gap-y-0 rounded-lg border border-slate-200 bg-white p-4 [@media(max-width:560px)]:p-3">
+            <div class="mb-3 grid min-w-0 content-start gap-2">
+              <div class="grid h-[140px] place-items-center overflow-hidden rounded-md bg-slate-100 text-xs text-slate-500 [@media(max-width:560px)]:h-[110px]">
+                <ProductThumbnail
+                  :image="p.imagen"
+                  :alt="p.nombre"
+                  image-class="h-full min-h-0 w-full object-contain"
+                  :described-by="isIllustrativeDemoImage(p.codigo, p.imagen) && !imageHasFailed(p) ? imageNoticeId(p.id) : undefined"
+                  @image-error="markImageFailed(p)"
+                >
+                  <span aria-hidden="true">Sin imagen</span>
+                </ProductThumbnail>
+              </div>
+              <IllustrativeImageNotice
+                v-if="isIllustrativeDemoImage(p.codigo, p.imagen) && !imageHasFailed(p)"
+                :id="imageNoticeId(p.id)"
+              />
             </div>
 
             <p class="m-0 min-w-0 max-w-full text-[.75rem] text-[var(--fp-muted)] [overflow-wrap:anywhere]">COD. {{ p.codigo }}</p>
             <h3 class="my-1 text-sm font-semibold [overflow-wrap:anywhere]">
               <RouterLink
                 :to="{ name: 'producto-detalle', params: { id: p.id }, query: { returnTo: route.fullPath } }"
-                class="rounded-sm text-inherit underline-offset-2 hover:text-[var(--fp-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fp-blue)]"
+                class="inline-flex min-h-[44px] items-center rounded-sm text-inherit underline-offset-2 hover:text-[var(--fp-blue)] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--fp-blue)]"
               >
                 {{ p.nombre }}
               </RouterLink>
             </h3>
             <ProductPrice :line="pricing.prices[p.id]" :loading="pricing.loading" :error="pricing.error" :personalized="pricing.personalized" />
 
-            <div class="mt-auto flex items-center justify-between gap-2 [@media(max-width:560px)]:flex-col [@media(max-width:560px)]:items-stretch">
-              <span aria-label="Disponibilidad de stock" class="text-sm" :class="p.disponible ? 'text-green-700' : 'text-red-700'">
-                {{ p.disponible ? 'Disponible' : 'No disponible' }}
-              </span>
-              <CatalogCartButton
-                :product="p"
-                :line="pricing.prices[p.id]"
-                :loading="pricing.loading"
-                :error="pricing.error"
-              />
-            </div>
+            <span aria-label="Disponibilidad de stock" class="mb-2 self-end text-sm" :class="p.disponible ? 'text-green-700' : 'text-red-700'">
+              {{ p.disponible ? 'Disponible' : 'No disponible' }}
+            </span>
+            <CatalogCartButton
+              class="contents"
+              :product="p"
+              :line="pricing.prices[p.id]"
+              :loading="pricing.loading"
+              :error="pricing.error"
+            />
           </li>
         </ul>
 
@@ -312,7 +405,7 @@ onBeforeUnmount(() => {
         >
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
+            class="fp-focus box-border min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasPrevious"
             @click="cambiarPagina(pagina - 1)"
           >
@@ -321,7 +414,7 @@ onBeforeUnmount(() => {
           <span aria-live="polite">Página {{ pagination.page }} de {{ pagination.totalPages }}</span>
           <button
             type="button"
-            class="min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
+            class="fp-focus box-border min-h-11 min-w-[110px] cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-semibold text-[#145a8d] hover:bg-[#145a8d] hover:text-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 [@media(max-width:560px)]:min-w-0 [@media(max-width:560px)]:flex-1"
             :disabled="cargando || !pagination.hasNext"
             @click="cambiarPagina(pagina + 1)"
           >
@@ -329,7 +422,6 @@ onBeforeUnmount(() => {
           </button>
         </nav>
         </ProductPrices>
-      </section>
-    </div>
+    </section>
   </main>
 </template>

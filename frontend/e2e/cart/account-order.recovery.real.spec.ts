@@ -23,12 +23,17 @@ interface OrderFixture {
   userId: number
 }
 
+interface OrderFixtureOptions {
+  limit?: string
+  quantity?: number
+}
+
 const require = createRequire(import.meta.url)
 const { connectOwned } = require('../../../backend/test/helpers/cc260-disposable.cjs') as {
   connectOwned(profile: unknown, runner: 'E2E'): Promise<OwnedSession>
 }
 const { createOrderFixture } = require('../../../backend/test/helpers/account-order.fixture.cjs') as {
-  createOrderFixture(session: OwnedSession): Promise<OrderFixture>
+  createOrderFixture(session: OwnedSession, options?: OrderFixtureOptions): Promise<OrderFixture>
 }
 const bcrypt = require('../../../backend/node_modules/bcrypt')
 const endpoint = '/api/pedidos/cuenta-corriente'
@@ -65,8 +70,11 @@ const recoveryTest = test.extend<{ database: DisposableDatabase }>({
   },
 })
 
-async function customer(database: DisposableDatabase) {
-  const f = await createOrderFixture(database.session)
+async function customer(
+  database: DisposableDatabase,
+  options: OrderFixtureOptions = {},
+) {
+  const f = await createOrderFixture(database.session, options)
   database.categoryIds.push(f.categoryId)
   const email = randomUUID() + '@example.test'
   const password = 'Recovery-' + randomUUID() + '!'
@@ -84,8 +92,57 @@ async function signIn(page: Page, f: Awaited<ReturnType<typeof customer>>) {
   await page.getByLabel('Email', { exact: true }).fill(f.email)
   await page.getByLabel(/^Contraseña/).fill(f.password)
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(/\/mi-cuenta$/)
 }
+
+recoveryTest('reconsulta elegibilidad contra el backend y no conserva el resultado ante un fallo de red', async ({
+  page, database,
+}) => {
+  const f = await customer(database)
+  let allowEligibility = false
+  let eligibilityRequests = 0
+  await page.route('**/api/pedidos/cuenta-corriente/eligibilidad', async route => {
+    eligibilityRequests++
+    if (!allowEligibility) return route.abort('failed')
+    return route.continue()
+  })
+
+  await signIn(page, f)
+  await page.goto('/catalogo?busqueda=' + encodeURIComponent(f.name))
+  const card = page.locator('li').filter({
+    has: page.getByRole('heading', { name: f.name, exact: true }),
+  })
+  const added = page.waitForResponse(response =>
+    response.url().endsWith(cartEndpoint + '/items') &&
+    response.request().method() === 'POST')
+  await card.getByRole('button', { name: 'Agregar', exact: true }).click()
+  expect((await added).status()).toBe(204)
+  await page.goto('/carrito')
+
+  const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(summary.getByRole('alert')).toContainText('No pudimos verificar')
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  allowEligibility = true
+  const eligibilityResponse = page.waitForResponse(response =>
+    response.url().endsWith(endpoint + '/eligibilidad') && response.status() === 200)
+  await retry.click()
+  const response = await eligibilityResponse
+  const cartResponse = await page.request.get(cartEndpoint)
+  expect(cartResponse.status()).toBe(200)
+  const cart = await cartResponse.json()
+  expect((await response.json()).data).toMatchObject({
+    elegible: true,
+    moneda: 'USD',
+    totalUSD: cart.totalUSD,
+  })
+  await expect(summary.getByRole('status').filter({
+    hasText: 'Elegibilidad actualizada.',
+  })).toBeVisible()
+  await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
+  expect(eligibilityRequests).toBeGreaterThan(0)
+  expect(await sql(database, f)).toMatchObject({ orders: [], charges: [], attempts: [] })
+})
 
 async function attemptInTab(page: Page, userId: number, key: string, quoteToken?: string) {
   await page.evaluate(([id, key, quoteToken]) => {
@@ -159,6 +216,7 @@ for (const width of [360, 1280]) {
       const summary = page.getByRole('region', { name: 'Resumen del carrito' })
       const eligibility = await addFromCatalog()
       expect(eligibility).toMatchObject({ elegible: true, totalUSD: '10.00', creditoDisponibleUSD: '15.00' })
+      await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
       await expect(summary).toContainText('USD 10.00')
       await expect(summary).toContainText('USD 15.00')
 
@@ -202,16 +260,16 @@ for (const width of [360, 1280]) {
       expect(read.status()).toBe(200)
       const { data: balance } = await read.json()
       expect(balance).toMatchObject({ saldo: '10.00', disponible: '5.00', moneda: 'USD' })
-      const accountSummary = page.getByRole('region', { name: 'Resumen de la cuenta' })
-      await expect(accountSummary.getByRole('article').filter({ hasText: 'Saldo actual (USD)' })).toContainText('10,00')
+      const accountSummary = page.getByRole('region', { name: 'Resumen financiero' })
+      await expect(accountSummary.getByRole('article').filter({ hasText: 'Saldo actual / deuda vigente (USD)' })).toContainText('10,00')
 
       const denied = await addFromCatalog()
       expect(denied).toMatchObject({
         elegible: false, codigo: 'CREDITO_INSUFICIENTE', totalUSD: '10.00', creditoDisponibleUSD: '5.00',
       })
-      await expect(summary.getByRole('alert')).toContainText('El crédito disponible no alcanza')
-      await expect(summary).toContainText('USD 5.00')
-      await expect(summary.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+      await expect(summary.getByRole('button', { name: 'Confirmar pedido por transferencia' })).toBeEnabled()
       const before = await sql(database, f)
       expect(before).toEqual({ ...committed, items: [{ cantidad: 1 }] })
       const rejectedKey = randomUUID()
@@ -234,6 +292,163 @@ for (const width of [360, 1280]) {
       expect((await updated.json()).data).toMatchObject({
         saldo: '10.00', disponible: '5.00', revision: balance.revision,
       })
+    })
+  })
+}
+
+for (const width of [360, 1280]) {
+  recoveryTest.describe(`#326 segunda compra a ${width}px`, () => {
+    recoveryTest.use({ viewport: { width, height: 800 } })
+
+    recoveryTest('A01: una confirmación anterior no bloquea la segunda compra', async ({ page, database }) => {
+      const f = await customer(database, { limit: '15.00', quantity: 1 })
+      const db = database.connection
+      await signIn(page, f)
+
+      const firstEligibility = page.waitForResponse(response =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === endpoint + '/eligibilidad')
+      await page.goto('/carrito')
+      const firstQuote = await firstEligibility
+      expect(firstQuote.status()).toBe(200)
+      expect((await firstQuote.json()).data).toMatchObject({
+        elegible: true,
+        totalUSD: '10.00',
+        creditoDisponibleUSD: '15.00',
+      })
+
+      const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+      await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
+      const firstPost = page.waitForResponse(response =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === endpoint)
+      await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
+      const firstResponse = await firstPost
+      expect(firstResponse.status()).toBe(201)
+      const first = (await firstResponse.json()).data
+      const firstKey = firstResponse.request().headers()['idempotency-key']
+      expect(firstKey).toBeTruthy()
+      await expect(receipt(page, first.pedidoId)).toBeVisible()
+      await expect(emptyCart(page)).toBeVisible()
+      const afterFirst = await sql(database, f)
+      confirmedOnce(afterFirst, firstKey, first.pedidoId, '10.00', 4)
+
+      await page.evaluate(() => {
+        ;(globalThis as { __fpSpaNavigation?: string }).__fpSpaNavigation = 'preserved'
+      })
+      const catalogLink = page.getByRole('link', { name: 'Explorar catálogo' })
+      await catalogLink.focus()
+      await page.keyboard.press('Enter')
+      await expect(page).toHaveURL(/\/catalogo$/)
+      expect(await page.evaluate(() =>
+        (globalThis as { __fpSpaNavigation?: string }).__fpSpaNavigation,
+      )).toBe('preserved')
+
+      const filters = page.getByRole('form', { name: 'Buscar y filtrar productos' })
+      const search = filters.getByLabel('Nombre o código', { exact: true })
+      await search.fill(f.name)
+      const filtered = page.waitForResponse(response =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === '/api/catalogo' &&
+        new URL(response.url()).searchParams.get('busqueda') === f.name)
+      await filters.getByRole('button', { name: 'Buscar', exact: true }).click()
+      expect((await filtered).status()).toBe(200)
+      const card = page.locator('li').filter({
+        has: page.getByRole('heading', { name: f.name, exact: true }),
+      })
+      const add = card.getByRole('button', { name: 'Agregar', exact: true })
+      await expect(add).toBeEnabled()
+      const added = page.waitForResponse(response =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === cartEndpoint + '/items')
+      await add.click()
+      expect((await added).status()).toBe(204)
+
+      const drawer = page.getByRole('dialog', { name: 'Tu carrito' })
+      await expect(drawer).toBeVisible()
+      expect(await page.evaluate(() =>
+        (globalThis as { __fpSpaNavigation?: string }).__fpSpaNavigation,
+      )).toBe('preserved')
+
+      const secondEligibility = page.waitForResponse(response =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === endpoint + '/eligibilidad' &&
+        response.status() === 200)
+      await drawer.getByRole('link', { name: 'Ver carrito completo' }).click()
+      await expect(page).toHaveURL(/\/carrito$/)
+      const secondQuote = await secondEligibility
+      expect((await secondQuote.json()).data).toMatchObject({
+        elegible: false,
+        codigo: 'CREDITO_INSUFICIENTE',
+        totalUSD: '10.00',
+        creditoDisponibleUSD: '5.00',
+      })
+      expect(await page.evaluate(() =>
+        (globalThis as { __fpSpaNavigation?: string }).__fpSpaNavigation,
+      )).toBe('preserved')
+
+      const nextSummary = page.getByRole('region', { name: 'Resumen del carrito' })
+      await expect(nextSummary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+      await expect(nextSummary.getByRole('button', { name: 'Confirmar pedido por transferencia' }))
+        .toBeEnabled()
+      await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      await expect(nextSummary).toContainText(
+        'El crédito disponible no alcanza para confirmar el pedido.',
+      )
+      const recheck = nextSummary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+      await expect(recheck).toBeVisible()
+      await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
+        .toContainText('USD 10.00')
+
+      const beforeRecheck = await sql(database, f)
+      expect(beforeRecheck).toEqual({ ...afterFirst, items: [{ cantidad: 1 }] })
+
+      const rechecked = page.waitForResponse(response =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === endpoint + '/eligibilidad' &&
+        response.status() === 200)
+      await recheck.focus()
+      await page.keyboard.press('Enter')
+      const recheckedResponse = await rechecked
+      expect((await recheckedResponse.json()).data).toMatchObject({
+        elegible: false,
+        totalUSD: '10.00',
+        creditoDisponibleUSD: '5.00',
+      })
+      await expect(nextSummary.getByRole('status').filter({
+        hasText: 'Elegibilidad actualizada.',
+      })).toBeVisible()
+      expect(await sql(database, f)).toEqual(beforeRecheck)
+
+      await page.route('**' + endpoint + '/eligibilidad', route => route.abort('failed'), { times: 1 })
+      const failed = page.waitForEvent('requestfailed', request =>
+        request.method() === 'GET' &&
+        new URL(request.url()).pathname === endpoint + '/eligibilidad')
+      await recheck.focus()
+      await page.keyboard.press('Enter')
+      await failed
+      await expect(nextSummary.getByRole('alert')).toContainText('No pudimos verificar')
+      await expect(nextSummary.getByRole('status').filter({
+        hasText: 'Elegibilidad actualizada.',
+      })).toHaveCount(0)
+      await expect(nextSummary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+      await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      expect(await sql(database, f)).toEqual(beforeRecheck)
+
+      const recovered = page.waitForResponse(response =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname === endpoint + '/eligibilidad' &&
+        response.status() === 200)
+      await recheck.focus()
+      await page.keyboard.press('Enter')
+      expect((await (await recovered).json()).data).toMatchObject({
+        elegible: false,
+        totalUSD: '10.00',
+        creditoDisponibleUSD: '5.00',
+      })
+      await expect(nextSummary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+      await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      expect(await sql(database, f)).toEqual(beforeRecheck)
     })
   })
 }

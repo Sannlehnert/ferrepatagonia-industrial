@@ -1,0 +1,32 @@
+{
+  "kind": "new-diagnostic-with-temporal-mitigation",
+  "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "command": [
+    "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+    "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355\\docs\\355\\tools\\persist-admin.cjs",
+    "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+    "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355\\docs\\355\\evidence\\correction\\persistence-diagnostic",
+    "8000"
+  ],
+  "startedUTC": "2026-11-24T01:08:40.959Z",
+  "finishedUTC": "2026-11-24T01:10:03.706Z",
+  "settleMilliseconds": 8000,
+  "originalTest": "backend/test/catalog-presentation.mariadb.test.cjs",
+  "originalTestSha256": "7878a1e7863f32504d717202837f1bf7e5c90abcd20fbfddd89e7e5a3dc9914e",
+  "applicationChanged": false,
+  "originalExpectationsChanged": false,
+  "timeoutsChanged": false,
+  "node": "v22.22.2",
+  "exitCode": 0,
+  "result": "PASS",
+  "sourceStatusAfter": "",
+  "logPath": "log.txt",
+  "logSha256": "6c7918c7aac1c7faf3ec3a6d49cce2a89b513b20fb55840560d07b6264983358",
+  "artifactSha256": {
+    "admin-persistence.json": "8317002f307a285a933d848d6b83606c9f82b84993e796ee832aa86a03481d66",
+    "cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34",
+    "coverage.csv": "3caa2b1596d6b7dea4567cd712e00c7d60f6fa462aef44df13b83c1ee585ce1a",
+    "coverage.json": "a256d723a3eb2493f36eed68604e359df2adaca5456f3dffde00c06751a1623f",
+    "summary.json": "6f0061870015a13e6194d4294c7758b7fe50d04d90ac2b292ed68483c5ee4134"
+  }
+}

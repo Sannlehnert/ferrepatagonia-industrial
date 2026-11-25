@@ -14,6 +14,9 @@ const clientRoom = (clientId: number) => `orders:client:${clientId}`;
 const adminRoom = 'orders:admin';
 const catalogRoom = 'catalog:authenticated';
 const orderEvent = 'pedido.confirmado.v1';
+const orderStatusEvent = 'pedido.estado.actualizado.v1';
+const receiptEvent = 'comprobante.estado.actualizado.v1';
+const paymentEvent = 'pago.acreditado.v1';
 const maxPendingChanges = 128;
 
 async function visibleProducts(productIds: readonly number[]): Promise<number[]> {
@@ -37,12 +40,20 @@ function claims(req: IncomingMessage) {
 async function authorizeSocket(req: IncomingMessage) {
   const auth = claims(req);
   if (!auth || !await restoreUsuario(auth)) return null;
-  if (auth.rol === 'ADMIN') return { room: adminRoom, canReceiveOrders: false };
+  if (auth.rol === 'ADMIN') {
+    return { room: adminRoom, canReceiveOrders: false, canReceiveTransferOrders: false };
+  }
 
-  const [client] = await dataSource.query<{ clientId: number; canReceiveOrders: number }[]>(`
+  const [client] = await dataSource.query<{
+    clientId: number;
+    canReceiveOrders: number;
+    canReceiveTransferOrders: number;
+  }[]>(`
     SELECT c.id_cliente AS clientId,
            COALESCE(c.tipo_cliente = 'EMPRESA' AND c.estado_aprobacion_empresa = 'APROBADA'
-             AND cc.habilitada = 1, 0) AS canReceiveOrders
+             AND cc.habilitada = 1, 0) AS canReceiveOrders,
+           COALESCE(c.tipo_cliente = 'PARTICULAR'
+             OR (c.tipo_cliente = 'EMPRESA' AND c.estado_aprobacion_empresa = 'APROBADA'), 0) AS canReceiveTransferOrders
     FROM USUARIO u
     JOIN CLIENTE c ON c.id_cliente = u.id_cliente
     LEFT JOIN CUENTA_CORRIENTE cc ON cc.id_cliente = c.id_cliente
@@ -50,7 +61,59 @@ async function authorizeSocket(req: IncomingMessage) {
   `, [auth.id]);
 
   return client && {
-    room: clientRoom(client.clientId), canReceiveOrders: client.canReceiveOrders === 1,
+    room: clientRoom(client.clientId),
+    canReceiveOrders: client.canReceiveOrders === 1,
+    canReceiveTransferOrders: client.canReceiveTransferOrders === 1,
+  };
+}
+
+function lifecycleEvent(
+  change: Extract<CommittedChange, { kind: 'orderStatus' | 'receipt' | 'payment' }>,
+): { name: string; payload: Record<string, unknown> } {
+  if (change.kind === 'orderStatus') {
+    return {
+      name: orderStatusEvent,
+      payload: {
+        version: 1,
+        idEvento: `${orderStatusEvent}:${change.order.pedidoId}:${change.order.estadoNuevo}:${change.order.actualizadoEn}`,
+        pedidoId: change.order.pedidoId,
+        estadoAnterior: change.order.estadoAnterior,
+        estadoNuevo: change.order.estadoNuevo,
+        actualizadoEn: change.order.actualizadoEn,
+      },
+    };
+  }
+
+  if (change.kind === 'receipt') {
+    // Nunca expone binarios ni observaciones/motivos privados de ADMIN en el broadcast.
+    return {
+      name: receiptEvent,
+      payload: {
+        version: 1,
+        idEvento: `${receiptEvent}:${change.receipt.comprobanteId}:${change.receipt.estadoDocumental}`,
+        comprobanteId: change.receipt.comprobanteId,
+        pedidoId: change.receipt.pedidoId,
+        cuentaCorrienteId: change.receipt.cuentaCorrienteId,
+        estadoDocumental: change.receipt.estadoDocumental,
+        actualizadoEn: change.receipt.actualizadoEn,
+      },
+    };
+  }
+
+  // Nunca expone evidencia ni observaciones privadas de ADMIN en el broadcast.
+  return {
+    name: paymentEvent,
+    payload: {
+      version: 1,
+      idEvento: `${paymentEvent}:${change.payment.pagoId}:${change.payment.estadoPago}:${change.payment.actualizadoEn}`,
+      pagoId: change.payment.pagoId,
+      pedidoId: change.payment.pedidoId,
+      cuentaCorrienteId: change.payment.cuentaCorrienteId,
+      estadoPago: change.payment.estadoPago,
+      montoUSD: change.payment.montoUSD,
+      revisionCuenta: change.payment.revisionCuenta,
+      actualizadoEn: change.payment.actualizadoEn,
+    },
   };
 }
 
@@ -85,7 +148,47 @@ export function attachOrderSockets(
   });
   io.on('connection', socket => { void socket.join([socket.data.room, catalogRoom]); });
 
+  async function deliverLifecycle(
+    change: Extract<CommittedChange, { kind: 'orderStatus' | 'receipt' | 'payment' }>,
+  ) {
+    const targetClientRoom = clientRoom(change.clientId);
+    const rooms = io.sockets.adapter.rooms;
+    const recipients = new Set([
+      ...(rooms.get(targetClientRoom) ?? []),
+      ...(rooms.get(adminRoom) ?? []),
+    ]);
+    if (!recipients.size) return;
+
+    const event = lifecycleEvent(change);
+
+    for (const id of recipients) {
+      const socket = io.sockets.sockets.get(id);
+      if (!socket) continue;
+      try {
+        // Re-read current ownership and authorization immediately before sending.
+        const access = await authorizeSocket(socket.request);
+        if (!access || access.room !== socket.data.room || !claims(socket.request)) {
+          socket.disconnect(true);
+          continue;
+        }
+        if (!socket.connected) continue;
+        // Sin filtro canReceiveOrders: clientes PARTICULAR y EMPRESA con cuenta inhabilitada
+        // regularizando deuda reciben actualizaciones de sus propios registros, igual que ADMIN.
+        if (access.room === targetClientRoom || access.room === adminRoom) {
+          socket.emit(event.name, event.payload);
+        }
+      } catch {
+        console.error('No se pudo notificar a una conexión autorizada.');
+      }
+    }
+  }
+
   async function deliver(change: CommittedChange) {
+    if (change.kind === 'orderStatus' || change.kind === 'receipt' || change.kind === 'payment') {
+      await deliverLifecycle(change);
+      return;
+    }
+
     const room = change.kind === 'stock' ? undefined : clientRoom(change.clientId);
     const rooms = io.sockets.adapter.rooms;
     const catalog = change.kind === 'cart' ? undefined : rooms.get(catalogRoom);
@@ -122,7 +225,10 @@ export function attachOrderSockets(
         }
         if (access.room === room) {
           socket.emit('carrito.actualizado.v1', { version: 1 });
-          if (orderPayload && access.canReceiveOrders) socket.emit(orderEvent, orderPayload);
+          const canReceiveOrder = change.kind === 'order' && change.order.modalidadPago === 'TRANSFERENCIA'
+            ? access.canReceiveTransferOrders
+            : access.canReceiveOrders;
+          if (orderPayload && canReceiveOrder) socket.emit(orderEvent, orderPayload);
         }
       } catch {
         console.error('No se pudo notificar a una conexión autorizada.');

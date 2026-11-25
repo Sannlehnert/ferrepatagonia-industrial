@@ -32,21 +32,28 @@ async function main() {
     if (!connection) throw Error('MariaDB desechable no disponible');
     const schema = fs.readFileSync(path.join(backend, '../database/schema.sql'), 'utf8');
     for (const statement of schema.split(';').filter(s => s.trim())) await connection.query(statement);
+    const verificationMigration = fs.readFileSync(
+      path.join(backend, '../database/migrate-fer-17-price-verification.sql'), 'utf8');
+    const applyMigration = statement => execFileSync('docker',
+      ['exec', '-i', container, 'mariadb', '-uroot', `-p${password}`, database],
+      { input: statement, stdio: 'pipe', timeout: 60000 });
+    applyMigration(verificationMigration);
     console.log(JSON.stringify({ database, port, version: await connection.query('SELECT VERSION() AS version'), image: info.Image }));
     const fingerprint = async () => {
-      const tables = await connection.query('SHOW TABLES');
+      const objects = await connection.query(`SELECT TABLE_NAME AS name, TABLE_TYPE AS type
+        FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE()`);
       const definitions = [];
-      for (const row of tables) {
-        const table = Object.values(row)[0];
-        const [ddl] = await connection.query('SHOW CREATE TABLE ' + table);
-        definitions.push(ddl['Create Table'].replace(/AUTO_INCREMENT=\d+ /g, ''));
+      for (const { name, type } of objects) {
+        const identifier = '`' + name.replaceAll('`', '``') + '`';
+        const [ddl] = await connection.query(`SHOW CREATE ${type === 'VIEW' ? 'VIEW' : 'TABLE'} ${identifier}`);
+        definitions.push(type === 'VIEW' ? ddl['Create View'] : ddl['Create Table'].replace(/AUTO_INCREMENT=\d+ /g, ''));
       }
       return require('node:crypto').createHash('sha256').update(definitions.sort().join('\n')).digest('hex');
     };
     const schemaBefore = await fingerprint();
     const tests = process.argv.slice(2).length > 0
       ? process.argv.slice(2)
-      : ['test/adminProduct.test.cjs', 'test/product-image.integration.test.cjs', 'test/catalog.integration.test.cjs', 'test/register.integration.test.cjs', 'test/auth.me.integration.test.cjs', 'test/clientes.integration.test.cjs', 'test/company-approval.test.cjs', 'test/orm.integration.test.cjs', 'test/database-policy.integration.test.cjs', 'test/auth.security.integration.test.cjs', 'test/fer17-data-model.integration.test.cjs', 'test/product-import-rollback.integration.test.cjs'];
+      : ['test/adminProduct.test.cjs', 'test/product-image.integration.test.cjs', 'test/catalog.integration.test.cjs', 'test/register.integration.test.cjs', 'test/auth.me.integration.test.cjs', 'test/clientes.integration.test.cjs', 'test/company-approval.test.cjs', 'test/profile.integration.test.cjs', 'test/profile.regressions.integration.test.cjs', 'test/orm.integration.test.cjs', 'test/database-policy.integration.test.cjs', 'test/auth.security.integration.test.cjs', 'test/fer17-data-model.integration.test.cjs', 'test/product-import-rollback.integration.test.cjs'];
     const result = spawnSync(process.execPath, ['--require', './test/helpers/test-env.cjs', '--test', '--test-concurrency=1', ...tests], {
       cwd: backend, stdio: 'inherit', env: { ...process.env,
         DOTENV_CONFIG_PATH: path.join(backend, 'test/helpers/nonexistent.env'),
@@ -54,6 +61,7 @@ async function main() {
         DB_NAME: database, DB_USER: 'root', DB_PASSWORD: password,
         ADMIN_PRODUCTS_TEST_DATABASE: database, CATALOG_TEST_DATABASE: database,
         REGISTER_TEST_DATABASE: database, AUTH_ME_TEST_DATABASE: database, CLIENTES_TEST_DATABASE: database,
+        PROFILE_TEST_DATABASE: database,
       },
     });
     const schemaAfter = await fingerprint();

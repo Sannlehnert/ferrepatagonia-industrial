@@ -30,6 +30,8 @@ test('#258 distingue fallos transitorios de errores de esquema e integridad', ()
   assert.equal(isAccountSourceUnavailable({ driverError: { code: 'ER_STATEMENT_TIMEOUT' } }), true);
   assert.equal(isAccountSourceUnavailable({ driverError: { errno: 1969 } }), true);
   assert.equal(isAccountSourceUnavailable({ code: 'ECONNREFUSED' }), true);
+  assert.equal(isAccountSourceUnavailable(new Error('No connections available.')), true);
+  assert.equal(isAccountSourceUnavailable(new Error('Queue limit reached.')), true);
   assert.equal(isAccountSourceUnavailable({ driverError: { code: 'ER_NO_SUCH_TABLE' } }), false);
   assert.equal(isAccountSourceUnavailable(new Error('Integridad de imputaciones inválida.')), false);
 });

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 2,
+  "kind": "collector-contract-tests",
+  "productSuitesExecuted": false,
+  "startingCommit": "a1dadcd90d7c0e97b747ca6aa39fe4b9310252b1",
+  "collectorSha256": "8573b1a6981588cf30b80763c5bbf9ed635cf87bd5a6a0228b0073dca06319c3",
+  "testSha256": "fe2cca313920fbee91aa619d8507236100801136f4b72c2d0f6f681f1adf209a",
+  "executionSha": "WORKING_COPY_TOOL_CONTRACT_NOT_PRODUCT",
+  "node": "v22.22.2",
+  "platform": "win32",
+  "startedUTC": "2026-11-24T02:29:35.600Z",
+  "logEncoding": "Raw stdout/stderr buffers in arrival order; explicit collector notes only for blocked/spawn-error records.",
+  "results": [
+    {
+      "name": "collector-contract-tests",
+      "executionSha": "WORKING_COPY_TOOL_CONTRACT_NOT_PRODUCT",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "--test",
+        "--test-concurrency=1",
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355\\docs\\355\\tools\\rerun.test.cjs"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355",
+      "startedUTC": "2026-11-24T02:29:35.606Z",
+      "finishedUTC": "2026-11-24T02:29:36.964Z",
+      "exitCode": 0,
+      "signal": null,
+      "result": "PASS",
+      "passed": 7,
+      "skipped": 0,
+      "failed": 0,
+      "blockedReason": null,
+      "spawnError": null,
+      "logPath": "collector-contract-tests.txt",
+      "logSha256": "ffdec2567e4d77b89f7a6c14c35925afe74f3bbbba6ad49e7ef0a9418b288f09",
+      "bytes": 2249,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    }
+  ],
+  "collectorErrors": [],
+  "finishedUTC": "2026-11-24T02:29:36.965Z",
+  "exitCode": 0,
+  "result": "PASS",
+  "artifactSha256": {},
+  "sourceRevisionNote": "Test source preserved in correction/tool-snapshots/rerun-test-before-cleanup-guard.cjs; superseded by verified run.",
+  "supersededForAcceptanceBy": "../collector-contracts-verified/execution.json"
+}

@@ -9,6 +9,14 @@ for (const width of [1280, 360]) {
       page,
     }) => {
       const state = await mockCart(page)
+      state.transferEligibility = {
+        ...state.transferEligibility,
+        elegible: false,
+        totalUSD: null,
+        codigo: 'CARRITO_NO_DISPONIBLE',
+        mensaje: 'La transferencia no está habilitada para este carrito.',
+        cotizacion: null,
+      }
       await page.goto('/carrito')
 
       const trigger = page.getByRole('button', {
@@ -54,6 +62,11 @@ for (const width of [1280, 360]) {
       await page.keyboard.press('Tab')
       await expect(dialog.getByRole('button', {
         name: 'Volver a consultar elegibilidad',
+      })).toBeFocused()
+
+      await page.keyboard.press('Tab')
+      await expect(dialog.getByRole('button', {
+        name: 'Volver a consultar el total',
       })).toBeFocused()
 
       await page.keyboard.press('Tab')

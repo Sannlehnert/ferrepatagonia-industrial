@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
 import ClientOrderDetail from '@/components/ClientOrderDetail.vue'
+import OrderFinancialStatusBadge from '@/components/OrderFinancialStatusBadge.vue'
+import OrderReceiptActions from '@/components/OrderReceiptActions.vue'
+import OrderReceiptDialog from '@/components/OrderReceiptDialog.vue'
+import { useDeferredRealtimeReconcile } from '@/composables/useDeferredRealtimeReconcile'
+import { useOrderReceiptSummaries } from '@/composables/useOrderReceiptSummaries'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
 import { listClientOrders } from '@/services/clientOrderService'
 import { onRealtime } from '@/services/realtime'
-import { orderReceiptsPath, uploadPaymentReceipt } from '@/services/paymentReceiptService'
 import { useAuthStore } from '@/stores/auth'
 import type { ClientOrderSummary } from '@/types/clientOrder'
+import { normalizeOrderFilter } from '@/utils/accountFilters'
+import {
+  orderPaymentModeLabel,
+  resolveOrderCommercialState,
+} from '@/utils/payment'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -25,32 +35,53 @@ const dateFormat = new Intl.DateTimeFormat('es-AR', {
   timeZone: 'America/Argentina/Buenos_Aires',
 })
 
-function loadOrders() {
-  return load(listClientOrders)
+const argentinaIsoDateFormat = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Argentina/Buenos_Aires',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function loadOrders(keepData = false) {
+  return load(listClientOrders, { keepData })
 }
 
 const expandedOrderId = ref<number | null>(null)
+const receiptOrder = ref<ClientOrderSummary | null>(null)
+const receipts = useOrderReceiptSummaries(() => orders.value)
+const realtimeReconcile = useDeferredRealtimeReconcile({
+  allowed,
+  reconcile: () => {
+    void loadOrders(true)
+  },
+})
+
+function refreshOrderStates() {
+  realtimeReconcile.suppress(800)
+  // loadOrders() actualiza orders.value, lo que dispara useOrderReceiptSummaries secuencialmente sin doble ráfaga.
+  void loadOrders(true)
+}
+
+function closeReceiptDialog() {
+  receiptOrder.value = null
+}
 
 function toggleOrder(orderId: number) {
   expandedOrderId.value = expandedOrderId.value === orderId ? null : orderId
 }
 
-function toggleOrderDetail(orderId: number) {
-  toggleOrder(orderId)
-}
-
-const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 768 : false)
+const isMobile = ref(typeof window !== 'undefined' ? window.innerWidth < 1024 : false)
 
 function updateIsMobile() {
   if (typeof window !== 'undefined') {
-    isMobile.value = window.innerWidth < 768
+    isMobile.value = window.innerWidth < 1024
   }
 }
 
 onMounted(() => {
   updateIsMobile()
   window.addEventListener('resize', updateIsMobile)
-  const mql = window.matchMedia('(max-width: 767px)')
+  const mql = window.matchMedia('(max-width: 1023px)')
   const handler = (e: MediaQueryListEvent) => {
     isMobile.value = e.matches
   }
@@ -62,24 +93,31 @@ onMounted(() => {
 })
 
 watch([identity, allowed], () => {
+  realtimeReconcile.reset()
   expandedOrderId.value = null
+  receiptOrder.value = null
   void loadOrders()
-}, { immediate: true })
+}, { flush: 'sync', immediate: true })
+
+onBeforeUnmount(() => {
+  realtimeReconcile.reset()
+})
 
 onRealtime(change => {
-  if (change.reconnect || change.orders.size > 0) {
-    void load(listClientOrders, { keepData: true })
-  }
+  if (!allowed()) return
+  if (!change.reconnect && change.orders.size === 0 && !change.payments && !change.account) return
+  realtimeReconcile.notify(change.reconnect)
 })
 
 // Filters
 const filtroFecha = ref('')
 const filtroComprobante = ref('')
 const filtroEstado = ref('')
+const filtroFinanciero = ref('')
 const filtroModalidad = ref('')
 
 watch(
-  () => route.query.filtro,
+  () => normalizeOrderFilter(route.query.filtro),
   filtro => {
     if (filtro === 'sin-comprobante') {
       filtroComprobante.value = 'NO_ADJUNTO'
@@ -99,270 +137,150 @@ function limpiarFiltros() {
   filtroFecha.value = ''
   filtroComprobante.value = ''
   filtroEstado.value = ''
+  filtroFinanciero.value = ''
   filtroModalidad.value = ''
-  if (route.query.filtro) {
+  if (route.query.filtro !== undefined) {
     void router.replace({ query: {} })
   }
-}
-
-// Receipt status simulation / tracking
-function getInitialUploadedReceipts(): Set<number> {
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      const raw = window.localStorage.getItem('ferrepatagonia_uploaded_receipts')
-      if (raw) {
-        const arr = JSON.parse(raw)
-        if (Array.isArray(arr)) {
-          return new Set(arr.map(Number).filter(n => Number.isInteger(n) && n > 0))
-        }
-      }
-    }
-  } catch {
-    // Ignore storage errors
-  }
-  return new Set()
-}
-
-const receiptsUploaded = ref(getInitialUploadedReceipts())
-
-function markReceiptUploaded(orderId: number) {
-  receiptsUploaded.value.add(orderId)
-  try {
-    if (typeof window !== 'undefined' && window.localStorage) {
-      window.localStorage.setItem('ferrepatagonia_uploaded_receipts', JSON.stringify([...receiptsUploaded.value]))
-    }
-  } catch {
-    // Ignore storage errors
-  }
-}
-
-onMounted(() => {
-  const handler = (e: Event) => {
-    const custom = e as CustomEvent<{ path: string }>
-    const match = custom.detail?.path?.match(/\/pedidos\/(\d+)\/comprobantes/)
-    if (match) {
-      markReceiptUploaded(Number(match[1]))
-    }
-  }
-  window.addEventListener('ferrepatagonia:receipt-uploaded', handler)
-  onUnmounted(() => {
-    window.removeEventListener('ferrepatagonia:receipt-uploaded', handler)
-  })
-})
-
-function handleReceiptUploaded(orderId: number) {
-  markReceiptUploaded(orderId)
-}
-
-function getReceiptStatus(order: ClientOrderSummary): 'Subido' | 'No adjunto' | 'Aprobado' | 'Rechazado' | '-' {
-  if (order.modalidadPago === 'CUENTA_CORRIENTE') return '-'
-
-  if (receiptsUploaded.value.has(order.pedidoId)) return 'Subido'
-  if (order.estado === 'ENTREGADO' || order.estado === 'CONFIRMADO' || order.estado === 'ENVIADO') return 'Aprobado'
-  if (order.estado === 'CANCELADO' || order.estado === 'RECHAZADO') return 'Rechazado'
-  if (order.estado === 'PENDIENTE') return 'No adjunto'
-  return 'Subido'
 }
 
 const filteredOrders = computed(() => {
   if (!orders.value) return []
   return orders.value.filter(order => {
     if (filtroFecha.value) {
-      const orderDateIso = new Date(order.fecha).toISOString().slice(0, 10)
+      const parsed = new Date(order.fecha)
+      const orderDateIso = Number.isNaN(parsed.getTime()) ? '' : argentinaIsoDateFormat.format(parsed)
       if (orderDateIso !== filtroFecha.value) return false
     }
-    if (filtroEstado.value && order.estado !== filtroEstado.value) {
+    if (filtroEstado.value && resolveOrderCommercialState(order) !== filtroEstado.value) {
+      return false
+    }
+    if (filtroFinanciero.value && (order.estadoFinanciero ?? 'NO_DETERMINABLE') !== filtroFinanciero.value) {
       return false
     }
     if (filtroModalidad.value && order.modalidadPago !== filtroModalidad.value) {
       return false
     }
-    if (filtroComprobante.value) {
-      if (order.modalidadPago === 'CUENTA_CORRIENTE') return false
-      const status = getReceiptStatus(order)
-      if (filtroComprobante.value === 'SUBIDO' && status !== 'Subido') return false
-      if (filtroComprobante.value === 'NO_ADJUNTO' && status !== 'No adjunto') return false
-      if (filtroComprobante.value === 'APROBADO' && status !== 'Aprobado') return false
-      if (filtroComprobante.value === 'RECHAZADO' && status !== 'Rechazado') return false
-    }
+    if (filtroComprobante.value && receipts.status(order) !== filtroComprobante.value) return false
     return true
   })
 })
-
-function getOrderStatusBadgeClasses(status: string) {
-  const s = status.toUpperCase().replaceAll(' ', '_')
-  if (s === 'PENDIENTE') return 'bg-[#FEF3C7] text-[#D97706]'
-  if (s === 'ENVIADO') return 'bg-emerald-50 text-emerald-700'
-  if (s === 'ENTREGADO') return 'bg-[#DCFCE7] text-[#16A34A]'
-  if (s === 'CONFIRMADO') return 'bg-sky-50 text-[#0EA5E9]'
-  if (s === 'CANCELADO' || s === 'RECHAZADO') return 'bg-[#FEE2E2] text-[#DC2626]'
-  return 'bg-slate-100 text-slate-700'
-}
-
-function getReceiptBadgeClasses(status: string) {
-  if (status === 'Aprobado') return 'bg-[#DCFCE7] text-[#16A34A]'
-  if (status === 'Subido') return 'bg-[#FEF3C7] text-[#D97706]'
-  if (status === 'Rechazado') return 'bg-[#FEE2E2] text-[#DC2626]'
-  return 'bg-slate-100 text-slate-600'
-}
-
-// Receipt Modal
-const modalOpen = ref(false)
-const modalTargetOrder = ref<ClientOrderSummary | null>(null)
-const modalFileInput = ref<HTMLInputElement | null>(null)
-const modalFile = shallowRef<File | null>(null)
-const modalBusy = ref(false)
-const modalError = ref('')
-const modalNotice = ref('')
-
-function openReceiptModal(order: ClientOrderSummary) {
-  modalTargetOrder.value = order
-  modalFile.value = null
-  modalError.value = ''
-  modalNotice.value = ''
-  modalOpen.value = true
-}
-
-function closeReceiptModal() {
-  if (modalBusy.value) return
-  modalOpen.value = false
-  modalTargetOrder.value = null
-  modalFile.value = null
-  modalError.value = ''
-  modalNotice.value = ''
-}
-
-function handleModalFileSelect(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0]
-  modalError.value = ''
-  modalNotice.value = ''
-  modalFile.value = file ?? null
-  if (file && (file.size === 0 || file.size > 5 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type))) {
-    modalError.value = 'Seleccioná un PDF, JPG o PNG con contenido y de hasta 5 MB.'
-    modalFile.value = null
-    if (modalFileInput.value) modalFileInput.value.value = ''
-  }
-}
-
-function handleModalDrop(event: DragEvent) {
-  const file = event.dataTransfer?.files?.[0]
-  modalError.value = ''
-  modalNotice.value = ''
-  modalFile.value = file ?? null
-  if (file && (file.size === 0 || file.size > 5 * 1024 * 1024 || !['application/pdf', 'image/jpeg', 'image/png'].includes(file.type))) {
-    modalError.value = 'Seleccioná un PDF, JPG o PNG con contenido y de hasta 5 MB.'
-    modalFile.value = null
-    if (modalFileInput.value) modalFileInput.value.value = ''
-  }
-}
-
-async function submitModalReceipt() {
-  if (!modalFile.value || !modalTargetOrder.value || modalBusy.value) return
-  modalBusy.value = true
-  modalError.value = ''
-  modalNotice.value = ''
-
-  try {
-    const controller = new AbortController()
-    const path = orderReceiptsPath(modalTargetOrder.value.pedidoId)
-    const success = await uploadPaymentReceipt(path, modalFile.value, controller.signal)
-    if (success) {
-      const orderId = modalTargetOrder.value.pedidoId
-      markReceiptUploaded(orderId)
-      modalNotice.value = 'Comprobante recibido. La acreditación del pago se gestiona por separado.'
-      setTimeout(() => {
-        closeReceiptModal()
-        void loadOrders()
-      }, 1200)
-    } else {
-      modalNotice.value = 'Este comprobante ya estaba registrado para la operación.'
-      setTimeout(() => {
-        closeReceiptModal()
-      }, 1200)
-    }
-  } catch {
-    modalError.value = 'No se pudo procesar el comprobante. Reintentá en unos instantes.'
-  } finally {
-    modalBusy.value = false
-  }
-}
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="min-w-0 space-y-6">
     <!-- Section Heading -->
-    <h3 class="m-0 mb-4 text-xl font-bold text-[#0B2438]">Mis pedidos</h3>
+    <div>
+      <h3 class="m-0 mb-1 text-xl font-bold text-[#0B2438]">Mis pedidos</h3>
+      <p class="m-0 text-xs text-slate-600">
+        El estado del pedido, el estado documental del comprobante y el estado financiero del pago se informan por separado.
+      </p>
+    </div>
 
     <!-- Filter Bar -->
-    <div class="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
-      <div class="flex flex-wrap items-center gap-3 min-w-0">
-        <div class="flex items-center gap-2">
+    <div class="box-border max-w-full bg-[#F8FAFC] border border-solid border-[#E2E8F0] rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between shadow-sm mb-6">
+      <div class="flex flex-wrap items-center gap-3 min-w-0 max-w-full">
+        <div class="flex w-full min-w-0 max-w-full flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label for="filtro-fecha" class="text-xs font-semibold text-slate-600">Fecha:</label>
           <input
             id="filtro-fecha"
             v-model="filtroFecha"
             type="date"
             aria-label="Filtrar por fecha"
-            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           />
         </div>
 
-        <div class="flex items-center gap-2">
+        <div class="flex w-full min-w-0 max-w-full flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
           <label for="filtro-comprobante" class="text-xs font-semibold text-slate-600">Comprobante:</label>
           <select
             id="filtro-comprobante"
             v-model="filtroComprobante"
             aria-label="Estado del Comprobante"
-            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Comprobante (Todos)</option>
-            <option value="SUBIDO">Subido</option>
             <option value="NO_ADJUNTO">No adjunto</option>
+            <option value="PENDIENTE">Pendiente de revisión</option>
             <option value="APROBADO">Aprobado</option>
             <option value="RECHAZADO">Rechazado</option>
           </select>
         </div>
 
-        <div class="flex items-center gap-2">
-          <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Estado:</label>
+        <div class="flex w-full min-w-0 max-w-full flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
+          <label for="filtro-estado" class="text-xs font-semibold text-slate-600">Pedido:</label>
           <select
             id="filtro-estado"
             v-model="filtroEstado"
             aria-label="Estado del Pedido"
-            class="bg-white border border-[#CBD5E1] rounded-lg px-3 py-1.5 text-sm min-h-[44px] text-slate-700 focus:outline-none focus:border-[#145A8D]"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:w-auto"
           >
             <option value="">Estado del Pedido (Todos)</option>
-            <option value="PENDIENTE">Pendiente</option>
             <option value="CONFIRMADO">Confirmado</option>
+            <option value="EN_PREPARACION">En preparación</option>
             <option value="ENVIADO">Enviado</option>
             <option value="ENTREGADO">Entregado</option>
-            <option value="CANCELADO">Cancelado</option>
+            <option value="DEMO_REGISTRADO">Registrado (DEMO)</option>
+          </select>
+        </div>
+
+        <div class="flex w-full min-w-0 max-w-full flex-col items-stretch gap-1 sm:w-auto sm:flex-row sm:items-center sm:gap-2">
+          <label for="filtro-financiero" class="text-xs font-semibold text-slate-600">Pago:</label>
+          <select
+            id="filtro-financiero"
+            v-model="filtroFinanciero"
+            aria-label="Estado financiero del pago"
+            class="box-border min-h-[44px] w-full min-w-0 max-w-full cursor-pointer rounded-lg border border-solid border-[#CBD5E1] bg-white px-3 py-1.5 font-[inherit] text-sm text-slate-700 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D] sm:max-w-[260px]"
+          >
+            <option value="">Estado Financiero (Todos)</option>
+            <option value="SIN_PAGO_ACREDITADO">Sin pago acreditado</option>
+            <option value="PAGO_PARCIAL">Pago parcial acreditado</option>
+            <option value="ACREDITADO">Pago acreditado</option>
+            <option value="CARGO_PENDIENTE">Imputado a cuenta corriente — pendiente de cancelación</option>
+            <option value="IMPUTADO_PARCIAL">Cancelado parcialmente en CC</option>
+            <option value="CANCELADO_EN_CC">Cancelado en cuenta corriente</option>
+            <option value="CARGO_ANULADO">Cargo anulado</option>
+            <option value="NO_DETERMINABLE">Estado financiero no determinable</option>
           </select>
         </div>
       </div>
 
       <button
-        v-if="filtroFecha || filtroComprobante || filtroEstado || filtroModalidad"
+        v-if="filtroFecha || filtroComprobante || filtroEstado || filtroFinanciero || filtroModalidad"
         type="button"
-        class="text-xs text-[#145A8D] hover:underline font-semibold min-h-[44px] px-2 py-1 cursor-pointer"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer rounded-lg border-0 bg-transparent px-2 py-1 font-[inherit] text-xs font-semibold text-[#145A8D] hover:underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="limpiarFiltros"
       >
         Limpiar filtros
       </button>
     </div>
 
+    <p v-if="receipts.loading.value" role="status" class="text-sm text-slate-500">
+      Consultando estados de comprobantes…
+    </p>
+    <div v-else-if="orders?.some(order => receipts.status(order) === 'ERROR')" class="space-y-2">
+      <p role="alert" class="text-sm text-red-700">No se pudieron consultar todos los estados de comprobantes.</p>
+      <button
+        type="button"
+        class="box-border min-h-[44px] min-w-[44px] cursor-pointer border-0 bg-transparent px-3 py-1 font-[inherit] text-sm font-semibold text-[#145A8D] underline focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        @click="receipts.refresh()"
+      >
+        Reintentar estados de comprobantes
+      </button>
+    </div>
+
     <!-- Table States & Content -->
     <!-- Loading State -->
-    <div v-if="loading && !orders" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+    <div v-if="loading && !orders" class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
       <p role="status" class="text-slate-500 m-0">Cargando tus pedidos…</p>
     </div>
 
     <!-- Error State -->
-    <div v-else-if="error" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm space-y-3">
+    <div v-else-if="error" class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-8 text-center shadow-sm space-y-3">
       <p role="alert" class="text-red-700 m-0">No se pudieron cargar tus pedidos.</p>
       <button
         type="button"
-        class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] bg-white px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+        class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
         @click="loadOrders()"
       >
         Reintentar
@@ -370,31 +288,38 @@ async function submitModalReceipt() {
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="orders?.length === 0" class="rounded-[10px] border border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
+    <div v-else-if="orders?.length === 0" class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-8 text-center shadow-sm">
       <p role="status" class="text-slate-600 m-0">Todavía no tenés pedidos.</p>
     </div>
 
     <!-- Filter empty message -->
     <p
-      v-else-if="filteredOrders.length === 0"
-      class="rounded-[10px] border border-[#E2E8F0] bg-white p-6 text-center text-slate-500 shadow-sm"
+      v-else-if="filteredOrders.length === 0 && !receipts.loading.value"
+      class="rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-6 text-center text-slate-500 shadow-sm"
     >
       No se encontraron pedidos con los filtros seleccionados.
     </p>
 
     <!-- Content with Orders -->
-    <div v-else class="space-y-6">
-      <!-- Desktop Table (>= 768px) -->
-      <div v-if="!isMobile" class="rounded-[10px] border border-[#E2E8F0] overflow-x-auto bg-white shadow-sm" role="list">
-        <table class="w-full min-w-[640px] border-collapse text-left">
+    <div v-else class="min-w-0 max-w-full space-y-6">
+      <!-- Desktop Table (>= 1024px) -->
+      <div
+        v-if="!isMobile"
+        tabindex="0"
+        aria-label="Tabla de mis pedidos; desplazamiento horizontal disponible"
+        class="max-w-full rounded-[10px] border border-solid border-[#E2E8F0] overflow-x-auto bg-white shadow-sm focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
+        role="list"
+      >
+        <table class="w-full min-w-[760px] border-collapse text-left">
           <thead class="bg-slate-50 border-b border-[#E2E8F0]">
             <tr>
-              <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha</th>
-              <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Monto Total</th>
-              <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Método de Pago</th>
-              <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Pedido</th>
-              <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider">Comprobante</th>
-              <th scope="col" class="py-4 px-6 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right">Detalle</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Fecha</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Monto Total</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Modalidad</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Pedido</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 max-w-[170px] text-xs font-semibold text-slate-600 uppercase tracking-wider">Estado Financiero</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 max-w-[165px] text-xs font-semibold text-slate-600 uppercase tracking-wider">Comprobante</th>
+              <th scope="col" class="py-4 px-2.5 xl:px-3 text-xs font-semibold text-slate-600 uppercase tracking-wider text-right">Detalle</th>
             </tr>
           </thead>
           <tbody
@@ -405,7 +330,7 @@ async function submitModalReceipt() {
           >
             <tr class="hover:bg-slate-50/50 transition-colors">
               <!-- Fecha -->
-              <td class="py-4 px-6 text-sm text-slate-600">
+              <td class="py-4 px-2.5 xl:px-3 text-sm text-slate-600 whitespace-normal">
                 <time :datetime="order.fecha">{{ dateFormat.format(new Date(order.fecha)) }}</time>
                 <h3 role="heading" class="m-0 block text-xs font-bold text-[#0B2438] font-mono">
                   {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
@@ -416,72 +341,50 @@ async function submitModalReceipt() {
               </td>
 
               <!-- Monto Total -->
-              <td class="py-4 px-6 text-sm font-bold text-[#0B2438]">
-                {{ order.total }} {{ order.moneda || 'USD' }}
+              <td class="py-4 px-2.5 xl:px-3 text-sm font-bold text-[#0B2438] whitespace-normal tabular-nums">
+                {{ order.total }} {{ order.moneda ?? '' }}
               </td>
 
               <!-- Método de Pago -->
-              <td class="py-4 px-6 text-sm">
+              <td class="py-4 px-2.5 xl:px-3 text-sm">
                 <span
                   :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                    ? 'text-[#0EA5E9] font-medium'
+                    ? 'text-[#0369A1] font-medium'
                     : 'text-slate-700'"
                 >
-                  {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
+                  {{ orderPaymentModeLabel(order.modalidadPago) }}
                 </span>
               </td>
 
-              <!-- Estado Pedido -->
-              <td class="py-4 px-6 text-sm">
-                <span
-                  class="inline-block rounded-full px-3 py-1 text-xs font-semibold"
-                  :class="getOrderStatusBadgeClasses(order.estado)"
-                >
-                  {{ order.estado.replaceAll('_', ' ') }}
-                </span>
+              <!-- Estado Pedido (Comercial / Logístico) -->
+              <td class="py-4 px-2.5 xl:px-3 text-sm whitespace-nowrap">
+                <AdminOrderStatusBadge :status="resolveOrderCommercialState(order)" />
               </td>
 
-              <!-- Comprobante -->
-              <td class="py-4 px-6 text-sm">
-                <template v-if="order.modalidadPago === 'CUENTA_CORRIENTE'">
-                  <span class="text-slate-400 font-medium">-</span>
-                </template>
-                <template v-else>
-                  <div class="flex items-center gap-2">
-                    <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                    <span
-                      class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                      :class="getReceiptBadgeClasses(getReceiptStatus(order))"
-                    >
-                      {{ getReceiptStatus(order) }}
-                    </span>
-                    <button
-                      type="button"
-                      class="text-[#145A8D] font-semibold underline cursor-pointer text-xs ml-1 hover:text-[#103A5C]"
-                      @click="toggleOrder(order.pedidoId)"
-                    >
-                      ver
-                    </button>
-                    <button
-                      type="button"
-                      class="inline-flex items-center justify-center min-h-[32px] min-w-[32px] text-slate-500 hover:text-[#103A5C] hover:bg-slate-100 rounded-[8px] transition cursor-pointer p-1"
-                      title="Subir o editar comprobante"
-                      aria-label="Subir o editar comprobante"
-                      @click="openReceiptModal(order)"
-                    >
-                      ✏️
-                    </button>
-                  </div>
-                </template>
+              <!-- Estado Financiero -->
+              <td class="py-4 px-2.5 xl:px-3 text-sm max-w-[170px]">
+                <OrderFinancialStatusBadge
+                  :status="order.estadoFinanciero"
+                  :monto-acreditado-usd="order.montoAcreditadoUSD"
+                  compact
+                />
+              </td>
+
+              <!-- Comprobante (Documental) -->
+              <td class="py-4 px-2.5 xl:px-3 text-sm max-w-[165px]">
+                <OrderReceiptActions
+                  :status="receipts.status(order)"
+                  :order-number="order.numero"
+                  @open="receiptOrder = order"
+                  @retry="receipts.refresh()"
+                />
               </td>
 
               <!-- Detalle Action Button -->
-              <td class="py-4 px-6 text-sm text-right">
+              <td class="py-4 px-2.5 xl:px-3 text-sm text-right whitespace-normal">
                 <button
                   type="button"
-                  class="inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+                  class="box-border inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
                   :aria-expanded="expandedOrderId === order.pedidoId"
                   :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
                   @click="toggleOrder(order.pedidoId)"
@@ -493,24 +396,28 @@ async function submitModalReceipt() {
 
             <!-- Expanded Detail Row -->
             <tr v-if="expandedOrderId === order.pedidoId">
-              <td colspan="6" class="p-4 sm:p-6 bg-slate-50/50 border-t border-[#E2E8F0]">
-                <ClientOrderDetail :order-id="order.pedidoId" @receipt-uploaded="handleReceiptUploaded(order.pedidoId)" />
+              <td colspan="7" class="p-4 sm:p-6 bg-slate-50/50 border-t border-[#E2E8F0]">
+                <ClientOrderDetail
+                  :order-id="order.pedidoId"
+                  :show-receipts="receiptOrder?.pedidoId !== order.pedidoId"
+                  @receipt-updated="refreshOrderStates"
+                />
               </td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <!-- Mobile Order Cards (< 768px) -->
+      <!-- Order Cards -->
       <div v-else role="list" class="space-y-4">
         <div
           v-for="order in filteredOrders"
           :key="order.pedidoId"
           role="listitem"
-          class="rounded-[10px] border border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
+          class="min-w-0 rounded-[10px] border border-solid border-[#E2E8F0] bg-white p-4 shadow-sm space-y-3"
         >
-          <div class="flex items-center justify-between gap-2 border-b border-[#E2E8F0] pb-2">
-            <div>
+          <div class="flex flex-wrap items-start justify-between gap-2 border-b border-[#E2E8F0] pb-2">
+            <div class="min-w-0">
               <h3 role="heading" class="m-0 font-bold text-[#0B2438] text-base">
                 {{ order.numero || ('PED-' + String((order as any).idPedido ?? order.pedidoId).padStart(6, '0')) }}
               </h3>
@@ -519,71 +426,50 @@ async function submitModalReceipt() {
                 Pedido simulado académico
               </p>
             </div>
-            <span
-              class="inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold"
-              :class="getOrderStatusBadgeClasses(order.estado)"
-            >
-              {{ order.estado.replaceAll('_', ' ') }}
-            </span>
+            <AdminOrderStatusBadge :status="resolveOrderCommercialState(order)" />
           </div>
 
           <div class="grid grid-cols-2 gap-2 text-sm">
-            <div>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
               <span class="text-xs text-slate-500 block">Monto Total:</span>
-              <span class="font-bold text-[#0B2438] text-base">
-                {{ order.total }} {{ order.moneda || 'USD' }}
+              <span class="font-bold text-[#0B2438] text-base tabular-nums">
+                {{ order.total }} {{ order.moneda ?? '' }}
               </span>
             </div>
-            <div>
-              <span class="text-xs text-slate-500 block">Método de Pago:</span>
+            <div class="min-w-0 [overflow-wrap:anywhere]">
+              <span class="text-xs text-slate-500 block">Modalidad de Pago:</span>
               <span
                 :class="order.modalidadPago === 'CUENTA_CORRIENTE'
-                  ? 'text-[#0EA5E9] font-medium'
+                  ? 'text-[#0369A1] font-medium'
                   : 'text-slate-700'"
               >
-                {{ order.modalidadPago === 'CUENTA_CORRIENTE' ? 'Cuenta Corriente' : order.modalidadPago.replaceAll('_', ' ') }}
+                {{ orderPaymentModeLabel(order.modalidadPago) }}
               </span>
             </div>
           </div>
 
-          <div v-if="order.modalidadPago !== 'CUENTA_CORRIENTE'" class="flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-sm">
-            <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
-              <span
-                class="inline-block rounded-full px-2 py-0.5 text-xs font-medium"
-                :class="getReceiptBadgeClasses(getReceiptStatus(order))"
-              >
-                {{ getReceiptStatus(order) }}
-              </span>
-              <button
-                type="button"
-                class="text-[#145A8D] font-semibold underline cursor-pointer text-xs ml-1 hover:text-[#103A5C]"
-                @click="toggleOrder(order.pedidoId)"
-              >
-                ver
-              </button>
-            </div>
-
-            <button
-              type="button"
-              class="inline-flex items-center justify-center min-h-[44px] min-w-[44px] text-slate-600 hover:text-[#103A5C] hover:bg-slate-100 rounded-[8px] transition cursor-pointer px-2"
-              title="Subir o editar comprobante"
-              aria-label="Subir o editar comprobante"
-              @click="openReceiptModal(order)"
-            >
-              ✏️ Comprobante
-            </button>
+          <div class="space-y-1">
+            <span class="block text-xs font-semibold text-slate-600">Estado financiero:</span>
+            <OrderFinancialStatusBadge
+              :status="order.estadoFinanciero"
+              :monto-acreditado-usd="order.montoAcreditadoUSD"
+              compact
+            />
           </div>
-          <div v-else class="flex items-center justify-between border-t border-[#E2E8F0] pt-2 text-sm text-slate-500">
-            <span class="text-xs">Comprobante:</span>
-            <span class="text-xs font-medium">-</span>
+
+          <div class="space-y-1">
+            <span class="block text-xs font-semibold text-slate-600">Comprobante:</span>
+            <OrderReceiptActions
+              :status="receipts.status(order)"
+              :order-number="order.numero"
+              @open="receiptOrder = order"
+              @retry="receipts.refresh()"
+            />
           </div>
 
           <button
             type="button"
-            class="w-full inline-flex min-h-[44px] min-w-[44px] items-center justify-center rounded-[8px] border border-[#103A5C] px-4 text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-[#145A8D] cursor-pointer"
+            class="box-border w-full inline-flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-[8px] border border-solid border-[#103A5C] bg-white px-4 font-[inherit] text-sm font-semibold text-[#103A5C] hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-offset-2 focus-visible:outline-[#145A8D]"
             :aria-expanded="expandedOrderId === order.pedidoId"
             :aria-label="`${expandedOrderId === order.pedidoId ? 'Ocultar' : 'Ver'} detalle de ${order.numero}`"
             @click="toggleOrder(order.pedidoId)"
@@ -594,78 +480,19 @@ async function submitModalReceipt() {
           <ClientOrderDetail
             v-if="expandedOrderId === order.pedidoId"
             :order-id="order.pedidoId"
-            @receipt-uploaded="handleReceiptUploaded(order.pedidoId)"
+            :show-receipts="receiptOrder?.pedidoId !== order.pedidoId"
+            @receipt-updated="refreshOrderStates"
           />
         </div>
       </div>
     </div>
 
-    <!-- Receipt Upload Modal (Figma Spec) -->
-    <div
-      v-if="modalOpen"
-      class="fixed inset-0 bg-[#0B2438]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      @click.self="closeReceiptModal"
-    >
-      <div class="bg-white rounded-xl shadow-2xl border border-[#E2E8F0] max-w-sm sm:max-w-md w-full p-6 flex flex-col items-center gap-6">
-        <div class="w-full flex items-center justify-between border-b border-[#E2E8F0] pb-3">
-          <h4 class="text-base font-bold text-[#0B2438] m-0">Comprobante · {{ modalTargetOrder?.numero }}</h4>
-          <button
-            type="button"
-            class="min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-slate-600 rounded-[8px] cursor-pointer"
-            aria-label="Cerrar modal"
-            @click="closeReceiptModal"
-          >
-            ✕
-          </button>
-        </div>
-
-        <label
-          class="border-2 border-dashed border-[#CBD5E1] rounded-[10px] p-6 sm:p-8 w-full flex flex-col items-center justify-center gap-3 bg-[#F8FAFC] hover:bg-slate-50 transition cursor-pointer text-center"
-          @dragover.prevent
-          @drop.prevent="handleModalDrop"
-        >
-          <svg class="w-10 h-10 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-          </svg>
-          <span class="text-xs sm:text-sm font-semibold text-slate-700 text-center">
-            Subir Comprobante de Transferencia (Click o arrastrar)
-          </span>
-          <span class="text-xs text-slate-500">
-            {{ modalFile ? modalFile.name : 'PDF, JPG o PNG, hasta 5 MB' }}
-          </span>
-          <input
-            ref="modalFileInput"
-            type="file"
-            aria-label="Archivo (PDF, JPG o PNG, hasta 5 MB)"
-            accept="application/pdf,image/jpeg,image/png,.pdf,.jpg,.jpeg,.png"
-            class="hidden"
-            :disabled="modalBusy"
-            @change="handleModalFileSelect"
-          />
-        </label>
-
-        <p v-if="modalError" role="alert" class="m-0 text-sm font-medium text-[#DC2626]">{{ modalError }}</p>
-        <p v-if="modalNotice" role="status" class="m-0 text-sm font-medium text-[#16A34A]">{{ modalNotice }}</p>
-
-        <div class="flex items-center justify-end gap-3 w-full">
-          <button
-            type="button"
-            class="bg-[#94A3B8] hover:bg-[#64748B] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition cursor-pointer"
-            :disabled="modalBusy"
-            @click="closeReceiptModal"
-          >
-            Cancelar
-          </button>
-          <button
-            type="button"
-            class="bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold rounded-[8px] px-6 py-2 min-h-[44px] min-w-[100px] text-sm transition shadow-sm disabled:opacity-50 cursor-pointer"
-            :disabled="!modalFile || modalBusy"
-            @click="submitModalReceipt"
-          >
-            {{ modalBusy ? 'Subiendo…' : 'Subir' }}
-          </button>
-        </div>
-      </div>
-    </div>
+    <OrderReceiptDialog
+      v-if="receiptOrder"
+      :key="`${identity()}:${receiptOrder.pedidoId}`"
+      :order="receiptOrder"
+      @close="closeReceiptDialog"
+      @updated="refreshOrderStates"
+    />
   </div>
 </template>

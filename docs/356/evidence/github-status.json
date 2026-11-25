@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-11-25T02:55:00Z",
+  "repository": "Sannlehnert/ferrepatagonia-industrial",
+  "open_pull_requests": 0,
+  "pr_167": {
+    "state": "closed",
+    "merged": true,
+    "head": "4ea9dd5388aa3364496c2a6edfd0c43790543d96",
+    "merge_commit": "e46843cfc6ca04b1d0a8bd01e76ded563eabcfa9",
+    "base": "develop"
+  },
+  "ci": {
+    "pr_167": { "run": 45522960344, "sha": "4ea9dd5388aa3364496c2a6edfd0c43790543d96", "conclusion": "success" },
+    "develop_push": { "run": 45528732034, "sha": "e46843cfc6ca04b1d0a8bd01e76ded563eabcfa9", "conclusion": "success" },
+    "main_push": { "run": 43469542261, "sha": "4a1b12d0b32bbb42645eaab2954f5a9606be9e37", "conclusion": "success" }
+  },
+  "branch_protection": "No consultable con API anónima (HTTP 401). No se realizó push ni se eludió ninguna restricción."
+}

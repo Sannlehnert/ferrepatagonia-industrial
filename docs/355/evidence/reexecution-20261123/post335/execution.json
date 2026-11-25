@@ -1,0 +1,297 @@
+{
+  "schemaVersion": 1,
+  "kind": "new-standard-execution",
+  "phase": "post335",
+  "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "historicalEvidenceReplaced": false,
+  "node": "v22.22.2",
+  "npm": "11.9.0",
+  "startedUTC": "2026-11-24T01:02:56.777Z",
+  "sourceStatusBefore": "",
+  "logEncoding": "Raw stdout and stderr buffers, merged in observed arrival order; no postprocessing.",
+  "clockPolicy": "No clock, expectation, timeout or test-source changes. Failures are retained.",
+  "results": [
+    {
+      "name": "install-backend",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "ci",
+        "--prefix",
+        "backend",
+        "--no-fund",
+        "--no-audit"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:02:56.924Z",
+      "finishedUTC": "2026-11-24T01:03:15.046Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "install-backend.txt",
+      "logSha256": "511c116614d87649d46fb398334bd622c5d4dfaa411d08cf1bc6034319f3ee4b",
+      "bytes": 27,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "install-frontend",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "ci",
+        "--prefix",
+        "frontend",
+        "--no-fund",
+        "--no-audit"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:03:15.049Z",
+      "finishedUTC": "2026-11-24T01:03:28.739Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "install-frontend.txt",
+      "logSha256": "0ddf078f3991231f2d59a76eee4cdf3e0397841b8444879440cd6ee331153aeb",
+      "bytes": 27,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "build-backend",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build",
+        "--prefix",
+        "backend"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:03:28.740Z",
+      "finishedUTC": "2026-11-24T01:03:34.545Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "build-backend.txt",
+      "logSha256": "4602d9dca8c249cc001e3f0e53e3361f4fb90638d1654e2ff555be9b958ae76b",
+      "bytes": 45,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "build-frontend",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js",
+        "run",
+        "build",
+        "--prefix",
+        "frontend"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:03:34.546Z",
+      "finishedUTC": "2026-11-24T01:03:45.423Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": null,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "build-frontend.txt",
+      "logSha256": "35d8069cbbef9d04d65a3f571dc15c45790684b06df47a480bb7347e96d1c022",
+      "bytes": 6343,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "account-admin",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-admin-account-mariadb.cjs"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:03:45.424Z",
+      "finishedUTC": "2026-11-24T01:04:05.011Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": 58,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "account-admin.txt",
+      "logSha256": "51c94e1049a88cfb0686afec5e13b01322dda23ba37b04bc1d8d77124721db89",
+      "bytes": 9717,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "payments",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-cuenta-corriente-mariadb.cjs",
+        "payments"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:04:05.013Z",
+      "finishedUTC": "2026-11-24T01:04:18.382Z",
+      "exitCode": 1,
+      "result": "FAIL",
+      "passed": 23,
+      "skipped": 0,
+      "failed": 2,
+      "logPath": "payments.txt",
+      "logSha256": "274fcd6841f90fc26f9295ffcfa5a5da0ac12e421d00ec01039f05b5ec16ff85",
+      "bytes": 8489,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "state-consistency",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-state-consistency-mariadb.cjs"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:04:18.383Z",
+      "finishedUTC": "2026-11-24T01:04:46.176Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": 11,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "state-consistency.txt",
+      "logSha256": "e795d42188f952222896b510795fa057f824730afc03ccecc4d84bb1eabddb13",
+      "bytes": 4606,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "catalog-browser",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-catalog-presentation-browser.cjs"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:04:46.178Z",
+      "finishedUTC": "2026-11-24T01:05:32.687Z",
+      "exitCode": 1,
+      "result": "FAIL",
+      "passed": 0,
+      "skipped": 0,
+      "failed": 1,
+      "logPath": "catalog-browser.txt",
+      "logSha256": "b9cc9f31796985523ff6a8d91fad92e8749085498eed348bcca66e52e23eda87",
+      "bytes": 1503,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "payment-actions",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-e2e.cjs",
+        "--payment-actions"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:05:32.690Z",
+      "finishedUTC": "2026-11-24T01:06:44.527Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": 23,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "payment-actions.txt",
+      "logSha256": "4f7f9e378c401703e3ef37d946c26059f3aa812800e76e01c4da21b23c5b1ab6",
+      "bytes": 4886,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "payments-browser",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-e2e.cjs",
+        "--payments"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:06:44.528Z",
+      "finishedUTC": "2026-11-24T01:07:07.370Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": 3,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "payments-browser.txt",
+      "logSha256": "18ac869327311a1eac0957a988021fe3181deff0941822f850b7d2ed1c52730b",
+      "bytes": 923,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    },
+    {
+      "name": "receipts-browser",
+      "executionSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+      "command": [
+        "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\tools-310\\node.exe",
+        "backend/test/helpers/run-e2e.cjs",
+        "--receipts"
+      ],
+      "cwd": "C:\\Users\\santi\\.codex\\.chatgpt-projects\\g-p-6ad2bb061ed081919f828743ce783346\\correction-355-post335",
+      "environment": {
+        "E2E_PRODUCTION_BUILD": "0"
+      },
+      "startedUTC": "2026-11-24T01:07:07.371Z",
+      "finishedUTC": "2026-11-24T01:07:53.201Z",
+      "exitCode": 0,
+      "result": "PASS",
+      "passed": 10,
+      "skipped": 0,
+      "failed": 0,
+      "logPath": "receipts-browser.txt",
+      "logSha256": "3782ce9b15dd7d0054cc9bd782d2be224409ed0abf1b6f3e0f511014978f4f6e",
+      "bytes": 2030,
+      "authentication": "CAPTURED_NEW_EXECUTION"
+    }
+  ],
+  "finishedUTC": "2026-11-24T01:07:53.202Z",
+  "sourceStatusAfter": "",
+  "result": "FAILURES_RETAINED",
+  "artifactSha256": {
+    "catalog-browser.txt": "b9cc9f31796985523ff6a8d91fad92e8749085498eed348bcca66e52e23eda87",
+    "catalog-cleanup.json": "6a57a050d8b49921cef669c07e8a79684a860e562affb9e9f1185494642bff34"
+  }
+}

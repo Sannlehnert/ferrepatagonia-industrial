@@ -1,0 +1,43 @@
+{
+  "environment": {
+    "node": "22.22.2",
+    "npm": "10.9.7",
+    "docker": "29.9.3",
+    "dockerCompose": "5.7.0",
+    "mariadb": "11.4.13"
+  },
+  "audit": { "backend": "0 vulnerabilidades", "frontend": "0 vulnerabilidades" },
+  "backend": {
+    "typeCheck": "PASS",
+    "build": "PASS",
+    "receiptSource": { "tests": 8, "pass": 8, "fail": 0 },
+    "unit": { "tests": 1423, "pass": 1423, "fail": 0 },
+    "receiptWorkerModes": { "development": 2, "production": 2, "fail": 0 },
+    "dtoSource": { "tests": 4, "pass": 4, "fail": 0 },
+    "integration": { "tapOutputs": 22, "tests": 792, "pass": 792, "fail": 0 },
+    "extraCiSteps": { "tests": 195, "pass": 195, "fail": 0 }
+  },
+  "frontend": {
+    "typeCheck": "PASS",
+    "build": "PASS",
+    "unit": { "tests": 411, "pass": 411, "fail": 0 }
+  },
+  "e2e": {
+    "integrated": { "passed": 401, "skippedByDesign": 4, "failed": 0 },
+    "receipts": { "passed": 11, "failed": 0 },
+    "payments": { "passed": 3, "failed": 0 },
+    "paymentActions": { "passed": 23, "failed": 0 },
+    "fer19": { "passed": 15, "failed": 0 },
+    "currentAccountProduction": { "passed": 3, "failed": 0 },
+    "fer19Production": { "passed": 2, "failed": 0 },
+    "demoCatalogUnit": { "tests": 17, "pass": 17, "fail": 0 },
+    "demoCatalogBrowser": { "passed": 1, "failed": 0 },
+    "catalogPresentationBrowser": { "tests": 1, "pass": 1, "fail": 0 }
+  },
+  "gitDiffCheck": "PASS",
+  "notes": [
+    "La primera corrida E2E falló por bibliotecas faltantes de Chromium en el host (libnspr4, libnss3, libasound2); se reejecutó con LD_LIBRARY_PATH y no se contabilizó el fallo de entorno como prueba aprobada.",
+    "Los 4 E2E omitidos son parte del diseño de la suite; no se declaran aprobados.",
+    "El CI remoto del candidato queda pendiente de publicar la rama."
+  ]
+}

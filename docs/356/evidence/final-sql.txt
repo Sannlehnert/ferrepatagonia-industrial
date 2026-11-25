@@ -1,0 +1,6 @@
+categorias_activas	productos_total	productos_activos	sku_unicos	con_imagen	con_precio	productos_ajenos	evidencias_sinteticas	pedidos	comprobantes
+8	100	100	100	100	100	0	100	3	3
+tablas
+26
+triggers
+13

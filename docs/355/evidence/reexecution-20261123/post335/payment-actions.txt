@@ -1,0 +1,37 @@
+Base E2E preparada: e2e_test_d469ad15314f40b88195985b5ef7f843
+(node:13076) ExperimentalWarning: The MockTimers API is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+Frontend E2E: http://127.0.0.1:49569
+
+Running 23 tests using 1 worker
+
+(node:23900) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok  1 [chromium] › e2e\admin\payments.real.spec.ts:120:3 › Gestión ADMIN de pagos con backend real › lista paginada, detalle y estados separados (3.6s)
+  ok  2 [chromium] › e2e\admin\payments.real.spec.ts:159:3 › Gestión ADMIN de pagos con backend real › muestra el listado vacío y recupera la consulta real (1.6s)
+  ok  3 [chromium] › e2e\admin\payments.real.spec.ts:173:3 › Gestión ADMIN de pagos con backend real › informa el error de consulta y permite reintentar sin datos inventados (1.4s)
+  ok  4 [chromium] › e2e\admin\payments.real.spec.ts:184:3 › Gestión ADMIN de pagos con backend real › aprueba documentación sin generar ningún ABONO (2.0s)
+  ok  5 [chromium] › e2e\admin\payments.real.spec.ts:212:3 › Gestión ADMIN de pagos con backend real › rechaza la documentación con motivo y deja el pago cerrado sin ABONO (1.6s)
+  ok  6 [chromium] › e2e\admin\payments.real.spec.ts:236:3 › Gestión ADMIN de pagos con backend real › acredita un pago USD y registra exactamente un ABONO (1.7s)
+  ok  7 [chromium] › e2e\admin\payments.real.spec.ts:260:3 › Gestión ADMIN de pagos con backend real › acredita un pago ARS con cotización FER17-v1 confirmada por el backend (1.7s)
+  ok  8 [chromium] › e2e\admin\payments.real.spec.ts:286:3 › Gestión ADMIN de pagos con backend real › sin cotización no acredita, informa el error y conserva el pago pendiente (1.5s)
+  ok  9 [chromium] › e2e\admin\payments.real.spec.ts:312:3 › Gestión ADMIN de pagos con backend real › con cotización inválida no acredita y no deja movimientos (1.5s)
+  ok 10 [chromium] › e2e\admin\payments.real.spec.ts:330:3 › Gestión ADMIN de pagos con backend real › bloquea el doble clic y envía una sola acreditación (1.5s)
+  ok 11 [chromium] › e2e\admin\payments.real.spec.ts:348:3 › Gestión ADMIN de pagos con backend real › ante un resultado incierto reconsulta y reintenta con la misma clave (1.6s)
+  ok 12 [chromium] › e2e\admin\payments.real.spec.ts:390:3 › Gestión ADMIN de pagos con backend real › una respuesta perdida se resuelve consultando el estado, sin duplicar ABONOS (1.6s)
+  ok 13 [chromium] › e2e\admin\payments.real.spec.ts:418:3 › Gestión ADMIN de pagos con backend real › no ofrece acciones sobre pagos ya acreditados, rechazados, anulados o sin comprobante (1.2s)
+  ok 14 [chromium] › e2e\admin\payments.real.spec.ts:442:3 › Gestión ADMIN de pagos con backend real › CLIENTE y usuario anónimo no acceden al listado ni a las acciones ADMIN (1.0s)
+  ok 15 [chromium] › e2e\admin\payments.real.spec.ts:467:3 › Gestión ADMIN de pagos con backend real › una sesión ADMIN revocada no puede acreditar y no mueve saldos (1.4s)
+  ok 16 [chromium] › e2e\admin\payments.real.spec.ts:485:3 › Gestión ADMIN de pagos con backend real › descarta respuestas tardías de una sesión ADMIN cerrada (2.2s)
+  ok 17 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 320px › es responsive, accesible por teclado y conserva el foco (4.2s)
+  ok 18 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 360px › es responsive, accesible por teclado y conserva el foco (4.3s)
+  ok 19 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 390px › es responsive, accesible por teclado y conserva el foco (3.9s)
+  ok 20 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 768px › es responsive, accesible por teclado y conserva el foco (4.1s)
+  ok 21 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 1280px › es responsive, accesible por teclado y conserva el foco (4.3s)
+  ok 22 [chromium] › e2e\admin\payments.real.spec.ts:596:5 › Acreditación de pago directo a pedido TRANSFERENCIA a 360px › adapta los mensajes sin anunciar ABONO en cuenta corriente y acredita sin desborde (2.0s)
+  ok 23 [chromium] › e2e\admin\payments.real.spec.ts:596:5 › Acreditación de pago directo a pedido TRANSFERENCIA a 1280px › adapta los mensajes sin anunciar ABONO en cuenta corriente y acredita sin desborde (2.2s)
+
+  23 passed (54.5s)
+10:06:43 [vite] (client) page reload playwright-report/payment-actions/index.html
+10:06:43 [vite] (client) page reload playwright-report/payment-actions/index.html
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.

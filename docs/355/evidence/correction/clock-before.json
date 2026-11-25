@@ -1,0 +1,80 @@
+{
+  "generatedUTC": "2026-11-24T01:07:23.552Z",
+  "node": "v22.22.2",
+  "measurement": "Container date versus host Date.now bracketing the Docker CLI call; bounds include process overhead.",
+  "clocksChanged": false,
+  "samples": [
+    {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "audit355-clock-d3144191-0fbd-4cb7-9a90-b3e3bb1662bb",
+        "--label",
+        "ferrepatagonia.audit355-clock=audit355-clock-d3144191-0fbd-4cb7-9a90-b3e3bb1662bb",
+        "--entrypoint",
+        "date",
+        "mariadb:11.4",
+        "-u",
+        "+%s%3N"
+      ],
+      "rawStdout": "1795482447819\n",
+      "hostBefore": 1795482441121,
+      "hostAfter": 1795482441864,
+      "dockerEpoch": 1795482447819,
+      "offsetMidpointMs": 6326.5,
+      "offsetMinMs": 5955,
+      "offsetMaxMs": 6698,
+      "containerRemoved": true
+    },
+    {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "audit355-clock-c9c9923c-6e84-4243-b979-71cdef353866",
+        "--label",
+        "ferrepatagonia.audit355-clock=audit355-clock-c9c9923c-6e84-4243-b979-71cdef353866",
+        "--entrypoint",
+        "date",
+        "mariadb:11.4",
+        "-u",
+        "+%s%3N"
+      ],
+      "rawStdout": "1795482448533\n",
+      "hostBefore": 1795482441930,
+      "hostAfter": 1795482442728,
+      "dockerEpoch": 1795482448533,
+      "offsetMidpointMs": 6204,
+      "offsetMinMs": 5805,
+      "offsetMaxMs": 6603,
+      "containerRemoved": true
+    },
+    {
+      "command": [
+        "docker",
+        "run",
+        "--rm",
+        "--name",
+        "audit355-clock-5d7c5011-fdb8-468f-8037-7b2f825ffe0f",
+        "--label",
+        "ferrepatagonia.audit355-clock=audit355-clock-5d7c5011-fdb8-468f-8037-7b2f825ffe0f",
+        "--entrypoint",
+        "date",
+        "mariadb:11.4",
+        "-u",
+        "+%s%3N"
+      ],
+      "rawStdout": "1795482449309\n",
+      "hostBefore": 1795482442831,
+      "hostAfter": 1795482443497,
+      "dockerEpoch": 1795482449309,
+      "offsetMidpointMs": 6145,
+      "offsetMinMs": 5812,
+      "offsetMaxMs": 6478,
+      "containerRemoved": true
+    }
+  ]
+}

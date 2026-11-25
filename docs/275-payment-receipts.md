@@ -2,15 +2,20 @@
 
 El comprobante documenta la recepción de una transferencia. La carga y la revisión documental conservan el pedido, el pago, la cuenta corriente, sus movimientos y los saldos. El campo histórico `PAGO.comprobante` sigue siendo una referencia del registro de pago.
 
+**La revisión de este comprobante no acredita dinero.** La declaración de pago, su revisión administrativa y la acreditación financiera autorizada son operaciones distintas de [#333](333/README.md): `POST /api/cuenta-corriente/pagos`, `PATCH /api/admin/pagos/:id/revision` y `POST /api/admin/pagos/:id/acreditar`. Ninguna ruta de comprobantes crea `PAGO`, `ABONO` ni modifica saldos.
+
 ## Operaciones y pantallas
 
 | Perfil | Operación | Pantalla |
 | --- | --- | --- |
 | Particular activo | Pedido propio persistido con modalidad `TRANSFERENCIA`. | **Mi cuenta → Historial de pedidos → Ver detalle → Comprobantes de pago** |
+| Empresa activa | Pedido propio con modalidad `TRANSFERENCIA`. | **Mi cuenta → Historial de pedidos → Ver detalle → Comprobantes de pago** |
 | Empresa activa con cuenta corriente | Transferencia destinada al saldo general o con referencia a un pedido propio `CUENTA_CORRIENTE`. Una cuenta inhabilitada para compras conserva la posibilidad de documentar el pago de deuda. | **Mi cuenta → Cuenta corriente** para saldo general. **Historial de pedidos → Ver detalle** para vincular un pedido. |
 | ADMIN activo | Listado, descarga y revisión documental. La primera revisión registra el usuario y el instante, y los reintentos conservan ambos. | **Administración → Comprobantes de pago** |
 
-El checkout existente confirma compras empresariales por cuenta corriente. Para demostrar el recorrido particular hace falta un pedido `TRANSFERENCIA` persistido por un proceso autorizado. La prueba de navegador usa un pedido de prueba en MariaDB descartable.
+La prueba de navegador de comprobantes usa un pedido de prueba en MariaDB descartable.
+
+El checkout permite crear pedidos por transferencia para clientes particulares y empresas, y ofrece cuenta corriente solo cuando el servidor confirma la elegibilidad. El registro del pedido no acredita ni aprueba el pago; el comprobante queda pendiente de revisión. Los datos bancarios mostrados en la interfaz de demostración son ficticios, no operativos y deben reemplazarse por datos oficiales antes de habilitar pagos reales.
 
 ## API autenticada
 

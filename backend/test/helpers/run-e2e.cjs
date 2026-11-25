@@ -15,10 +15,12 @@ const profile = newProfile('E2E');
 const args = process.argv.slice(2);
 const fer19 = args.includes('--fer19-production') ? 'production' : args.includes('--fer19') ? 'acceptance' : '';
 const receipts = args.includes('--receipts');
+const payments = args.includes('--payments');
 const demoCatalog = args.includes('--demo-catalog');
 const demoInteractive = args.includes('--demo-interactiva');
-const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--demo-catalog', '--demo-interactiva'].includes(arg));
-assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(demoCatalog) <= 1, 'Elegí un único perfil E2E.');
+const paymentActions = args.includes('--payment-actions');
+const testArgs = args.filter(arg => !['--fer19', '--fer19-production', '--receipts', '--payments', '--demo-catalog', '--demo-interactiva', '--payment-actions'].includes(arg));
+assert.ok(Number(Boolean(fer19)) + Number(receipts) + Number(payments) + Number(demoCatalog) + Number(paymentActions) <= 1, 'Elegí un único perfil E2E.');
 assert.ok(!demoInteractive || (demoCatalog && process.stdin.isTTY && testArgs.length === 0),
   'Para la demo interactiva usá --demo-catalog --demo-interactiva en una terminal, sin otros argumentos.');
 
@@ -34,18 +36,46 @@ function startService(file, cwd, env) {
   const child = fork(file, [], {
     cwd,
     env,
-    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+    stdio: ['ignore', 'inherit', 'pipe', 'ipc'],
     windowsHide: true,
   });
 
   services.push(child);
 
   return new Promise((resolve, reject) => {
+    const MAX_STDERR_CHARS = 32_768;
+    let stderrBuffer = '';
+    let settled = false;
+
+    const stderrEnded = new Promise(done => {
+      if (!child.stderr) return done();
+      child.stderr.once('end', done);
+      child.stderr.once('close', done);
+    });
+
+    function onStderrData(chunk) {
+      process.stderr.write(chunk);
+      if (settled) return;
+      stderrBuffer += chunk.toString('utf8');
+      if (stderrBuffer.length > MAX_STDERR_CHARS) {
+        stderrBuffer = stderrBuffer.slice(-MAX_STDERR_CHARS);
+      }
+    }
+
+    child.stderr?.on('data', onStderrData);
+
     const timer = setTimeout(() => {
-      finish(new Error(`Tiempo agotado al iniciar ${path.basename(file)}`));
+      const details = stderrBuffer.trim();
+      finish(new Error(
+        details
+          ? `Tiempo agotado al iniciar ${path.basename(file)}\n${details}`
+          : `Tiempo agotado al iniciar ${path.basename(file)}`,
+      ));
     }, 60_000);
 
     function finish(error, ready) {
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
       child.off('message', onMessage);
       child.off('exit', onExit);
@@ -65,8 +95,15 @@ function startService(file, cwd, env) {
       }
     }
 
-    function onExit() {
-      finish(new Error(`Se cerró ${path.basename(file)} antes de iniciar`));
+    async function onExit(code, signal) {
+      await Promise.race([
+        stderrEnded,
+        new Promise(done => setTimeout(done, 250)),
+      ]);
+      const details = stderrBuffer.trim();
+      const status = signal ? `signal ${signal}` : `code ${code}`;
+      const base = `Se cerró ${path.basename(file)} antes de iniciar (${status})`;
+      finish(new Error(details ? `${base}\n${details}` : base));
     }
 
     function onError(error) {
@@ -125,62 +162,88 @@ async function main() {
   connection = session.connection;
   await prepareDatabase(session, checkInterrupted);
   if (!fer19) await seedFixtures(connection, {
-    includeAccountOrderFixture: receipts || demoCatalog,
-    includeReceiptFixture: receipts,
+    includeAccountOrderFixture: receipts || payments || demoCatalog,
+    includeReceiptFixture: receipts || payments,
     includeCatalogProducts: !demoCatalog,
+    accountOrigin: payments ? 'REAL' : 'DEMO',
   });
-  if (receipts) receiptStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-receipts-e2e-'));
+  // Almacenamiento temporal para los E2E de comprobantes,
+  // pagos, acciones de pago ADMIN, checkout normal y demo interactiva.
+  if (receipts || payments || demoInteractive || paymentActions || (!fer19 && !demoCatalog)) {
+    receiptStorage = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'ferre-receipts-e2e-')
+    );
+  }
   productImageStorage = fs.mkdtempSync(path.join(os.tmpdir(), 'ferre-product-images-e2e-'));
   await connection.end();
   connection = undefined;
   console.log(`Base E2E preparada: ${profile.database}`);
   checkInterrupted();
 
-  // Elegir el origen antes de iniciar la API; strictPort falla si se ocupa.
+  // Elegir y retener el puerto web mientras inicia la API para evitar colisiones con strictPort.
   const candidate = require('node:net').createServer();
   await new Promise((resolve, reject) => {
     candidate.once('error', reject);
     candidate.listen(0, '127.0.0.1', resolve);
   });
   const plannedWebPort = candidate.address().port;
-  await new Promise(resolve => candidate.close(resolve));
-  const apiEnv = {
-    ...process.env,
-    NODE_ENV: 'test',
-    TZ: 'UTC',
-    APP_PUBLIC_ORIGIN: 'http://127.0.0.1:' + plannedWebPort,
-    TRUSTED_PROXY_CIDRS: 'none',
-    HTTPS_TERMINATION: 'trusted-proxy',
-    AUTH_RATE_STORE: 'memory',
-    API_PROCESS_COUNT: '1',
-    AUTH_LOGIN_LIMIT: '100',
-    AUTH_REGISTER_LIMIT: '100',
-    AUTH_LOGIN_WINDOW_MS: '60000',
-    AUTH_REGISTER_WINDOW_MS: '60000',
-    DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
-    E2E_ISOLATED: '1',
-    E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
-    JWT_SECRET: randomUUID(),
-    E2E_FER19: fer19,
-    E2E_RECEIPTS: receipts ? '1' : '',
-    RECEIPT_STORAGE_DIR: receiptStorage ?? '',
-    PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
-    DB_HOST: profile.host,
-    DB_PORT: String(profile.port),
-    DB_NAME: profile.database,
-    DB_USER: 'root',
-    DB_PASSWORD: profile.password,
-    CCE2E_TEST_PROFILE: JSON.stringify(profile),
-    PORT: '3000',
-  };
-
-  const { port: apiPort, adminAccounts, fer19Fixture } = await startService(
-    path.join(__dirname, 'e2e-server.cjs'),
-    backend,
-    apiEnv,
+  const releaseCandidatePort = () => (
+    candidate.listening
+      ? new Promise(resolve => candidate.close(resolve))
+      : Promise.resolve()
   );
 
-  checkInterrupted();
+  const jwtSecret = randomUUID();
+  let apiReady;
+  try {
+    const apiEnv = {
+      ...process.env,
+      NODE_ENV: 'test',
+      TZ: 'UTC',
+      APP_PUBLIC_ORIGIN: 'http://127.0.0.1:' + plannedWebPort,
+      TRUSTED_PROXY_CIDRS: 'none',
+      HTTPS_TERMINATION: 'trusted-proxy',
+      AUTH_RATE_STORE: 'memory',
+      API_PROCESS_COUNT: '1',
+      AUTH_LOGIN_LIMIT: '100',
+      AUTH_REGISTER_LIMIT: '100',
+      AUTH_LOGIN_WINDOW_MS: '60000',
+      AUTH_REGISTER_WINDOW_MS: '60000',
+      DOTENV_CONFIG_PATH: path.join(__dirname, 'nonexistent-e2e.env'),
+      E2E_ISOLATED: '1',
+      E2E_DEMO_CATALOG: demoCatalog ? '1' : '',
+      JWT_SECRET: jwtSecret,
+      E2E_FER19: fer19,
+      E2E_RECEIPTS: receipts ? '1' : '',
+      E2E_PAYMENTS: payments ? '1' : '',
+      E2E_PAYMENT_ACTIONS: paymentActions ? '1' : '',
+      RECEIPT_STORAGE_DIR: receiptStorage ?? '',
+      PRODUCT_IMAGE_STORAGE_DIR: productImageStorage,
+      DB_HOST: profile.host,
+      DB_PORT: String(profile.port),
+      DB_NAME: profile.database,
+      DB_USER: 'root',
+      DB_PASSWORD: profile.password,
+      // En E2E el pool separado usa la credencial descartable del runner. En
+      // producción debe ser un usuario MariaDB dedicado de mínimo privilegio.
+      PRICE_VERIFICATION_DB_USER: 'root',
+      PRICE_VERIFICATION_DB_PASSWORD: profile.password,
+      CCE2E_TEST_PROFILE: JSON.stringify(profile),
+      PORT: '3000',
+    };
+
+    apiReady = await startService(
+      path.join(__dirname, 'e2e-server.cjs'),
+      backend,
+      apiEnv,
+    );
+
+    checkInterrupted();
+  } finally {
+    await releaseCandidatePort();
+  }
+
+  const { port: apiPort, adminAccounts, fer19Fixture, paymentActions: paymentActionsFixture } = apiReady;
 
   const browserEnv = {
     ...process.env,
@@ -192,6 +255,9 @@ async function main() {
     E2E_ADMIN_ACCOUNTS: JSON.stringify(adminAccounts),
     E2E_FER19: fer19,
     E2E_RECEIPTS: receipts ? '1' : '',
+    E2E_PAYMENTS: payments ? '1' : '',
+    E2E_PAYMENT_ACTIONS: paymentActions ? '1' : '',
+    E2E_PAYMENT_ACTIONS_FIXTURE: paymentActionsFixture ? JSON.stringify(paymentActionsFixture) : '',
   };
   if (fer19 === 'production') browserEnv.E2E_PRODUCTION_BUILD = '1';
   else if (fer19) browserEnv.E2E_PRODUCTION_BUILD = '0';
@@ -227,7 +293,7 @@ async function main() {
         ...(fer19 ? {
           FER19_E2E_FIXTURE: JSON.stringify(fer19Fixture),
           FER19_E2E_PROFILE: JSON.stringify(profile),
-          FER19_E2E_CURSOR_KEY: apiEnv.JWT_SECRET,
+          FER19_E2E_CURSOR_KEY: jwtSecret,
         } : { CCE2E_TEST_PROFILE: JSON.stringify(profile) }),
       },
       stdio: 'inherit',
@@ -239,9 +305,16 @@ async function main() {
   });
 
   if (demoInteractive && result === 0 && !interrupted) {
+    const { seedAdminPreviewOrders, seedAdminPreviewReceipts } = require('./admin-preview-orders.cjs');
+    const previewOrders = await seedAdminPreviewOrders(profile);
+    const previewReceipts = await seedAdminPreviewReceipts(profile, receiptStorage);
+    console.log(`Vista previa ADMIN: ${previewOrders} pedidos temporales en cuatro estados operativos.`);
+    console.log(`Comprobantes temporales: ${previewReceipts}, con archivos PDF y distintos estados de revisión.`);
     const { account } = require('./e2e-fixtures.cjs').credentials;
     console.log(`Demo académica local: ${baseURL}\nUsuario de prueba: ${account.email}\nClave de prueba: ${account.password}`);
     console.log('Buscá FP-DEMO-MAN-LLAVE-AJUSTABLE-150-MM. Abrí la ficha en dos sesiones con el mismo usuario de prueba.');
+    const { admin } = require('./e2e-fixtures.cjs').credentials;
+    console.log(`Panel ADMIN: ${baseURL}/admin/dashboard\nEmail: ${admin.email}\nClave de prueba: ${admin.password}`);
     demoPrompt = require('node:readline').createInterface({ input: process.stdin, output: process.stdout });
     await new Promise(resolve => {
       demoPrompt.once('close', resolve);

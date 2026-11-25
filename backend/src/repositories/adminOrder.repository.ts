@@ -8,6 +8,11 @@ import {
     type AdminOrderListFilters,
     type AdminOrderOperationalStatus,
 } from '../dtos/orders/admin-order.dto';
+import {
+    projectOrderStates,
+    type OrderDocumentState,
+    type OrderFinancialState,
+} from '../services/orders/order-state-projection';
 
 export interface AdminOrderClientSummary {
     idCliente: number;
@@ -30,6 +35,10 @@ export interface AdminOrderListItem {
     idPedido: number;
     fecha: string;
     estado: string;
+    estadoPedido: string;
+    estadoDocumental: OrderDocumentState;
+    estadoFinanciero: OrderFinancialState;
+    montoAcreditadoUSD: string | null;
     estadosPermitidos: readonly AdminOrderOperationalStatus[];
     modalidadPago: string;
     moneda: string | null;
@@ -42,6 +51,7 @@ export interface AdminOrderListItem {
     totalUnidades: number;
     cargoCuentaCorrienteId: number | null;
     origen: 'REAL' | 'DEMO';
+    comprobantes: { total: number; pendientesRevision: number };
     cliente: AdminOrderClientSummary;
 }
 
@@ -86,6 +96,16 @@ interface RawOrderRow {
     cantidad_items: number | string;
     total_unidades: number | string;
     id_cargo: number | string | null;
+    cargo_estado: string | null;
+    cargo_monto: string | number | null;
+    cuenta_cobertura: string | null;
+    monto_imputado_vigente: string | number | null;
+    comprobantes_total: number | string;
+    comprobantes_aprobados: number | string;
+    comprobantes_pendientes: number | string;
+    comprobantes_rechazados: number | string;
+    pagos_sin_usd: number | string;
+    total_acreditado_usd: string | number | null;
     id_cliente: number | string;
     tipo_cliente: 'PARTICULAR' | 'EMPRESA';
     nombre_razon_social: string;
@@ -129,17 +149,43 @@ function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
     const estado = String(row.estado);
     const modalidadPago = String(row.modalidad_pago);
     const origen = resolveOrigin(estado, modalidadPago, row.evidencia_total_usd);
+    const moneda = row.moneda_total ? String(row.moneda_total) : null;
+    const total = toMoneyString(row.total);
+    const projection = projectOrderStates(
+        estado,
+        {
+            total: Number(row.comprobantes_total ?? 0),
+            aprobados: Number(row.comprobantes_aprobados ?? 0),
+            pendientes: Number(row.comprobantes_pendientes ?? 0),
+            rechazados: Number(row.comprobantes_rechazados ?? 0),
+        },
+        {
+            modalidadPago,
+            monedaTotal: moneda,
+            total,
+            pagosAcreditadosSinUsd: Number(row.pagos_sin_usd ?? 0),
+            totalAcreditadoUsd: row.total_acreditado_usd,
+            cuentaCobertura: row.cuenta_cobertura,
+            cargoEstado: row.cargo_estado,
+            cargoMonto: row.cargo_monto,
+            montoImputadoVigente: row.monto_imputado_vigente,
+        },
+    );
 
     return {
         idPedido: Number(row.id_pedido),
         fecha: serializeOrderInstant(row.fecha_utc),
         estado,
+        estadoPedido: projection.estadoPedido,
+        estadoDocumental: projection.estadoDocumental,
+        estadoFinanciero: projection.estadoFinanciero,
+        montoAcreditadoUSD: projection.montoAcreditadoUSD,
         estadosPermitidos: origen === 'DEMO' ? [] : getAllowedNextStates(estado, modalidadPago),
         modalidadPago,
-        moneda: row.moneda_total ? String(row.moneda_total) : null,
+        moneda,
         subtotal: toMoneyString(row.subtotal),
         descuento: toMoneyString(row.descuento),
-        total: toMoneyString(row.total),
+        total,
         evidenciaTotalUSD: row.evidencia_total_usd ? String(row.evidencia_total_usd) : null,
         observaciones: row.observaciones ?? null,
         cantidadItems: Number(row.cantidad_items ?? 0),
@@ -148,6 +194,10 @@ function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
             ? Number(row.id_cargo)
             : null,
         origen,
+        comprobantes: {
+            total: Number(row.comprobantes_total ?? 0),
+            pendientesRevision: Number(row.comprobantes_pendientes ?? 0),
+        },
         cliente: {
             idCliente: Number(row.id_cliente),
             tipoCliente: row.tipo_cliente,
@@ -161,6 +211,58 @@ function mapOrderListItem(row: RawOrderRow): AdminOrderListItem {
         },
     };
 }
+
+const ADMIN_ORDER_PROJECTION_COLUMNS = `
+                mcc.estado AS cargo_estado,
+                mcc.monto AS cargo_monto,
+                COALESCE(cc_mov.cobertura, cc_cli.cobertura) AS cuenta_cobertura,
+                COALESCE(imp_stat.monto_imputado_vigente, 0.00) AS monto_imputado_vigente,
+                COALESCE(cp_stat.total, 0) AS comprobantes_total,
+                COALESCE(cp_stat.aprobados, 0) AS comprobantes_aprobados,
+                COALESCE(cp_stat.pendientes, 0) AS comprobantes_pendientes,
+                COALESCE(cp_stat.rechazados, 0) AS comprobantes_rechazados,
+                COALESCE(pago_stat.pagos_sin_usd, 0) AS pagos_sin_usd,
+                COALESCE(pago_stat.total_acreditado_usd, 0.00) AS total_acreditado_usd,
+`;
+
+const ADMIN_ORDER_PROJECTION_JOINS = `
+            LEFT JOIN CUENTA_CORRIENTE cc_mov ON cc_mov.id_cuenta_corriente = mcc.id_cuenta_corriente
+            LEFT JOIN CUENTA_CORRIENTE cc_cli ON cc_cli.id_cliente = p.id_cliente
+            LEFT JOIN (
+                SELECT
+                    id_cargo,
+                    COALESCE(SUM(monto_imputado), 0.00) AS monto_imputado_vigente
+                FROM IMPUTACION_MOVIMIENTO_CUENTA
+                WHERE estado = 'VIGENTE'
+                GROUP BY id_cargo
+            ) imp_stat ON imp_stat.id_cargo = mcc.id_movimiento_cuenta
+            LEFT JOIN (
+                SELECT
+                    r.id_pedido,
+                    r.id_cliente,
+                    COUNT(*) AS total,
+                    SUM(CASE WHEN r.estado_revision = 'APROBADO' THEN 1 ELSE 0 END) AS aprobados,
+                    SUM(CASE WHEN r.estado_revision = 'PENDIENTE' THEN 1 ELSE 0 END) AS pendientes,
+                    SUM(CASE WHEN r.estado_revision = 'RECHAZADO' THEN 1 ELSE 0 END) AS rechazados
+                FROM COMPROBANTE_PAGO r
+                WHERE r.id_pedido IS NOT NULL
+                  AND (r.id_cuenta_corriente IS NULL OR EXISTS (
+                      SELECT 1 FROM CUENTA_CORRIENTE rc
+                      WHERE rc.id_cuenta_corriente = r.id_cuenta_corriente AND rc.id_cliente = r.id_cliente
+                  ))
+                GROUP BY r.id_pedido, r.id_cliente
+            ) cp_stat ON cp_stat.id_pedido = p.id_pedido AND cp_stat.id_cliente = p.id_cliente
+            LEFT JOIN (
+                SELECT
+                    id_pedido,
+                    SUM(CASE WHEN monto_usd IS NULL THEN 1 ELSE 0 END) AS pagos_sin_usd,
+                    COALESCE(SUM(monto_usd), 0.00) AS total_acreditado_usd
+                FROM PAGO
+                WHERE id_pedido IS NOT NULL
+                  AND estado = 'ACREDITADO'
+                GROUP BY id_pedido
+            ) pago_stat ON pago_stat.id_pedido = p.id_pedido
+`;
 
 export async function findAdminOrders(
     filters: AdminOrderListFilters,
@@ -252,6 +354,7 @@ export async function findAdminOrders(
                 COALESCE(agg.cantidad_items, 0) AS cantidad_items,
                 COALESCE(agg.total_unidades, 0) AS total_unidades,
                 COALESCE(cpcc.id_cargo, mcc.id_movimiento_cuenta) AS id_cargo,
+                ${ADMIN_ORDER_PROJECTION_COLUMNS}
                 c.id_cliente,
                 c.tipo_cliente,
                 c.nombre_razon_social,
@@ -273,6 +376,7 @@ export async function findAdminOrders(
             ) agg ON agg.id_pedido = p.id_pedido
             LEFT JOIN CONFIRMACION_PEDIDO_CC cpcc ON cpcc.id_pedido = p.id_pedido
             LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE mcc ON mcc.id_pedido = p.id_pedido AND mcc.tipo_movimiento = 'CARGO'
+            ${ADMIN_ORDER_PROJECTION_JOINS}
             ${whereClause}
             ORDER BY fecha_utc DESC, p.id_pedido DESC
             LIMIT ? OFFSET ?
@@ -313,6 +417,7 @@ export async function findAdminOrderById(
                 0 AS cantidad_items,
                 0 AS total_unidades,
                 COALESCE(cpcc.id_cargo, mcc.id_movimiento_cuenta) AS id_cargo,
+                ${ADMIN_ORDER_PROJECTION_COLUMNS}
                 c.id_cliente,
                 c.tipo_cliente,
                 c.nombre_razon_social,
@@ -328,6 +433,7 @@ export async function findAdminOrderById(
             INNER JOIN CLIENTE c ON c.id_cliente = p.id_cliente
             LEFT JOIN CONFIRMACION_PEDIDO_CC cpcc ON cpcc.id_pedido = p.id_pedido
             LEFT JOIN MOVIMIENTO_CUENTA_CORRIENTE mcc ON mcc.id_pedido = p.id_pedido AND mcc.tipo_movimiento = 'CARGO'
+            ${ADMIN_ORDER_PROJECTION_JOINS}
             WHERE p.id_pedido = ?
             LIMIT 1
         `,
@@ -392,6 +498,7 @@ export async function findAdminOrderById(
 
 export interface LockedOrderStateRow {
     idPedido: number;
+    idCliente: number;
     estado: string;
     modalidadPago: string;
     origen: 'REAL' | 'DEMO';
@@ -402,10 +509,16 @@ export async function lockAdminOrderForStateChange(
     orderId: number,
 ): Promise<LockedOrderStateRow | null> {
     const rows = await manager.query<
-        Array<{ id_pedido: number | string; estado: string; modalidad_pago: string; evidencia_total_usd: string | null }>
+        Array<{
+            id_pedido: number | string;
+            id_cliente: number | string;
+            estado: string;
+            modalidad_pago: string;
+            evidencia_total_usd: string | null;
+        }>
     >(
         `
-            SELECT id_pedido, estado, modalidad_pago, evidencia_total_usd
+            SELECT id_pedido, id_cliente, estado, modalidad_pago, evidencia_total_usd
             FROM PEDIDO
             WHERE id_pedido = ?
             FOR UPDATE
@@ -420,10 +533,28 @@ export async function lockAdminOrderForStateChange(
 
     return {
         idPedido: Number(row.id_pedido),
+        idCliente: Number(row.id_cliente),
         estado: String(row.estado),
         modalidadPago: String(row.modalidad_pago),
         origen: resolveOrigin(row.estado, row.modalidad_pago, row.evidencia_total_usd),
     };
+}
+
+export async function verifyActiveAdminInTransaction(
+    manager: EntityManager,
+    userId: number,
+): Promise<{ activo: boolean; rol: string } | null> {
+    const [row] = await manager.query<Array<{ activo: number | boolean; rol: string }>>(
+        `
+            SELECT activo, rol
+            FROM USUARIO
+            WHERE id_usuario = ?
+            LOCK IN SHARE MODE
+        `,
+        [userId],
+    );
+    if (!row) return null;
+    return { activo: Number(row.activo) === 1, rol: String(row.rol) };
 }
 
 export async function updateAdminOrderStateInTransaction(

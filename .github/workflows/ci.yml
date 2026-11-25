@@ -187,8 +187,18 @@ jobs:
                   node --test data/demo-catalog/generar.test.cjs
                   E2E_PRODUCTION_BUILD=1 node backend/test/helpers/run-e2e.cjs --demo-catalog
 
+            - name: Verify the normal catalog of 100 products, lists and cart
+              working-directory: backend
+              run: npm run test:catalogo-presentacion:browser
+
             - name: Verify private payment receipts in the browser
               run: node backend/test/helpers/run-e2e.cjs --receipts
+
+            - name: Verify company payment declaration in the browser
+              run: node backend/test/helpers/run-e2e.cjs --payments
+
+            - name: Verify admin payment review and accreditation in the browser
+              run: node backend/test/helpers/run-e2e.cjs --payment-actions
 
             - name: Run FER-19 acceptance with the disposable #253 ledger
               run: node backend/test/helpers/run-e2e.cjs --fer19

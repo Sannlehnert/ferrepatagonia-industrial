@@ -25,6 +25,22 @@ const currentItem = computed(() =>
 )
 
 const message = computed(() => {
+  if (props.loading) {
+    return 'Consultando precio…'
+  }
+
+  if (props.error) {
+    return 'No se pudo consultar el precio. Reintentá la consulta.'
+  }
+
+  if (props.line?.estadoPrecio === 'BASE_NO_VERIFICADA') {
+    return 'El precio está pendiente de verificación y no se puede agregar.'
+  }
+
+  if (!precioComprable(props.line)) {
+    return 'Precio no disponible para agregar.'
+  }
+
   if (!auth.isAuthenticated) {
     return 'Iniciá sesión para agregar productos.'
   }
@@ -37,17 +53,9 @@ const message = computed(() => {
     return 'Producto sin stock disponible.'
   }
 
-  if (props.loading) {
-    return 'Consultando precio…'
-  }
-
-  if (props.error || !precioComprable(props.line)) {
-    return 'Precio no disponible para agregar.'
-  }
-
   if (
     cart.loadError ||
-    (cart.needsSync && !cart.loading)
+    cart.stale
   ) {
     return 'Volvé a consultar el carrito antes de agregar.'
   }
@@ -93,7 +101,7 @@ async function add() {
         text-base sm:text-sm font-semibold text-white
         disabled:cursor-not-allowed disabled:bg-slate-400
         focus-visible:outline-2 focus-visible:outline-offset-2
-        focus-visible:outline-[#145a8d] transition-colors"
+        focus-visible:outline-[#145a8d] transition-colors [.contents>&]:self-start"
       :disabled="disabled"
       :aria-describedby="`cart-message-${product.id}`"
       @click="add"
@@ -103,7 +111,7 @@ async function add() {
 
     <p
       :id="`cart-message-${product.id}`"
-      class="mb-0 mt-2 text-xs text-slate-500 empty:hidden"
+      class="mb-0 mt-2 text-xs text-slate-500 empty:hidden [.contents>&]:order-last [.contents>&]:w-full"
     >
       {{ message }}
     </p>

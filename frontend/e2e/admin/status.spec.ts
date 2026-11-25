@@ -32,7 +32,7 @@ test('cancela, desactiva y reactiva un producto con reflejo público', async ({
   });
 
   try {
-    await page.goto('/admin/productos');
+    await page.goto('/admin/productos?busqueda=E2E-02');
     await expect(deactivate).toBeEnabled();
 
     await visitor.goto(`${origin}/catalogo?busqueda=E2E-02`);
@@ -40,11 +40,13 @@ test('cancela, desactiva y reactiva un producto con reflejo público', async ({
 
     // Cancelar la confirmación debe conservar el estado original.
     const cancelled = page.waitForEvent('dialog');
-    const cancelClick = deactivate.click();
+    await deactivate.focus();
+    const cancelClick = page.keyboard.press('Space');
     const cancelDialog = await cancelled;
     const cancelMessage = cancelDialog.message();
     await cancelDialog.dismiss();
     await cancelClick;
+    await expect(deactivate).toBeFocused();
 
     expect(cancelMessage).toContain('Producto E2E 02');
     expect(cancelMessage).toContain('E2E-02');
@@ -63,12 +65,14 @@ test('cancela, desactiva y reactiva un producto con reflejo público', async ({
     );
 
     const confirmation = page.waitForEvent('dialog');
-    const confirmClick = deactivate.click();
+    await deactivate.focus();
+    const confirmClick = page.keyboard.press('Enter');
     const confirmDialog = await confirmation;
     await confirmDialog.accept();
     await confirmClick;
 
     expect((await deactivation).status()).toBe(200);
+    await expect(activate).toBeFocused();
     await expect(activate).toBeEnabled();
 
     await page.reload();
@@ -88,8 +92,10 @@ test('cancela, desactiva y reactiva un producto con reflejo público', async ({
       && response.request().method() === 'PUT',
     );
 
-    await activate.click();
+    await activate.focus();
+    await page.keyboard.press('Space');
     expect((await reactivation).status()).toBe(200);
+    await expect(deactivate).toBeFocused();
     await expect(deactivate).toBeEnabled();
 
     await page.reload();

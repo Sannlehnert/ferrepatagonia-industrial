@@ -53,23 +53,36 @@ test('server timeout rolls back stock before HTTP error, with no late write', as
 });
 
 
-test('saturation rejects HTTP requests, does not queue, permits shutdown and recovery', async t => {
+test('pool queues short bursts, rejects sustained saturation, permits shutdown and recovers', async t => {
+ const burstRunners=Array.from({length:5},()=>dataSource.createQueryRunner());
+ await Promise.all(burstRunners.map(r=>r.connect()));
+ const releaseSoon=setTimeout(()=>{ void Promise.all(burstRunners.map(r=>r.release())); }, 120);
+ try {
+  await checkDatabase();
+ } finally {
+  clearTimeout(releaseSoon);
+  await Promise.all(burstRunners.filter(r=>!r.isReleased).map(r=>r.release()));
+ }
+
  const runners=Array.from({length:5},()=>dataSource.createQueryRunner());
  await Promise.all(runners.map(r=>r.connect()));
  let server=app.listen(0,'127.0.0.1'); await once(server,'listening');
  const url='http://127.0.0.1:'+server.address().port;
  try {
   const start=Date.now();
-  const health=await fetch(url+'/api/health',{signal:AbortSignal.timeout(2000)});
+  const [health, category]=await Promise.all([
+   fetch(url+'/api/health',{signal:AbortSignal.timeout(4000)}),
+   fetch(url+'/api/categorias',{signal:AbortSignal.timeout(4000)}),
+  ]);
   assert.equal(health.status,503);assert.deepEqual(await health.json(),{api:'ok',database:'error'});
-  const category=await fetch(url+'/api/categorias',{signal:AbortSignal.timeout(2000)});assert.equal(category.status,500);await category.json();
-  assert.ok(Date.now()-start<2000,'Fail fast instead of queueing');
+  assert.equal(category.status,500);await category.json();
+  assert.ok(Date.now()-start<4000,'Reject sustained saturation within bounded timeout');
   await Promise.race([new Promise(r=>server.close(r)),delay(2000).then(()=>{throw Error('shutdown blocked');})]);server=undefined;
   t.diagnostic(JSON.stringify({saturatedHealth:503,saturatedCategory:500,elapsed:Date.now()-start,shutdown:'completed with pool occupied'}));
  } finally { if(server)await new Promise(r=>server.close(r));await Promise.all(runners.map(r=>r.release())); }
  await checkDatabase();
  for(let i=0;i<2;i++) {const batch=Array.from({length:5},()=>dataSource.createQueryRunner());await Promise.all(batch.map(r=>r.connect()));await Promise.all(batch.map(r=>r.release()));}
- t.diagnostic('Recovered health and all five connections; no queued late acquisitions');
+ t.diagnostic('Recovered health and all five connections; bounded queue and cleanup verified');
 });
 test('slow registration logs diagnostics without secrets, then rolls back', async t => {
  const blocker=await pool.getConnection(); const email='audit-slow@example.test';

@@ -8,7 +8,7 @@ El sistema está destinado a:
 - **Clientes registrados (`PARTICULAR` y `EMPRESA`):** gestión de carrito persistente y, para empresas aprobadas con cuenta corriente habilitada, confirmación de pedidos a crédito, consulta de saldos/movimientos y envío de comprobantes.
 - **Administradores (`ADMIN`):** gestión de productos, imágenes, importación masiva CSV/XLSX, categorías, listas de precios, aprobación de clientes empresa, seguimiento de pedidos y revisión de comprobantes.
 
-> **Alcance del proyecto:** se trata de un **proyecto académico de desarrollo full stack** (entrega académica de Programación Backend, corte `develop` posterior al PR #105). No constituye un sistema listo para producción ni reemplaza las validaciones comerciales, de infraestructura TLS/proxy o de pruebas manuales integrales pendientes.
+> **Alcance del proyecto:** se trata de un **proyecto académico de desarrollo full stack** desarrollado para la asignatura **Práctica Profesionalizante** (estado vigente sobre `develop`). No constituye un sistema listo para producción ni reemplaza las validaciones comerciales, de infraestructura TLS/proxy o de pruebas manuales integrales pendientes.
 
 ---
 
@@ -19,12 +19,13 @@ El sistema está destinado a:
 3. [Arquitectura](#arquitectura)
 4. [Requisitos de instalación](#requisitos-de-instalación)
 5. [Instalación local paso a paso](#instalación-local-paso-a-paso)
-6. [Variables de entorno](#variables-de-entorno)
-7. [Programación Backend — Requisitos implementados](#programación-backend--requisitos-implementados)
-8. [Pruebas y calidad](#pruebas-y-calidad)
-9. [Estructura del repositorio](#estructura-del-repositorio)
-10. [Equipo](#equipo)
-11. [Documentación adicional](#documentación-adicional)
+6. [Catálogo normal de 100 productos](#catálogo-normal-de-100-productos)
+7. [Variables de entorno](#variables-de-entorno)
+8. [Práctica Profesionalizante — Requisitos técnicos implementados](#práctica-profesionalizante--requisitos-técnicos-implementados)
+9. [Pruebas y calidad](#pruebas-y-calidad)
+10. [Estructura del repositorio](#estructura-del-repositorio)
+11. [Equipo](#equipo)
+12. [Documentación adicional](#documentación-adicional)
 
 ---
 
@@ -38,9 +39,9 @@ Las capacidades listadas a continuación corresponden al código efectivo presen
 | **Clientes particulares y empresas** | Alta con validaciones DTO/reglas específicas para particulares y empresas, panel de cuenta (`/mi-cuenta`), alta/edición administrativa de estados y aprobación o rechazo de empresas (`/api/admin/clientes`). | Algunas rutas del menú autenticado siguen declaradas como accesos en preparación sin ruta asignada; ciertas vistas internas priorizan la operación funcional sobre terminaciones visuales completas. |
 | **Catálogo y categorías** | Catálogo público paginado (`GET /api/catalogo` y detalle `GET /api/catalogo/:id`), filtros de búsqueda y paginación en frontend, listado público de categorías (`GET /api/categorias`) y administración de categorías (`/api/admin/categorias`). | `GET /api/catalogo` devuelve `precio: null` y `estadoPrecio: "PENDIENTE_DEFINICION"`; los importes efectivos se consultan mediante el módulo de precios. En el menú público, el acceso directo a "Categorías" está marcado en desarrollo, mientras el filtrado por categoría funciona desde `/catalogo`. |
 | **Carrito y pedidos** | Carrito autenticado persistido en MariaDB (`/api/carrito`), bloqueo de stock en transacción e historial/detalle de pedidos del cliente (`/api/pedidos`). Confirmación transaccional por cuenta corriente (`/api/pedidos/cuenta-corriente`) con clave de idempotencia UUID v4. | El checkout en línea implementado solo admite pedidos mediante **Cuenta Corriente** para clientes `EMPRESA` aprobados con crédito habilitado y plazo configurado. No existen otros medios de pago online ni checkout directo habilitado para `PARTICULAR`. |
-| **Gestión administrativa** | CRUD de productos (`/api/admin/productos`), actualización puntual de stock, carga/reemplazo de imágenes normalizadas, importación masiva CSV/XLSX (`FER16-v2`) con previsualización y confirmación idempotente, categorías, listas de precios, pedidos (`/api/admin/pedidos`) y revisión de comprobantes (`/api/admin/comprobantes`). | El tablero inicial `/admin` (`AdminDashboardView.vue`) conserva tarjetas con valores estáticos de ejemplo en lugar de métricas agregadas en vivo. |
+| **Gestión administrativa** | CRUD de productos (`/api/admin/productos`), actualización puntual de stock, carga/reemplazo de imágenes normalizadas, importación masiva CSV/XLSX (`FER16-v2`) con previsualización y confirmación idempotente, categorías, listas de precios, pedidos (`/api/admin/pedidos`), revisión de comprobantes (`/api/admin/comprobantes`) y revisión/acreditación de declaraciones de pago (`/api/admin/pagos`). | El tablero inicial `/admin` (`AdminDashboardView.vue`) conserva tarjetas con valores estáticos de ejemplo en lugar de métricas agregadas en vivo. |
 | **Precios y condiciones comerciales** | Cotización pública al 0% (`POST /api/precios`) y privada por lista asignada al cliente (`POST /api/precios/mios`) con soporte USD/ARS, descuentos por volumen y asignación administrativa de listas de precios (`/api/admin/listas-precios`, clientes). | La política comercial definitiva y la habilitación final de listas y monedas permanecen sujetas a validación comercial del cliente. |
-| **Cuenta corriente** | Consulta propia de resumen, límite, saldo USD, movimientos, vencimientos a 30/60 días e imputaciones FIFO (`/api/cuenta-corriente`), y consulta administrativa (`GET`) del listado de cuentas corrientes (`/api/admin/cuentas-corrientes`), resumen de una cuenta (`/api/admin/clientes/:clienteId/cuenta-corriente`), movimientos (`/api/admin/clientes/:clienteId/cuenta-corriente/movimientos`) y vencimientos (`/api/admin/clientes/:clienteId/cuenta-corriente/vencimientos`). Emisión atómica de `CARGO` al confirmar pedidos. | Los endpoints administrativos de cuenta corriente implementados en `backend/src/routes/admin.routes.ts` son solo de consulta (`GET`) y no exponen modificación de cuentas, plazos, límites ni movimientos. Además, cuentas legadas sin trazabilidad histórica acreditada informan saldo/disponible en `null`, impidiendo confirmar nuevas compras a crédito hasta su conciliación administrativa. |
+| **Cuenta corriente** | Consulta propia de resumen, límite, saldo USD, movimientos, vencimientos a 30/60 días e imputaciones FIFO (`/api/cuenta-corriente`), declaración de pagos con comprobante e idempotencia (`/api/cuenta-corriente/pagos`), y consulta administrativa del listado de cuentas corrientes (`/api/admin/cuentas-corrientes`), resumen de una cuenta (`/api/admin/clientes/:clienteId/cuenta-corriente`), movimientos (`/api/admin/clientes/:clienteId/cuenta-corriente/movimientos`) y vencimientos (`/api/admin/clientes/:clienteId/cuenta-corriente/vencimientos`). Revisión documental y acreditación financiera separadas en `/api/admin/pagos`. Emisión atómica de `CARGO` al confirmar pedidos. | Los endpoints administrativos de cuenta corriente implementados en `backend/src/routes/admin.routes.ts` son de consulta (`GET`) salvo la revisión y acreditación de pagos. No exponen modificación de cuentas, plazos, límites ni movimientos. Además, cuentas legadas sin trazabilidad histórica acreditada informan saldo/disponible en `null`, impidiendo confirmar nuevas compras a crédito hasta su conciliación administrativa. |
 | **Archivos y comprobantes** | Subida de planillas CSV/XLSX (`uploadCatalogFile` con Multer), subida y normalización WebP de fotos de producto (`uploadProductImage` con Multer y `sharp`), y carga, consulta y revisión documental de comprobantes de pago (`/api/cuenta-corriente/comprobantes`, `/api/admin/comprobantes`, sin acreditación automática ni modificación de saldos) procesados vía `express.raw` + Worker Threads. | Si faltan `PRODUCT_IMAGE_STORAGE_DIR` o `RECEIPT_STORAGE_DIR`, el servidor arranca, pero esas rutas devuelven HTTP `503`. Para `IMPORT_STORAGE_DIR`, si se omite se usa un directorio temporal del sistema operativo (no persistente ante limpiezas o reinicios), y si se configura una ruta inválida o no escribible responde HTTP `503`. |
 | **Actualizaciones en tiempo real** | Servidor Socket.IO autenticado con JWT por cookie y verificación de origen/transporte. Emite `stock.actualizado.v1` a `catalog:authenticated`, y `carrito.actualizado.v1` / `pedido.confirmado.v1` a `orders:client:<id>`. | La sala `orders:admin` se asigna al conectar un `ADMIN`, pero permanece reservada y actualmente **no emite eventos hacia administradores**. |
 
@@ -91,7 +92,7 @@ El sistema sigue una arquitectura cliente-servidor desacoplada:
 - **API REST y WebSockets (`backend/`):** un único servidor HTTP Node/Express ([http-server.ts](backend/src/http-server.ts)) expone los endpoints `/api/*` y monta Socket.IO (`attachOrderSockets`).
 - **Configuración fail-fast con Joi:** al arrancar ([server.ts](backend/src/server.ts)), `env.config.ts` valida variables críticas y reglas HTTP/proxy antes de inicializar MariaDB o abrir el puerto HTTP.
 - **Seguridad basada en cookies:** el inicio de sesión emite la cookie `HttpOnly` `jwt_token`; Passport JWT valida firma, expiración, estado activo y rol vigente en MariaDB. Los middlewares HTTP validan `Origin`/`Referer`/Fetch Metadata y límites de tasa antes de los controladores privados.
-- **Persistencia mixta sobre MariaDB:** `ControlledDataSource` (TypeORM con `mysql2`) mapea 11 `EntitySchema` activos y convive con consultas SQL parametrizadas y un pool `mariadb` dedicado para lectura consistente de catálogo (`catalog-snapshot.config.ts`). El esquema SQL ([database/schema.sql](database/schema.sql) junto con los triggers FER-20 de [database/migrate-fer-20-account-movements.sql](database/migrate-fer-20-account-movements.sql)) es la fuente autoritativa; `synchronize`, `dropSchema` y `migrationsRun` están deshabilitados.
+- **Persistencia mixta sobre MariaDB:** `ControlledDataSource` (TypeORM con `mysql2`) mapea 11 `EntitySchema` activos y convive con consultas SQL parametrizadas, un pool `mariadb` dedicado para lectura consistente de catálogo (`catalog-snapshot.config.ts`) y un pool específico de privilegios mínimos para verificación de precios (`price-verification.config.ts`). El esquema SQL ([database/schema.sql](database/schema.sql) junto con las 6 migraciones documentadas en [database/README.md](database/README.md)) es la fuente autoritativa; `synchronize`, `dropSchema` y `migrationsRun` están deshabilitados.
 - **Almacenamiento en disco y tiempo real:** fotos de productos, comprobantes privados y archivos JSON de seguimiento de importaciones CSV/XLSX se guardan en directorios del filesystem definidos por variables de entorno; tras confirmar transacciones críticas en MariaDB, el servidor publica eventos Socket.IO post-commit.
 
 ```mermaid
@@ -117,98 +118,391 @@ flowchart LR
 
 ## Instalación local paso a paso
 
-> **Importante sobre Docker Compose:** [`compose.yml`](compose.yml) **únicamente** levanta el contenedor de **MariaDB 11.4** en `127.0.0.1:3307`. **No** levanta automáticamente el backend ni el frontend, y **no** ejecuta automáticamente los scripts de esquema ni de datos de prueba (`database/` se monta solo lectura en `/scripts`).
+Esta es la instalación normal recomendada. Parte de una base **vacía** y termina
+con las **ocho categorías**, los **100 SKU** del catálogo maestro, sus imágenes y
+las referencias de precio publicadas por un ADMIN autorizado. **No** carga
+`seed.sql` ni la demo de 904 productos: esos fixtures son incompatibles con el
+importador del catálogo maestro.
 
-1. **Clonar el repositorio:**
+> **Docker Compose:** [`compose.yml`](compose.yml) solo levanta **MariaDB 11.4**
+> en `127.0.0.1:3307`. No inicia backend, frontend ni ejecuta scripts SQL.
+> `database/` se monta como `/scripts` de solo lectura.
 
-   ```bash
-   git clone https://github.com/Sannlehnert/ferrepatagonia-industrial.git
-   cd ferrepatagonia-industrial
-   ```
+> **Segunda instalación simultánea en el mismo equipo:** usar un checkout
+> separado, un nombre de proyecto Compose y un puerto libres. Por ejemplo,
+> establecer `COMPOSE_PROJECT_NAME=ferrepatagonia-otra`, cambiar **solo en la
+> copia** el puerto de `127.0.0.1:3307:3306` a `127.0.0.1:3318:3306`, y usar
+> `DB_PORT=3318` en el `.env` de esa copia. Mantener esos valores durante todo
+> el procedimiento, incluido el reinicio, y usar directorios de archivos propios.
 
-2. **Instalar dependencias de backend y frontend:**
+### 1. Requisitos previos
 
-   ```bash
-   cd backend && npm ci && cd ..
-   cd frontend && npm ci && cd ..
-   ```
+- **Git**.
+- **Node.js `22.22.2` + npm `10.9.7`** (versión exacta usada por el equipo y por
+  GitHub Actions). Comprobar con `node --version` y `npm --version`.
+  - `backend` declara `"engines": { "node": ">=22" }`; `frontend` declara
+    `^22.18.0 || >=24.12.0` por sus dependencias de Vite/Playwright. La
+    referencia `22.22.2` evita incompatibilidades entre ambos paquetes.
+- **Docker** con contenedores Linux y **Docker Compose v2**. En Linux, el
+  usuario debe poder ejecutar Docker.
+- **MariaDB 11.4** se obtiene desde la imagen de `compose.yml`; no hace falta
+  instalar MariaDB en el host.
+- Puertos libres en loopback: `3307` (MariaDB), `3000` (API) y `5173` (web en
+  desarrollo). Para una segunda instalación, elegir otros.
 
-3. **Levantar MariaDB con Docker Compose (desde la raíz):**
+### 2. Clonar el repositorio e instalar dependencias
 
-   ```bash
-   docker compose up -d --wait --wait-timeout 180 mariadb
-   ```
+```bash
+git clone https://github.com/Sannlehnert/ferrepatagonia-industrial.git
+cd ferrepatagonia-industrial
+git switch develop
+git pull --ff-only origin develop
+npm ci --prefix backend
+npm ci --prefix frontend
+```
 
-4. **Crear `backend/.env` desde la plantilla de desarrollo:**
+`npm ci` instala exactamente `package-lock.json`; no sustituirlo por `npm install`
+para la validación de release.
 
-   - En **Bash (Linux/macOS):**
+### 3. Configurar `backend/.env`
 
-     ```bash
-     cp backend/.env.example backend/.env
-     ```
+```bash
+cp backend/.env.example backend/.env
+node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+```
 
-   - En **PowerShell (Windows):**
+Editar `backend/.env`:
 
-     ```powershell
-     Copy-Item backend\.env.example backend\.env
-     ```
+- pegar el valor generado en `JWT_SECRET` (nunca vacío ni versionado);
+- mantener `DB_HOST=127.0.0.1`, `DB_PORT=3307`, `DB_NAME=ferrepatagonia_dev`,
+  `DB_USER=ferrepatagonia` y `DB_PASSWORD=ferrepatagonia_dev_only` para el
+  Compose local;
+- usar `NODE_ENV=development` y `APP_PUBLIC_ORIGIN=http://127.0.0.1:5173`.
+  Para una segunda instalación, ajustar `DB_PORT` y el origen.
 
-5. **Generar un `JWT_SECRET` local y colocarlo en `backend/.env`:**
+No copiar `backend/.env` a un repositorio ni reutilizar estos valores fuera de
+desarrollo local.
 
-   ```bash
-   node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
-   ```
+### 4. Crear los directorios persistentes
 
-   Pegar el resultado en `JWT_SECRET=<valor-generado>` dentro de `backend/.env` (nunca dejar vacío ni versionar `.env`).
+Las fotos, los comprobantes privados y el estado de importaciones deben vivir
+**fuera del checkout**, en tres directorios separados y sin relaciones de
+contención. Agregar a `backend/.env` rutas absolutas, por ejemplo:
 
-6. **Inicializar esquema, triggers FER-20 y datos de prueba (solo sobre una base nueva/vacía):**
+```dotenv
+PRODUCT_IMAGE_STORAGE_DIR=/home/<usuario>/ferrepatagonia-datos/fotos-productos
+RECEIPT_STORAGE_DIR=/home/<usuario>/ferrepatagonia-datos/comprobantes
+IMPORT_STORAGE_DIR=/home/<usuario>/ferrepatagonia-datos/importaciones
+```
 
-   > `database/schema.sql` crea las **21 tablas** base, pero **no incluye los 3 triggers FER-20** de cuenta corriente e imputaciones (`fer260_cuenta_revision`, `fer260_imputacion_insert`, `fer260_imputacion_update`). Toda instalación desde cero debe aplicar `database/migrate-fer-20-account-movements.sql` inmediatamente después de `schema.sql` (y antes de cargar datos o arrancar el backend). No ejecutar `schema.sql` ni `seed.sql` sobre una base persistente que ya contenga tablas o datos. Para detalle operativo y reset controlado, consultar [database/README.md](database/README.md).
+Validar y crear con el mecanismo existente:
 
-   ```bash
-   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
-   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-20-account-movements.sql'
-   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/seed.sql'
-   docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/verify-seed.sql'
-   ```
+```bash
+cd backend
+node scripts/prepare-local-storage.cjs
+node scripts/prepare-local-storage.cjs --apply
+cd ..
+```
 
-   `verify-seed.sql` debe mostrar `PASS: conteos, relaciones, importes y destinos de pago` (pero no comprueba la existencia de los triggers). Verificar explícitamente mediante SQL las **21 tablas** y los **3 triggers FER-20**:
+En Windows usar rutas como `C:\Datos\ferrepatagonia\...`. El script crea con
+permisos restrictivos, rechaza symlinks y no relaja permisos preexistentes.
+Mantener estos directorios y el volumen de MariaDB en la estrategia de respaldo.
 
-   ```bash
-   docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE(); SELECT TRIGGER_NAME, EVENT_MANIPULATION, ACTION_TIMING, EVENT_OBJECT_TABLE FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE() ORDER BY TRIGGER_NAME;"
-   ```
+### 5. Iniciar MariaDB
 
-   La salida debe informar `21` tablas y exactamente los triggers `fer260_cuenta_revision`, `fer260_imputacion_insert` y `fer260_imputacion_update`. *(En una base limpia sin fixtures de desarrollo, omitir `seed.sql` y `verify-seed.sql`, manteniendo `schema.sql`, `migrate-fer-20-account-movements.sql` y esta comprobación SQL.)*
+```bash
+docker compose config
+docker compose up -d --wait --wait-timeout 180 mariadb
+docker compose ps
+```
 
-7. **Arrancar el backend (en una terminal desde `backend/`):**
+Esperar `healthy`. Si falla, revisar `docker compose logs --tail=100 mariadb`
+antes de continuar.
 
-   ```bash
-   cd backend
-   npm run dev
-   ```
+### 6. Crear el esquema y aplicar las seis migraciones
 
-   Escucha por defecto en `http://localhost:3000`.
+Ejecutar **una sola vez** sobre una base vacía, en este orden. Si un comando
+falla, detenerse y revisar el error; no continuar ni repetir `schema.sql`.
 
-8. **Arrancar el frontend (en otra terminal desde `frontend/`):**
+```bash
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/schema.sql'
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-20-account-movements.sql'
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-fer-17-price-verification.sql'
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-09-1-credit-workflow.sql'
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-06-1-transfer-order-confirmation.sql'
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-04-2-state-consistency.sql'
+docker compose exec -T mariadb sh -c 'mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev < /scripts/migrate-s7-10-2-payment-accreditation.sql'
+```
 
-   ```bash
-   cd frontend
-   npm run dev
-   ```
+`schema.sql` crea las **26 tablas** base. Las migraciones agregan las tablas de
+crédito, la auditoría FER-17, los **13 triggers** y la vista
+`FER17_AUDITORIA_TRIGGERS`. Verificar explícitamente:
 
-   Escucha por defecto en `http://localhost:5173`.
+```bash
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT COUNT(*) AS tablas FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'; SELECT COUNT(*) AS triggers FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = DATABASE(); SELECT TABLE_NAME FROM information_schema.VIEWS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'FER17_AUDITORIA_TRIGGERS';"
+```
 
-9. **Verificar el API y abrir la aplicación web:**
+Resultado esperado: `26` tablas, `13` triggers y la vista
+`FER17_AUDITORIA_TRIGGERS`. **No ejecutar `seed.sql` en esta instalación.**
+Los fixtures de desarrollo se describen al final de esta sección.
 
-   - Consultar salud del backend:
+### 7. Crear los usuarios locales y el ADMIN inicial
 
-     ```bash
-     curl -i http://localhost:3000/api/health
-     ```
+El registro público crea clientes, nunca administradores. El bootstrap
+autorizado para desarrollo local crea un `ADMIN`, un particular y dos empresas
+de prueba, con contraseñas aleatorias guardadas **fuera del repositorio**:
 
-     Respuesta esperada: HTTP `200` con `{"api":"ok","database":"ok"}`.
+```bash
+cd backend
+export FERREPATAGONIA_LOCAL_DIR="$HOME/.ferrepatagonia-local"
+node scripts/prepare-local-users.cjs
+node scripts/prepare-local-users.cjs --apply
+cd ..
+```
 
-   - Abrir en el navegador `http://localhost:5173`.
+El script exige `NODE_ENV=development`, verifica las 26 tablas, los 13 triggers
+y la vista FER-17 antes de escribir, y no modifica usuarios existentes. Las
+credenciales quedan en
+`$FERREPATAGONIA_LOCAL_DIR/test-users-ferrepatagonia_dev.json` con permisos
+privados. No imprimir ni versionar ese archivo. Exportar solo lo necesario para
+la carga de imágenes:
+
+```bash
+export DEMO_ADMIN_EMAIL="$(node -p "require(process.env.FERREPATAGONIA_LOCAL_DIR + '/test-users-ferrepatagonia_dev.json').accounts.admin.email")"
+export DEMO_ADMIN_PASSWORD="$(node -p "require(process.env.FERREPATAGONIA_LOCAL_DIR + '/test-users-ferrepatagonia_dev.json').accounts.admin.password")"
+export ADMIN_ID="$(node -p "require(process.env.FERREPATAGONIA_LOCAL_DIR + '/test-users-ferrepatagonia_dev.json').accounts.admin.id_usuario")"
+```
+
+En PowerShell:
+
+```powershell
+$env:FERREPATAGONIA_LOCAL_DIR = "$HOME\.ferrepatagonia-local"
+cd backend
+node scripts/prepare-local-users.cjs
+node scripts/prepare-local-users.cjs --apply
+cd ..
+$cred = Get-Content "$env:FERREPATAGONIA_LOCAL_DIR\test-users-ferrepatagonia_dev.json" | ConvertFrom-Json
+$env:DEMO_ADMIN_EMAIL = $cred.accounts.admin.email
+$env:DEMO_ADMIN_PASSWORD = $cred.accounts.admin.password
+$env:ADMIN_ID = $cred.accounts.admin.id_usuario
+```
+
+### 8. Crear el usuario verificador de precios
+
+Crear una credencial MariaDB exclusiva con privilegios mínimos y guardarla
+únicamente en `backend/.env`:
+
+```bash
+PRICE_VERIFICATION_PASSWORD="$(node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))")"
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uroot -proot_dev_only ferrepatagonia_dev -e "CREATE USER IF NOT EXISTS 'ferre_precio_verificador'@'%' IDENTIFIED BY '${PRICE_VERIFICATION_PASSWORD}'; GRANT SELECT ON ferrepatagonia_dev.PRODUCTO TO 'ferre_precio_verificador'@'%'; GRANT SELECT ON ferrepatagonia_dev.USUARIO TO 'ferre_precio_verificador'@'%'; GRANT SELECT, INSERT, UPDATE ON ferrepatagonia_dev.PRECIO_USD_EVIDENCIA TO 'ferre_precio_verificador'@'%'; GRANT SELECT, INSERT ON ferrepatagonia_dev.FER17_PRECIO_EVENTO TO 'ferre_precio_verificador'@'%'; GRANT SELECT ON ferrepatagonia_dev.FER17_AUDITORIA_TRIGGERS TO 'ferre_precio_verificador'@'%'; FLUSH PRIVILEGES;"
+cat >> backend/.env <<EOF
+PRICE_VERIFICATION_DB_USER=ferre_precio_verificador
+PRICE_VERIFICATION_DB_PASSWORD=$PRICE_VERIFICATION_PASSWORD
+EOF
+```
+
+El usuario `root` y su clave `root_dev_only` son exclusivos del Compose local y
+públicos en este repositorio; no se reutilizan fuera de desarrollo. La credencial
+operativa `ferrepatagonia` no tiene privilegio `CREATE USER`, por eso este paso
+usa `root` solo para crear el verificador y otorgar permisos mínimos.
+
+No volver a ejecutar el `cat >>` en una instalación existente: duplicaría las
+variables. Si se omiten ambas, la API arranca pero la verificación administrativa
+de precios responde HTTP `503`. La contraseña no debe imprimirse ni compartirse.
+
+### 9. Crear las ocho categorías del catálogo maestro
+
+El importador **no crea categorías**. Crear exactamente estas ocho categorías
+activas una sola vez, antes de importar:
+
+```bash
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "INSERT INTO CATEGORIA (nombre, descripcion, activo) VALUES ('Construcción y consumibles', 'Catálogo académico de referencia', 1), ('Electricidad e iluminación', 'Catálogo académico de referencia', 1), ('Fijaciones', 'Catálogo académico de referencia', 1), ('Herramientas', 'Catálogo académico de referencia', 1), ('Neumática', 'Catálogo académico de referencia', 1), ('Protección personal', 'Catálogo académico de referencia', 1), ('Ropa y calzado de trabajo', 'Catálogo académico de referencia', 1), ('Señalización y balizamiento', 'Catálogo académico de referencia', 1);"
+```
+
+Los nombres deben coincidir exactamente, estar activos y no estar duplicados.
+El detalle del contrato está en
+[`docs/312/carga-catalogo-maestro.md`](docs/312/carga-catalogo-maestro.md).
+
+### 10. Importar los 100 SKU del catálogo maestro
+
+Desde `backend/`, con el `.env` cargado:
+
+```bash
+cd backend
+npm run build
+npm run catalogo:importar-maestro -- --confirmar-destino 127.0.0.1:3307/ferrepatagonia_dev
+cd ..
+```
+
+El comando valida el destino y la guarda anti-demo, exige las ocho categorías y
+la auditoría FER-17 completa, y crea los 100 productos **inactivos** con su
+`precio_referencia_usd`. No publica precios ni asocia imágenes. La salida JSON
+debe informar `100` insertados y `0` conservados en una base limpia. Los datos
+provienen de [`docs/309/catalogo-maestro.csv`](docs/309/catalogo-maestro.csv) y
+son **referencias académicas simuladas**, no evidencia comercial real.
+
+### 11. Iniciar backend y frontend en desarrollo
+
+En dos terminales, desde la raíz:
+
+```bash
+cd backend && npm run dev
+```
+
+```bash
+cd frontend && npm run dev -- --host 127.0.0.1 --port 5173
+```
+
+La API escucha en `http://127.0.0.1:3000`; la web en
+`http://127.0.0.1:5173`. Vite reenvía `/api` y `/socket.io/` al backend. Si se
+cambia el puerto de Vite, actualizar `APP_PUBLIC_ORIGIN` y reiniciar la API.
+
+### 12. Asociar las imágenes de los 100 SKU
+
+Con ambos servidores activos y las variables del ADMIN exportadas. Si se abrió
+una terminal nueva, volver a exportar `FERREPATAGONIA_LOCAL_DIR`,
+`DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD` y `ADMIN_ID` como en el paso 7:
+
+```bash
+node data/demo-catalog/asociar-fotos.cjs http://127.0.0.1:5173 --catalogo docs/309/catalogo-maestro.csv
+node data/demo-catalog/asociar-fotos.cjs http://127.0.0.1:5173 --catalogo docs/309/catalogo-maestro.csv --aplicar
+```
+
+El primer comando solo revisa: debe informar `skuCatalogo: 100`,
+`conFuente: 100` y `sinFuente: 0`. Revisar el plan y ejecutar el segundo, que
+sube los WebP mediante la API ADMIN y conserva las asociaciones existentes.
+Las imágenes son fotografías o ilustraciones académicas con procedencia y
+licencia documentadas en [`docs/310`](docs/310) y [`docs/311`](docs/311); las
+ilustraciones no certifican medidas, materiales ni certificaciones.
+
+### 13. Publicar las referencias de precio con el ADMIN autorizado
+
+Desde `backend/`, usando el ID del ADMIN creado en el paso 7:
+
+```bash
+cd backend
+npm run catalogo:importar-maestro -- --confirmar-destino 127.0.0.1:3307/ferrepatagonia_dev --publicar --admin "$ADMIN_ID"
+cd ..
+```
+
+Esta publicación explícita activa los 100 productos revisados y registra
+evidencia **sintética** (`PRECIO_USD_EVIDENCIA.sintetica = 1`) y eventos FER-17,
+con el ADMIN, importe, SKU y fecha. **No convierte las referencias en precios
+comerciales verificados.** Es la autorización operativa del catálogo académico
+de presentación definida en [`docs/313/README.md`](docs/313/README.md).
+
+### 14. Verificar la instalación normal
+
+**SQL:** deben aparecer 8 categorías activas, 100 productos activos, 100 SKU
+únicos, 100 con imagen, 100 con precio positivo y ningún producto ajeno:
+
+```bash
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "SELECT (SELECT COUNT(*) FROM CATEGORIA WHERE activo = 1) AS categorias_activas, (SELECT COUNT(*) FROM PRODUCTO WHERE activo = 1) AS productos_activos, (SELECT COUNT(DISTINCT codigo) FROM PRODUCTO WHERE activo = 1) AS sku_unicos, (SELECT COUNT(*) FROM PRODUCTO WHERE activo = 1 AND imagen IS NOT NULL) AS con_imagen, (SELECT COUNT(*) FROM PRODUCTO WHERE activo = 1 AND precio > 0) AS con_precio, (SELECT COUNT(*) FROM PRODUCTO WHERE codigo NOT LIKE 'FP-DEMO-%') AS productos_ajenos;"
+```
+
+**API:** salud y catálogo paginado:
+
+```bash
+curl -i http://127.0.0.1:3000/api/health
+curl -s "http://127.0.0.1:3000/api/catalogo?page=1&limit=100"
+```
+
+La salud debe responder HTTP `200` con `{"api":"ok","database":"ok"}`; el
+catálogo debe informar `data.pagination.total: 100`, 100 productos y `imagen` en cada
+ficha. El catálogo público mantiene el contrato histórico
+`precio: null`/`PENDIENTE_DEFINICION`; los importes se consultan por el motor de
+precios. Sustituir `PRODUCT_ID` por un `id` devuelto por el catálogo:
+
+```bash
+curl -s -X POST http://127.0.0.1:3000/api/precios -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:5173" -d '{"moneda":"USD","productos":[{"productoId":PRODUCT_ID,"cantidad":1}]}'
+```
+
+La respuesta debe incluir `estadoPrecio: "DEFINIDO"`, `precioComprable: true`,
+`datosSinteticos: true` y `referenciaCatalogo: true`. La procedencia sintética
+se conserva a propósito: no se declara una cotización real.
+
+**Navegador:** abrir `http://127.0.0.1:5173`, comprobar que el catálogo muestra
+100 productos, que las imágenes cargan y que búsqueda, filtros y paginación
+responden. Las verificaciones de carrito, checkout, comprobantes, crédito,
+exportación y persistencia se documentan en
+[`docs/356/README.md`](docs/356/README.md).
+
+### 15. Ejecución compilada local
+
+La ejecución compilada usa el mismo `.env` de desarrollo; **no** es un despliegue
+de producción. Detener los servidores de desarrollo y ejecutar:
+
+```bash
+cd backend
+npm run build
+npm start
+```
+
+```bash
+cd frontend
+npm run build
+npm run preview -- --host 127.0.0.1 --port 5173
+```
+
+`npm start` ejecuta `backend/dist/server.js`; el worker de comprobantes resuelve
+`receipt-file.worker.js` compilado. `npm run preview` sirve `frontend/dist` en
+el mismo puerto web y conserva el reenvío de `/api` hacia `:3000` cuando se usa
+la configuración de Vite del proyecto. Verificar salud, catálogo, carga de una
+foto y carga/consulta de un comprobante en este modo.
+
+### 16. Detener y reiniciar sin perder información
+
+Detener API y web con `Ctrl+C`. Para MariaDB:
+
+```bash
+docker compose stop mariadb
+docker compose start mariadb
+docker compose ps
+```
+
+Volver a iniciar API y web con los mismos comandos y el mismo `.env`, `JWT_SECRET`,
+directorios y volumen. Comprobar salud, inicio de sesión, catálogo, imágenes y
+un comprobante existente. `docker compose down` conserva el volumen;
+`docker compose down -v` **elimina definitivamente** los datos locales. Nunca
+ejecutar `schema.sql` ni las migraciones sobre una base ya cargada.
+
+### Fixtures de desarrollo y demo de 904 productos
+
+`database/seed.sql` y `verify-seed.sql` son fixtures de desarrollo con 3
+productos ficticios y categorías `DEMO`; **no** deben cargarse en la instalación
+normal de 100 productos. La demo académica de 904 productos se usa únicamente
+en las suites E2E (`node backend/test/helpers/run-e2e.cjs --demo-catalog`) y no
+forma parte del arranque recomendado. Para reiniciar una base de fixtures,
+consultar el procedimiento destructivo de
+[`database/README.md`](database/README.md) y usarlo solo en un entorno
+descartable.
+
+---
+
+## Catálogo normal de 100 productos
+
+El **catálogo normal** es el recorrido principal de esta instalación:
+
+| Elemento | Estado normal | Fuente |
+| --- | --- | --- |
+| Categorías | 8 activas, sin duplicados | [`docs/312/carga-catalogo-maestro.md`](docs/312/carga-catalogo-maestro.md) |
+| Productos | 100 SKU únicos, activos después de publicar | [`docs/309/catalogo-maestro.csv`](docs/309/catalogo-maestro.csv) |
+| Imágenes | 100 recursos WebP asociados por ADMIN | [`docs/310`](docs/310), [`docs/311`](docs/311) |
+| Precios | 100 referencias USD publicadas con evidencia sintética | [`docs/313/README.md`](docs/313/README.md) |
+| Procedencia | Académica y representativa; **no** comercial verificada | `PRECIO_USD_EVIDENCIA.sintetica = 1` |
+
+Esta instalación **no** usa `database/seed.sql` (3 productos DEMO) ni la demo de
+904 productos (`data/demo-catalog`). El importador del catálogo maestro rechaza
+bases con identidad o datos de la demo y conserva productos ajenos existentes;
+por eso el arranque recomendado parte de una base vacía y crea solo las ocho
+categorías requeridas. Los precios publicados son referencias académicas
+simuladas: no deben presentarse como cotizaciones, evidencia comercial ni
+precios de mercado verificados.
+
+Para revisar el catálogo sin publicarlo, ejecutar la importación sin
+`--publicar`: los 100 productos quedan inactivos y no son visibles en la tienda.
+Para una instalación normal completa, el recorrido termina con el paso 13
+(publicación) y las comprobaciones del paso 14.
 
 ---
 
@@ -219,10 +513,27 @@ La plantilla local de referencia es [backend/.env.example](backend/.env.example)
 | Categoría | Variables | Descripción y comportamiento |
 | --- | --- | --- |
 | **Base de datos** | `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `LEGACY_ORDER_UTC_OFFSET` | Parámetros de conexión a MariaDB (el Compose local expone `127.0.0.1:3307` y base `ferrepatagonia_dev`). `DB_HOST`, `DB_NAME`, `DB_USER` y `DB_PASSWORD` son obligatorias. |
+| **Verificación de precios** | `PRICE_VERIFICATION_DB_USER`, `PRICE_VERIFICATION_DB_PASSWORD` | Credenciales dedicadas de privilegios mínimos para publicar precios verificados vía `POST /api/admin/productos/:id/verificar-precio` (usa `DB_HOST`, `DB_PORT` y `DB_NAME`). Deben configurarse en par o omitirse ambas; si faltan, la API arranca pero el endpoint responde HTTP `503` (`VERIFICACION_NO_CONFIGURADA`). |
 | **Autenticación JWT** | `JWT_SECRET` | Obligatoria al iniciar. Secreto para firmar/verificar JWT `HS256`. Sin fallback interno; en producción exige secreto privado de al menos 32 bytes sin repetición trivial. |
 | **Entorno HTTP y origen** | `NODE_ENV`, `PORT`, `APP_PUBLIC_ORIGIN` | `NODE_ENV` (`development`, `test`, `production`) es obligatorio. `APP_PUBLIC_ORIGIN` define el origen exacto permitido (`http://localhost:5173` en dev; HTTPS obligatorio en `production`). |
 | **Proxy y rate limit** | `TRUSTED_PROXY_CIDRS`, `HTTPS_TERMINATION`, `AUTH_RATE_STORE`, `API_PROCESS_COUNT`, `AUTH_LOGIN_LIMIT`, `AUTH_LOGIN_WINDOW_MS`, `AUTH_REGISTER_LIMIT`, `AUTH_REGISTER_WINDOW_MS` | Regulan confianza en proxies, requerimiento de HTTPS (`trusted-proxy` obligatorio en producción) y cuotas en memoria (`memory`, 1 proceso). |
 | **Almacenamiento** | `PRODUCT_IMAGE_STORAGE_DIR`, `RECEIPT_STORAGE_DIR`, `IMPORT_STORAGE_DIR` | Rutas absolutas opcionales al arrancar (Joi rechaza valores relativos o malformados). |
+
+### Provisión del usuario de verificación de precios en MariaDB
+
+Para habilitar la verificación administrativa de precios sin otorgar permisos de DDL ni escrituras sobre tablas de negocio ajenas, crear un usuario MariaDB exclusivo de privilegios mínimos y cargar sus credenciales en `PRICE_VERIFICATION_DB_USER` y `PRICE_VERIFICATION_DB_PASSWORD`:
+
+```sql
+CREATE USER '<usuario_verificador>'@'%' IDENTIFIED BY '<clave_segura>';
+GRANT SELECT ON ferrepatagonia_dev.PRODUCTO TO '<usuario_verificador>'@'%';
+GRANT SELECT ON ferrepatagonia_dev.USUARIO TO '<usuario_verificador>'@'%';
+GRANT SELECT, INSERT, UPDATE ON ferrepatagonia_dev.PRECIO_USD_EVIDENCIA TO '<usuario_verificador>'@'%';
+GRANT SELECT, INSERT ON ferrepatagonia_dev.FER17_PRECIO_EVENTO TO '<usuario_verificador>'@'%';
+GRANT SELECT ON ferrepatagonia_dev.FER17_AUDITORIA_TRIGGERS TO '<usuario_verificador>'@'%';
+FLUSH PRIVILEGES;
+```
+
+En MariaDB, `SELECT ... FOR UPDATE` sobre `PRODUCTO` funciona con permiso `SELECT` sin habilitar `UPDATE` ni `DELETE` sobre el catálogo ni sobre cuentas corrientes o pedidos.
 
 ### Diferencia entre variables de almacenamiento opcionales al arrancar vs requeridas al operar
 
@@ -231,9 +542,9 @@ La plantilla local de referencia es [backend/.env.example](backend/.env.example)
 
 ---
 
-## Programación Backend — Requisitos implementados
+## Práctica Profesionalizante — Requisitos técnicos implementados
 
-Sección de verificación técnica para la evaluación académica de Backend:
+Sección de verificación técnica para la evaluación de la asignatura **Práctica Profesionalizante**:
 
 | Requisito | Tecnología | Estado | Archivos principales |
 | --- | --- | --- | --- |
@@ -250,7 +561,7 @@ Sección de verificación técnica para la evaluación académica de Backend:
 2. **Joi:** `loadEnv` valida de manera estricta (`convert: false`) configuración de BD, `JWT_SECRET`, seguridad HTTP/proxy, rate limits y rutas opcionales de almacenamiento al importar la configuración antes de abrir conexiones.
    - *Verificación:* `node --require ./test/helpers/test-env.cjs --test test/env-config.test.cjs` desde `backend/`, que incluye ensayos reales de arranque fallido de `dist/server.js` sin filtrar secretos.
 3. **TypeORM:** `ControlledDataSource` registra **11 `EntitySchema` activos** en `activeSchemas` (`CategoriaSchema`, `ProductoSchema`, `ClienteSchema`, `UsuarioSchema`, `ListaPrecioSchema`, `CotizacionSchema`, `CarritoSchema`, `ItemCarritoSchema`, `CuentaCorrienteSchema`, `MovimientoCuentaCorrienteSchema`, `ImputacionMovimientoCuentaCorrienteSchema`).
-   - *Aclaración técnica:* no todas las tablas de `database/schema.sql` (21 tablas) están mapeadas con `EntitySchema`. El uso de TypeORM (`getRepository`, `QueryBuilder`, `QueryRunner` / transacciones) convive con consultas SQL parametrizadas mediante `EntityManager.query` (por ejemplo bloqueos `FOR UPDATE`) y con el pool `mariadb` dedicado al snapshot de lectura consistente del catálogo (`catalog-snapshot.config.ts`). `synchronize`, `dropSchema` y `migrationsRun` permanecen en `false`.
+   - *Aclaración técnica:* no todas las tablas de `database/schema.sql` (26 tablas) están mapeadas con `EntitySchema`. El uso de TypeORM (`getRepository`, `QueryBuilder`, `QueryRunner` / transacciones) convive con consultas SQL parametrizadas mediante `EntityManager.query` (por ejemplo bloqueos `FOR UPDATE`) y con el pool `mariadb` dedicado al snapshot de lectura consistente del catálogo (`catalog-snapshot.config.ts`). `synchronize`, `dropSchema` y `migrationsRun` permanecen en `false`.
    - *Verificación:* `npm --prefix backend run test:unit` (`test/database.test.cjs`, `test/database-outcome.test.cjs`) y `npm --prefix backend run test:integration`.
 4. **Multer:** utilizado con `memoryStorage` y límite de `5 MiB` en dos flujos: importación masiva de catálogo CSV/XLSX (`uploadCatalogFile`, validación de extensión/MIME/cabeceras binarias) y carga/reemplazo de fotos de productos (`uploadProductImage` + normalización WebP con `sharp`). *(La carga de comprobantes de pago usa `express.raw` + Worker Threads en [paymentReceipt.routes.ts](backend/src/routes/paymentReceipt.routes.ts), no Multer.)*
    - *Verificación:* `node --require ./test/helpers/test-env.cjs --test test/productImport.test.cjs` y `npm --prefix backend run test:integration` (`test/helpers/run-admin-products-mariadb.cjs`).
@@ -268,15 +579,19 @@ Los scripts disponibles están definidos en [backend/package.json](backend/packa
 | --- | --- | --- |
 | **Type-check backend** | `npm --prefix backend run type-check` | Ejecuta `tsc --noEmit`. |
 | **Build backend** | `npm --prefix backend run build` | Compila TypeScript en `backend/dist/`. |
-| **Pruebas unitarias backend** | `npm --prefix backend run test:unit` | Incluye pruebas de autenticación, Joi, DTOs, importación, precios, cuentas y sockets sin DB real. |
+| **Pruebas unitarias backend** | `npm --prefix backend run test:unit` | Incluye autenticación, Joi, DTOs, importación, precios, cuentas, sockets, fotos de producto y el worker de comprobantes en desarrollo y producción. |
+| **Worker de comprobantes (fuente)** | `npm --prefix backend run test:receipt-source` | Ejecuta el worker `.ts` con `tsx`, sin depender de `dist/`; incluye fallos operativos 503. |
 | **Verificación fuentes DTO** | `npm --prefix backend run test:dto-source` | Valida contratos estáticos de DTOs y Passport. |
+| **Catálogo maestro** | `npm --prefix backend run test:catalogo-maestro` | **Requiere Docker.** Carga los 100 SKU, valida rollback, concurrencia, guardas anti-demo y publicación. |
+| **Catálogo de presentación** | `npm --prefix backend run test:catalogo-presentacion` | **Requiere Docker.** Recorre carga, imágenes, publicación, precios, listas y carrito sobre MariaDB aislada. |
+| **Catálogo de presentación (navegador)** | `npm --prefix backend run test:catalogo-presentacion:browser` | **Requiere Docker, builds y Chromium.** Verifica las 100 fichas, imágenes, búsqueda y totales. |
 | **Pruebas integración backend** | `npm --prefix backend run test:integration` | **Requiere Docker.** Levanta contenedores e instancias MariaDB desechables por suite y los elimina al finalizar. |
-| **Suite completa backend** | `npm --prefix backend test` | Ejecuta build + `test:unit` + `test:dto-source` + `test:integration`. |
+| **Suite completa backend** | `npm --prefix backend test` | Ejecuta `test:receipt-source` + build + `test:unit` + `test:dto-source` + `test:integration`. |
 | **Type-check frontend** | `npm --prefix frontend run type-check` | Ejecuta `vue-tsc --build`. |
 | **Build frontend** | `npm --prefix frontend run build` | Ejecuta `vue-tsc --build` y `vite build` en paralelo. |
 | **Pruebas unitarias frontend** | `npm --prefix frontend test` | Ejecuta `node --test` en `frontend/test/`. |
-| **E2E Playwright** | `node backend/test/helpers/run-e2e.cjs` | **Requiere Docker**, builds previos (`backend` y `frontend`) y Chromium de Playwright. Usa base descartable aislada; soporta perfiles `--fer19`, `--fer19-production`, `--receipts`. |
-| **CI en GitHub Actions** | Ver [ci.yml](.github/workflows/ci.yml) | Ejecuta `npm ci`, `npm audit --audit-level=high`, type-check, build, pruebas unitarias, integración MariaDB aislada y E2E en cada push/PR hacia `develop` o `main`. |
+| **E2E Playwright** | `node backend/test/helpers/run-e2e.cjs` | **Requiere Docker**, builds previos (`backend` y `frontend`) y Chromium de Playwright. Usa base descartable aislada; soporta perfiles `--receipts`, `--payments`, `--payment-actions`, `--fer19`, `--fer19-production` y `--demo-catalog`. |
+| **CI en GitHub Actions** | Ver [ci.yml](.github/workflows/ci.yml) | Dos jobs: `npm ci`, `npm audit --audit-level=high`, type-check, build, unitarias, integración MariaDB aislada, E2E y verificación de limpieza de contenedores/volúmenes en cada push/PR hacia `develop` o `main`. |
 
 ---
 

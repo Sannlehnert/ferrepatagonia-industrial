@@ -70,6 +70,44 @@ const openOrder = (page: Page, id: number) => page.getByRole('button', { name: `
 const listQuery = (request: { method(): string; url(): string }) =>
   request.method() === 'GET' && new URL(request.url()).pathname === ordersPath
 
+for (const lostResponse of [false, true]) {
+  ordersTest(`última página filtrada vuelve a una página válida con respuesta ${lostResponse ? 'perdida' : 'confirmada'}`, async ({ page, db }) => {
+    const { company, a } = await fixture(db, 19)
+    await openPanel(page, company)
+    await page.getByLabel('Filtrar por estado del pedido').selectOption('CONFIRMADO')
+    await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+    await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+    const pagination = page.getByRole('navigation', { name: 'Paginación de pedidos', exact: true })
+    await expect(pagination).toContainText('1–20 de 21 pedidos')
+    await pagination.getByRole('button', { name: 'Siguiente', exact: true }).click()
+    await expect(pagination).toContainText('21–21 de 21 pedidos')
+    const reads: string[] = []
+    let patches = 0
+    const patchPath = `${ordersPath}/${a}/estado`
+    page.on('request', request => {
+      if (listQuery(request)) reads.push(request.url())
+      if (request.method() === 'PATCH' && new URL(request.url()).pathname === patchPath) patches++
+    })
+    if (lostResponse) await page.route(`**${patchPath}`, async route => {
+      expect((await route.fetch()).ok()).toBe(true)
+      await route.abort('failed')
+    }, { times: 1 })
+    await openOrder(page, a)
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('button', { name: 'Guardar Estado' }).click()
+    await expect(pagination).toContainText('1–20 de 20 pedidos')
+    expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+    expect(patches).toBe(1)
+    expect(reads.map(url => Object.fromEntries(new URL(url).searchParams))).toEqual([2, 1].map(page => ({
+      page: String(page), limit: '20', estado: 'CONFIRMADO', modalidadPago: 'TRANSFERENCIA', fecha: '2026-11-10', q: company,
+    })))
+    await dialog.getByRole('button', { name: 'Cerrar modal' }).click()
+    await expect(rowFor(page, a)).toHaveCount(0)
+    await expect(page.getByLabel('Filtrar por estado del pedido')).toHaveValue('CONFIRMADO')
+    await expect(pagination.getByRole('button', { name: 'Siguiente', exact: true })).toHaveCount(0)
+  })
+}
+
 function gate() {
   let release!: () => void
   const ready = new Promise<void>(resolve => { release = resolve })
@@ -94,7 +132,7 @@ ordersTest('un PATCH tardío actualiza por REST la página filtrada y deja intac
   const { company, a, b } = await fixture(db, 20)
   const bBefore = await persisted(db, b)
   await openPanel(page, company)
-  await page.getByRole('button', { name: 'Siguiente', exact: true }).click()
+  await page.getByRole('navigation', { name: 'Paginación de pedidos', exact: true }).getByRole('button', { name: 'Siguiente', exact: true }).click()
   await expect(rowFor(page, a)).toContainText('Confirmado')
   await expect(rowFor(page, a)).toContainText('10/11/2026')
   const pending = await holdCommittedPatch(page, a)
@@ -180,4 +218,120 @@ ordersTest('si la red pierde la respuesta después del commit, el listado se rec
   await expect(rowFor(page, a)).toContainText('En preparación')
   expect(patches).toBe(1)
   expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+})
+
+function observeSocket(page: Page) {
+  const state = { upgraded: 0, events: [] as string[] }
+  page.on('websocket', ws => {
+    if (new URL(ws.url()).pathname !== '/socket.io/') return
+    ws.on('framesent', ({ payload }) => { if (payload === '5') state.upgraded++ })
+    ws.on('framereceived', ({ payload }) => {
+      if (typeof payload === 'string' && payload.startsWith('42')) state.events.push(payload)
+    })
+  })
+  return state
+}
+
+ordersTest('R01-A: un cambio comercial externo actualiza la fila y el modal abierto conservando filtros activos', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+  await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+  await expect.poll(() => socket.upgraded).toBe(1)
+  await expect(rowFor(page, a)).toContainText('Confirmado')
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  const modalStatusHeader = dialog.getByRole('heading', { name: 'Estado del pedido (comercial / logístico)' }).locator('..')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(modalStatusHeader).toContainText('Confirmado')
+
+  const patchResponse = await page.request.patch(`${ordersPath}/${a}/estado`, {
+    data: { estado: 'EN_PREPARACION' },
+    headers: { Origin: new URL(page.url()).origin },
+  })
+  expect(patchResponse.status()).toBe(200)
+
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  await expect(modalStatusHeader).toContainText('En preparación')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(dialog.getByRole('combobox')).toHaveValue('ENVIADO')
+  await expect(page.getByLabel('Buscar pedidos por empresa, ID o CUIT')).toHaveValue(company)
+  await expect(page.getByLabel('Filtrar por fecha')).toHaveValue('2026-11-10')
+  await expect(page.getByLabel('Filtrar por modalidad de pago')).toHaveValue('TRANSFERENCIA')
+  expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+})
+
+ordersTest('R01-B: guardar estado propio no dispara consultas GET duplicadas por su propio evento Socket.IO', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await expect.poll(() => socket.upgraded).toBe(1)
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  await expect(dialog.getByRole('button', { name: 'Guardar Estado' })).toBeEnabled()
+
+  const listGets: string[] = []
+  const detailGets: string[] = []
+  const detailPath = `${ordersPath}/${a}`
+  page.on('request', request => {
+    if (request.method() !== 'GET') return
+    const pathname = new URL(request.url()).pathname
+    if (pathname === ordersPath) listGets.push(request.url())
+    if (pathname === detailPath) detailGets.push(request.url())
+  })
+
+  await dialog.getByRole('button', { name: 'Guardar Estado' }).click()
+  await expect(dialog.getByText('Estado actualizado a En preparación.')).toBeVisible()
+  await expect.poll(() => socket.events.some(event => event.includes('pedido.estado.actualizado.v1'))).toBe(true)
+  await page.waitForTimeout(150)
+
+  expect(listGets.length).toBe(1)
+  expect(detailGets.length).toBe(0)
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  expect((await persisted(db, a))[0]?.estado).toBe('EN_PREPARACION')
+})
+
+ordersTest('R01-C: una transición externa posterior dentro de los 1.500 ms actualiza la fila y el modal abierto sin recargar', async ({ page, db }) => {
+  const { company, a } = await fixture(db)
+  const socket = observeSocket(page)
+  await openPanel(page, company)
+  await page.getByLabel('Filtrar por modalidad de pago').selectOption('TRANSFERENCIA')
+  await page.getByRole('button', { name: 'Filtrar', exact: true }).click()
+  await expect.poll(() => socket.upgraded).toBe(1)
+  await expect(rowFor(page, a)).toContainText('Confirmado')
+
+  await openOrder(page, a)
+  const dialog = page.getByRole('dialog')
+  const modalStatusHeader = dialog.getByRole('heading', { name: 'Estado del pedido (comercial / logístico)' }).locator('..')
+  const saveButton = dialog.getByRole('button', { name: 'Guardar Estado' })
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(modalStatusHeader).toContainText('Confirmado')
+  await expect(saveButton).toBeEnabled()
+
+  await saveButton.click()
+  await expect(dialog.getByText('Estado actualizado a En preparación.')).toBeVisible()
+  await expect(rowFor(page, a)).toContainText('En preparación')
+  await expect(modalStatusHeader).toContainText('En preparación')
+  await expect(saveButton).toBeEnabled()
+  const savedAt = Date.now()
+
+  const patchResponse = await page.request.patch(`${ordersPath}/${a}/estado`, {
+    data: { estado: 'ENVIADO' },
+    headers: { Origin: new URL(page.url()).origin },
+  })
+  expect(patchResponse.status()).toBe(200)
+  expect(Date.now() - savedAt).toBeLessThan(1500)
+
+  await expect(rowFor(page, a)).toContainText('Enviado')
+  await expect(modalStatusHeader).toContainText('Enviado')
+  await expect(dialog.getByRole('heading', { name: `Pedido #${a}` })).toBeVisible()
+  await expect(dialog.getByRole('combobox')).toHaveValue('ENTREGADO')
+  await expect(dialog.getByRole('combobox').locator('option[value="ENTREGADO"]')).toHaveText('Entregado')
+  await expect(page.getByLabel('Buscar pedidos por empresa, ID o CUIT')).toHaveValue(company)
+  await expect(page.getByLabel('Filtrar por fecha')).toHaveValue('2026-11-10')
+  await expect(page.getByLabel('Filtrar por modalidad de pago')).toHaveValue('TRANSFERENCIA')
+  expect((await persisted(db, a))[0]?.estado).toBe('ENVIADO')
 })

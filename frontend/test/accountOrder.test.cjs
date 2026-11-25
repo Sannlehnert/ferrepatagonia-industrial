@@ -27,6 +27,7 @@ const confirmed = {
     venceEl: '2026-12-09',
 }
 const tick = () => new Promise(resolve => setImmediate(resolve))
+const confirmationReset = loadTypeScript('services/confirmationReset.ts')
 
 function loadTypeScript(relativePath, dependencies = {}) {
     const source = readFileSync(resolve(__dirname, '../src', relativePath), 'utf8')
@@ -68,6 +69,7 @@ function createRuntime(t, transport, savedKey = null) {
         '@/services/sessionGeneration': {
             currentSessionGeneration: () => generation,
         },
+        '@/services/confirmationReset': confirmationReset,
         '@/stores/auth': { useAuthStore: () => auth },
         '@/services/realtime': { onRealtime() {} },
         '@/stores/cart': { useCartStore: () => ({ reconciliarPedidoConfirmado() {} }) },
@@ -151,6 +153,59 @@ test('enables account orders only when the server confirms eligibility', async t
     })
     await tick()
     assert.equal(eligible.store.canUseCredit, true)
+})
+
+test('ignora una respuesta de elegibilidad de un carrito anterior', async t => {
+    let resolveOld
+    const oldResponse = new Promise(resolve => { resolveOld = resolve })
+    const calls = []
+    const { store } = createRuntime(t, {
+        getEligibility: async (_signal) => {
+            calls.push(calls.length)
+            if (calls.length === 2) return oldResponse
+            if (calls.length === 1) return eligibleOrder
+            return { ...eligibleOrder, totalUSD: '160.00' }
+        },
+        confirm: async () => assert.fail('No debe enviar la confirmación'),
+        recover: async () => assert.fail('No debe consultar un intento'),
+    })
+    await tick()
+
+    const oldRequest = store.loadEligibility('cart-80')
+    const currentRequest = store.loadEligibility('cart-160')
+    resolveOld({ ...eligibleOrder, totalUSD: '80.00' })
+    await oldRequest
+    await currentRequest
+
+    assert.equal(store.eligibilityUpdated, true)
+    assert.equal(store.eligibility.totalUSD, '160.00')
+    assert.equal(store.eligibilityLoading, false)
+})
+
+test('invalida y aborta una consulta cuando el carrito deja de ser verificable', async t => {
+    const response = deferred()
+    let requestSignal
+    const { store } = createRuntime(t, {
+        getEligibility: async signal => {
+            requestSignal = signal
+            return response.promise
+        },
+        confirm: async () => assert.fail('No debe enviar la confirmación'),
+        recover: async () => assert.fail('No debe consultar un intento'),
+    })
+    await tick()
+
+    const request = store.loadEligibility('cart-80')
+    store.invalidateEligibility()
+
+    assert.equal(requestSignal.aborted, true)
+    assert.equal(store.eligibility, null)
+    assert.equal(store.eligibilityLoading, false)
+    assert.equal(store.eligibilityUpdated, false)
+    response.resolve(eligibleOrder)
+    assert.equal(await request, false)
+    assert.equal(store.eligibility, null)
+    assert.equal(store.eligibilityUpdated, false)
 })
 
 test('ignora doble confirmación y mantiene el resultado incierto bajo la misma clave', async t => {
@@ -272,4 +327,66 @@ test('H03: rechazo persistido durante recuperación finaliza el intento y permit
     assert.equal(store.attemptError, 'Crédito insuficiente.')
     store.prepareRetry()
     assert.equal(store.attemptState, 'idle')
+})
+
+test('A01: la navegación libera la confirmación anterior y habilita una segunda compra', async t => {
+    const requests = []
+    let eligibilityCalls = 0
+    const { store } = createRuntime(t, {
+        getEligibility: async () => {
+            eligibilityCalls++
+            if (eligibilityCalls === 1) return eligibleOrder
+            return {
+                ...eligibleOrder,
+                elegible: false,
+                totalUSD: '160.00',
+                creditoDisponibleUSD: '20.00',
+                codigo: 'CREDITO_INSUFICIENTE',
+                mensaje: 'El crédito disponible no alcanza para confirmar el pedido.',
+                cotizacion: null,
+            }
+        },
+        confirm: async requestKey => {
+            requests.push(requestKey)
+            return { estado: 'CONFIRMADO', result: confirmed }
+        },
+        recover: async () => assert.fail('No hay un intento pendiente'),
+    })
+    await tick()
+
+    assert.equal(store.canUseCredit, true)
+    assert.equal(await store.confirm(), true)
+    assert.equal(store.attemptState, 'confirmed')
+    assert.deepEqual(store.receipts, [confirmed])
+
+    confirmationReset.clearRegisteredConfirmations()
+    assert.equal(store.attemptState, 'idle')
+    assert.equal(store.confirmation, null)
+    assert.deepEqual(store.receipts, [confirmed])
+
+    await store.loadEligibility('cart-160')
+    assert.equal(store.canUseCredit, false)
+    assert.equal(store.attemptState, 'idle')
+    assert.equal(await store.confirm(), false)
+    assert.equal(requests.length, 1)
+})
+
+test('A01: la navegación no descarta un intento pendiente ni su clave idempotente', async t => {
+    const saved = JSON.stringify({ key, quoteToken: eligibleOrder.cotizacion })
+    const { store, storage } = createRuntime(t, {
+        getEligibility: async () => eligibleOrder,
+        confirm: async () => assert.fail('No debe crear otra confirmación'),
+        recover: async () => ({
+            estado: 'PENDIENTE',
+            result: { estado: 'PENDIENTE', code: 'CONFIRMACION_PENDIENTE', message: 'Pendiente' },
+        }),
+    }, saved)
+    await tick()
+    assert.equal(store.attemptState, 'pending')
+
+    confirmationReset.clearRegisteredConfirmations()
+    assert.equal(store.attemptState, 'pending')
+    assert.equal(store.pendingKey, key)
+    assert.equal(store.pendingQuoteToken, eligibleOrder.cotizacion)
+    assert.deepEqual(JSON.parse(storage.get(7)), { key, quoteToken: eligibleOrder.cotizacion })
 })

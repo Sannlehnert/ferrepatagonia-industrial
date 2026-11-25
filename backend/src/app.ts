@@ -15,9 +15,10 @@ import { createPricingRouter } from './routes/pricing.routes';
 import { adminAccountPrivacy } from './middlewares/adminAccountPrivacy.middleware';
 import { cuentaCorrienteRouter } from './routes/cuentaCorriente.routes';
 import { accountOrderPrivateResponses } from './middlewares/account-order-http.middleware';
-import { accountOrderRouter, clientOrderRouter } from './routes/accountOrder.routes';
+import { accountOrderRouter, clientOrderRouter, transferOrderRouter } from './routes/accountOrder.routes';
 import { receiptRouter } from './routes/paymentReceipt.routes';
 import { productImageRouter } from './routes/productImage.routes';
+import { perfilRouter } from './routes/perfil.routes';
 
 export const app = express();
 app.set('trust proxy', env.httpSecurity.trustedProxies);
@@ -34,8 +35,9 @@ app.use('/api', httpSecurity(env.httpSecurity));
 app.use(cookieParser());
 app.use(authPassport.initialize());
 
-// Auth procesa su JSON para conservar { message } sin cambiar otras rutas.
+// Auth y perfil procesan su JSON para conservar { message } sin cambiar otras rutas.
 app.use('/api/auth', authRouter);
+app.use('/api/perfil', perfilRouter);
 app.use('/api', receiptRouter);
 app.use('/api', productImageRouter);
 app.use(express.json());
@@ -47,6 +49,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/carrito', cartRouter);
 app.use('/api/cuenta-corriente', cuentaCorrienteRouter);
 app.use('/api/pedidos/cuenta-corriente', accountOrderRouter);
+app.use('/api/pedidos/transferencia', transferOrderRouter);
 app.use('/api/pedidos', clientOrderRouter);
 
 app.use((_req, res) => {

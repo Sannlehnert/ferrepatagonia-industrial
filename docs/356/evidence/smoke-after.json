@@ -1,0 +1,27 @@
+{
+  "phase": "after",
+  "emails": {
+    "particular": "smoke-356-particular-1795574871629@example.test",
+    "empresa": "smoke-356-empresa-1795574872036@example.test",
+    "aprobada": "aprobada.local@s7.test"
+  },
+  "transferOrderId": 2,
+  "transferKey": "58c1d229-6cd6-4fd8-a088-4db30204115d",
+  "receiptId": "2f64c3f5-46e9-49ac-b2e3-67435c8842c0",
+  "receiptSha": "0988cd0ba0b7c5d1c60fdb63ff21ac2f481979980c7a182e4ae29a66c1e3bf71",
+  "creditOrderId": 3,
+  "creditRequestId": 1,
+  "productA": 1,
+  "productB": 2,
+  "checks": {
+    "health": "PASS",
+    "catalog100": "PASS",
+    "images": "PASS",
+    "loginAfterRestart": "PASS",
+    "transferOrderPersisted": "PASS",
+    "receiptSha256AfterRestart": "PASS",
+    "creditAccountPersisted": "PASS",
+    "priceAfterRestart": "PASS"
+  },
+  "result": "PASS"
+}

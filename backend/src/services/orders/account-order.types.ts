@@ -1,3 +1,8 @@
+import type {
+  OrderDocumentState,
+  OrderFinancialState,
+} from './order-state-projection';
+
 export interface ConfirmedAccountOrder {
   simulado?: true;
   pedidoId: number;
@@ -9,11 +14,22 @@ export interface ConfirmedAccountOrder {
   venceEl: string;
 }
 
+export interface ConfirmedTransferOrder {
+  simulado?: true;
+  pedidoId: number;
+  estado: 'CONFIRMADO';
+  modalidadPago: 'TRANSFERENCIA';
+  moneda: 'USD';
+  totalUSD: string;
+}
+
 export interface PendingAccountOrder {
   estado: 'PENDIENTE';
   code: 'CONFIRMACION_PENDIENTE';
   message: string;
 }
+
+export type PendingTransferOrder = PendingAccountOrder;
 
 export interface ClientOrderSummary {
   simulado?: true;
@@ -21,6 +37,10 @@ export interface ClientOrderSummary {
   numero: string;
   fecha: string;
   estado: string;
+  estadoPedido: string;
+  estadoDocumental: OrderDocumentState;
+  estadoFinanciero: OrderFinancialState;
+  montoAcreditadoUSD: string | null;
   modalidadPago: string;
   moneda: string | null;
   subtotal: string;
@@ -55,12 +75,20 @@ export interface AccountOrderFailure {
   estado?: 'RECHAZADO';
 }
 
+export type TransferOrderFailure = AccountOrderFailure;
+
 export type AccountOrderResponse =
   | { data: ConfirmedAccountOrder }
+  | { data: ConfirmedTransferOrder }
   | { data: PendingAccountOrder }
   | { data: { items: ClientOrderSummary[] } }
   | { data: ClientOrderDetail }
   | AccountOrderFailure;
+
+export type TransferOrderResponse =
+  | { data: ConfirmedTransferOrder }
+  | { data: PendingTransferOrder }
+  | TransferOrderFailure;
 
 export type AccountOrderHttpStatus =
   | 200
@@ -79,6 +107,11 @@ export interface AccountOrderResult {
   body: AccountOrderResponse;
 }
 
+export interface TransferOrderResult {
+  status: AccountOrderHttpStatus;
+  body: TransferOrderResponse;
+}
+
 export interface AccountOrderEligibility {
   simulado?: true;
   elegible: boolean;
@@ -93,4 +126,20 @@ export interface AccountOrderEligibility {
 export interface AccountOrderEligibilityResult {
   status: 200;
   body: { data: AccountOrderEligibility };
+}
+
+export interface TransferOrderEligibility {
+  simulado?: true;
+  elegible: boolean;
+  modalidadPago: 'TRANSFERENCIA';
+  moneda: 'USD';
+  totalUSD: string | null;
+  codigo: string | null;
+  mensaje: string | null;
+  cotizacion: string | null;
+}
+
+export interface TransferOrderEligibilityResult {
+  status: 200;
+  body: { data: TransferOrderEligibility };
 }

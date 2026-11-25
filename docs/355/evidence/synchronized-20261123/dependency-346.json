@@ -1,0 +1,19 @@
+{
+  "verifiedUTC": "2026-11-24T02:54:23.518Z",
+  "developSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "verification": "git ls-remote origin refs/heads/develop",
+  "task346PR": 162,
+  "headSha": "0008f0c94345fc8577e55f3c25f2ba926ec9a3bc",
+  "merged": false,
+  "baseSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "includedInAuditedOrReexecutedBases": false,
+  "certifiedBy355": false,
+  "requiredIfIntegrated": [
+    "Backend query filters/pagination, legacy contract, invalid/duplicate params and RBAC",
+    "Company approval/credit, price-list assignments and drafts",
+    "R01: lost response saving B must retain the draft of A at 360/1280px",
+    "Session/stale responses, URL/popstate, keyboard/focus and responsive layouts",
+    "Catalog/list discounts 10/20, carts, checkout and persistence",
+    "Affected ADMIN/account/payments/receipts smoke and both CI on new integrated SHA"
+  ]
+}

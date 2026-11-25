@@ -1,0 +1,1 @@
+collector-contract-tests: PASS; pass=7; fail=0; skip=0; exit=0; log=collector-contract-tests.txt; sha256=270be89b07e75c3071c3c5548157ef5a36c09a22f536232f00e0a0e85d91dc8f

@@ -50,7 +50,7 @@ test.setTimeout(60_000)
 async function login(page: Page, email: string, password: string, admin = false) {
   await page.goto('/login')
   await submitLogin(page, email, password)
-  await expect(page).toHaveURL(admin ? /\/admin(?:\/|$)/ : /\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(admin ? /\/admin(?:\/|$)/ : /\/mi-cuenta$/)
 }
 
 async function submitLogin(page: Page, email: string, password: string) {
@@ -61,6 +61,10 @@ async function submitLogin(page: Page, email: string, password: string) {
 
 async function confirmOrder(page: Page) {
   const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+  const retry = summary.getByRole('button', { name: 'Volver a consultar elegibilidad' })
+  if (await retry.isVisible()) {
+    await retry.click()
+  }
   await summary.getByRole('radio', { name: 'Cuenta corriente' }).check()
   await summary.getByRole('button', { name: 'Confirmar pedido a cuenta corriente' }).click()
 }
@@ -169,6 +173,9 @@ test('compra real actualiza stock, historial y comprobante con un solo cargo', a
     const socket = observeSocket(page)
     await page.goto('/carrito')
     await expect(quantity(page, f.name)).toHaveValue('2')
+    await expect(
+      page.getByRole('region', { name: 'Resumen del carrito' }).getByRole('radio', { name: 'Cuenta corriente' }),
+    ).toBeVisible()
     await sibling.goto('/carrito')
     await expect(quantity(sibling, f.name)).toHaveValue('2')
     const historySocket = observeSocket(history)
@@ -198,7 +205,7 @@ test('compra real actualiza stock, historial y comprobante con un solo cargo', a
       has: history.getByRole('heading', { name: /^PED-\d+$/ }),
     })
     await expect(entry).toHaveCount(1)
-    await expect(entry).toContainText('CONFIRMADO')
+    await expect(entry).toContainText('Confirmado')
     await entry.getByRole('button', { name: /^Ver detalle/ }).click()
     await expect(entry.getByText(f.name, { exact: true })).toBeVisible()
     expect(socket.events.some(event => event.includes('pedido.confirmado.v1'))).toBe(true)
@@ -410,7 +417,7 @@ test('historial invalida solo las lecturas activas y descarta respuestas de otra
     await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
     await expect(page).toHaveURL(/\/login$/)
     await submitLogin(page, 'cliente-nuevo@e2e.test', 'E2eLocal-214!')
-    await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+    await expect(page).toHaveURL(/\/mi-cuenta$/)
     await historyLink.click()
     await expect(page.getByText('Todavía no tenés pedidos.')).toBeVisible()
     releaseDetail.resolve()

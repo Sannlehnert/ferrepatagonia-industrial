@@ -1,0 +1,25 @@
+TAP version 13
+# 313: carga y asociación de 100 imágenes por ADMIN completadas; activación explícita de los 100 productos.
+# 313: las 100 fichas, búsquedas por SKU/nombre, categorías e imágenes HTTP pasaron antes del reinicio.
+# 313: fichas comprobadas en Chromium: 20
+# 313: fichas comprobadas en Chromium: 40
+# 313: fichas comprobadas en Chromium: 60
+# 313: fichas comprobadas en Chromium: 80
+# 313: fichas comprobadas en Chromium: 100
+# Subtest: 313: catálogo autónomo de 100, listas 10/20, carrito y persistencia
+ok 1 - 313: catálogo autónomo de 100, listas 10/20, carrito y persistencia
+  ---
+  duration_ms: 212477.03339
+  type: 'test'
+  ...
+# 100 fichas API y navegador; listas 10/20, carrito y persistencia verificados.
+# CLEANUP313 OK: contenedor y volumen propios eliminados.
+1..1
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 215753.853532

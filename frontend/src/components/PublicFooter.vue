@@ -59,6 +59,14 @@ const accountLinks = computed(() => {
           <ul>
             <li>
               <RouterLink
+                :to="{ name: 'home' }"
+                class="fp-focus"
+              >
+                Inicio
+              </RouterLink>
+            </li>
+            <li>
+              <RouterLink
                 :to="{ name: 'catalogo' }"
                 class="fp-focus"
               >
@@ -87,28 +95,6 @@ const accountLinks = computed(() => {
                 class="fp-focus"
               >
                 {{ link.label }}
-              </RouterLink>
-            </li>
-          </ul>
-        </nav>
-
-        <nav aria-labelledby="footer-access-title">
-          <h2 id="footer-access-title">Tienda</h2>
-          <ul>
-            <li>
-              <RouterLink
-                :to="{ name: 'home', hash: '#empresas' }"
-                class="fp-focus"
-              >
-                Área empresas
-              </RouterLink>
-            </li>
-            <li>
-              <RouterLink
-                :to="{ name: 'home' }"
-                class="fp-focus"
-              >
-                Inicio
               </RouterLink>
             </li>
           </ul>
@@ -180,6 +166,7 @@ ul {
 nav a {
   display: inline-flex;
   align-items: center;
+  min-width: 44px;
   min-height: 44px;
   border-radius: 3px;
   color: #d9e8f4;

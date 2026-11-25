@@ -85,6 +85,31 @@ async function assertControlFits(control: Locator) {
   expect.soft(right).toBeLessThanOrEqual(width + 1)
 }
 
+test('A.3 empresa pendiente sin cuenta puede consultar pero no operar a crédito', async ({ page }) => {
+  const email = `a3-${randomUUID()}@e2e.test`
+  const password = 'EmpresaPassword123!'
+  const cuit = `30-${String(Math.floor(Math.random() * 100000000)).padStart(8, '0')}-9`
+  await page.goto('/')
+  const registration = await page.request.post('/api/auth/register', {
+    headers: { Origin: new URL(page.url()).origin },
+    data: { tipoCliente: 'EMPRESA', nombreRazonSocial: 'Empresa A3', cuit, email, password },
+  })
+  expect(registration.status()).toBe(201)
+  await login(page, email, password, '/mi-cuenta')
+  const session = await (await page.request.get('/api/auth/me')).json()
+  expect(session.user).toMatchObject({ estadoAprobacionEmpresa: 'PENDIENTE', cuentaCorrienteHabilitada: null })
+  await page.goto('/mi-cuenta')
+  const commercial = page.getByRole('region', { name: 'Estado comercial' })
+  await expect(commercial).toContainText('aprobación de tu empresa está pendiente')
+  await expect(commercial).toContainText('No tenés una cuenta corriente asociada')
+  await page.getByRole('navigation', { name: 'Menú de mi cuenta' }).getByRole('link', { name: 'Cuenta corriente', exact: true }).click()
+  await expect(page.getByRole('main')).toContainText('No tenés una cuenta corriente asociada')
+  const eligibility = await (await page.request.get(eligibilityPath)).json()
+  expect(eligibility.data).toMatchObject({ elegible: false, codigo: 'CUENTA_NO_HABILITADA', cotizacion: null })
+  await page.goto('/carrito')
+  await expect(page.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+})
+
 test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', async ({ page, browser, company }) => {
   await company.db.query("UPDATE CLIENTE SET estado_aprobacion_empresa = 'PENDIENTE' WHERE id_cliente = ?", [company.clientId])
   await page.setViewportSize({ width: 360, height: 844 })
@@ -99,7 +124,11 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
   const clientContext = await browser.newContext()
   try {
     const client = await clientContext.newPage()
-    await login(client, company.email, company.password, '/mi-cuenta/datos')
+    await login(client, company.email, company.password, '/mi-cuenta')
+    await client.goto('/mi-cuenta')
+    const commercial = client.getByRole('region', { name: 'Estado comercial' })
+    await expect(commercial).toContainText('aprobación de tu empresa está pendiente')
+    await expect(commercial).toContainText('crédito está bloqueado')
     const checkout = client.getByRole('region', { name: 'Confirmación de pedido' })
     async function readEligibility(navigate: () => Promise<unknown>) {
       const eligibility = client.waitForResponse(response =>
@@ -113,18 +142,43 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
       await expect(checkout.getByRole('alert')).toHaveText('La empresa no está aprobada para esta operación.')
       await expect(checkout.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
       await expect(checkout.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+      await expect(checkout.getByRole('radio', { name: 'Transferencia' })).toHaveCount(0)
     }
     const blocked = { elegible: false, codigo: 'EMPRESA_NO_HABILITADA', cotizacion: null }
     expect(await readEligibility(() => client.goto('/carrito'))).toMatchObject(blocked)
     await expectBlocked()
 
     await row.getByRole('button', { name: 'Rechazar cuenta empresa de ' + company.name }).click()
+    {
+      const decision = page.getByRole('dialog', { name: 'Rechazar empresa', exact: true })
+      await decision.getByRole('button', { name: 'Confirmar rechazo', exact: true }).click()
+      await expect(decision.getByRole('status').filter({ hasText: 'Empresa rechazada.' })).toHaveText('Empresa rechazada.')
+      await decision.getByRole('button', { name: 'Cerrar detalle del cliente', exact: true }).click()
+      await expect(decision).toHaveCount(0)
+    }
     await expect(row.getByText('Rechazada', { exact: true })).toBeVisible()
+    await client.goto('/mi-cuenta')
+    await commercial.getByRole('button', { name: 'Actualizar estado comercial' }).click()
+    await expect(commercial).toContainText('empresa fue rechazada')
+    await expect(commercial).toContainText('crédito está bloqueado')
+    await client.goto('/carrito')
     expect(await readEligibility(() => client.reload())).toMatchObject(blocked)
     await expectBlocked()
 
     await row.getByRole('button', { name: 'Aprobar cuenta empresa de ' + company.name }).click()
+    {
+      const decision = page.getByRole('dialog', { name: 'Aprobar empresa', exact: true })
+      await decision.getByRole('button', { name: 'Confirmar aprobación', exact: true }).click()
+      await expect(decision.getByRole('status').filter({ hasText: 'Empresa aprobada.' })).toHaveText('Empresa aprobada.')
+      await decision.getByRole('button', { name: 'Cerrar detalle del cliente', exact: true }).click()
+      await expect(decision).toHaveCount(0)
+    }
     await expect(row.getByText('Aprobada', { exact: true })).toBeVisible()
+    await client.goto('/mi-cuenta')
+    await commercial.getByRole('button', { name: 'Actualizar estado comercial' }).click()
+    await expect(commercial).toContainText('empresa está aprobada')
+    await expect(commercial).toContainText('crédito está disponible')
+    await client.goto('/carrito')
     expect(await readEligibility(() => client.reload())).toMatchObject({
       elegible: true, totalUSD: '20.00', creditoDisponibleUSD: '25.00', cotizacion: expect.any(String),
     })
@@ -134,8 +188,9 @@ test('la decisión de ADMIN modifica la elegibilidad visible de la empresa', asy
     expect(await readEligibility(() =>
       client.getByRole('button', { name: 'Aumentar cantidad de ' + product }).click(),
     )).toMatchObject({ elegible: false, codigo: 'CREDITO_INSUFICIENTE', totalUSD: '30.00' })
-    await expect(checkout.getByRole('alert')).toHaveText('El crédito disponible no alcanza para confirmar el pedido.')
-    await expect(checkout.getByRole('button', { name: 'Finalizar compra' })).toBeDisabled()
+    await expect(checkout.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+    await expect(checkout.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+    await expect(checkout.getByRole('button', { name: 'Confirmar pedido por transferencia' })).toBeEnabled()
   } finally {
     await clientContext.close()
   }
@@ -154,7 +209,7 @@ for (const width of [320, 360, 390, 768, 1024, 1280]) {
 
     await page.setViewportSize({ width, height: width < 768 ? 844 : 900 })
     await page.emulateMedia({ reducedMotion: 'reduce' })
-    await login(page, company.email, company.password, '/mi-cuenta/datos')
+    await login(page, company.email, company.password, '/mi-cuenta')
 
     async function capture(name: string) {
       if (process.env.SPRINT6_284_CAPTURES !== '1') return
@@ -183,7 +238,8 @@ for (const width of [320, 360, 390, 768, 1024, 1280]) {
     await toggle.press('Enter')
     await expect(page.getByRole('button', { name: /^Ocultar detalle de PED-/ })).toBeFocused()
     await expect(page.getByText(product, { exact: true })).toBeVisible()
-    await expect(page.getByText('Cantidad 2 · Precio unitario 10.00 USD')).toBeVisible()
+    await expect(page.getByText('Cantidad: 2', { exact: true })).toBeVisible()
+    await expect(page.getByText('Precio unitario: 10.00 USD', { exact: true })).toBeVisible()
     await assertPageFits(page)
     await capture('historial')
 

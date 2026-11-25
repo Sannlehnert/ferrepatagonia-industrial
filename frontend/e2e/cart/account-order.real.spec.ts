@@ -6,7 +6,7 @@ async function signIn(page: import('@playwright/test').Page) {
   await page.getByLabel('Email', { exact: true }).fill('cc258-empty@example.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(/\/mi-cuenta$/)
 }
 
 test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda compra', async ({ page, context }) => {
@@ -47,6 +47,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
 
   const summary = page.getByRole('region', { name: 'Resumen del carrito' })
   await expect(summary).toContainText('USD 124.00')
+  await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
 
   const secondTab = await context.newPage()
@@ -81,6 +82,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   expect((await addedAgain).status()).toBe(204)
   await page.getByRole('link', { name: 'Ver carrito completo' }).click()
   const nextSummary = page.getByRole('region', { name: 'Resumen del carrito' })
+  await expect(nextSummary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
   await expect(nextSummary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
   await expect(page.getByRole('list', { name: 'Comprobantes de pedidos confirmados' }))
     .toContainText('USD 248.00')
@@ -126,7 +128,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   })
 
   await expect(order).toHaveCount(1)
-  await expect(order).toContainText('CONFIRMADO')
+  await expect(order).toContainText('Confirmado')
   const orderNumber = await order.getByRole('heading').innerText()
   const savedOrder = history.items.find(item => item.numero === orderNumber)
   if (!savedOrder) throw new Error(`El pedido ${orderNumber} no figura en la respuesta del historial.`)
@@ -146,12 +148,14 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await expect(order.getByRole('alert')).toContainText('No se pudo cargar el detalle del pedido.')
   await order.getByRole('button', { name: 'Reintentar detalle', exact: true }).click()
   await expect(order.getByText('Producto E2E 24', { exact: true })).toBeVisible()
-  await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
+  await expect(order.getByText('Cantidad: 1', { exact: true })).toBeVisible()
+  await expect(order.getByText('Precio unitario: 124.00 USD', { exact: true })).toBeVisible()
 
   await page.reload()
   await expect(order.getByRole('heading', { name: orderNumber, exact: true })).toBeVisible()
   await order.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
-  await expect(order.getByText('Cantidad 1 · Precio unitario 124.00 USD')).toBeVisible()
+  await expect(order.getByText('Cantidad: 1', { exact: true })).toBeVisible()
+  await expect(order.getByText('Precio unitario: 124.00 USD', { exact: true })).toBeVisible()
 
   await page.getByRole('button', { name: 'Cerrar sesión', exact: true }).click()
   await expect(page).toHaveURL(/\/login$/)
@@ -164,7 +168,7 @@ test('H01/H02: dos pestañas rechazan cotización vieja y permiten una segunda c
   await page.getByLabel('Email', { exact: true }).fill('cliente@e2e.test')
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/mi-cuenta\/datos$/)
+  await expect(page).toHaveURL(/\/mi-cuenta$/)
   await page.goto('/mi-cuenta/pedidos')
   await expect(page.getByText('Todavía no tenés pedidos.', { exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: orderNumber, exact: true })).toHaveCount(0)

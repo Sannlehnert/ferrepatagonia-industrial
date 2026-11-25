@@ -1,0 +1,6 @@
+Modo compilado local (NODE_ENV=development, base descartable #356)
+- backend: npm run build -> PASS; npm start -> GET /api/health 200 {"api":"ok","database":"ok"}
+- worker de comprobantes compilado: POST /api/pedidos/2/comprobantes (image/jpeg) -> 201
+- foto de producto: GET /api/product-images/<uuid>.webp -> 200 image/webp
+- frontend: npm run build -> PASS; vite preview 127.0.0.1:5173 -> GET / 200
+- proxy del frontend compilado: GET http://127.0.0.1:5173/api/health -> 200

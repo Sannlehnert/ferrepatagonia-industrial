@@ -1,0 +1,43 @@
+# Reconciliación #356
+fecha=2026-11-25
+rama=release/356-final-preparation
+develop_inicial=e46843cfc6ca04b1d0a8bd01e76ded563eabcfa9
+main_inicial=4a1b12d0b32bbb42645eaab2954f5a9606be9e37
+head_167=4ea9dd5388aa3364496c2a6edfd0c43790543d96
+ci_167=45522960344 SUCCESS
+ci_develop=e46843c run 45528732034 SUCCESS
+ci_main=4a1b12d run 43469542261 SUCCESS
+
+## merge
+commit=af88617a8dd304e2cf5ca3c642e1b5478c7fe1a1
+parents=e46843cfc6ca04b1d0a8bd01e76ded563eabcfa9 4a1b12d0b32bbb42645eaab2954f5a9606be9e37
+subject=merge: reconcile main into release/356-final-preparation
+
+## commits exclusivos de main incorporados
+4a1b12d Merge pull request #109 from Sannlehnert/fix/receipt-worker-dev-and-image-errors
+fe7e8dd fix(backend): support tsx receipt worker in dev and preserve 503 product image errors
+78968a4 Merge pull request #107 from Sannlehnert/develop
+93b00b6 Merge pull request #57 from Sannlehnert/release/4.5-develop-main
+17e1696 merge: integrate develop into main candidate and recover reverted files
+8187801 Merge pull request #7 from Sannlehnert/fix/revert-accidental-main-merge
+e08bc95 Revert "Merge pull request #6 from Sannlehnert/chore/mariadb-compose"
+4613e0a Merge pull request #6 from Sannlehnert/chore/mariadb-compose
+
+## estado final
+main_exclusive_commits=0
+develop_exclusive_commits=10
+
+## conflictos resueltos
+backend/package.json -> base develop + test:receipt-source + product-image-http
+backend/src/services/receipts/receipt-storage.ts -> implementación #354 + seam de pruebas
+
+## diff resumido contra develop
+ .github/workflows/ci.yml                         |   4 +
+ README.md                                        | 471 +++++++++++++++++------
+ backend/package.json                             |   5 +-
+ backend/src/routes/productImage.routes.ts        |  13 +-
+ backend/src/services/receipts/receipt-storage.ts |  15 +-
+ backend/test/product-image-http.test.cjs         | 156 ++++++++
+ backend/test/product-image.integration.test.cjs  |  10 +
+ backend/test/receipt-worker-source.test.cjs      | 298 ++++++++++++++
+ 8 files changed, 852 insertions(+), 120 deletions(-)

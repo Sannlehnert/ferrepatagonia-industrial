@@ -1,0 +1,95 @@
+
+> ferrepatagonia@0.0.0 build
+> run-p type-check "build-only {@}" --
+
+
+> ferrepatagonia@0.0.0 type-check
+> vue-tsc --build
+
+
+> ferrepatagonia@0.0.0 build-only
+> vite build
+
+vite v8.3.5 building client environment for production...
+transforming...
+✓ 369 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                     1.13 kB │ gzip:  0.47 kB
+dist/assets/contours-BHMC9l2i.svg                  28.99 kB │ gzip: 12.30 kB
+dist/assets/ProductDetailView-BbYWHjSd.css          0.07 kB │ gzip:  0.09 kB
+dist/assets/PublicBrand-BmKDB0QZ.css                0.24 kB │ gzip:  0.18 kB
+dist/assets/LoginView-CuKlF5HL.css                  0.35 kB │ gzip:  0.21 kB
+dist/assets/RegistroView-D3GRLK-y.css               1.78 kB │ gzip:  0.63 kB
+dist/assets/AdminLayout-BAiC_Q6v.css                1.81 kB │ gzip:  0.67 kB
+dist/assets/registro-Brb9_y1U.css                   2.77 kB │ gzip:  0.96 kB
+dist/assets/AdminOrdersView-JYmfATBy.css            3.87 kB │ gzip:  1.17 kB
+dist/assets/PublicLayout-BbifPuTs.css               4.37 kB │ gzip:  1.18 kB
+dist/assets/AdminAccountsView-D0pA5kW5.css          5.67 kB │ gzip:  1.09 kB
+dist/assets/AdminPaymentsView-Dl7tYabf.css          6.04 kB │ gzip:  1.51 kB
+dist/assets/HomeView-BBQuKwQN.css                   6.06 kB │ gzip:  1.85 kB
+dist/assets/index-CXN4FRj6.css                     59.85 kB │ gzip: 12.06 kB
+dist/assets/contours-Cg_vpSZP.js                    0.05 kB │ gzip:  0.07 kB
+dist/assets/_plugin-vue_export-helper-BDNMzG2s.js   0.08 kB │ gzip:  0.09 kB
+dist/assets/confirmationReset-BRgPQTYz.js           0.11 kB │ gzip:  0.11 kB
+dist/assets/accountFilters-D7C64gwf.js              0.11 kB │ gzip:  0.12 kB
+dist/assets/rolldown-runtime-DK3Fl9T5.js            0.15 kB │ gzip:  0.15 kB
+dist/assets/rutas-BAAo4CCL.js                       0.40 kB │ gzip:  0.27 kB
+dist/assets/useNavigationDisclosure--vgoh8Tj.js     0.42 kB │ gzip:  0.29 kB
+dist/assets/usePrivateAccountRead-CNbhLm5T.js       0.54 kB │ gzip:  0.35 kB
+dist/assets/paymentReceiptService-DZvsC9pP.js       0.67 kB │ gzip:  0.42 kB
+dist/assets/DemoNotice-BfLhOtUf.js                  0.67 kB │ gzip:  0.47 kB
+dist/assets/adminMutationError-CcQZyigz.js          0.69 kB │ gzip:  0.42 kB
+dist/assets/AdminPaymentReceiptsView-rtwk5R0C.js    0.73 kB │ gzip:  0.49 kB
+dist/assets/ProductThumbnail-BOyltEnc.js            0.80 kB │ gzip:  0.51 kB
+dist/assets/CartView-eTh2sojc.js                    0.87 kB │ gzip:  0.60 kB
+dist/assets/companyStatus-CEtmL0ND.js               0.87 kB │ gzip:  0.44 kB
+dist/assets/AccessDeniedView-Dz5PbkZW.js            1.00 kB │ gzip:  0.63 kB
+dist/assets/cuentaCorriente-f2tkg6uG.js             1.33 kB │ gzip:  0.74 kB
+dist/assets/CommerceIcon-CK0a043q.js                1.49 kB │ gzip:  0.74 kB
+dist/assets/OrderFinancialStatusBadge-BsS-vxzY.js   1.66 kB │ gzip:  0.77 kB
+dist/assets/useOrderReceiptSummaries-B-WvzO3r.js    1.87 kB │ gzip:  0.93 kB
+dist/assets/CatalogCartButton-6r8GxEBV.js           2.01 kB │ gzip:  1.12 kB
+dist/assets/NavigationMenu-B7GorMM1.js              2.42 kB │ gzip:  1.14 kB
+dist/assets/AdminOrderReceiptSummary-Da-WbwK5.js    2.46 kB │ gzip:  1.24 kB
+dist/assets/adminAccountService-CrI1p-rq.js         2.83 kB │ gzip:  1.37 kB
+dist/assets/AdminLayout-CqSw6X_f.js                 2.92 kB │ gzip:  1.50 kB
+dist/assets/LoginView-BlkiiYOp.js                   3.06 kB │ gzip:  1.54 kB
+dist/assets/menu-DJPRMABl.js                        3.09 kB │ gzip:  0.95 kB
+dist/assets/illustrativeDemoImage-XQtkUipv.js       3.42 kB │ gzip:  1.31 kB
+dist/assets/registro-BvI8Q2iY.js                    4.56 kB │ gzip:  2.06 kB
+dist/assets/CompanyStatus-DyORivA1.js               4.65 kB │ gzip:  1.97 kB
+dist/assets/AboutView-CRv3PyX1.js                   4.67 kB │ gzip:  1.85 kB
+dist/assets/FaqView-DGzQA59-.js                     5.04 kB │ gzip:  2.18 kB
+dist/assets/PublicBrand-ElQqXPej.js                 5.13 kB │ gzip:  1.61 kB
+dist/assets/cart-DHMrHK7M.js                        5.25 kB │ gzip:  2.52 kB
+dist/assets/ProductDetailView-76BInaDD.js           5.27 kB │ gzip:  2.37 kB
+dist/assets/RegistroView-BzUrGgPK.js                6.27 kB │ gzip:  2.43 kB
+dist/assets/devtools-EWN81iOl-aga55kRu.js           6.94 kB │ gzip:  3.02 kB
+dist/assets/MiCuentaDashboardView-BqVdV6ij.js       7.17 kB │ gzip:  2.45 kB
+dist/assets/MiCuentaLayout-DGOAauhR.js              7.39 kB │ gzip:  2.31 kB
+dist/assets/catalogService-ZfrLszVd.js              7.70 kB │ gzip:  3.24 kB
+dist/assets/payment-ByrB5ZMX.js                     8.01 kB │ gzip:  2.75 kB
+dist/assets/auth-CWWRElkn.js                        8.19 kB │ gzip:  3.55 kB
+dist/assets/DatosClientes-q73KMv_t.js               8.92 kB │ gzip:  3.05 kB
+dist/assets/HomeView-l82HcEoC.js                    9.23 kB │ gzip:  3.52 kB
+dist/assets/AdminDashboardView-xgmbXHrR.js          9.42 kB │ gzip:  3.48 kB
+dist/assets/AdminProductImportView-1dO_F63V.js     10.82 kB │ gzip:  4.21 kB
+dist/assets/PublicLayout-B_4rh_IJ.js               11.27 kB │ gzip:  4.56 kB
+dist/assets/CatalogoView-D0phcHWc.js               13.70 kB │ gzip:  5.12 kB
+dist/assets/PaymentReceipts-CUlXeL-f.js            16.46 kB │ gzip:  5.83 kB
+dist/assets/vue-router-v6ls4-BL.js                 18.75 kB │ gzip:  7.55 kB
+dist/assets/AdminAccountsView-D8kaSkBk.js          21.43 kB │ gzip:  6.67 kB
+dist/assets/AdminOrdersView-ceHlL2KV.js            24.62 kB │ gzip:  8.28 kB
+dist/assets/AdminCategoriesView-ZgcnuWOO.js        25.18 kB │ gzip:  6.77 kB
+dist/assets/HistorialPedidos-WBpbtdH7.js           25.31 kB │ gzip:  6.73 kB
+dist/assets/AdminClientsView-D9n_D-nn.js           32.14 kB │ gzip:  9.20 kB
+dist/assets/AdminProductsListView-D8Z_-nnv.js      34.03 kB │ gzip: 10.45 kB
+dist/assets/CartContents-CLlz-AwB.js               43.70 kB │ gzip: 10.81 kB
+dist/assets/AdminPaymentsView-DKR8XbTI.js          54.61 kB │ gzip: 13.47 kB
+dist/assets/api-CHoPsr2j.js                        60.52 kB │ gzip: 22.51 kB
+dist/assets/runtime-core.esm-bundler-Db9BHuE4.js   63.78 kB │ gzip: 24.97 kB
+dist/assets/index-C32iWlUl.js                      65.60 kB │ gzip: 22.12 kB
+dist/assets/CuentaCorrienteView-DF0z3kjS.js        68.09 kB │ gzip: 16.16 kB
+
+✓ built in 2.27s

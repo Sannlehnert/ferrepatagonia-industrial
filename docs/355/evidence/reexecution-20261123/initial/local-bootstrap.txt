@@ -1,0 +1,60 @@
+{"mode":"local-bootstrap","database":"cc260_test_62ef8af844284b45833a5278c4e5da3c","host":"127.0.0.1","port":64802,"container":"cc260-test-62ef8af844284b45833a5278c4e5da3c"}
+TAP version 13
+# Subtest: bootstrap rechaza un perfil parcial FER-20 sin crear usuarios ni credenciales
+ok 1 - bootstrap rechaza un perfil parcial FER-20 sin crear usuarios ni credenciales
+  ---
+  duration_ms: 5603.9409
+  type: 'test'
+  ...
+# Subtest: bootstrap inicial crea cuatro perfiles y credenciales validas
+ok 2 - bootstrap inicial crea cuatro perfiles y credenciales validas
+  ---
+  duration_ms: 9049.33
+  type: 'test'
+  ...
+# Subtest: recrear una base limpia con el mismo DB_NAME actualiza las contrasenas del JSON
+ok 3 - recrear una base limpia con el mismo DB_NAME actualiza las contrasenas del JSON
+  ---
+  duration_ms: 3115.7493
+  type: 'test'
+  ...
+# Subtest: reejecucion secuencial es idempotente y no reescribe credenciales
+ok 4 - reejecucion secuencial es idempotente y no reescribe credenciales
+  ---
+  duration_ms: 2434.4725
+  type: 'test'
+  ...
+# Subtest: login real de los cuatro perfiles, separacion ADMIN/CLIENTE y reinicio
+ok 5 - login real de los cuatro perfiles, separacion ADMIN/CLIENTE y reinicio
+  ---
+  duration_ms: 6449.173
+  type: 'test'
+  ...
+# Subtest: dos bootstraps concurrentes sobre una base vacia no duplican ni corrompen
+ok 6 - dos bootstraps concurrentes sobre una base vacia no duplican ni corrompen
+  ---
+  duration_ms: 11184.5229
+  type: 'test'
+  ...
+# Subtest: un fallo al escribir credenciales no afirma rollback y conserva los usuarios
+ok 7 - un fallo al escribir credenciales no afirma rollback y conserva los usuarios # SKIP
+  ---
+  duration_ms: 0.3183
+  type: 'test'
+  ...
+# Subtest: si existen usuarios y falta el JSON solo advierte, sin restablecer contrasenas
+ok 8 - si existen usuarios y falta el JSON solo advierte, sin restablecer contrasenas
+  ---
+  duration_ms: 327.4729
+  type: 'test'
+  ...
+1..8
+# tests 8
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 1
+# todo 0
+# duration_ms 41024.116
+CLEANUP OK T-S7-01.2: contenedor eliminado, datos tmpfs, sin volumen persistente.

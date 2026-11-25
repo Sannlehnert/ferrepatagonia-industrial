@@ -1,0 +1,8 @@
+{
+  "kind": "environment-setup-attempt",
+  "result": "BLOCKED_DOCKER_SOCKET",
+  "exitCode": 1,
+  "reason": "Native Linux Docker defaulted to /var/run/docker.sock, which is absent; no MariaDB connection or complete SQL clock measurement was obtained.",
+  "partialCommandOutputsPreserved": true,
+  "resolution": "Use the native Linux CLI and existing Docker Desktop proxy socket in a process-scoped environment; root only for that root-owned socket, without chmod or service changes."
+}

@@ -21,13 +21,13 @@ async function signIn(page: Page, email: string) {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta\/datos)$/)
+  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta)$/)
 }
 
 test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ page }) => {
   await page.goto('/')
   const search = header(page).getByRole('searchbox', { name: 'Buscar productos por nombre o código' })
-  await expect(header(page).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login')
+  await expect(header(page).getByRole('link', { name: 'Ingresar' })).toHaveAttribute('href', '/login?redirect=/')
   await expect(header(page).getByRole('link', { name: 'Crear cuenta' })).toHaveAttribute('href', '/registro')
   await expect(header(page).getByRole('button', { name: 'Carrito', exact: true })).toHaveCount(0)
   await expect(header(page).getByRole('link', { name: 'Panel de administración' })).toHaveCount(0)
@@ -57,6 +57,86 @@ test('Home usa categorías, búsqueda y detalle del catálogo real', async ({ pa
   await expect(page).toHaveURL(/\/$/)
 })
 
+test('Área Empresas lleva a ingreso y registro de empresa con teclado desde el encabezado', async ({ page }) => {
+  await page.goto('/')
+  await page.getByRole('navigation', { name: 'Menú principal' })
+    .getByRole('link', { name: 'Empresas', exact: true }).click()
+  await expect(page).toHaveURL(/\/#empresas$/)
+  await expect(business(page)).toBeFocused()
+
+  await page.keyboard.press('Tab')
+  await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/login$/)
+
+  await page.goto('/')
+  await business(page).getByRole('link', { name: 'Registrá tu empresa' }).focus()
+  await page.keyboard.press('Enter')
+  await expect(page).toHaveURL(/\/registro\?tipo=empresa$/)
+  await expect(page.getByRole('radio', { name: 'Empresa' })).toBeChecked()
+  await expect(page.getByLabel('Razón social')).toBeVisible()
+})
+
+test('Área Empresas desde el header de escritorio enfoca el destino y permite tabular al ingreso', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.goto('/')
+  const headerLink = page.getByRole('navigation', { name: 'Menú principal' })
+    .getByRole('link', { name: 'Empresas', exact: true })
+  await headerLink.focus()
+  await page.keyboard.press('Enter')
+
+  await expect(page).toHaveURL(/\/#empresas$/)
+  await expect(business(page)).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
+})
+
+test('el acceso directo a #empresas enfoca el destino y mantiene el orden de tabulación', async ({ page }) => {
+  await page.goto('/#empresas')
+
+  await expect(business(page)).toBeFocused()
+  await page.keyboard.press('Tab')
+  await expect(business(page).getByRole('link', { name: 'Ingresar como empresa' })).toBeFocused()
+})
+
+test('el acceso de empresas permanece visible al cargar contenido en móvil', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 568 })
+  let releaseRequests!: () => void
+  const requestsReady = new Promise<void>(resolve => { releaseRequests = resolve })
+  await page.route('**/api/catalogo?*', async route => {
+    await requestsReady
+    await route.continue()
+  })
+  await page.route('**/api/categorias', async route => {
+    await requestsReady
+    await route.continue()
+  })
+
+  await page.goto('/#empresas')
+  await expect(business(page)).toBeFocused()
+  releaseRequests()
+
+  const login = business(page).getByRole('link', { name: 'Ingresar como empresa' })
+  await expect(login).toBeInViewport()
+  await expect(categories(page).getByRole('link', { name: 'Herramientas E2E' })).toBeVisible()
+  expect(await page.locator('html').evaluate(element => element.scrollWidth)).toBe(320)
+})
+
+for (const width of [360, 1280]) {
+  test('el pie no duplica Área Empresas y conserva los accesos de cuenta a ' + width + ' px', async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 })
+    await page.goto('/catalogo')
+    const footer = page.getByRole('contentinfo')
+    await expect(footer.getByRole('link', { name: 'Área empresas' })).toHaveCount(0)
+    await expect(footer.getByRole('link', { name: 'Inicio', exact: true })).toBeVisible()
+
+    await footer.getByRole('link', { name: 'Crear cuenta', exact: true }).focus()
+    await page.keyboard.press('Enter')
+    await expect(page).toHaveURL(/\/registro$/)
+    await expect(page.getByRole('heading', { name: 'Crear cuenta', exact: true })).toBeVisible()
+  })
+}
+
 test('Home de particular muestra su acceso y abre el carrito real', async ({ page }) => {
   await signIn(page, 'cliente-nuevo@e2e.test')
   await page.goto('/')
@@ -83,14 +163,13 @@ test('Home de administración muestra solo accesos de su rol', async ({ page }) 
 
 test('empresa aprobada sin cuenta en la base aislada recibe un acceso de consulta', async ({ page }) => {
   await signIn(page, 'empresa-cuenta@e2e.test')
-  const summary = page.waitForResponse(response => response.url().endsWith('/api/cuenta-corriente'))
   await page.goto('/')
-  expect((await (await summary).json()).data.estado).toBe('SIN_CUENTA')
-  await expect(business(page).getByRole('link', { name: 'Consultar estado de cuenta' })).toHaveAttribute('href', '/mi-cuenta/cuenta-corriente')
+  await expect(business(page).getByRole('link', { name: 'Consultar estado comercial' })).toHaveAttribute('href', '/mi-cuenta')
+  await expect(business(page)).toContainText('empresa está aprobada')
   await expect(business(page)).not.toContainText('Tu cuenta corriente está habilitada')
 })
 
-test('empresa con cuenta habilitada recibe el acceso directo sin importes', async ({ page }) => {
+test('empresa con cuenta habilitada no recibe una promesa de crédito en Home', async ({ page }) => {
   const profile = process.env.CCE2E_TEST_PROFILE
   if (!profile) throw new Error('Ejecutá las pruebas con el runner E2E aislado')
   const { connection } = await connectOwned(JSON.parse(profile), 'E2E')
@@ -110,8 +189,9 @@ test('empresa con cuenta habilitada recibe el acceso directo sin importes', asyn
 
     await signIn(page, 'empresa-cuenta@e2e.test')
     await page.goto('/')
-    await expect(business(page).getByRole('link', { name: 'Ver cuenta corriente' })).toHaveAttribute('href', '/mi-cuenta/cuenta-corriente')
-    await expect(business(page)).toContainText('Tu cuenta corriente está habilitada')
+    await expect(business(page).getByRole('link', { name: 'Consultar estado comercial' })).toHaveAttribute('href', '/mi-cuenta')
+    await expect(business(page)).toContainText('autorización de crédito se evalúa por separado')
+    await expect(business(page)).not.toContainText('crédito está disponible')
     await expect(business(page)).not.toContainText('1337.00')
   } finally {
     try {
@@ -192,6 +272,55 @@ test('Home conserva el nombre completo y el acceso a la ficha a 360 px', async (
   await link.click()
   await expect(page).toHaveURL(/\/producto\/1\?returnTo=/)
 })
+
+for (const width of [360, 768, 1280]) {
+  test(`Home conserva el espacio de la ilustración y breadcrumbs táctiles a ${width}px`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 900 })
+    const illustration = '/demo-catalog/ilustrativa-rop-camisa.webp'
+    await page.route('**/api/catalogo?*', async route => {
+      const response = await route.fetch()
+      const json = await response.json()
+      Object.assign(json.data.productos[0], { codigo: 'FP-DEMO-ROP-CAMISA-TALLE-2XL', imagen: illustration })
+      json.data.productos[1].imagen = '/demo-catalog/llave-ajustable.webp'
+      await route.fulfill({ response, json })
+    })
+    await page.goto('/')
+    const image = products(page).getByRole('img', { name: 'Producto E2E 01', exact: true })
+    await image.scrollIntoViewIfNeeded()
+    await expect.poll(() => image.evaluate(element => (element as unknown as { naturalWidth: number }).naturalWidth)).toBeGreaterThan(0)
+    const note = products(page).getByRole('note')
+    await expect(note).toBeVisible()
+    await expect(image).toHaveAttribute('aria-describedby', (await note.getAttribute('id'))!)
+    const imageBox = (await image.boundingBox())!
+    const padding = await image.evaluate(element => {
+      const style = element.ownerDocument.defaultView!.getComputedStyle(element)
+      return parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+    })
+    expect(imageBox.height - padding).toBeGreaterThan(40)
+    const photoBox = (await products(page).getByRole('img', { name: 'Producto E2E 02', exact: true }).boundingBox())!
+    expect(Math.abs(imageBox.height - photoBox.height)).toBeLessThan(1.5)
+    expect((await note.boundingBox())!.y).toBeGreaterThanOrEqual(imageBox.y + imageBox.height)
+    expect(await page.locator('html').evaluate(element => element.scrollWidth)).toBeLessThanOrEqual(width)
+    await products(page).screenshot({ path: info.outputPath(`home-ilustracion-${width}.png`) })
+
+    await page.route(`**${illustration}`, route => route.fulfill({ status: 404, body: '' }))
+    await page.reload()
+    await expect(products(page).getByRole('link', { name: 'Ver producto: Producto E2E 01' })).toBeVisible()
+    await expect(image).toHaveCount(0)
+    await expect(note).toHaveCount(0)
+    await products(page).getByRole('link', { name: 'Ver producto: Producto E2E 01' }).click()
+    for (const target of [undefined, '/catalogo?categoria=1']) {
+      if (target) await page.goto(target)
+      const navigation = page.getByRole('navigation', { name: 'Ruta de navegación', exact: true })
+      await expect(navigation.getByRole('link')).toHaveCount(2)
+      for (const link of await navigation.getByRole('link').all()) {
+        const box = (await link.boundingBox())!
+        expect(box.height).toBeGreaterThanOrEqual(44)
+        expect(box.width).toBeGreaterThanOrEqual(44)
+      }
+    }
+  })
+}
 
 for (const width of [360, 390, 768, 1024, 1280, 1440]) {
   test('Home responsive y navegación con teclado a ' + width + ' px', async ({ page }, testInfo) => {

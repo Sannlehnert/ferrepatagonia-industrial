@@ -1,4 +1,5 @@
 export interface PriceProduct {
+  catalogReference?: true;
   id: number;
   baseUSD: string | null;
   specialPercent: string | null;
@@ -54,6 +55,7 @@ export interface PricingSource {
 }
 export type PriceState = 'DEFINIDO' | 'PRECIO_AUSENTE' | 'BASE_CERO' | 'BASE_NO_VERIFICADA' | 'FINAL_CERO' | 'ARS_CERO';
 export interface PriceLine {
+  referenciaCatalogo?: true;
   productoId: number;
   moneda: 'USD' | 'ARS';
   precioBaseUSD: string | null;

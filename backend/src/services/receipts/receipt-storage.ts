@@ -1,11 +1,17 @@
 import { constants, existsSync } from 'node:fs';
 import { lstat, open, realpath, stat, unlink } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { tmpdir } from 'node:os';
-import { extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Worker, type WorkerOptions } from 'node:worker_threads';
 import { readStorageDir } from '../../config/storage-env.config';
 import { isReceiptId, ReceiptError, receiptUnavailable, type ReceiptMime } from './receipt-types';
+import type { ReceiptValidationFailure, ReceiptValidationResult } from './receipt-file.worker';
+
+const validationMessages: Record<ReceiptValidationFailure, string> = {
+  ARCHIVO_DANADO: 'El archivo está dañado o incompleto. Probá con otro archivo.',
+  CONTENIDO_NO_PERMITIDO: 'El archivo contiene elementos activos o incrustados no permitidos. Probá con un PDF o una imagen simple.',
+  TIPO_INCOMPATIBLE: 'El archivo no coincide con el formato declarado. Verificá que sea PDF, JPG o PNG.',
+};
 
 function contains(parent: string, child: string): boolean {
   const location = relative(parent, child);
@@ -36,134 +42,92 @@ function receiptPath(root: string, id: string): string {
   return join(root, id);
 }
 
-const receiptWorkerTimeoutMs = 6000;
-const receiptWorkerLimits = {
-  maxOldGenerationSizeMb: 96,
-  maxYoungGenerationSizeMb: 16,
-  stackSizeMb: 2,
-} as const;
+// En desarrollo `tsx` ejecuta el código fuente, donde solo existe el worker
+// `.ts`. En producción `tsc` genera el `.js` junto a este módulo. Se resuelve
+// siempre el artefacto adyacente para no depender del directorio de trabajo.
+function receiptWorker() {
+  const compiled = join(__dirname, 'receipt-file.worker.js');
+  if (existsSync(compiled)) return { file: compiled, execArgv: [] };
 
-type WorkerLaunchConfig = {
-  file: string;
-  execArgv: string[];
-  env: Record<string, string>;
-};
-
-type ValidationOutcome =
-  | { kind: 'verdict'; valid: boolean }
-  | { kind: 'operational'; reason: string; code?: string };
-
-function safeWorkerErrorCode(error: unknown): string | undefined {
-  const code = (error as { code?: unknown } | null)?.code;
-  return typeof code === 'string' && /^[A-Z0-9_]{1,40}$/.test(code) ? code : undefined;
+  const source = join(__dirname, 'receipt-file.worker.ts');
+  if (!existsSync(source)) throw receiptUnavailable();
+  let loader: string;
+  try {
+    loader = require.resolve('tsx');
+  } catch {
+    throw receiptUnavailable();
+  }
+  return { file: source, execArgv: ['--import', pathToFileURL(loader).href] };
 }
 
-function logWorkerFailure(reason: string, code?: string): void {
-  console.error('receipt.worker.failed', code ? { reason, code } : { reason });
-}
-
+// Punto de extensión mínimo para probar los fallos operativos del worker sin
+// alterar la resolución real usada en desarrollo y producción.
 export const receiptWorkerRuntime = {
-  resolveWorker(sourceFile = __filename): WorkerLaunchConfig {
-    if (extname(sourceFile) === '.ts') {
-      const tsxCjsLoader = createRequire(sourceFile).resolve('tsx/cjs');
-      const tempDir = tmpdir();
-      return {
-        file: join(__dirname, 'receipt-file.worker.ts'),
-        execArgv: ['--require', tsxCjsLoader],
-        // Keep process secrets out of the worker while giving tsx an explicit OS temp dir.
-        env: {
-          TSX_DISABLE_CACHE: '1',
-          TEMP: tempDir,
-          TMP: tempDir,
-          TMPDIR: tempDir,
-        },
-      };
-    }
-    return {
-      file: join(__dirname, 'receipt-file.worker.js'),
-      execArgv: [],
-      env: {},
-    };
-  },
+  resolveWorker: receiptWorker,
   createWorker(file: string, options: WorkerOptions): Worker {
     return new Worker(file, options);
   },
 };
 
+type ValidationOutcome =
+  | { status: 'result'; value: ReceiptValidationResult }
+  | { status: 'unavailable' };
+
 export async function validateReceiptContent(bytes: Buffer, mime: ReceiptMime, signal: AbortSignal): Promise<void> {
   signal.throwIfAborted();
   if (!bytes.length) throw new ReceiptError(400, 'ARCHIVO_VACIO', 'Seleccioná un archivo con contenido.');
+  const location = receiptWorkerRuntime.resolveWorker();
   const input = new Uint8Array(bytes);
+
   let worker: Worker;
   try {
-    const launch = receiptWorkerRuntime.resolveWorker();
-    worker = receiptWorkerRuntime.createWorker(launch.file, {
+    worker = receiptWorkerRuntime.createWorker(location.file, {
       workerData: { bytes: input, mime },
       transferList: [input.buffer],
-      env: launch.env,
-      resourceLimits: receiptWorkerLimits,
-      execArgv: launch.execArgv,
+      env: {},
+      resourceLimits: { maxOldGenerationSizeMb: 96, maxYoungGenerationSizeMb: 16, stackSizeMb: 2 },
+      execArgv: location.execArgv,
     });
-  } catch (error) {
-    logWorkerFailure('worker_init_error', safeWorkerErrorCode(error));
+  } catch {
+    console.error('receipt.validation.worker.unavailable');
     throw receiptUnavailable();
   }
 
-  let outcome: ValidationOutcome;
-  try {
-    outcome = await new Promise<ValidationOutcome>(resolve => {
-      let settled = false;
-      const onError = (error: unknown) => {
-        finish({ kind: 'operational', reason: 'worker_error', code: safeWorkerErrorCode(error) });
-      };
-      const onMessage = (result: unknown) => {
-        if (typeof result === 'boolean') {
-          finish({ kind: 'verdict', valid: result });
-          return;
-        }
-        finish({ kind: 'operational', reason: 'invalid_message' });
-      };
-      const onExit = (exitCode: number) => {
-        finish({
-          kind: 'operational',
-          reason: 'worker_exit',
-          code: Number.isInteger(exitCode) ? `EXIT_${exitCode}` : undefined,
-        });
-      };
-      const onAbort = () => finish({ kind: 'operational', reason: 'aborted' });
-      const timer = setTimeout(() => finish({ kind: 'operational', reason: 'worker_timeout' }), receiptWorkerTimeoutMs);
-
-      function finish(result: ValidationOutcome) {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        signal.removeEventListener('abort', onAbort);
-        worker.off('message', onMessage);
-        worker.off('exit', onExit);
-        resolve(result);
+  const outcome = await new Promise<ValidationOutcome>(resolve => {
+    let settled = false;
+    const finish = (value: ValidationOutcome) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal.removeEventListener('abort', cancel);
+      resolve(value);
+    };
+    const unavailable = () => finish({ status: 'unavailable' });
+    const cancel = () => unavailable();
+    const timer = setTimeout(unavailable, 6000);
+    worker.once('message', value => {
+      if (value && typeof value === 'object' && value.ok === true) {
+        finish({ status: 'result', value: { ok: true } });
+      } else if (value && typeof value === 'object' && value.ok === false
+        && typeof value.code === 'string' && Object.hasOwn(validationMessages, value.code)) {
+        finish({ status: 'result', value: { ok: false, code: value.code as ReceiptValidationFailure } });
+      } else {
+        unavailable();
       }
-
-      worker.on('error', onError);
-      worker.once('message', onMessage);
-      worker.once('exit', onExit);
-      signal.addEventListener('abort', onAbort, { once: true });
-      if (signal.aborted) onAbort();
     });
-  } finally {
-    try {
-      await worker.terminate();
-    } catch {
-      // Ignore worker shutdown errors after validation settles or aborts.
-    }
-  }
+    worker.once('error', unavailable);
+    worker.once('exit', unavailable);
+    signal.addEventListener('abort', cancel, { once: true });
+  }).finally(() => worker.terminate());
 
   signal.throwIfAborted();
-  if (outcome.kind === 'operational') {
-    logWorkerFailure(outcome.reason, outcome.code);
+  if (outcome.status === 'unavailable') {
+    console.error('receipt.validation.worker.failed');
     throw receiptUnavailable();
   }
-  if (!outcome.valid) {
-    throw new ReceiptError(422, 'CONTENIDO_INVALIDO', 'El archivo está dañado, contiene elementos no permitidos o no coincide con su tipo.');
+  const result = outcome.value;
+  if (!result.ok) {
+    throw new ReceiptError(422, result.code, validationMessages[result.code]);
   }
 }
 

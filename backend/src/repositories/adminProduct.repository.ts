@@ -1,6 +1,8 @@
 import { dataSource, inTransaction } from '../config/database.config';
+import type { EntityManager } from 'typeorm';
 import { ProductoSchema, CategoriaSchema } from '../entities/active.schemas';
 import { notifyAfterCommit, type NotifyCommittedChange } from '../realtime/committed-change';
+import { nonBlankPriceEvidence, priceEvidenceAdmin, productPriceEvidence, sqlUTC } from './product-price-evidence.sql';
 
 export interface ProductRecord {
     id_producto: number;
@@ -8,7 +10,8 @@ export interface ProductRecord {
     codigo: string;
     nombre: string;
     descripcion: string | null;
-    precio: string;
+    precio: string | null;
+    descuento_especial_pct: string | null;
     stock: number;
     imagen: string | null;
     activo: number | boolean;
@@ -38,17 +41,61 @@ export interface UpdateProductDTO {
 }
 
 // Explicit raw projections preserve DECIMAL strings, numeric flags and JSON keys.
-const fields = ['id_producto', 'id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo', 'fecha_actualizacion'];
+const fields = ['id_producto', 'id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'descuento_especial_pct', 'stock', 'imagen', 'activo', 'fecha_actualizacion'];
 
-function productQuery() {
-    const query = dataSource.getRepository(ProductoSchema).createQueryBuilder('p');
+function productQuery(manager?: EntityManager) {
+    const query = (manager ?? dataSource).getRepository(ProductoSchema).createQueryBuilder('p');
     fields.forEach((field, index) => index === 0 ? query.select('p.' + field, field) : query.addSelect('p.' + field, field));
     return query;
 }
 
-export const findAllAdmin = async (): Promise<ProductRecord[]> => productQuery()
+export type AdminBasePriceState = 'SIN_PRECIO' | 'BASE_CERO' | 'NO_VERIFICADO' | 'VERIFICADO' | 'SINTETICO';
+export type AdminProductRow = ProductRecord & {
+    estado_precio_base: AdminBasePriceState;
+    precio_verificado: string | null;
+};
+type RawAdminProductRow = ProductRecord & {
+    price_verifier: number | null;
+    price_synthetic: number | null;
+    precio_verificado: string | null;
+};
+
+const adminListQuery = (manager?: EntityManager) => productQuery(manager)
     .innerJoin('p.categoria', 'c').addSelect('c.nombre', 'categoria_nombre')
-    .orderBy('p.id_producto', 'DESC').getRawMany<ProductRecord>();
+    .leftJoin('PRECIO_USD_EVIDENCIA', 'e', productPriceEvidence(':at', ':nonBlank'), {
+        at: sqlUTC(new Date()), nonBlank: nonBlankPriceEvidence,
+    })
+    .leftJoin('USUARIO', 'ea', priceEvidenceAdmin)
+    .addSelect('ea.id_usuario', 'price_verifier')
+    .addSelect('e.sintetica', 'price_synthetic')
+    .addSelect('e.precio_verificado', 'precio_verificado')
+    .orderBy('p.id_producto', 'DESC');
+
+const withBasePriceState = ({ price_verifier, price_synthetic, ...product }: RawAdminProductRow): AdminProductRow => ({
+    ...product,
+    estado_precio_base: product.precio === null ? 'SIN_PRECIO'
+        : Number(product.precio) === 0 ? 'BASE_CERO'
+        : price_verifier === null ? 'NO_VERIFICADO'
+        : price_synthetic === 1 ? 'SINTETICO' : 'VERIFICADO',
+});
+
+export const findAllAdmin = async (): Promise<AdminProductRow[]> =>
+    (await adminListQuery().getRawMany<RawAdminProductRow>()).map(withBasePriceState);
+
+export const findAdminPage = (requestedPage: number, limit: number, search?: string) =>
+    inTransaction(async manager => {
+        const query = adminListQuery(manager);
+        if (search !== undefined) {
+            const pattern = '%' + search.replace(/[!%_]/g, '!$&') + '%';
+            query.andWhere("(p.nombre LIKE :pattern ESCAPE '!' OR p.codigo LIKE :pattern ESCAPE '!')", { pattern });
+        }
+        const total = await query.getCount();
+        const totalPages = Math.ceil(total / limit);
+        const page = Math.min(requestedPage, Math.max(1, totalPages));
+        const rows = total === 0 ? [] : await query
+            .offset((page - 1) * limit).limit(limit).getRawMany<RawAdminProductRow>();
+        return { data: rows.map(withBasePriceState), page, limit, total, totalPages };
+    }, { isolation: 'REPEATABLE READ' });
 
 export const findById = async (id: number): Promise<ProductRecord | null> =>
     await productQuery().where('p.id_producto = :id', { id }).getRawOne<ProductRecord>() ?? null;
@@ -62,21 +109,30 @@ export const findByCodigo = async (codigo: string, excludeId?: number): Promise<
 export const categoryExists = (id_categoria: number): Promise<boolean> =>
     dataSource.getRepository(CategoriaSchema).existsBy({ id_categoria });
 
-export const create = async (data: CreateProductDTO): Promise<number> => {
-    const result = await inTransaction(manager => manager.getRepository(ProductoSchema).insert({
-        id_categoria: data.id_categoria,
-        codigo: data.codigo.trim(),
-        nombre: data.nombre.trim(),
-        descripcion: data.descripcion ?? null,
-        precio: String(data.precio),
-        stock: data.stock,
-        imagen: data.imagen ?? null,
-        activo: data.activo === undefined ? 1 : Number(data.activo),
-    }));
+export const create = async (data: CreateProductDTO, actorId?: number | null): Promise<number> => {
+    const result = await inTransaction(async manager => {
+        // The FER-17 trigger validates this id again against an active ADMIN.
+        await manager.query('SET @fer17_actor_id = ?', [actorId ?? null]);
+        try {
+            return await manager.getRepository(ProductoSchema).insert({
+                id_categoria: data.id_categoria,
+                codigo: data.codigo.trim(),
+                nombre: data.nombre.trim(),
+                descripcion: data.descripcion ?? null,
+                precio: String(data.precio),
+                stock: data.stock,
+                imagen: data.imagen ?? null,
+                activo: data.activo === undefined ? 1 : Number(data.activo),
+            });
+        } finally {
+            await manager.query('SET @fer17_actor_id = NULL').catch(() => undefined);
+        }
+    });
     return Number(result.identifiers[0].id_producto);
 };
 
-export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange) => {
+export const update = async (id: number, data: UpdateProductDTO, notify?: NotifyCommittedChange,
+    actorId?: number | null) => {
     // Never spread HTTP input into an entity; ignored keys stay ignored.
     const values: Record<string, string | number | null> = {};
     for (const field of ['id_categoria', 'codigo', 'nombre', 'descripcion', 'precio', 'stock', 'imagen', 'activo'] as const) {
@@ -87,20 +143,26 @@ export const update = async (id: number, data: UpdateProductDTO, notify?: Notify
     }
     if (!Object.keys(values).length) return { updated: false, replacedImage: null };
     const { updated, stockChanged, replacedImage } = await inTransaction(async manager => {
-        // Compare under the same row lock as the update, including a PUT with other fields.
-        const [before] = data.imagen !== undefined || (notify && data.stock !== undefined)
-            ? await manager.query<{ stock: number; imagen: string | null }[]>(
-                'SELECT stock, imagen FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
-            )
-            : [];
-        const result = await manager.getRepository(ProductoSchema).update({ id_producto: id }, values);
-        const updated = (result.affected ?? 0) > 0;
-        return {
-            updated,
-            stockChanged: updated && before !== undefined && data.stock !== undefined && before.stock !== data.stock,
-            replacedImage: updated && before && data.imagen !== undefined && before.imagen !== data.imagen
-                ? before.imagen : null,
-        };
+        // The trigger reads this only inside this transaction and revalidates ADMIN.
+        await manager.query('SET @fer17_actor_id = ?', [actorId ?? null]);
+        try {
+            // Compare under the same row lock as the update, including a PUT with other fields.
+            const [before] = data.imagen !== undefined || data.precio !== undefined || (notify && data.stock !== undefined)
+                ? await manager.query<{ stock: number; imagen: string | null }[]>(
+                    'SELECT stock, imagen FROM PRODUCTO WHERE id_producto = ? FOR UPDATE', [id],
+                )
+                : [];
+            const result = await manager.getRepository(ProductoSchema).update({ id_producto: id }, values);
+            const updated = (result.affected ?? 0) > 0;
+            return {
+                updated,
+                stockChanged: updated && before !== undefined && data.stock !== undefined && before.stock !== data.stock,
+                replacedImage: updated && before && data.imagen !== undefined && before.imagen !== data.imagen
+                    ? before.imagen : null,
+            };
+        } finally {
+            await manager.query('SET @fer17_actor_id = NULL').catch(() => undefined);
+        }
     });
     if (stockChanged) notifyAfterCommit(notify, { kind: 'stock', productIds: [id] });
     return { updated, replacedImage };

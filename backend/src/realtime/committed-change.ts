@@ -7,8 +7,44 @@ export type CommittedChange =
   | {
     kind: 'order';
     clientId: number;
-    order: Pick<ConfirmedAccountOrder, 'pedidoId' | 'estado'>;
+    order: Pick<ConfirmedAccountOrder, 'pedidoId' | 'estado'> & {
+      modalidadPago?: 'CUENTA_CORRIENTE' | 'TRANSFERENCIA';
+    };
     productIds: readonly number[];
+  }
+  | {
+    kind: 'orderStatus';
+    clientId: number;
+    order: {
+      pedidoId: number;
+      estadoAnterior: string;
+      estadoNuevo: string;
+      actualizadoEn: string;
+    };
+  }
+  | {
+    kind: 'receipt';
+    clientId: number;
+    receipt: {
+      comprobanteId: string;
+      pedidoId: number | null;
+      cuentaCorrienteId: number | null;
+      estadoDocumental: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO';
+      actualizadoEn: string;
+    };
+  }
+  | {
+    kind: 'payment';
+    clientId: number;
+    payment: {
+      pagoId: number;
+      pedidoId: number | null;
+      cuentaCorrienteId: number | null;
+      estadoPago: 'ACREDITADO' | 'ANULADO';
+      montoUSD: string;
+      revisionCuenta: string | null;
+      actualizadoEn: string;
+    };
   };
 
 export type NotifyCommittedChange = (change: CommittedChange) => void;

@@ -74,6 +74,17 @@ siendo cero, no un centinela. Si una línea no tiene precio USD positivo no hay
 total USD parcial. ARS cero bloquea su total, conservando consulta USD.
 `precioComprable` describe precio, no stock reservado ni autorización de compra.
 
+En `GET /api/admin/productos`, `estado_precio_base` describe el importe cargado:
+`SIN_PRECIO`, `BASE_CERO`, `NO_VERIFICADO`, `VERIFICADO` o `SINTETICO`.
+Utiliza los mismos criterios de evidencia que la consulta pública, incluso para
+productos inactivos. Un precio base verificado no garantiza un precio final
+comprable: también intervienen descuentos, disponibilidad y autorización.
+Guardar o cambiar un importe no genera evidencia. Catálogo y detalle reconsultan
+los precios al recuperar el foco de la ventana; no ofrecen actualización en tiempo real.
+En consultas USD mixtas, el catálogo conserva las líneas reales verificadas y
+oculta los importes de líneas sintéticas no habilitadas para compra académica;
+estas se identifican como sintéticas y no bloquean los demás precios.
+
 ## Persistencia y transacción
 
 [Operación, migraciones y carga manual](../operaciones-precios.md).
@@ -91,6 +102,10 @@ Solicitudes repetidas o simultáneas no producen duplicaciones diarias innecesar
 La evidencia USD está vinculada al importe exacto actual, un ADMIN y un instante
 no futuro. Cambiar el precio invalida esa evidencia hasta nueva revisión. No hay
 evidencia global de dataset que habilite importes arbitrarios por configuración.
+El procedimiento local autorizado para verificar un alta o una edición, con
+historial append-only y rechazos auditados, está en
+[T-S7-05.2](../s7-05/T-S7-05.2-verificacion-precios.md). No existe endpoint HTTP
+para escribir evidencias.
 
 ARS exige calendario activo/verificado/versionado con cobertura explícita de cada
 fecha recorrida. Nunca presume feriados. Referencia = mayor hábil estrictamente
@@ -134,3 +149,8 @@ no errores operativos. La identidad, evidencia y trazabilidad se consultan en se
 
 Fuera de alcance: #242, #243, FER-16, carrito, crédito, checkout y APIs administrativas.
 La carga manual verificable es operación de datos controlada, no una interfaz de administración.
+
+
+## Referencias del catálogo normal (#313)
+
+La publicación operativa de los 100 SKU de #309 puede emitir `referenciaCatalogo: true` en cada línea o precio de carrito. Es una salida del backend, nunca un dato aceptado del navegador. El servidor contrasta SKU, importe, huella versionada y evidencia válida del ADMIN. Se conserva `datosSinteticos: true` (y `evidenciaBaseUSD.synthetic: true` en precios) para expresar su procedencia representativa. Esta marca permite consumir las referencias publicadas mediante los descuentos y totales existentes, sin el checkout académico de la demo. Otra evidencia sintética sigue bloqueada en el cliente. No equivale a evidencia comercial real. Procedimiento y límites: [#313](../313/README.md).

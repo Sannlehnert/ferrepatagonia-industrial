@@ -1,3 +1,7 @@
+import type { OrderDocumentState, OrderFinancialState } from './orderStates'
+
+export type { OrderDocumentState, OrderFinancialState }
+
 export type AdminOrderOperationalStatus =
   | 'CONFIRMADO'
   | 'EN_PREPARACION'
@@ -29,9 +33,13 @@ export interface AdminOrderListItem {
   idPedido: number
   fecha: string
   estado: AdminOrderFilterStatus | string
+  estadoPedido?: string
+  estadoDocumental?: OrderDocumentState
+  estadoFinanciero?: OrderFinancialState
+  montoAcreditadoUSD?: string | null
   estadosPermitidos: AdminOrderOperationalStatus[]
   modalidadPago: string
-  moneda: string
+  moneda: string | null
   subtotal: string
   descuento: string
   total: string
@@ -41,6 +49,7 @@ export interface AdminOrderListItem {
   totalUnidades: number
   cargoCuentaCorrienteId: number | null
   origen: 'REAL' | 'DEMO'
+  comprobantes?: { total: number; pendientesRevision: number }
   cliente: AdminOrderClientSummary
 }
 

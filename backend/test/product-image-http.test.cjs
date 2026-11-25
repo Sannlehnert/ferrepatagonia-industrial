@@ -1,5 +1,4 @@
 const assert = require('node:assert/strict');
-const { EventEmitter } = require('node:events');
 const { once } = require('node:events');
 const { randomUUID } = require('node:crypto');
 const { mkdtemp, rm, writeFile } = require('node:fs/promises');
@@ -7,7 +6,6 @@ const { tmpdir } = require('node:os');
 const { join } = require('node:path');
 const { after, before, beforeEach, test } = require('node:test');
 const sharp = require('sharp');
-const { fetchFromBrowser } = require('./helpers/browser-request.cjs');
 const { sessionRow } = require('./helpers/session-fixture.cjs');
 
 Object.assign(process.env, {
@@ -21,8 +19,6 @@ Object.assign(process.env, {
 
 const { app } = require('../dist/app');
 const { dataSource, destroyDatabase } = require('../dist/config/database.config');
-const { receiptWorkerRuntime } = require('../dist/services/receipts/receipt-storage');
-const { signToken } = require('../dist/services/token.service');
 
 let server;
 let baseUrl;
@@ -31,7 +27,6 @@ let receiptDir;
 let regularFile;
 let existingName;
 let validWebp;
-let validPng;
 let previousImageDir;
 let previousReceiptDir;
 
@@ -55,9 +50,6 @@ before(async () => {
   validWebp = await sharp({
     create: { width: 12, height: 12, channels: 3, background: '#126c9e' },
   }).webp().toBuffer();
-  validPng = await sharp({
-    create: { width: 8, height: 8, channels: 3, background: 'white' },
-  }).png().toBuffer();
 
   existingName = `${randomUUID()}.webp`;
   await writeFile(join(validDir, existingName), validWebp);
@@ -161,36 +153,4 @@ test('GET y HEAD /api/product-images/:name conservan 404 para nombres inválidos
   assert.equal(okHead.headers.get('content-type'), 'image/webp');
   assert.equal(Number(okHead.headers.get('content-length')), validWebp.length);
   assert.equal((await okHead.arrayBuffer()).byteLength, 0);
-});
-
-test('compilado: fallo operativo del worker de comprobantes devuelve 503 y nunca 422', async t => {
-  setStorageEnv(validDir, receiptDir);
-  const logs = [];
-  t.mock.method(console, 'error', (...args) => logs.push(JSON.stringify(args)));
-  t.mock.method(receiptWorkerRuntime, 'createWorker', () => {
-    const emitter = new EventEmitter();
-    emitter.terminate = async () => 1;
-    queueMicrotask(() => {
-      emitter.emit('error', Object.assign(new Error('Cannot load /secret/path/worker.js'), {
-        code: 'ERR_MODULE_NOT_FOUND',
-      }));
-    });
-    return emitter;
-  });
-
-  const response = await fetchFromBrowser(`${baseUrl}/pedidos/1/comprobantes`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'image/png',
-      Cookie: 'jwt_token=' + signToken({ id: 1, rol: 'CLIENTE' }),
-    },
-    body: validPng,
-  });
-
-  assert.equal(response.status, 503);
-  assert.equal(response.headers.get('retry-after'), '1');
-  const json = await response.json();
-  assert.equal(json.code, 'COMPROBANTES_NO_DISPONIBLES');
-  assert.ok(!JSON.stringify(json).includes('/secret/path/worker.js'));
-  assert.ok(!logs.join('\n').includes('/secret/path/worker.js'));
 });

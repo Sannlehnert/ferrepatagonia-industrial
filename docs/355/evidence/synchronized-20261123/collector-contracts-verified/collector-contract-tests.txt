@@ -1,0 +1,60 @@
+TAP version 13
+# {"name":"ok","result":"PASS","exitCode":0,"passed":null,"failed":0}
+# Subtest: all successful child processes produce PASS and aggregate exit 0
+ok 1 - all successful child processes produce PASS and aggregate exit 0
+  ---
+  duration_ms: 82.0591
+  type: 'test'
+  ...
+# {"name":"fail","result":"FAIL","exitCode":17,"passed":null,"failed":0}
+# {"name":"later","result":"PASS","exitCode":0,"passed":null,"failed":0}
+# Subtest: a failing suite preserves its complete log and subsequent results, aggregate exit 1
+ok 2 - a failing suite preserves its complete log and subsequent results, aggregate exit 1
+  ---
+  duration_ms: 132.1718
+  type: 'test'
+  ...
+# {"name":"prerequisite","result":"FAIL","exitCode":23,"passed":null,"failed":0}
+# {"name":"dependent","result":"BLOCKED","exitCode":null,"passed":null,"failed":0}
+# Subtest: failed prerequisite records dependent work as BLOCKED without executing it
+ok 3 - failed prerequisite records dependent work as BLOCKED without executing it
+  ---
+  duration_ms: 77.6448
+  type: 'test'
+  ...
+# {"name":"missing-executable","result":"FAIL","exitCode":-4058,"passed":null,"failed":0}
+# Subtest: spawn errors preserve a FAIL record and cannot produce aggregate success
+ok 4 - spawn errors preserve a FAIL record and cannot produce aggregate success
+  ---
+  duration_ms: 20.8184
+  type: 'test'
+  ...
+# {"name":"ok","result":"PASS","exitCode":0,"passed":null,"failed":0}
+# CLI fixture: exit=1, installation exit=42, 5 dependent records BLOCKED, evidence preserved.
+# Subtest: final verification errors preserve logs and force COLLECTOR_ERROR/exit 1
+ok 5 - final verification errors preserve logs and force COLLECTOR_ERROR/exit 1
+  ---
+  duration_ms: 77.3654
+  type: 'test'
+  ...
+# Subtest: real CLI propagates prerequisite failure to its process exit status
+ok 6 - real CLI propagates prerequisite failure to its process exit status
+  ---
+  duration_ms: 367.3945
+  type: 'test'
+  ...
+# Subtest: real CLI preserves a blocked manifest when its npm version probe fails
+ok 7 - real CLI preserves a blocked manifest when its npm version probe fails
+  ---
+  duration_ms: 297.4893
+  type: 'test'
+  ...
+1..7
+# tests 7
+# suites 0
+# pass 7
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 1146.0121

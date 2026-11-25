@@ -53,7 +53,7 @@ async function main() {
     const health = await page.request.get('/api/health');
     assert.equal(health.headers()['x-ferre-demo'], proof, 'La web no apunta a la MariaDB exclusiva de la demo.');
     const [counts] = await db.query(`SELECT COUNT(*) AS sku, COUNT(imagen) AS fotos FROM PRODUCTO WHERE codigo LIKE 'FP-DEMO-%'`);
-    assert.deepEqual([Number(counts.sku), Number(counts.fotos)], [904, 132]);
+    assert.deepEqual([Number(counts.sku), Number(counts.fotos)], [904, 182]);
     const { data } = await json(await page.request.get('/api/catalogo?busqueda=' + sku));
     assert.equal(data.pagination.total, 1);
     const [{ id, imagen, nombre, categoria }] = data.productos;
@@ -95,7 +95,7 @@ async function main() {
       const resource = await particular.request.get(await receipt.getAttribute('href'));
       assert.equal(resource.status(), 200);
       assert.deepEqual(await resource.body(), png);
-      console.log('Reinicio verificado: 904 SKU, 132 fotos, stock, usuario, pedido y comprobante revisado con archivo intacto.');
+      console.log('Reinicio verificado: 904 SKU, 182 imágenes, stock, usuario, pedido y comprobante revisado con archivo intacto.');
       return;
     }
 
@@ -190,10 +190,10 @@ async function main() {
     await admin.getByRole('link', { name: 'Comprobantes de pago', exact: true }).click();
     const row = admin.getByRole('region', { name: 'Comprobantes de pago' }).getByRole('listitem')
       .filter({ has: admin.locator('a[href$="/' + comprobanteId + '"]') });
-    const mark = row.getByRole('button', { name: 'Marcar revisado' });
+    const mark = row.getByRole('button', { name: 'Aprobar comprobante' });
     await expect(row).toBeVisible();
     if (await mark.count()) await mark.click();
-    await expect(row.getByText(/^Revisado/)).toBeVisible();
+    await expect(row.getByText(/^Aprobado/)).toBeVisible();
 
     const [effects] = await db.query(`SELECT
       (SELECT COUNT(*) FROM MOVIMIENTO_CUENTA_CORRIENTE WHERE id_pedido=? AND tipo_movimiento='CARGO'

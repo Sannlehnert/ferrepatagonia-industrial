@@ -1,0 +1,194 @@
+[
+  {
+    "id": 14876710044,
+    "sha256": "e287b253b74efa153c724e7660d62388225148b9655c57046c78bedf71cd4d6b",
+    "entries": [
+      {
+        "name": "ci-diagnostics/frontend-e2e-docker-cleanup.json",
+        "length": 99
+      },
+      {
+        "name": "frontend/playwright-report/data/20936bf02459582f6d7f53dfbd9e69201768154f.png",
+        "length": 58183
+      },
+      {
+        "name": "frontend/playwright-report/data/308e280f45567cb57ad1b3ff902af79f55efc343.png",
+        "length": 34890
+      },
+      {
+        "name": "frontend/playwright-report/data/4ad14052d0307ef27eef9cf45eb2975d81993e0b.png",
+        "length": 30157
+      },
+      {
+        "name": "frontend/playwright-report/data/69ebcf67d33d5a3897179a272086d5ca9d22cfbd.png",
+        "length": 159064
+      },
+      {
+        "name": "frontend/playwright-report/data/8f4b3c857cba3df7e507c4b1659d72fa45b49eb5.png",
+        "length": 148254
+      },
+      {
+        "name": "frontend/playwright-report/data/a52177937d42a823352caa8ad042604c058a626d.png",
+        "length": 122745
+      },
+      {
+        "name": "frontend/playwright-report/data/a8c82315fa5930d3187683581e39019b558c1297.png",
+        "length": 83021
+      },
+      {
+        "name": "frontend/playwright-report/data/b7e50ddf7c904918f54cf7302d2fdefb68401630.png",
+        "length": 45514
+      },
+      {
+        "name": "frontend/playwright-report/data/e045f08313b700d4ad51bb632da6dfb42301e3fc.png",
+        "length": 84826
+      },
+      {
+        "name": "frontend/playwright-report/data/e5114dfdeeccbf57271a353b4289718abb574cc7.png",
+        "length": 126318
+      },
+      {
+        "name": "frontend/playwright-report/data/f2f73f7da2847d837c2b0908a5a96a3072df9147.png",
+        "length": 52497
+      },
+      {
+        "name": "frontend/playwright-report/demo-catalog/index.html",
+        "length": 1023648
+      },
+      {
+        "name": "frontend/playwright-report/fer19-acceptance/index.html",
+        "length": 608140
+      },
+      {
+        "name": "frontend/playwright-report/fer19-production/index.html",
+        "length": 567720
+      },
+      {
+        "name": "frontend/playwright-report/index.html",
+        "length": 1652276
+      },
+      {
+        "name": "frontend/playwright-report/payment-actions/index.html",
+        "length": 633032
+      },
+      {
+        "name": "frontend/playwright-report/payments/index.html",
+        "length": 573840
+      },
+      {
+        "name": "frontend/playwright-report/production/index.html",
+        "length": 562900
+      },
+      {
+        "name": "frontend/playwright-report/receipts/index.html",
+        "length": 592288
+      }
+    ]
+  },
+  {
+    "id": 14875560445,
+    "sha256": "8160cc1c60fd00ed70a215f1b5715c73ec8ca02bed67fd9f2c88c43028731381",
+    "entries": [
+      {
+        "name": "backend-docker-cleanup.json",
+        "length": 98
+      }
+    ]
+  },
+  {
+    "id": 14858500594,
+    "sha256": "d8cfd39ab9120be689594a4be56de0a82a19d834f7b10bbc8128713c35aadcc3",
+    "entries": [
+      {
+        "name": "ci-diagnostics/frontend-e2e-docker-cleanup.json",
+        "length": 99
+      },
+      {
+        "name": "frontend/playwright-report/data/12d709fbb9e55581bc6e505a8841b7d4a57b43b9.png",
+        "length": 35791
+      },
+      {
+        "name": "frontend/playwright-report/data/20936bf02459582f6d7f53dfbd9e69201768154f.png",
+        "length": 58183
+      },
+      {
+        "name": "frontend/playwright-report/data/2d50938ad8496d6e94632c6d08b78e3a3e6fcfea.png",
+        "length": 122766
+      },
+      {
+        "name": "frontend/playwright-report/data/4ad14052d0307ef27eef9cf45eb2975d81993e0b.png",
+        "length": 30157
+      },
+      {
+        "name": "frontend/playwright-report/data/69ebcf67d33d5a3897179a272086d5ca9d22cfbd.png",
+        "length": 159064
+      },
+      {
+        "name": "frontend/playwright-report/data/a8c82315fa5930d3187683581e39019b558c1297.png",
+        "length": 83021
+      },
+      {
+        "name": "frontend/playwright-report/data/b7e50ddf7c904918f54cf7302d2fdefb68401630.png",
+        "length": 45514
+      },
+      {
+        "name": "frontend/playwright-report/data/e045f08313b700d4ad51bb632da6dfb42301e3fc.png",
+        "length": 84826
+      },
+      {
+        "name": "frontend/playwright-report/data/e5114dfdeeccbf57271a353b4289718abb574cc7.png",
+        "length": 126318
+      },
+      {
+        "name": "frontend/playwright-report/data/f2f73f7da2847d837c2b0908a5a96a3072df9147.png",
+        "length": 52497
+      },
+      {
+        "name": "frontend/playwright-report/data/f4e23f026e1bf2652ffb4f4efe350d1183670e08.png",
+        "length": 148211
+      },
+      {
+        "name": "frontend/playwright-report/demo-catalog/index.html",
+        "length": 983844
+      },
+      {
+        "name": "frontend/playwright-report/fer19-acceptance/index.html",
+        "length": 567192
+      },
+      {
+        "name": "frontend/playwright-report/fer19-production/index.html",
+        "length": 526604
+      },
+      {
+        "name": "frontend/playwright-report/index.html",
+        "length": 1611156
+      },
+      {
+        "name": "frontend/playwright-report/payment-actions/index.html",
+        "length": 592116
+      },
+      {
+        "name": "frontend/playwright-report/production/index.html",
+        "length": 521740
+      },
+      {
+        "name": "frontend/playwright-report/payments/index.html",
+        "length": 532664
+      },
+      {
+        "name": "frontend/playwright-report/receipts/index.html",
+        "length": 551160
+      }
+    ]
+  },
+  {
+    "id": 14857257790,
+    "sha256": "3a74aaa270e060b38310d452da008fbb75af9a6664011a762857bf1b9a117d97",
+    "entries": [
+      {
+        "name": "backend-docker-cleanup.json",
+        "length": 98
+      }
+    ]
+  }
+]

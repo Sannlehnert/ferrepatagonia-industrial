@@ -105,14 +105,22 @@ for (const kind of ['absent', 'invalid', 'expired', 'without exp', 'HS384', 'wro
   });
   assert.equal(await productSnapshot(), before);
 });
-test('real identity pool saturation produces controlled 500 and recovers', async t => {
+test('real identity pool saturation produces controlled 503 with Retry-After and recovers', async t => {
   const before = await productSnapshot();
   const runners = Array.from({ length: 5 }, () => dataSource.createQueryRunner());
   try {
     await Promise.all(runners.map(r => r.connect()));
-    for (const route of routes) await t.test(route.method + ' ' + route.path, async () => {
-      const response = await send(route, admin.cookie);
-      assert.equal(response.status, 500); assert.deepEqual(response.body, { message: 'Error interno del servidor.' });
+    const results = await Promise.all(routes.map(async route => ({
+      route,
+      response: await send(route, admin.cookie),
+    })));
+    for (const { route, response } of results) await t.test(route.method + ' ' + route.path, async () => {
+      assert.equal(response.status, 503);
+      assert.equal(response.headers.get('retry-after'), '1');
+      assert.deepEqual(response.body, {
+        code: 'SERVICIO_NO_DISPONIBLE',
+        message: 'El servicio está temporalmente ocupado. Intentá nuevamente en unos instantes.',
+      });
       assert.equal(response.headers.get('set-cookie'), null);
     });
   } finally { await Promise.all(runners.map(r => r.release())); }
@@ -136,7 +144,7 @@ test('real login/me/logout preserve cookie flags, TTL, public JSON and no refres
     try {
       const login = await call({ method: 'POST', path: '/api/auth/login', body: { email: admin.email, password: admin.password } });
       assert.equal(login.status, 200);
-      assert.deepEqual(login.body, { message: 'Login exitoso', user: { id: admin.id, email: admin.email, rol: 'ADMIN', tipo_cliente: null, nombre: 'Administrador' } });
+      assert.deepEqual(login.body, { message: 'Login exitoso', user: { id: admin.id, email: admin.email, rol: 'ADMIN', tipo_cliente: null, nombre: 'Administrador', estadoAprobacionEmpresa: null, cuentaCorrienteHabilitada: null } });
       const set = login.headers.get('set-cookie');
       for (const pattern of [/HttpOnly/, /SameSite=Strict/, /Path=\//, /Max-Age=7200/]) assert.ok(pattern.test(set), 'Required cookie flag missing');
       assert.equal(/; Secure/i.test(set), mode === 'production'); assert.equal(/Domain=/i.test(set), false);

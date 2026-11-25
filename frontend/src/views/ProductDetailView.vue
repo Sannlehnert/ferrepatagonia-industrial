@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import CatalogCartButton from '@/components/CatalogCartButton.vue'
+import IllustrativeImageNotice from '@/components/IllustrativeImageNotice.vue'
+import ProductThumbnail from '@/components/ProductThumbnail.vue'
 import ProductPrice from '@/components/ProductPrice.vue'
 import ProductPrices from '@/components/ProductPrices.vue'
 import { getCatalogProduct } from '@/services/catalogService'
 import { refreshOnStock } from '@/services/realtime'
 import type { CatalogProduct, CatalogProductDetail } from '@/types/catalog'
 import { getProductImageSource } from '@/utils/productImage'
+import { isIllustrativeDemoImage } from '@/utils/illustrativeDemoImage'
 import axios from 'axios'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -43,6 +46,10 @@ const returnLabel = computed(() => {
 })
 
 const imageSource = computed(() => getProductImageSource(product.value?.imagen))
+const illustrativeNoticeId = 'product-detail-image-note'
+const isIllustrativeImage = computed(() =>
+  product.value ? isIllustrativeDemoImage(product.value.codigo, product.value.imagen) : false,
+)
 
 async function loadProduct() {
   controller?.abort()
@@ -82,9 +89,9 @@ onBeforeUnmount(() => controller?.abort())
 <template>
   <main class="fp-shell py-6 lg:py-10">
     <nav aria-label="Ruta de navegación" class="mb-5 flex flex-wrap items-center gap-1.5 text-sm">
-      <RouterLink :to="{ name: 'home' }" class="fp-focus text-[var(--fp-blue)] underline">Inicio</RouterLink>
+      <RouterLink :to="{ name: 'home' }" class="inline-flex min-h-11 min-w-11 items-center justify-center fp-focus text-[var(--fp-blue)] underline">Inicio</RouterLink>
       <span aria-hidden="true" class="text-slate-400"> / </span>
-      <RouterLink :to="returnTarget" class="fp-focus text-[var(--fp-blue)] underline">{{ returnLabel }}</RouterLink>
+      <RouterLink :to="returnTarget" class="inline-flex min-h-11 min-w-11 items-center fp-focus text-[var(--fp-blue)] underline">{{ returnLabel }}</RouterLink>
       <span aria-hidden="true" class="text-slate-400"> / </span>
       <span class="text-slate-600">Detalle del producto</span>
     </nav>
@@ -112,15 +119,20 @@ onBeforeUnmount(() => controller?.abort())
     <ProductPrices v-else-if="product" :products="pricedProducts" :catalog-loading="loading" v-slot="pricing">
       <article class="grid gap-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6 lg:grid-cols-2 lg:gap-10">
         <div class="grid min-h-64 place-items-center overflow-hidden rounded-lg bg-slate-100 sm:min-h-80">
-          <img
-            v-if="imageSource && !imageFailed"
-            :src="imageSource"
+          <ProductThumbnail
+            :image="imageSource"
             :alt="product.nombre"
-            class="max-h-[520px] w-full object-contain"
-            loading="lazy"
-            @error="imageFailed = true"
+            image-class="max-h-[520px] w-full object-contain"
+            :described-by="isIllustrativeImage && !imageFailed ? illustrativeNoticeId : undefined"
+            @image-error="imageFailed = true"
+          >
+            <span class="text-sm text-slate-500">Sin imagen disponible</span>
+          </ProductThumbnail>
+          <IllustrativeImageNotice
+            v-if="isIllustrativeImage && !imageFailed"
+            :id="illustrativeNoticeId"
+            class="mx-3 mb-3"
           />
-          <span v-else class="text-sm text-slate-500">Sin imagen disponible</span>
         </div>
 
         <div class="flex min-w-0 flex-col">

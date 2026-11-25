@@ -1,15 +1,23 @@
 import { PERMISSIONS, type Permission } from './permissions'
+import type { LocationQueryRaw } from 'vue-router'
 
 export interface MenuItem {
     id: string
     label: string
     // null indica que la ruta todavía no está implementada.
     routeName: string | null
+    query?: LocationQueryRaw
     // null indica que la opción es pública y no requiere un permiso.
     permission: Permission | null
 }
 
 export const accountMenu: readonly MenuItem[] = [
+    {
+        id: 'account-dashboard',
+        label: 'Dashboard',
+        routeName: 'cuenta-dashboard',
+        permission: PERMISSIONS.VIEW_OWN_ACCOUNT,
+    },
     {
         id: 'account-orders',
         label: 'Historial de pedidos',
@@ -19,22 +27,22 @@ export const accountMenu: readonly MenuItem[] = [
     {
         id: 'account-orders-without-receipt',
         label: 'Pedidos sin comprobante',
-        // Pendiente de implementar el destino y el filtro correspondiente.
-        routeName: null,
+        routeName: 'cuenta-pedidos',
+        query: { filtro: 'sin-comprobante' },
         permission: PERMISSIONS.VIEW_OWN_ORDERS,
     },
     {
         id: 'account-credit-orders',
         label: 'Pedidos con cuenta corriente',
-        // Destino pendiente hasta disponer de pantalla y datos específicos.
-        routeName: null,
+        routeName: 'cuenta-pedidos',
+        query: { filtro: 'cuenta-corriente' },
         permission: PERMISSIONS.VIEW_OWN_CREDIT_ORDERS,
     },
     {
         id: 'account-credit',
         label: 'Cuenta corriente',
         routeName: 'cuenta-corriente',
-        permission: PERMISSIONS.VIEW_OWN_ACCOUNT,
+        permission: PERMISSIONS.VIEW_OWN_CREDIT_ACCOUNT,
     },
     {
         id: 'account-details',
@@ -62,6 +70,12 @@ export const adminMenu: readonly MenuItem[] = [
         label: 'Productos',
         routeName: 'admin-products',
         permission: PERMISSIONS.MANAGE_PRODUCTS,
+    },
+    {
+        id: 'admin-payments',
+        label: 'Gestión de pagos',
+        routeName: 'admin-payments',
+        permission: PERMISSIONS.VIEW_ADMIN_PANEL,
     },
     {
         id: 'admin-receipts',

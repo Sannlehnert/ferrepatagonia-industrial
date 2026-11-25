@@ -1,4 +1,4 @@
-import { computed, onScopeDispose, ref, watch, type Ref } from 'vue'
+import { computed, onMounted, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { currentSessionGeneration } from '@/services/sessionGeneration'
 import { getPrices, priceErrorMessage } from '@/services/pricingService'
@@ -47,7 +47,26 @@ export function useProductPrices(products: Ref<CatalogProduct[]>, catalogLoading
   watch(() => [products.value, catalogLoading.value, auth.sessionVersion, auth.user?.id,
     auth.user?.rol, auth.sessionChecked, auth.loggingIn, auth.loggingOut, auth.sessionError],
   () => { void retry() }, { immediate: true, flush: 'sync' })
-  onScopeDispose(() => { controller?.abort(); prices.value = {} })
+  const AUTO_REFRESH_COOLDOWN_MS = 250
+  let lastAutoRefreshAt = -Infinity
+  function refreshOnAutoReturn() {
+    const now = Date.now()
+    if (now - lastAutoRefreshAt < AUTO_REFRESH_COOLDOWN_MS) return
+    lastAutoRefreshAt = now
+    void retry()
+  }
+  const refreshOnFocus = () => { refreshOnAutoReturn() }
+  const refreshOnVisible = () => { if (document.visibilityState === 'visible') refreshOnAutoReturn() }
+  onMounted(() => {
+    if (typeof window !== 'undefined') window.addEventListener('focus', refreshOnFocus)
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', refreshOnVisible)
+  })
+  onScopeDispose(() => {
+    if (typeof window !== 'undefined') window.removeEventListener('focus', refreshOnFocus)
+    if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', refreshOnVisible)
+    controller?.abort()
+    prices.value = {}
+  })
   async function retryPrices() {
     if (auth.sessionError) {
       try { await auth.fetchSession() } catch { return }

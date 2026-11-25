@@ -1,0 +1,285 @@
+BLOQUE build-backend — PASS
+
+
+BLOQUE build-frontend — PASS
+
+
+BLOQUE account-admin — PASS
+# Subtest: listado vacío real y alta de los escenarios aislados
+ok 1 - listado vacío real y alta de los escenarios aislados
+# Subtest: listado rechaza visitante
+ok 2 - listado rechaza visitante
+# Subtest: listado rechaza CLIENTE
+ok 3 - listado rechaza CLIENTE
+# Subtest: listado rechaza token inválido
+ok 4 - listado rechaza token inválido
+# Subtest: listado rechaza token expirado
+ok 5 - listado rechaza token expirado
+# Subtest: listado rechaza ADMIN inactivo
+ok 6 - listado rechaza ADMIN inactivo
+# Subtest: listado devuelve 200 a ADMIN activo con privacidad
+ok 7 - listado devuelve 200 a ADMIN activo con privacidad
+# Subtest: resumen rechaza visitante
+ok 8 - resumen rechaza visitante
+# Subtest: resumen rechaza CLIENTE
+ok 9 - resumen rechaza CLIENTE
+# Subtest: resumen rechaza token inválido
+ok 10 - resumen rechaza token inválido
+# Subtest: resumen rechaza token expirado
+ok 11 - resumen rechaza token expirado
+# Subtest: resumen rechaza ADMIN inactivo
+ok 12 - resumen rechaza ADMIN inactivo
+# Subtest: resumen devuelve 200 a ADMIN activo con privacidad
+ok 13 - resumen devuelve 200 a ADMIN activo con privacidad
+# Subtest: movimientos rechaza visitante
+ok 14 - movimientos rechaza visitante
+# Subtest: movimientos rechaza CLIENTE
+ok 15 - movimientos rechaza CLIENTE
+# Subtest: movimientos rechaza token inválido
+ok 16 - movimientos rechaza token inválido
+# Subtest: movimientos rechaza token expirado
+ok 17 - movimientos rechaza token expirado
+# Subtest: movimientos rechaza ADMIN inactivo
+ok 18 - movimientos rechaza ADMIN inactivo
+# Subtest: movimientos devuelve 200 a ADMIN activo con privacidad
+ok 19 - movimientos devuelve 200 a ADMIN activo con privacidad
+# Subtest: vencimientos rechaza visitante
+ok 20 - vencimientos rechaza visitante
+# Subtest: vencimientos rechaza CLIENTE
+ok 21 - vencimientos rechaza CLIENTE
+# Subtest: vencimientos rechaza token inválido
+ok 22 - vencimientos rechaza token inválido
+# Subtest: vencimientos rechaza token expirado
+ok 23 - vencimientos rechaza token expirado
+# Subtest: vencimientos rechaza ADMIN inactivo
+ok 24 - vencimientos rechaza ADMIN inactivo
+# Subtest: vencimientos devuelve 200 a ADMIN activo con privacidad
+ok 25 - vencimientos devuelve 200 a ADMIN activo con privacidad
+# Subtest: rol antes de ID y destino, ausencia de cliente y ausencia de cuenta
+ok 26 - rol antes de ID y destino, ausencia de cliente y ausencia de cuenta
+# Subtest: query inválida con privacidad: limite=0
+ok 27 - query inválida con privacidad: limite=0
+# Subtest: query inválida con privacidad: limite=101
+ok 28 - query inválida con privacidad: limite=101
+# Subtest: query inválida con privacidad: limite=25&limite=25
+ok 29 - query inválida con privacidad: limite=25&limite=25
+# Subtest: query inválida con privacidad: cursor=a&cursor=b
+ok 30 - query inválida con privacidad: cursor=a&cursor=b
+# Subtest: query inválida con privacidad: cursor=alterado
+ok 31 - query inválida con privacidad: cursor=alterado
+# Subtest: query inválida con privacidad: habilitada=0
+ok 32 - query inválida con privacidad: habilitada=0
+# Subtest: query inválida con privacidad: habilitada=true&habilitada=false
+ok 33 - query inválida con privacidad: habilitada=true&habilitada=false
+# Subtest: query inválida con privacidad: clienteId=2147483648
+ok 34 - query inválida con privacidad: clienteId=2147483648
+# Subtest: query inválida con privacidad: cuentaId=1
+ok 35 - query inválida con privacidad: cuentaId=1
+# Subtest: query inválida con privacidad: rol=ADMIN
+ok 36 - query inválida con privacidad: rol=ADMIN
+# Subtest: lista solo cuentas existentes y aplica filtros combinados exactos
+ok 37 - lista solo cuentas existentes y aplica filtros combinados exactos
+# Subtest: fuera de test las cuentas DEMO quedan excluidas de listado y detalle
+ok 38 - fuera de test las cuentas DEMO quedan excluidas de listado y detalle
+# Subtest: páginas del listado recorren claves únicas y mantienen corte y revisión
+ok 39 - páginas del listado recorren claves únicas y mantienen corte y revisión
+# Subtest: cursor autentica identidad, rol, ámbito, cliente y filtros, y expira
+ok 40 - cursor autentica identidad, rol, ámbito, cliente y filtros, y expira
+# Subtest: revisión detecta cambios financieros, alta y habilitación dentro del filtro
+ok 41 - revisión detecta cambios financieros, alta y habilitación dentro del filtro
+# Subtest: resumen financiero debt
+ok 42 - resumen financiero debt
+# Subtest: resumen financiero long
+ok 43 - resumen financiero long
+# Subtest: resumen financiero favor
+ok 44 - resumen financiero favor
+# Subtest: resumen financiero disabled
+ok 45 - resumen financiero disabled
+# Subtest: resumen financiero empty
+ok 46 - resumen financiero empty
+# Subtest: resumen financiero zero
+ok 47 - resumen financiero zero
+# Subtest: resumen financiero partial
+ok 48 - resumen financiero partial
+# Subtest: resumen financiero unknown
+ok 49 - resumen financiero unknown
+# Subtest: movimientos paginados, empate de fecha, anulación, saldo resultante y propiedad
+ok 50 - movimientos paginados, empate de fecha, anulación, saldo resultante y propiedad
+# Subtest: vencimientos FIFO: fecha civil, vence hoy, remanente, plazo histórico y corte estable
+ok 51 - vencimientos FIFO: fecha civil, vence hoy, remanente, plazo histórico y corte estable
+# Subtest: lecturas dejan el ledger y sus revisiones intactos y cambios de \#260 invalidan cursores
+ok 52 - lecturas dejan el ledger y sus revisiones intactos y cambios de \#260 invalidan cursores
+# Subtest: CLIENTE conserva su cuenta propia y no eleva permisos mediante headers
+ok 53 - CLIENTE conserva su cuenta propia y no eleva permisos mediante headers
+# Subtest: error SQL real sanitizado y consulta posterior recuperada
+ok 54 - error SQL real sanitizado y consulta posterior recuperada
+# Subtest: un bloqueo real de MariaDB provoca 503 y permite reintentar
+ok 55 - un bloqueo real de MariaDB provoca 503 y permite reintentar
+# Subtest: H04 protege todo el libro con el abono DEMO en página 2
+ok 56 - H04 protege todo el libro con el abono DEMO en página 2
+# Subtest: H04 protege todo el libro con el abono DEMO primero
+ok 57 - H04 protege todo el libro con el abono DEMO primero
+# Subtest: producción: el listado ADMIN omite libros restringidos y conserva cuentas REAL legítimas
+ok 58 - producción: el listado ADMIN omite libros restringidos y conserva cuentas REAL legítimas
+# tests 58
+# suites 0
+# pass 58
+# fail 0
+# skipped 0
+# duration_ms 19002.5573
+Limpieza #258 confirmada: contenedor propio eliminado, datos tmpfs.
+
+BLOQUE payments — PASS
+# Subtest: \#333 declaración inicial: PAGO PENDIENTE sin movimientos, imputaciones ni cambio de saldo
+ok 1 - \#333 declaración inicial: PAGO PENDIENTE sin movimientos, imputaciones ni cambio de saldo
+# Subtest: \#333 declaración idempotente: misma clave y contenido no duplica; contenido distinto se rechaza
+ok 2 - \#333 declaración idempotente: misma clave y contenido no duplica; contenido distinto se rechaza
+# Subtest: \#333 declaraciones simultáneas con la misma clave crean una sola fila
+ok 3 - \#333 declaraciones simultáneas con la misma clave crean una sola fila
+# Subtest: \#333 revisión documental no acredita y el rechazo bloquea la acreditación
+ok 4 - \#333 revisión documental no acredita y el rechazo bloquea la acreditación
+# Subtest: \#333 acreditación autorizada: pago parcial, movimiento único y trazabilidad del actor
+ok 5 - \#333 acreditación autorizada: pago parcial, movimiento único y trazabilidad del actor
+# Subtest: \#333 pago total cancela la deuda sin exceder el importe declarado
+ok 6 - \#333 pago total cancela la deuda sin exceder el importe declarado
+# Subtest: \#333 dos ADMIN concurrentes: una sola acreditación efectiva
+ok 7 - \#333 dos ADMIN concurrentes: una sola acreditación efectiva
+# Subtest: \#333 misma clave concurrente: replay idempotente sin doble movimiento
+ok 8 - \#333 misma clave concurrente: replay idempotente sin doble movimiento
+# Subtest: \#333 error SQL en declaración: rollback total y sin PAGO parcial
+ok 9 - \#333 error SQL en declaración: rollback total y sin PAGO parcial
+# Subtest: \#333 error SQL en acreditación: rollback de PAGO y ausencia de movimiento
+ok 10 - \#333 error SQL en acreditación: rollback de PAGO y ausencia de movimiento
+# Subtest: \#333 permisos, sesiones cruzadas y ausencia de datos financieros ajenos
+ok 11 - \#333 permisos, sesiones cruzadas y ausencia de datos financieros ajenos
+# Subtest: \#333 vínculo de comprobante: inexistente, ajeno o con cuenta inconsistente se rechaza
+ok 12 - \#333 vínculo de comprobante: inexistente, ajeno o con cuenta inconsistente se rechaza
+# Subtest: \#333 límite DECIMAL(12,2): máximo exacto aceptado y un centavo superior rechazado
+ok 13 - \#333 límite DECIMAL(12,2): máximo exacto aceptado y un centavo superior rechazado
+# Subtest: \#333 cuenta restringida: cobertura incompleta y libro mixto bloquean la acreditación
+ok 14 - \#333 cuenta restringida: cobertura incompleta y libro mixto bloquean la acreditación
+# Subtest: \#333 cuenta inhabilitada conserva la posibilidad de acreditar el pago de deuda
+ok 15 - \#333 cuenta inhabilitada conserva la posibilidad de acreditar el pago de deuda
+# Subtest: \#333 importes inválidos y campos financieros no permitidos se rechazan sin escrituras
+ok 16 - \#333 importes inválidos y campos financieros no permitidos se rechazan sin escrituras
+# Subtest: \#333 pago en ARS: sin cotización verificada no acredita; con cotización FER17-v1 convierte una sola vez
+ok 17 - \#333 pago en ARS: sin cotización verificada no acredita; con cotización FER17-v1 convierte una sola vez
+# Subtest: \#333 cliente propio inactivo recibe 403 CLIENTE_INACTIVO y no un 404 ambiguo
+ok 18 - \#333 cliente propio inactivo recibe 403 CLIENTE_INACTIVO y no un 404 ambiguo
+# Subtest: \#333 revalida el comprobante en revisión y acreditación antes de mover saldos
+ok 19 - \#333 revalida el comprobante en revisión y acreditación antes de mover saldos
+# Subtest: \#333 cabeceras privadas en /api/admin/pagos incluso ante rechazos tempranos
+ok 20 - \#333 cabeceras privadas en /api/admin/pagos incluso ante rechazos tempranos
+# Subtest: \#333 filtra pagos DEMO_REGISTRADO y libros DEMO o mixtos también fuera de test
+ok 21 - \#333 filtra pagos DEMO_REGISTRADO y libros DEMO o mixtos también fuera de test
+# Subtest: \#333 conversión ARS que redondea a USD 0.00 se rechaza sin escribir
+ok 22 - \#333 conversión ARS que redondea a USD 0.00 se rechaza sin escribir
+# Subtest: \#333 claves de idempotencia son globales entre cuentas y flujos
+ok 23 - \#333 claves de idempotencia son globales entre cuentas y flujos
+# Subtest: \#335 P1-02: carrera concurrente APROBADO vs RECHAZADO devuelve [200, 409] y alinea pedidoId
+ok 24 - \#335 P1-02: carrera concurrente APROBADO vs RECHAZADO devuelve [200, 409] y alinea pedidoId
+# Subtest: \#335 P1-02: comprobante rechazado en /admin/comprobantes bloquea aprobación documental en /revision
+ok 25 - \#335 P1-02: comprobante rechazado en /admin/comprobantes bloquea aprobación documental en /revision
+# tests 25
+# suites 0
+# pass 25
+# fail 0
+# skipped 0
+# duration_ms 14397.7394
+CLEANUP OK #260: contenedor eliminado, datos tmpfs, sin volumen persistente.
+
+BLOQUE state-consistency — PASS
+# Subtest: 1. INV-01 + NEG-05/06/07/08/09/13: comprobantes (PENDIENTE/APROBADO/RECHAZADO) dejan en 0 cambios financieros
+ok 1 - 1. INV-01 + NEG-05/06/07/08/09/13: comprobantes (PENDIENTE/APROBADO/RECHAZADO) dejan en 0 cambios financieros
+# Subtest: 2. INV-02 + NEG-01/02/03/04: ciclo comercial del pedido sin estado PAGADO y grafo acíclico estricto
+ok 2 - 2. INV-02 + NEG-01/02/03/04: ciclo comercial del pedido sin estado PAGADO y grafo acíclico estricto
+# Subtest: 3. INV-03 + Proyección coherente ADMIN y CLIENTE (TRANSFERENCIA USD/ARS FER17-v1, sin falsos pagados)
+ok 3 - 3. INV-03 + Proyección coherente ADMIN y CLIENTE (TRANSFERENCIA USD/ARS FER17-v1, sin falsos pagados)
+# Subtest: 4. INV-03 + CUENTA_CORRIENTE: acreditación ARS/USD genera ABONO + FIFO y anulación recalcula FIFO y proyección
+ok 4 - 4. INV-03 + CUENTA_CORRIENTE: acreditación ARS/USD genera ABONO + FIFO y anulación recalcula FIFO y proyección
+# Subtest: 5. NEG-10, NEG-11, NEG-12 (triggers SQL), NEG-13 y RBAC (401/403/404) en PAGO y MOVIMIENTO
+ok 5 - 5. NEG-10, NEG-11, NEG-12 (triggers SQL), NEG-13 y RBAC (401/403/404) en PAGO y MOVIMIENTO
+# Subtest: 6. TOCTOU-01 a TOCTOU-05: concurrencia real en MariaDB, orden de locks y revalidación transaccional
+ok 6 - 6. TOCTOU-01 a TOCTOU-05: concurrencia real en MariaDB, orden de locks y revalidación transaccional
+# Subtest: 7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actualizado.v1 y pago.acreditado.v1 post-COMMIT sin filtro canReceiveOrders
+ok 7 - 7. Socket.IO §8: pedido.estado.actualizado.v1, comprobante.estado.actualizado.v1 y pago.acreditado.v1 post-COMMIT sin filtro canReceiveOrders
+# Subtest: 8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO
+ok 8 - 8. P2-01 y P2-02: validación SQL ARS->USD/FER17, observaciones exactas en replay y unicidad global Idempotency-Key en PAGO
+# Subtest: 9. R01: fallos SQL/concurrencia en consulta de cotización FER17 NO devuelven 422 COTIZACION_FER17_NO_VERIFICADA y hacen ROLLBACK
+ok 9 - 9. R01: fallos SQL/concurrencia en consulta de cotización FER17 NO devuelven 422 COTIZACION_FER17_NO_VERIFICADA y hacen ROLLBACK
+# Subtest: 10. R03: contrato unificado /api/admin/pagos* (\#317 + \#333), guardia documental 409, idempotencia global y flujo completo con FER17-v1 + Socket.IO
+ok 10 - 10. R03: contrato unificado /api/admin/pagos* (\#317 + \#333), guardia documental 409, idempotencia global y flujo completo con FER17-v1 + Socket.IO
+# Subtest: 11. R05: migración real sobre base previa a \#317 conserva huella histórica \#333 y valida replay estricto sin duplicar ABONO ni Socket.IO
+ok 11 - 11. R05: migración real sobre base previa a \#317 conserva huella histórica \#333 y valida replay estricto sin duplicar ABONO ni Socket.IO
+# tests 11
+# suites 0
+# pass 11
+# fail 0
+# skipped 0
+# duration_ms 30761.3645
+Reaplicación idempotente #290 + #333 verificada: filas de las 26 tablas preservadas intactas.
+CLEANUP OK T-S7-04.2: contenedor eliminado, datos tmpfs, almacenamiento temporal eliminado.
+
+BLOQUE catalog-browser — PASS
+# 313: carga y asociación de 100 imágenes por ADMIN completadas; activación explícita de los 100 productos.
+# 313: fichas comprobadas en Chromium: 20
+# 313: fichas comprobadas en Chromium: 40
+# 313: fichas comprobadas en Chromium: 60
+# 313: fichas comprobadas en Chromium: 80
+# 313: fichas comprobadas en Chromium: 100
+# Subtest: 313: catálogo autónomo de 100, listas 10/20, carrito y persistencia
+ok 1 - 313: catálogo autónomo de 100, listas 10/20, carrito y persistencia
+# tests 1
+# suites 0
+# pass 1
+# fail 0
+# skipped 0
+# duration_ms 102261.8275
+
+BLOQUE payment-actions — PASS
+  ok  1 [chromium] › e2e\admin\payments.real.spec.ts:120:3 › Gestión ADMIN de pagos con backend real › lista paginada, detalle y estados separados (4.4s)
+  ok  2 [chromium] › e2e\admin\payments.real.spec.ts:159:3 › Gestión ADMIN de pagos con backend real › muestra el listado vacío y recupera la consulta real (2.0s)
+  ok  3 [chromium] › e2e\admin\payments.real.spec.ts:173:3 › Gestión ADMIN de pagos con backend real › informa el error de consulta y permite reintentar sin datos inventados (1.9s)
+  ok  4 [chromium] › e2e\admin\payments.real.spec.ts:184:3 › Gestión ADMIN de pagos con backend real › aprueba documentación sin generar ningún ABONO (2.7s)
+  ok  5 [chromium] › e2e\admin\payments.real.spec.ts:212:3 › Gestión ADMIN de pagos con backend real › rechaza la documentación con motivo y deja el pago cerrado sin ABONO (2.8s)
+  ok  6 [chromium] › e2e\admin\payments.real.spec.ts:236:3 › Gestión ADMIN de pagos con backend real › acredita un pago USD y registra exactamente un ABONO (2.7s)
+  ok  7 [chromium] › e2e\admin\payments.real.spec.ts:260:3 › Gestión ADMIN de pagos con backend real › acredita un pago ARS con cotización FER17-v1 confirmada por el backend (2.4s)
+  ok  8 [chromium] › e2e\admin\payments.real.spec.ts:286:3 › Gestión ADMIN de pagos con backend real › sin cotización no acredita, informa el error y conserva el pago pendiente (2.2s)
+  ok  9 [chromium] › e2e\admin\payments.real.spec.ts:312:3 › Gestión ADMIN de pagos con backend real › con cotización inválida no acredita y no deja movimientos (2.2s)
+  ok 10 [chromium] › e2e\admin\payments.real.spec.ts:330:3 › Gestión ADMIN de pagos con backend real › bloquea el doble clic y envía una sola acreditación (2.3s)
+  ok 11 [chromium] › e2e\admin\payments.real.spec.ts:348:3 › Gestión ADMIN de pagos con backend real › ante un resultado incierto reconsulta y reintenta con la misma clave (2.5s)
+  ok 12 [chromium] › e2e\admin\payments.real.spec.ts:390:3 › Gestión ADMIN de pagos con backend real › una respuesta perdida se resuelve consultando el estado, sin duplicar ABONOS (2.4s)
+  ok 13 [chromium] › e2e\admin\payments.real.spec.ts:418:3 › Gestión ADMIN de pagos con backend real › no ofrece acciones sobre pagos ya acreditados, rechazados, anulados o sin comprobante (1.8s)
+  ok 14 [chromium] › e2e\admin\payments.real.spec.ts:442:3 › Gestión ADMIN de pagos con backend real › CLIENTE y usuario anónimo no acceden al listado ni a las acciones ADMIN (1.6s)
+  ok 15 [chromium] › e2e\admin\payments.real.spec.ts:467:3 › Gestión ADMIN de pagos con backend real › una sesión ADMIN revocada no puede acreditar y no mueve saldos (2.1s)
+  ok 16 [chromium] › e2e\admin\payments.real.spec.ts:485:3 › Gestión ADMIN de pagos con backend real › descarta respuestas tardías de una sesión ADMIN cerrada (3.1s)
+  ok 17 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 320px › es responsive, accesible por teclado y conserva el foco (5.9s)
+  ok 18 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 360px › es responsive, accesible por teclado y conserva el foco (5.7s)
+  ok 19 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 390px › es responsive, accesible por teclado y conserva el foco (5.7s)
+  ok 20 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 768px › es responsive, accesible por teclado y conserva el foco (5.9s)
+  ok 21 [chromium] › e2e\admin\payments.real.spec.ts:526:5 › Gestión de pagos ADMIN a 1280px › es responsive, accesible por teclado y conserva el foco (5.8s)
+  ok 22 [chromium] › e2e\admin\payments.real.spec.ts:596:5 › Acreditación de pago directo a pedido TRANSFERENCIA a 360px › adapta los mensajes sin anunciar ABONO en cuenta corriente y acredita sin desborde (2.8s)
+  ok 23 [chromium] › e2e\admin\payments.real.spec.ts:596:5 › Acreditación de pago directo a pedido TRANSFERENCIA a 1280px › adapta los mensajes sin anunciar ABONO en cuenta corriente y acredita sin desborde (3.2s)
+  23 passed (1.3m)
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.
+
+BLOQUE payments-browser — PASS
+  ok 1 [chromium] › e2e\account\payment-declaration.real.spec.ts:96:1 › declarar no crea ABONO y el historial no confunde revisión con acreditación (8.0s)
+  ok 2 [chromium] › e2e\account\payment-declaration.real.spec.ts:193:1 › declaración ARS conserva la moneda y no inventa equivalente USD (3.4s)
+  ok 3 [chromium] › e2e\account\payment-declaration.real.spec.ts:224:1 › respuesta perdida y reintento idempotente no duplica el pago ni crea un ABONO (3.8s)
+  3 passed (16.8s)
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.
+
+BLOQUE receipts-browser — PASS
+  ok  1 [chromium] › e2e\account\payment-receipts.real.spec.ts:46:1 › particular, empresa y administración recorren los comprobantes reales en pantalla (12.8s)
+  ok  2 [chromium] › e2e\account\payment-receipts.real.spec.ts:98:1 › rechaza archivos inválidos antes de enviarlos (2.3s)
+  ok  3 [chromium] › e2e\account\payment-receipts.real.spec.ts:161:1 › permite reintentar la consulta y la carga después de un error (3.1s)
+  ok  4 [chromium] › e2e\account\payment-receipts.real.spec.ts:231:1 › muestra la carga y bloquea envíos repetidos a 360 px (2.8s)
+  ok  5 [chromium] › e2e\account\payment-receipts.real.spec.ts:285:1 › descarta una consulta de comprobantes de la sesión anterior (3.5s)
+  ok  6 [chromium] › e2e\account\payment-receipts.real.spec.ts:370:3 › listado y detalle comparten comprobantes persistidos a 1280 px (5.2s)
+  ok  7 [chromium] › e2e\account\payment-receipts.real.spec.ts:370:3 › listado y detalle comparten comprobantes persistidos a 360 px (4.8s)
+  ok  8 [chromium] › e2e\account\payment-receipts.real.spec.ts:475:1 › un error de consulta no se presenta como ausencia de comprobantes (1.7s)
+  ok  9 [chromium] › e2e\account\payment-receipts.real.spec.ts:498:3 › transferencia y comprobante privado en historial: cliente@e2e.test (6.8s)
+  ok 10 [chromium] › e2e\account\payment-receipts.real.spec.ts:498:3 › transferencia y comprobante privado en historial: empresa-cuenta@e2e.test (6.8s)
+  10 passed (52.0s)
+Limpieza E2E confirmada: contenedor eliminado, datos tmpfs.

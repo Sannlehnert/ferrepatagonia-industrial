@@ -7,9 +7,11 @@ import AccountOrderCheckout from '@/components/AccountOrderCheckout.vue'
 import { useAccountOrderStore } from '@/stores/accountOrder'
 import { useCartStore } from '@/stores/cart'
 import { useCartPanelStore } from '@/stores/cartPanel'
+import { useTransferOrderStore } from '@/stores/transferOrder'
 
 const cart = useCartStore()
 const order = useAccountOrderStore()
+const transfer = useTransferOrderStore()
 const panel = useCartPanelStore()
 
 onMounted(() => {
@@ -19,7 +21,8 @@ onMounted(() => {
 const cartBusy = computed(() => cart.loading || cart.operation !== null)
 const busy = computed(() =>
   cartBusy.value || order.attemptState === 'submitting' ||
-  order.attemptState === 'pending',
+  order.attemptState === 'pending' || transfer.attemptState === 'submitting' ||
+  transfer.attemptState === 'pending',
 )
 </script>
 
@@ -109,7 +112,7 @@ const busy = computed(() =>
           :key="item.id_producto"
           :item="item"
           :busy="busy"
-          :stale="cart.needsSync"
+          :stale="cart.stale"
           @quantity="cart.actualizarCantidad(item.id_producto, $event)"
           @remove="cart.quitarProducto(item.id_producto)"
         />
@@ -118,9 +121,13 @@ const busy = computed(() =>
       <CartSummary
         v-if="cart.items.length"
         :snapshot="cart.cart"
-        :stale="cart.needsSync"
+        :stale="cart.stale"
       />
     </template>
-    <AccountOrderCheckout v-if="!cart.items.length && order.pendingKey" />
+    <AccountOrderCheckout
+      v-if="!cart.items.length && (
+        order.pendingKey || transfer.pendingKey || transfer.confirmation
+      )"
+    />
   </section>
 </template>

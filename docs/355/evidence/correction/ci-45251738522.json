@@ -1,0 +1,332 @@
+{
+  "verifiedUTC": "2026-11-24T01:03:39.871Z",
+  "run": 45251738522,
+  "url": "https://github.com/Sannlehnert/ferrepatagonia-industrial/actions/runs/45251738522",
+  "branch": "develop",
+  "event": "push",
+  "headSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "checkoutSha": "d0e18514a46083aa3921acdf70c79dfa35500229",
+  "jobs": [
+    {
+      "id": 137962879104,
+      "name": "Frontend CI (Node 22 + Vite + Playwright E2E)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Setup Node.js 22.22.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Capture initial Docker resources baseline",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install frontend dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run frontend security audit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Type check frontend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Run frontend unit tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Build frontend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Prepare backend dependencies and build for integrated E2E",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Install Playwright Chromium browser",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Run integrated E2E suite",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Verify the academic catalog in disposable MariaDB",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Verify the normal catalog of 100 products, lists and cart",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Verify private payment receipts in the browser",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Verify company payment declaration in the browser",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Verify admin payment review and accreditation in the browser",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Run FER-19 acceptance with the disposable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18
+        },
+        {
+          "name": "Verify H04 against the production frontend build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19
+        },
+        {
+          "name": "Verify MariaDB E2E container and volume cleanup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20
+        },
+        {
+          "name": "Upload frontend and E2E CI diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21
+        },
+        {
+          "name": "Post Setup Node.js 22.22.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 41
+        },
+        {
+          "name": "Post Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 42
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 43
+        }
+      ]
+    },
+    {
+      "id": 137962879841,
+      "name": "Backend CI (Node 22 + MariaDB + E2E & Cleanup)",
+      "status": "completed",
+      "conclusion": "success",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1
+        },
+        {
+          "name": "Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2
+        },
+        {
+          "name": "Setup Node.js 22.22.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3
+        },
+        {
+          "name": "Capture initial Docker resources baseline",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4
+        },
+        {
+          "name": "Install backend dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5
+        },
+        {
+          "name": "Run backend security audit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6
+        },
+        {
+          "name": "Type check backend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7
+        },
+        {
+          "name": "Build backend",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8
+        },
+        {
+          "name": "Run backend unit tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9
+        },
+        {
+          "name": "Run backend DTO source tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10
+        },
+        {
+          "name": "Run backend MariaDB integration tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11
+        },
+        {
+          "name": "Verify administrative account queries in MariaDB",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12
+        },
+        {
+          "name": "Run E2E cleanup resilience tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13
+        },
+        {
+          "name": "Run account seed safety and cleanup tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14
+        },
+        {
+          "name": "Run account seed, contract and client HTTP integration",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15
+        },
+        {
+          "name": "Verify MariaDB container and volume cleanup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16
+        },
+        {
+          "name": "Upload backend CI diagnostics",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17
+        },
+        {
+          "name": "Post Setup Node.js 22.22.2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33
+        },
+        {
+          "name": "Post Checkout repository",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35
+        }
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "id": 14858500594,
+      "name": "frontend-e2e-ci-diagnostics",
+      "size_in_bytes": 3652653,
+      "url": "https://api.github.com/repos/Sannlehnert/ferrepatagonia-industrial/actions/artifacts/14858500594",
+      "archive_download_url": "https://api.github.com/repos/Sannlehnert/ferrepatagonia-industrial/actions/artifacts/14858500594/zip",
+      "expired": false,
+      "created_at": "2026-11-23T20:01:04Z",
+      "expires_at": "2026-11-30T20:01:03Z",
+      "updated_at": "2026-11-23T20:01:04Z",
+      "digest": "sha256:d8cfd39ab9120be689594a4be56de0a82a19d834f7b10bbc8128713c35aadcc3",
+      "workflow_run": {
+        "id": 45251738522,
+        "repository_id": 1363571857,
+        "head_repository_id": 1363571857,
+        "head_branch": "develop",
+        "head_sha": "d0e18514a46083aa3921acdf70c79dfa35500229"
+      }
+    },
+    {
+      "id": 14857257790,
+      "name": "backend-ci-diagnostics",
+      "size_in_bytes": 245,
+      "url": "https://api.github.com/repos/Sannlehnert/ferrepatagonia-industrial/actions/artifacts/14857257790",
+      "archive_download_url": "https://api.github.com/repos/Sannlehnert/ferrepatagonia-industrial/actions/artifacts/14857257790/zip",
+      "expired": false,
+      "created_at": "2026-11-23T19:51:04Z",
+      "expires_at": "2026-11-30T19:51:04Z",
+      "updated_at": "2026-11-23T19:51:04Z",
+      "digest": "sha256:3a74aaa270e060b38310d452da008fbb75af9a6664011a762857bf1b9a117d97",
+      "workflow_run": {
+        "id": 45251738522,
+        "repository_id": 1363571857,
+        "head_repository_id": 1363571857,
+        "head_branch": "develop",
+        "head_sha": "d0e18514a46083aa3921acdf70c79dfa35500229"
+      }
+    }
+  ],
+  "scope": "Remote historical CI. Does not validate the new local correction commit."
+}

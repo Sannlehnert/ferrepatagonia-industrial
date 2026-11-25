@@ -1,0 +1,4 @@
+Timezone=Etc/UTC
+NTP=yes
+NTPSynchronized=yes
+tsc

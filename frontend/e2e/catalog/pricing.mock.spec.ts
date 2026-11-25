@@ -7,7 +7,7 @@ function line(id = 1, changes: Record<string, unknown> = {}) {
 }
 const user = (id: number, rol = 'CLIENTE') => ({ id, rol, email: `test${id}@example.test`, tipo_cliente: 'PARTICULAR', nombre_razon_social: 'Test' })
 async function setup(page: Page, initial: ReturnType<typeof user> | null = null) {
-  const state = { identity: initial, failure: 0, changes: {} as Record<string, unknown>, delay: null as null | Promise<void>, requests: [] as { path: string; body: any }[] }
+  const state = { identity: initial, failure: 0, changes: {} as Record<string, unknown>, mixed: false, delay: null as null | Promise<void>, requests: [] as { path: string; body: any }[] }
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url())
     const json = (data: unknown, status = 200) => route.fulfill({ status, json: data })
@@ -41,7 +41,8 @@ async function setup(page: Page, initial: ReturnType<typeof user> | null = null)
     }
     if (url.pathname === '/api/catalogo') {
       const pageNumber = Number(url.searchParams.get('page') || 1), id = pageNumber === 1 ? 1 : 2
-      return json({data:{productos:[{id,nombre:`Producto ${id}`,codigo:`SKU-${id}`,categoria:{id:1,nombre:'Herramientas'},precio:null,estadoPrecio:'PENDIENTE_DEFINICION',disponible:id===1}],pagination:{page:pageNumber,limit:12,total:13,totalPages:2,hasNext:pageNumber===1,hasPrevious:pageNumber===2}}})
+      const product = (productId: number) => ({id:productId,nombre:`Producto ${productId}`,codigo:`SKU-${productId}`,categoria:{id:1,nombre:'Herramientas'},precio:null,estadoPrecio:'PENDIENTE_DEFINICION',disponible:productId===1})
+      return json({data:{productos:state.mixed ? [product(1),product(2)] : [product(id)],pagination:{page:pageNumber,limit:12,total:13,totalPages:2,hasNext:pageNumber===1,hasPrevious:pageNumber===2}}})
     }
     if (url.pathname.startsWith('/api/precios')) {
       const body = route.request().postDataJSON()
@@ -51,7 +52,7 @@ async function setup(page: Page, initial: ReturnType<typeof user> | null = null)
       if (failure) return json({message:'Operational failure'},failure)
       const personalized = url.pathname.endsWith('/mios')
       const unit = personalized ? (identity?.id === 1 ? '90.00' : '85.00') : '95.00'
-      return json({data:{regla:'FER17-v1',ivaIncluido:true,moneda:'USD',datosSinteticos:false,productos:body.productos.map((p:any)=>line(p.productoId,{precioUnitarioUSD:unit,descuentoAplicado:personalized?'10.00':'5.00',origenDescuento:personalized?'LISTA':'ESPECIAL_PUBLICO',...changes})),totalUSD:unit,totalARS:null,cotizacion:null}})
+      return json({data:{regla:'FER17-v1',ivaIncluido:true,moneda:'USD',datosSinteticos:state.mixed,productos:body.productos.map((p:any)=>line(p.productoId,{precioUnitarioUSD:unit,descuentoAplicado:personalized?'10.00':'5.00',origenDescuento:personalized?'LISTA':'ESPECIAL_PUBLICO',...changes,...(state.mixed && p.productoId===2 ? {evidenciaBaseUSD:{reference:'FIXTURE',verifiedAt:'2026-01-01T00:00:00Z',synthetic:true}} : {})})),totalUSD:unit,totalARS:null,cotizacion:null}})
     }
     return route.abort()
   })
@@ -95,23 +96,48 @@ for (const [name,identity,endpoint,label,amount] of [
 test('contrato interceptado: Home y Catálogo comparten precio, descuento y promoción',async({page})=>{
   await setup(page);await page.goto('/')
   await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
-  await expect(page.getByText(/Descuento 5.00%/)).toContainText('Promoción especial')
+  await expect(page.getByText('Descuento 5.00%', { exact: true })).toBeVisible()
+  await expect(page.getByText('Promoción especial', { exact: true })).toBeVisible()
+  await expect(page.locator('s[aria-label="Precio base"]')).toHaveText('USD 100.00')
   await page.getByRole('link',{name:'Ver catálogo completo'}).click()
   await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
-  await expect(page.getByText(/Descuento 5.00%/)).toContainText('Promoción especial')
+  await expect(page.getByText('Descuento 5.00%', { exact: true })).toBeVisible()
+  await expect(page.getByText('Promoción especial', { exact: true })).toBeVisible()
+  await expect(page.locator('s[aria-label="Precio base"]')).toHaveText('USD 100.00')
+})
+test('contrato interceptado: el precio sintético no oculta el precio real del catálogo',async({page})=>{
+ const s=await setup(page,user(1));s.mixed=true;await page.goto('/catalogo')
+ const real=page.locator('li').filter({hasText:'Producto 1'})
+ const synthetic=page.locator('li').filter({hasText:'Producto 2'})
+ await expect(real).toContainText('USD 90.00')
+ await expect(real.getByRole('button',{name:'Agregar',exact:true})).toBeEnabled()
+ await expect(synthetic).toContainText('Precio sintético no disponible')
+ await expect(synthetic).not.toContainText('USD')
+ await expect(synthetic.getByRole('button',{name:'Agregar',exact:true})).toBeDisabled()
+ await expect(page.getByRole('alert')).toHaveCount(0)
 })
 for(const [state,label] of [['PRECIO_AUSENTE','Precio a confirmar'],['BASE_CERO','Precio base cero · No comprable'],['BASE_NO_VERIFICADA','Precio pendiente de verificación'],['FINAL_CERO','Precio final cero · No comprable'],['ARS_CERO','Precio en ARS no habilitado']]) {
  test(`contrato interceptado: ${state} no publica importes ni habilita compra`,async({page})=>{
    const s=await setup(page);s.changes={estadoPrecio:state,precioComprable:false,precioUnitarioUSD:null};await page.goto('/catalogo')
    await expect(page.getByText(label,{exact:true})).toBeVisible();await expect(page.getByText(/USD \d/)).toHaveCount(0)
    await expect(page.getByRole('button',{name:'Agregar',exact:true})).toBeDisabled()
+   if (state === 'BASE_NO_VERIFICADA') await expect(page.getByRole('button',{name:'Agregar',exact:true})).toHaveAccessibleDescription('El precio está pendiente de verificación y no se puede agregar.')
  })
 }
 for(const status of [404,422,500]) test(`contrato interceptado: error ${status} conserva productos y reintenta`,async({page})=>{
  const s=await setup(page);s.failure=status;await page.goto('/catalogo')
  await expect(page.getByRole('alert')).toBeVisible();await expect(page.getByRole('heading',{name:'Producto 1',exact:true})).toBeVisible()
+ await expect(page.getByText('No se pudo consultar el precio',{exact:true})).toBeVisible()
+ await expect(page.getByRole('button',{name:'Agregar',exact:true})).toHaveAccessibleDescription('No se pudo consultar el precio. Reintentá la consulta.')
  await expect(page.getByText('Todavía no hay productos en el catálogo.')).toHaveCount(0)
  s.failure=0;await page.getByRole('button',{name:'Reintentar precios'}).click();await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
+})
+test('al recuperar foco se consulta nuevamente el precio sin conservar el importe anterior',async({page})=>{
+ const s=await setup(page);await page.goto('/catalogo');await expect(page.getByText('USD 95.00',{exact:true})).toBeVisible()
+ s.changes={estadoPrecio:'BASE_NO_VERIFICADA',precioComprable:false,precioUnitarioUSD:null}
+ await page.evaluate('window.dispatchEvent(new Event("focus"))')
+ await expect(page.getByText('Precio pendiente de verificación',{exact:true})).toBeVisible()
+ await expect(page.getByText('USD 95.00',{exact:true})).toHaveCount(0)
 })
 test('contrato interceptado: cambio A → B y logout limpian los precios de la sesión anterior',async({page})=>{
  const s=await setup(page,user(1));await page.goto('/catalogo');await expect(page.getByText('USD 90.00',{exact:true})).toBeVisible()

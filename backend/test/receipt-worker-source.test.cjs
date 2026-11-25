@@ -52,6 +52,9 @@ function createMockRunner() {
       if (/FROM\s+`?USUARIO`?/i.test(sql)) {
         return { records: [sessionRow(params[0], 'CLIENTE', { tipo_cliente: 'PARTICULAR' })] };
       }
+      if (/FROM\s+`?CLIENTE`?/i.test(sql)) {
+        return { records: [{ activo: 1 }] };
+      }
       throw new Error('Unexpected runner SQL in source test: ' + sql);
     },
     manager: {
@@ -67,9 +70,17 @@ function createMockRunner() {
             tipoMime: mime,
             bytes,
             fecha: '2026-11-13 12:00:00.000',
+            estadoRevision: 'PENDIENTE',
             revisadoEn: null,
+            motivoRechazo: null,
           });
           return { affectedRows: 1 };
+        }
+        if (/FROM\s+`?USUARIO`?/i.test(sql)) {
+          return [sessionRow(params[0], 'CLIENTE', { id_cliente: 10, tipo_cliente: 'PARTICULAR' })];
+        }
+        if (/FROM\s+`?CLIENTE`?/i.test(sql)) {
+          return [{ activo: 1 }];
         }
         throw new Error('Unexpected transaction SQL in source test: ' + sql);
       },
@@ -146,21 +157,12 @@ function uploadOrderReceipt(bytes, mime) {
   });
 }
 
-test('tsx source: resolveWorker selecciona worker .ts con entorno aislado y .js en compilado', () => {
-  const tsConfig = receiptWorkerRuntime.resolveWorker();
-  assert.match(tsConfig.file, /services[\\/]+receipts[\\/]+receipt-file\.worker\.ts$/);
-  assert.equal(tsConfig.execArgv[0], '--require');
-  assert.ok(tsConfig.execArgv[1]);
-  assert.equal(tsConfig.env.TSX_DISABLE_CACHE, '1');
-  assert.equal(tsConfig.env.JWT_SECRET, undefined);
-  assert.equal(tsConfig.env.DB_PASSWORD, undefined);
-
-  const jsConfig = receiptWorkerRuntime.resolveWorker(
-    resolve(__dirname, '../dist/services/receipts/receipt-storage.js'),
-  );
-  assert.match(jsConfig.file, /services[\\/]+receipts[\\/]+receipt-file\.worker\.js$/);
-  assert.deepEqual(jsConfig.execArgv, []);
-  assert.deepEqual(jsConfig.env, {});
+test('tsx source: resolveWorker selecciona el worker .ts adyacente sin depender de dist', () => {
+  const config = receiptWorkerRuntime.resolveWorker();
+  assert.match(config.file, /services[\\/]+receipts[\\/]+receipt-file\.worker\.ts$/);
+  assert.equal(config.execArgv[0], '--import');
+  assert.match(config.execArgv[1], /tsx/);
+  assert.equal(existsSync(join(__dirname, '../src/services/receipts/receipt-file.worker.js')), false);
 });
 
 test('tsx source: acepta PNG, JPG y PDF válidos por ruta HTTP sin depender de dist', async () => {
@@ -191,16 +193,16 @@ test('tsx source: rechaza archivos realmente inválidos con 422 y vacíos con 40
   assert.equal(empty.status, 400);
   assert.equal((await empty.json()).code, 'ARCHIVO_VACIO');
 
-  for (const [bytes, mime] of [
-    [png.subarray(0, 16), 'image/png'],
-    [png, 'image/jpeg'],
-    [jpg.subarray(0, -2), 'image/jpeg'],
-    [activeBytes, 'application/pdf'],
-    [Buffer.from('%PDF-1.7\nCorrupto\n%%EOF'), 'application/pdf'],
+  for (const [bytes, mime, code] of [
+    [png.subarray(0, 16), 'image/png', 'ARCHIVO_DANADO'],
+    [png, 'image/jpeg', 'TIPO_INCOMPATIBLE'],
+    [jpg.subarray(0, -2), 'image/jpeg', 'ARCHIVO_DANADO'],
+    [activeBytes, 'application/pdf', 'CONTENIDO_NO_PERMITIDO'],
+    [Buffer.from('%PDF-1.7\nCorrupto\n%%EOF'), 'application/pdf', 'ARCHIVO_DANADO'],
   ]) {
     const response = await uploadOrderReceipt(bytes, mime);
     assert.equal(response.status, 422);
-    assert.equal((await response.json()).code, 'CONTENIDO_INVALIDO');
+    assert.equal((await response.json()).code, code);
   }
 
   assert.deepEqual(await readdir(receiptDir), beforeFiles);
@@ -265,8 +267,32 @@ test('tsx source: distingue fallos operativos del worker como 503 sin filtrar ru
   });
 
   const combinedLogs = logs.join('\n');
-  assert.match(combinedLogs, /receipt\.worker\.failed/);
+  assert.match(combinedLogs, /receipt\.validation\.worker\.failed/);
   assert.ok(!combinedLogs.includes(secretPath));
   assert.ok(!combinedLogs.includes('secreto-interno'));
   assert.ok(!combinedLogs.includes('SECRETO_DEL_ARCHIVO_USUARIO'));
+});
+
+test('tsx source: fallo operativo del worker de comprobantes devuelve 503 y nunca 422', async t => {
+  const logs = [];
+  t.mock.method(console, 'error', (...args) => logs.push(JSON.stringify(args)));
+  t.mock.method(receiptWorkerRuntime, 'createWorker', () => {
+    const emitter = new EventEmitter();
+    emitter.terminate = async () => 1;
+    queueMicrotask(() => {
+      emitter.emit('error', Object.assign(new Error('Cannot load /secret/path/worker.js'), {
+        code: 'ERR_MODULE_NOT_FOUND',
+      }));
+    });
+    return emitter;
+  });
+
+  const response = await uploadOrderReceipt(png, 'image/png');
+
+  assert.equal(response.status, 503);
+  assert.equal(response.headers.get('retry-after'), '1');
+  const json = await response.json();
+  assert.equal(json.code, 'COMPROBANTES_NO_DISPONIBLES');
+  assert.ok(!JSON.stringify(json).includes('/secret/path/worker.js'));
+  assert.ok(!logs.join('\n').includes('/secret/path/worker.js'));
 });

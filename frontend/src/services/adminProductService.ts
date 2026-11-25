@@ -1,5 +1,6 @@
 import type { AxiosRequestConfig } from 'axios';
 import api from '@/services/api';
+import type { AdminBasePriceState } from '@/types/pricing';
 
 export interface AdminProduct {
     id_producto: number;
@@ -9,6 +10,9 @@ export interface AdminProduct {
     nombre: string;
     descripcion: string | null;
     precio: number | string | null; // <-- Permitir null y string además de number
+    descuento_especial_pct?: number | string | null;
+    precio_verificado?: number | string | null;
+    estado_precio_base?: AdminBasePriceState;
     stock: number;
     imagen: string | null;
     activo: number | boolean;
@@ -55,6 +59,34 @@ export async function getAdminProducts(
     if (Array.isArray(raw?.data?.productos)) return raw.data.productos;
     // An invalid response must not unlock mutations after an uncertain save.
     throw new Error('La respuesta del listado de productos no es válida.');
+}
+
+export interface AdminProductPage {
+    data: AdminProduct[];
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+}
+
+export async function getAdminProductPage(
+    page: number,
+    search: string,
+    signal?: AbortSignal,
+    limit = 20,
+): Promise<AdminProductPage> {
+    const { data } = await api.get<AdminProductPage>('/admin/productos', {
+        params: { page, limit, busqueda: search || undefined },
+        signal,
+    });
+    if (!Array.isArray(data?.data) || !Number.isSafeInteger(data.total) || data.total < 0
+        || !Number.isSafeInteger(data.limit) || data.limit < 1 || data.limit > 100
+        || data.totalPages !== Math.ceil(data.total / data.limit)
+        || data.page !== Math.min(page, Math.max(1, data.totalPages))
+        || data.data.length !== Math.min(data.limit, data.total - (data.page - 1) * data.limit)) {
+        throw new Error('La respuesta del listado de productos no es válida.');
+    }
+    return data;
 }
 
 export async function setAdminProductActive(productId: number, active: boolean): Promise<void> {
@@ -117,6 +149,44 @@ export async function saveAdminProduct(
         );
         return response.data;
     }
+}
+
+export interface PriceVerificationResult {
+    productoId: number
+    precio: string
+    evidencia: string
+    verificadoEn: string
+    estadoFer17: string
+    publicado: boolean
+    eventoId: string
+    replay: boolean
+}
+
+export interface VerifyPricePayload {
+    importe: string
+    evidencia: string
+    confirmar: true
+}
+
+export function canonicalPrice(value: number | string | null | undefined): string | null {
+    if (value === null || value === undefined) return null
+    const text = String(value).trim().replace(',', '.')
+    const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(text)
+    if (!match) return null
+    return `${match[1]}.${(match[2] ?? '').padEnd(2, '0')}`
+}
+
+export async function verifyAdminProductPrice(
+    productId: number,
+    payload: VerifyPricePayload,
+    signal?: AbortSignal,
+): Promise<PriceVerificationResult> {
+    const response = await api.post<{ data: PriceVerificationResult }>(
+        `/admin/productos/${productId}/verificar-precio`,
+        payload,
+        { signal },
+    )
+    return response.data.data
 }
 
 export async function saveAdminProductWithImage(

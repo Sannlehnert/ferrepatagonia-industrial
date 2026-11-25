@@ -11,9 +11,9 @@ async function summary(page: Page, key: string, expected: Partial<CuentaCorrient
   const result = await data<CuentaCorrienteConsulta>(await page.request.get(own))
   expect(result).toMatchObject({ cuentaId: client(key).accountId, origen: 'DEMO', moneda: 'USD', ...expected })
   if (result.estado === 'SIN_CUENTA') throw Error('Se esperaba una cuenta persistida')
-  const cards = page.getByRole('region', { name: 'Resumen de la cuenta' })
+  const cards = page.getByRole('region', { name: 'Resumen financiero' })
   for (const [name, value] of [
-    ['Saldo actual (USD)', result.saldo],
+    ['Saldo actual / deuda vigente (USD)', result.saldo],
     ['Límite de crédito (USD)', result.limite],
     ['Crédito utilizado (USD)', result.utilizado],
     ['Crédito disponible (USD)', result.disponible],
@@ -133,8 +133,8 @@ test('CLIENTE muestra carga mientras MariaDB está bloqueada y luego presenta la
     await connection.query('LOCK TABLES CUENTA_CORRIENTE WRITE')
     try {
       await clientAccount(page)
-      await expect(page.getByRole('status')).toContainText('Consultando la cuenta corriente')
-      await expect(page.getByRole('region', { name: 'Resumen de la cuenta' })).toHaveCount(0)
+      await expect(page.getByRole('status').filter({ hasText: 'Consultando la cuenta corriente' })).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Resumen financiero' })).toHaveCount(0)
     } finally {
       await connection.query('UNLOCK TABLES')
     }

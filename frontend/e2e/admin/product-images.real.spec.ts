@@ -14,7 +14,7 @@ async function signIn(page: Page, email = 'admin@e2e.test') {
   await page.getByLabel('Email', { exact: true }).fill(email)
   await page.getByLabel(/^Contraseña/).fill('E2eLocal-214!')
   await page.getByRole('button', { name: 'Ingresar', exact: true }).click()
-  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta\/datos)$/)
+  await expect(page).toHaveURL(/\/(admin\/dashboard|mi-cuenta)$/)
 }
 
 async function photo(width: number) {
@@ -35,13 +35,15 @@ test('alta y reemplazo con vista previa, estado de carga y catálogo a 360 px', 
   await page.setViewportSize({ width: 360, height: 780 })
   await signIn(page)
   await page.goto('/admin/productos')
-  const code = 'IMG-E2E-' + randomUUID().slice(0, 8)
+  // Evita que el SKU generado contenga por azar el término E2E-25 que
+  // otras pruebas ADMIN usan como búsqueda por subcadena.
+  const code = 'IMG-' + randomUUID().slice(0, 8)
   const name = 'Foto E2E ' + code
   await page.getByRole('button', { name: '+ Nuevo Producto' }).click()
   await field(page, 'Nombre del Producto').fill(name)
   await field(page, 'Código SKU').fill(code)
   await page.locator('form').getByRole('combobox').selectOption({ label: 'Herramientas E2E' })
-  await field(page, 'Precio Base').fill('150')
+  await field(page, 'Importe base cargado').fill('150')
   await field(page, 'Stock').fill('8')
   await photoInput(page).setInputFiles({ name: 'invalida.svg', mimeType: 'image/svg+xml', buffer: Buffer.from('<svg/>') })
   await expect(page.getByRole('alert')).toContainText('Seleccioná una foto JPEG, PNG o WebP.')
@@ -75,7 +77,7 @@ test('alta y reemplazo con vista previa, estado de carga y catálogo a 360 px', 
     baseURL: new URL(page.url()).origin, viewport: { width: 360, height: 780 },
   })
   try {
-    await expectLoaded(page.getByRole('img', { name, exact: true }), 24)
+    await expectLoaded(page.getByRole('rowheader', { name, exact: true }).locator('img[alt=""]'), 24)
     const visitor = await visitorContext.newPage()
     await visitor.goto('/catalogo?busqueda=' + code)
     await expectLoaded(visitor.getByRole('img', { name, exact: true }), 24)

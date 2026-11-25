@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 
 const png = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAADklEQVQImWP4DwYMEAoAU7oL9W/sIDEAAAAASUVORK5CYII=',
@@ -16,36 +17,58 @@ async function signIn(page: Page, email: string) {
   await expect(logout.or(menu)).toBeVisible()
 }
 
-async function upload(region: Locator) {
-  await region.getByLabel(/Archivo \(PDF/).setInputFiles({
-    name: 'transferencia.png', mimeType: 'image/png', buffer: png,
-  })
+type UploadFile = { name: string; mimeType: string; buffer: Buffer }
+
+async function upload(
+  region: Locator,
+  file: UploadFile = { name: 'transferencia.png', mimeType: 'image/png', buffer: png },
+) {
+  await region.getByLabel(/Archivo \(PDF/).setInputFiles(file)
   await region.getByRole('button', { name: 'Adjuntar comprobante' }).click()
   await expect(region.getByText(/Comprobante recibido/)).toBeVisible()
   await expect(region.getByText('Pendiente de revisión')).toBeVisible()
 }
 
-async function download(page: Page, row: Locator) {
+async function download(
+  page: Page,
+  row: Locator,
+  extension: 'pdf' | 'jpg' | 'png' = 'png',
+  expected: Buffer = png,
+) {
   const pending = page.waitForEvent('download')
   await row.getByRole('link', { name: 'Descargar comprobante' }).click()
   const file = await pending
-  expect(file.suggestedFilename()).toMatch(/^comprobante-[0-9a-f-]+\.png$/)
-  expect(await readFile(await file.path())).toEqual(png)
+  expect(file.suggestedFilename()).toMatch(new RegExp(`^comprobante-[0-9a-f-]+\\.${extension}$`))
+  expect(await readFile(await file.path())).toEqual(expected)
 }
 
-async function openOrder(page: Page) {
+async function openOrder(page: Page, beforeDetail?: () => Promise<unknown>) {
   await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByRole('button', { name: /^Ver detalle de PED-/ })).toBeVisible()
+  await expect(page.getByText('Consultando estados de comprobantes…', { exact: true })).toHaveCount(0)
+  await beforeDetail?.()
   await page.getByRole('button', { name: /^Ver detalle de PED-/ }).click()
   return page.getByRole('region', { name: 'Comprobantes de pago' })
 }
 
 test('particular, empresa y administración recorren los comprobantes reales en pantalla', async ({ page, browser }) => {
+  const realPdf = await readFile(new URL(
+    '../../../backend/test/fixtures/receipts/comprobante-transferencia.pdf',
+    import.meta.url,
+  ))
+  const realJpg = await readFile(new URL(
+    '../../../backend/test/fixtures/receipts/comprobante-transferencia.jpg',
+    import.meta.url,
+  ))
+
   await signIn(page, 'cliente@e2e.test')
   const particular = await openOrder(page)
-  await upload(particular)
+  await upload(particular, {
+    name: 'comprobante-transferencia.pdf', mimeType: 'application/pdf', buffer: realPdf,
+  })
   const privatePath = await particular.getByRole('link', { name: 'Descargar comprobante' }).getAttribute('href')
   expect(privatePath).toMatch(/^\/api\/pedidos\/\d+\/comprobantes\//)
-  await download(page, particular)
+  await download(page, particular, 'pdf', realPdf)
 
   const company = await browser.newPage()
   await signIn(company, 'empresa-cuenta@e2e.test')
@@ -54,9 +77,11 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   const account = company.getByRole('region', { name: 'Comprobantes de pago' })
   const before = (await (await company.request.get('/api/cuenta-corriente')).json()).data
   expect(before.saldo).toBe('84.00')
-  await upload(account)
-  await expect(account.getByText(/Saldo general de cuenta corriente · PNG/)).toBeVisible()
-  await download(company, account)
+  await upload(account, {
+    name: 'comprobante-transferencia.jpg', mimeType: 'image/jpeg', buffer: realJpg,
+  })
+  await expect(account.getByText(/Saldo general de cuenta corriente · JPG/)).toBeVisible()
+  await download(company, account, 'jpg', realJpg)
   await account.getByRole('link', { name: 'Mis pedidos' }).click()
   await expect(company).toHaveURL(/\/mi-cuenta\/pedidos$/)
   await company.getByRole('button', { name: /^Ver detalle de PED-/ }).click()
@@ -72,16 +97,81 @@ test('particular, empresa y administración recorren los comprobantes reales en 
   const adminReceipts = admin.getByRole('region', { name: 'Comprobantes de pago' })
   await expect(adminReceipts.getByRole('listitem')).toHaveCount(3)
   const particularRow = adminReceipts.getByRole('listitem').filter({ hasText: 'Cliente E2E · Cliente 1' })
-  await expect(particularRow).toContainText(/Pedido PED-\d+ · PNG/)
-  await download(admin, particularRow)
-  await particularRow.getByRole('button', { name: 'Marcar revisado' }).click()
-  await expect(particularRow.getByText(/^Revisado/)).toBeVisible()
+  await expect(particularRow).toContainText(/Pedido PED-\d+ · PDF/)
+  await download(admin, particularRow, 'pdf', realPdf)
+  const [reviewRequest] = await Promise.all([
+    admin.waitForRequest(request =>
+      new URL(request.url()).pathname.endsWith('/revision') && request.method() === 'PATCH'),
+    particularRow.getByRole('button', { name: 'Aprobar comprobante' }).click(),
+  ])
+  expect(reviewRequest.headers()['idempotency-key']).toMatch(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+  )
+  expect(reviewRequest.postDataJSON()).toEqual({ estado: 'APROBADO' })
+  await expect(particularRow.getByText('Aprobado', { exact: true })).toBeVisible()
 
   const reloaded = await openOrder(page)
-  await expect(reloaded.getByText(/^Revisado/)).toBeVisible()
+  await expect(reloaded.getByText('Aprobado', { exact: true })).toBeVisible()
   await company.close()
   await admin.close()
 });
+
+test('a 1024 px los metadatos del comprobante conservan ancho útil y las acciones quedan debajo', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1024, height: 900 })
+  await signIn(page, 'admin@e2e.test')
+  await page.goto('/admin/comprobantes')
+  const region = page.getByRole('region', { name: 'Comprobantes de pago' })
+  const pending = region.getByRole('listitem').filter({
+    has: page.getByRole('link', { name: 'Descargar comprobante' }),
+    hasText: 'Pendiente de revisión',
+  }).first()
+  await expect(pending).toBeVisible()
+  await expect(pending.getByRole('link', { name: 'Descargar comprobante' })).toBeVisible()
+  await expect(pending.getByRole('button', { name: 'Aprobar comprobante' })).toBeVisible()
+  await expect(pending.getByRole('button', { name: 'Rechazar comprobante' })).toBeVisible()
+
+  // El menú lateral ADMIN en 1024 px es persistente; se comprueba su presencia.
+  await expect(page.getByRole('complementary', { name: 'Panel administrativo' })).toBeVisible()
+
+  const metadata = pending.getByTestId('receipt-metadata')
+  const actions = pending.getByTestId('receipt-actions')
+  const metadataBox = await metadata.boundingBox()
+  const actionsBox = await actions.boundingBox()
+  expect(metadataBox).not.toBeNull()
+  expect(actionsBox).not.toBeNull()
+  if (process.env.E2E_RECEIPT_CAPTURE) {
+    await page.screenshot({
+      path: `../docs/354/evidence/receipts-1024-${process.env.E2E_RECEIPT_CAPTURE}.png`,
+      fullPage: true,
+    })
+  }
+  // La medición es efectiva: no alcanza con que existan clases responsive.
+  expect(metadataBox!.width).toBeGreaterThanOrEqual(300)
+  expect(actionsBox!.y).toBeGreaterThanOrEqual(metadataBox!.y + metadataBox!.height - 1)
+  expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+
+  for (const width of [320, 360, 390, 768, 1024, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    const boxes = await pending.evaluate(element => {
+      const metadata = element.querySelector('[data-testid="receipt-metadata"]')
+      const actions = element.querySelector('[data-testid="receipt-actions"]')
+      if (!metadata || !actions) return null
+      return {
+        metadata: metadata.getBoundingClientRect(),
+        actions: actions.getBoundingClientRect(),
+      }
+    })
+    expect(boxes, `medición a ${width} px`).not.toBeNull()
+    expect(boxes!.metadata.width, `metadatos a ${width} px`).toBeGreaterThan(0)
+    // Los nombres, fechas, estados y referencias no quedan aplastados.
+    expect(boxes!.metadata.width, `legibilidad a ${width} px`).toBeGreaterThanOrEqual(
+      width >= 768 ? 280 : 180,
+    )
+    expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+  }
+})
 
 test('rechaza archivos inválidos antes de enviarlos', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 })
@@ -154,7 +244,7 @@ test('permite reintentar la consulta y la carga después de un error', async ({
   let failRead = true
   let failUpload = true
 
-  await page.route(/\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/, async route => {
+  const interceptDetail = () => page.route(/\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/, async route => {
     const method = route.request().method()
 
     if (method === 'GET' && failRead) {
@@ -180,7 +270,7 @@ test('permite reintentar la consulta y la carga después de un error', async ({
     await route.continue()
   })
 
-  const region = await openOrder(page)
+  const region = await openOrder(page, interceptDetail)
   await expect(region.getByRole('alert')).toHaveText(
     'No se pudieron cargar los comprobantes.',
   )
@@ -213,7 +303,7 @@ test('permite reintentar la consulta y la carga después de un error', async ({
   })).toBeVisible()
   await expect(region.getByRole('link', {
     name: 'Descargar comprobante',
-  })).toBeVisible()
+  }).first()).toBeVisible()
 })
 
 test('muestra la carga y bloquea envíos repetidos a 360 px', async ({ page }) => {
@@ -288,7 +378,7 @@ test('descarta una consulta de comprobantes de la sesión anterior', async ({
   let delayed = false
   let previousOrderPath = ''
 
-  await page.route(
+  const interceptDetail = () => page.route(
     /\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/,
     async route => {
       if (route.request().method() !== 'GET' || delayed) {
@@ -307,7 +397,7 @@ test('descarta una consulta de comprobantes de la sesión anterior', async ({
   )
 
   try {
-    const previousRegion = await openOrder(page)
+    const previousRegion = await openOrder(page, interceptDetail)
     await readStarted
 
     await expect(previousRegion.getByRole('status')).toHaveText(
@@ -353,3 +443,202 @@ test('descarta una consulta de comprobantes de la sesión anterior', async ({
     releaseRead()
   }
 })
+
+for (const width of [1280, 360]) {
+  test(`listado y detalle comparten comprobantes persistidos a ${width} px`, async ({ page, browser }) => {
+    test.setTimeout(45_000)
+    await page.setViewportSize({ width, height: 850 })
+    await page.addInitScript(() => {
+      localStorage.setItem('ferrepatagonia_uploaded_receipts', '[1,999999]')
+    })
+    await signIn(page, 'cliente@e2e.test')
+    const orders = await page.request.get('/api/pedidos')
+    expect(orders.ok()).toBe(true)
+    const order = (await orders.json()).data.items[0]
+    const path = `/api/pedidos/${order.pedidoId}/comprobantes`
+    const before = await page.request.get(path)
+    expect(before.ok()).toBe(true)
+    const previousReceipts = (await before.json()).data.items
+    const hasApproved = previousReceipts.some((item: { estadoRevision: string }) =>
+      item.estadoRevision === 'APROBADO')
+    const initialStatus = hasApproved ? 'Aprobado'
+      : previousReceipts.some((item: { estadoRevision: string }) =>
+        item.estadoRevision === 'PENDIENTE') ? 'Pendiente de revisión'
+        : previousReceipts.length ? 'Rechazado' : 'No adjunto'
+
+    await page.goto('/mi-cuenta/pedidos')
+    const row = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: order.numero, exact: true }),
+    })
+    await expect(row.getByText(initialStatus, { exact: true })).toBeVisible()
+    const opener = row.getByRole('button', { name: `Ver comprobantes de ${order.numero}` })
+    await opener.click()
+    const dialog = page.getByRole('dialog', { name: `Comprobantes · ${order.numero}` })
+    const receipts = dialog.getByRole('region', { name: 'Comprobantes de pago' })
+
+    // Un PNG distinto por escenario evita que la deduplicación reutilice el archivo de otro test.
+    const sharp = createRequire(import.meta.url)('../../../backend/node_modules/sharp')
+    const image: Buffer = await sharp({ create: {
+      width: 2, height: 2, channels: 3, background: { r: width === 1280 ? 30 : 80, g: 120, b: 40 },
+    } }).png().toBuffer()
+    await receipts.getByLabel(/Archivo \(PDF/).setInputFiles({
+      name: 'comprobante-327.png', mimeType: 'image/png', buffer: image,
+    })
+    const savedResponse = page.waitForResponse(response =>
+      new URL(response.url()).pathname === path && response.request().method() === 'POST')
+    await receipts.getByRole('button', { name: 'Adjuntar comprobante' }).click()
+    const saved = await savedResponse
+    expect(saved.status()).toBe(201)
+    const receiptId = (await saved.json()).data.id
+    const href = `${path}/${receiptId}`
+    await expect(receipts.getByText('Comprobante recibido. La acreditación del pago se gestiona por separado.')).toBeVisible()
+    await expect(receipts.getByText('Pendiente de revisión', { exact: true }).first()).toBeVisible()
+    await expect(row.getByText(hasApproved ? 'Aprobado' : 'Pendiente de revisión', { exact: true })).toBeVisible()
+
+    const downloaded = page.waitForEvent('download')
+    await receipts.locator('a').filter({ hasText: 'Descargar comprobante' })
+      .and(receipts.locator(`a[href="${href}"]`)).click()
+    expect(await readFile(await (await downloaded).path())).toEqual(image)
+    expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(opener).toBeFocused()
+
+    await row.getByRole('button', { name: `Ver detalle de ${order.numero}`, exact: true }).click()
+    const detailReceipts = row.getByRole('region', { name: 'Comprobantes de pago' })
+    await expect(detailReceipts.locator(`a[href="${href}"]`)).toBeVisible()
+    await expect(detailReceipts.getByText('Pendiente de revisión', { exact: true }).first()).toBeVisible()
+
+    const admin = await browser.newPage()
+    try {
+      await signIn(admin, 'admin@e2e.test')
+      await admin.getByRole('link', { name: 'Comprobantes de pago', exact: true }).click()
+      const pendingIds = previousReceipts
+        .filter((item: { estadoRevision: string }) => item.estadoRevision === 'PENDIENTE')
+        .map((item: { id: string }) => item.id)
+      for (const id of [...pendingIds, receiptId]) {
+        const adminRow = admin.getByRole('listitem').filter({
+          has: admin.locator(`a[href="/api/admin/comprobantes/${id}"]`),
+        })
+        const [reviewRequest] = await Promise.all([
+          admin.waitForRequest(request =>
+            new URL(request.url()).pathname === `/api/admin/comprobantes/${id}/revision`
+            && request.method() === 'PATCH'),
+          adminRow.getByRole('button', { name: 'Aprobar comprobante' }).click(),
+        ])
+        expect(reviewRequest.headers()['idempotency-key']).toMatch(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        )
+        expect(reviewRequest.postDataJSON()).toEqual({ estado: 'APROBADO' })
+        await expect(adminRow.getByText('Aprobado', { exact: true })).toBeVisible()
+      }
+    } finally {
+      await admin.close()
+    }
+
+    await page.reload()
+    await expect(row.getByText('Aprobado', { exact: true })).toBeVisible()
+    await page.getByLabel('Estado del Comprobante').selectOption('APROBADO')
+    await expect(row).toBeVisible()
+    await page.getByLabel('Estado del Comprobante').selectOption('RECHAZADO')
+    await expect(row).toHaveCount(0)
+    await page.getByLabel('Estado del Comprobante').selectOption('NO_ADJUNTO')
+    await expect(row).toHaveCount(0)
+    await page.getByRole('button', { name: 'Limpiar filtros' }).click()
+    await expect(row).toBeVisible()
+    expect(await page.evaluate('document.documentElement.scrollWidth <= window.innerWidth')).toBe(true)
+  })
+}
+
+test('un error de consulta no se presenta como ausencia de comprobantes', async ({ page }) => {
+  await signIn(page, 'cliente@e2e.test')
+  let fail = true
+  await page.route(/\/api\/pedidos\/\d+\/comprobantes(?:\?.*)?$/, async route => {
+    if (fail && route.request().method() === 'GET') {
+      await route.fulfill({ status: 503, json: { message: 'Consulta no disponible.' } })
+    } else {
+      await route.continue()
+    }
+  })
+  await page.goto('/mi-cuenta/pedidos')
+  await expect(page.getByText('Estado no disponible', { exact: true })).toBeVisible()
+  await expect(page.getByRole('listitem').getByText('No adjunto', { exact: true })).toHaveCount(0)
+  fail = false
+  await page.getByRole('button', { name: 'Reintentar estados de comprobantes', exact: true }).click()
+  await expect(page.getByRole('listitem').getByText('Aprobado', { exact: true })).toBeVisible()
+  await expect(page.getByText('Estado no disponible', { exact: true })).toHaveCount(0)
+})
+
+for (const client of [
+  { email: 'cliente@e2e.test', other: 'empresa-cuenta@e2e.test', company: false },
+  { email: 'empresa-cuenta@e2e.test', other: 'cliente@e2e.test', company: true },
+]) {
+  test(`transferencia y comprobante privado en historial: ${client.email}`, async ({ page, browser }) => {
+    test.setTimeout(60_000)
+    await page.route('**/socket.io/**', route => route.abort())
+    await signIn(page, client.email)
+    const before = client.company ? (await (await page.request.get('/api/cuenta-corriente')).json()).data : null
+    await page.goto('/catalogo?busqueda=E2E-24')
+    const card = page.locator('li').filter({
+      has: page.getByRole('heading', { name: 'Producto E2E 24', exact: true }),
+    })
+    const added = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/carrito/items' && response.request().method() === 'POST')
+    await card.getByRole('button', { name: 'Agregar', exact: true }).click()
+    expect((await added).status()).toBe(204)
+    await page.goto('/carrito')
+
+    const summary = page.getByRole('region', { name: 'Resumen del carrito' })
+    await expect(summary.getByRole('radio', { name: 'Transferencia' })).toBeVisible()
+    if (client.company) {
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toBeVisible()
+    } else {
+      await expect(summary.getByRole('radio', { name: 'Cuenta corriente' })).toHaveCount(0)
+    }
+    const submitted = page.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/pedidos/transferencia' &&
+      response.request().method() === 'POST')
+    await summary.getByRole('button', { name: 'Confirmar pedido por transferencia' }).click()
+    const response = await submitted
+    expect(response.status()).toBe(201)
+    const orderId: number = (await response.json()).data.pedidoId
+    await expect(page.getByRole('status').filter({
+      hasText: 'El pago por transferencia está pendiente de acreditación',
+    })).toContainText('no significa que el pago haya sido aprobado')
+    await expect(page.getByRole('region', { name: 'Comprobantes de pago' })).toBeVisible()
+
+    await page.goto('/mi-cuenta/pedidos')
+    const history = (await (await page.request.get('/api/pedidos')).json()).data.items
+    const savedOrder = history.find((order: { pedidoId: number }) => order.pedidoId === orderId)
+    expect(savedOrder).toBeDefined()
+    const orderNumber: string = savedOrder.numero
+    const row = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: orderNumber, exact: true }),
+    })
+    await expect(row.getByText('No adjunto', { exact: true })).toBeVisible()
+    await row.getByRole('button', { name: `Ver detalle de ${orderNumber}` }).click()
+    const detailReceipts = row.getByRole('region', { name: 'Comprobantes de pago' })
+    await expect(detailReceipts).toBeVisible()
+    await upload(detailReceipts)
+    await expect(row.getByRole('row').first().getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+
+    await row.getByRole('button', { name: `Ver comprobantes de ${orderNumber}` }).click()
+    const dialog = page.getByRole('dialog', { name: `Comprobantes · ${orderNumber}` })
+    await expect(detailReceipts).toHaveCount(0)
+    await expect(dialog.getByText('Pendiente de revisión', { exact: true })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(detailReceipts).toBeVisible()
+
+    const other = await browser.newPage()
+    try {
+      await signIn(other, client.other)
+      expect((await other.request.get(`/api/pedidos/${orderId}/comprobantes`)).status()).toBe(404)
+    } finally {
+      await other.close()
+    }
+    if (before) {
+      const after = (await (await page.request.get('/api/cuenta-corriente')).json()).data
+      expect({ saldo: after.saldo, revision: after.revision }).toEqual({ saldo: before.saldo, revision: before.revision })
+    }
+  })
+}

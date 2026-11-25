@@ -525,3 +525,58 @@ test('requires a confirmed snapshot before the first write and after clearing st
   assert.equal(await cart.cargarCarrito(), true)
   assert.equal(await cart.agregarProducto(7, 1), true)
 })
+
+test('no marca datos obsoletos durante una escritura ni durante su relectura exitosa', async t => {
+  const write = deferred()
+  const refresh = deferred()
+  let reads = 0
+  const { cart } = runtime(t, {
+    restore: user(1),
+    read: () => ++reads === 1 ? Promise.resolve(snapshot()) : refresh.promise,
+    mutate: () => write.promise,
+  })
+  await tick()
+  assert.equal(cart.needsSync, false)
+  assert.equal(cart.stale, false)
+
+  const pending = cart.actualizarCantidad(7, 2)
+  assert.equal(cart.operation, 'update')
+  assert.equal(cart.needsSync, true)
+  assert.equal(cart.stale, false, 'la escritura en curso todavía puede confirmar el carrito')
+
+  write.resolve()
+  await tick()
+  assert.equal(cart.operation, 'update')
+  assert.equal(cart.needsSync, true)
+  assert.equal(cart.stale, false, 'la relectura posterior sigue en curso')
+
+  refresh.resolve(snapshot(1, 2))
+  assert.equal(await pending, true)
+  assert.equal(cart.operation, null)
+  assert.equal(cart.needsSync, false)
+  assert.equal(cart.stale, false)
+  assert.equal(cart.items[0].cantidad, 2)
+})
+
+test('solo expone datos obsoletos cuando la relectura posterior realmente falla', async t => {
+  let reads = 0
+  let failRefresh = false
+  const { cart } = runtime(t, {
+    restore: user(1),
+    read: async () => {
+      if (++reads > 1 && failRefresh) throw new Error('offline')
+      return snapshot()
+    },
+    mutate: async () => { failRefresh = true },
+  })
+  await tick()
+  assert.equal(await cart.actualizarCantidad(7, 2), false)
+  assert.equal(cart.operation, null)
+  assert.ok(cart.loadError)
+  assert.equal(cart.needsSync, true)
+  assert.equal(cart.stale, true)
+
+  failRefresh = false
+  assert.equal(await cart.cargarCarrito(), true)
+  assert.equal(cart.stale, false)
+})

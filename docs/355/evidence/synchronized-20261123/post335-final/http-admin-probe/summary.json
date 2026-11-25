@@ -1,0 +1,67 @@
+{
+  "base": "d0e1851 + cambios de integración #313",
+  "criteriaSource": "Capturas de Bruno: HU288 y tareas309–313",
+  "normalInstall": true,
+  "academicCheckout": false,
+  "publication": "Asociación oficial de imágenes y activación ADMIN explícita, solo en base descartable",
+  "checkpoints": [
+    {
+      "phase": "before",
+      "total": 100,
+      "detail": 100,
+      "searchSKU": 100,
+      "searchName": 100,
+      "imageHTTP": 100,
+      "categories": 8,
+      "catalogReferencePrices": 100
+    },
+    {
+      "phase": "after",
+      "total": 100,
+      "detail": 100,
+      "searchSKU": 100,
+      "searchName": 100,
+      "imageHTTP": 100,
+      "categories": 8,
+      "catalogReferencePrices": 100
+    }
+  ],
+  "afterImport": {
+    "products": 100,
+    "active": 0,
+    "images": 0,
+    "prices": 100,
+    "public": 0
+  },
+  "browser": {
+    "details": 100,
+    "mobile": 2,
+    "catalogSearch": true,
+    "afterRestart": true,
+    "confirmedTransferLists": [
+      10,
+      20
+    ],
+    "orderDetailReceipts": [
+      10,
+      20
+    ]
+  },
+  "prices": {
+    "defined": 100,
+    "missing": 0,
+    "catalogReferences": true,
+    "academicCheckout": false,
+    "lists": [
+      10,
+      20
+    ],
+    "policy": "Referencias #309 publicadas por ADMIN; procedencia representativa conservada."
+  },
+  "result": "PASS: catálogo normal independiente, listas y carrito con precios publicados",
+  "adversarial": {
+    "conflictingPublicationRollback": true,
+    "preservesAdminChanges": true,
+    "changedPriceInvalidatesReference": true
+  }
+}
