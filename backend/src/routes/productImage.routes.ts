@@ -21,7 +21,18 @@ productImageRouter.get('/product-images/:name', async (req, res, next) => {
         await pipeline(image.handle.createReadStream(), res);
     } catch (error) {
         if (res.destroyed) return;
-        if (error instanceof ProductImageError || (error as NodeJS.ErrnoException).code === 'ENOENT') return next();
+        if (res.headersSent) {
+            next(error);
+            return;
+        }
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return next();
+        if (error instanceof ProductImageError) {
+            if (error.statusCode >= 500) {
+                res.setHeader('Cache-Control', 'no-store');
+            }
+            res.status(error.statusCode).json({ message: error.message, code: error.code });
+            return;
+        }
         next(error);
     }
 });

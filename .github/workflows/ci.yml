@@ -46,6 +46,10 @@ jobs:
               working-directory: backend
               run: npm run type-check
 
+            - name: Run backend receipt worker source tests (without dist)
+              working-directory: backend
+              run: npm run test:receipt-source
+
             - name: Build backend
               working-directory: backend
               run: npm run build
