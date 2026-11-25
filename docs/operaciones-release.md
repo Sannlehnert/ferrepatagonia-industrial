@@ -347,9 +347,9 @@ resolución:
 - Merge de reconciliación: `af88617a8dd304e2cf5ca3c642e1b5478c7fe1a1`
   (padres `develop` y `main`; `main` queda íntegramente incorporado).
 - Documentación funcional: `faf10d80125df6c4aedb6fe6296d3ed0ee8136e9`.
-- El SHA final del candidato es el HEAD de la rama después de incorporar
-  `docs/356/README.md` y su evidencia; se informa en el PR. El SHA definitivo de
-  `main` se registrará recién después del merge real.
+- SHA candidato verificado: `16c7a9280597be19ae7ab6d3dad441a9162701a3`.
+  El HEAD final de la rama, que agrega este registro de trazabilidad, se informa
+  en el PR. El SHA definitivo de `main` se registrará después del merge real.
 - Instalación limpia verificada: 26 tablas, 13 triggers, 1 vista FER-17, 6
   migraciones, 8 categorías, 100 productos activos, 100 SKU únicos, 100 imágenes
   y 100 precios de referencia sintéticos.

@@ -289,9 +289,11 @@ Capturas tomadas sobre el frontend compilado (`vite preview`) con la base limpia
 
 - Merge de reconciliación: `af88617a8dd304e2cf5ca3c642e1b5478c7fe1a1`.
 - Documentación funcional: `faf10d80125df6c4aedb6fe6296d3ed0ee8136e9`.
-- El SHA final del candidato es el HEAD de `release/356-final-preparation`
-  después de incorporar este documento y su evidencia. Se informa en la entrega
-  y en la descripción del PR; no se declara un SHA de `main` antes del merge.
+- **SHA candidato verificado: `16c7a9280597be19ae7ab6d3dad441a9162701a3`**
+  (HEAD con código, README, evidencia y estado remoto antes de este registro de
+  cierre). El HEAD final de la rama, que solo agrega esta línea de trazabilidad,
+  se informa en la entrega y en la descripción del PR.
+- No se declara un SHA de `main` antes del merge real.
 
 Pasos pendientes, fuera de esta etapa:
 
