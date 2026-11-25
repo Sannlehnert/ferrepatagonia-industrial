@@ -46,6 +46,7 @@ async function setup(page: Page, count = 44) {
     },
   } } }))
   await page.route(/\/api\/auth\/me(?:\?.*)?$/, route => route.fulfill({ json: { user: admin } }))
+  await page.route(/\/api\/admin\/pagos(?:\?.*)?$/, route => route.fulfill({ json: { data: { items: [], paginaSiguiente: null } } }))
   await page.route(/\/api\/admin\/pedidos(?:\?.*)?$/, route => {
     const url = new URL(route.request().url())
     reads.push(url)

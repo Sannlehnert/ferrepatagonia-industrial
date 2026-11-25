@@ -120,7 +120,36 @@ test('soporta pagos directos a pedidos TRANSFERENCIA con cuentaCorrienteId null 
   assert.equal(directOrderPayment.pedidoId, 42)
   assert.equal(canReview(directOrderPayment), false)
   assert.equal(canReview(payment({ cuentaCorrienteId: null, pedidoId: 42 })), false)
+  // El fixture conserva declaranteUsuarioId: es una declaración con revisión pendiente.
   assert.equal(canAccredit(directOrderPayment), false)
+
+  // Un pago directo registrado por ADMIN no tiene declarante ni comprobante y
+  // el backend lo acredita contra la cobertura del pedido sin exigir revisión.
+  const adminDirect = decodeAdminPayment(payment({
+    id: 100,
+    cuentaCorrienteId: null,
+    pedidoId: 42,
+    comprobanteId: null,
+    declaranteUsuarioId: null,
+    estadoDocumental: 'PENDIENTE',
+  }))
+  assert.equal(canAccredit(adminDirect), true)
+  assert.equal(canAccredit(payment({
+    id: 101,
+    cuentaCorrienteId: null,
+    pedidoId: 42,
+    comprobanteId: null,
+    declaranteUsuarioId: null,
+    estado: 'ACREDITADO',
+  })), false)
+  assert.equal(canAccredit(payment({
+    id: 102,
+    cuentaCorrienteId: null,
+    pedidoId: 42,
+    comprobanteId: null,
+    declaranteUsuarioId: null,
+    monto: '0.00',
+  })), false)
 
   assert.throws(() => decodeAdminPayment(payment({ cuentaCorrienteId: null, pedidoId: null })))
 })
@@ -131,6 +160,113 @@ test('formatea importes sin convertir dinero a Number', () => {
   assert.equal(formatPaymentMoney('1500000.00', 'ARS'), 'ARS 1.500.000,00')
   assert.equal(formatPaymentMoney('12.00', null), 'Importe 12,00')
   assert.equal(formatPaymentMoney('1e3', 'USD'), 'Importe no disponible')
+})
+
+test('crea el pago directo con el DTO exacto y conserva la Idempotency-Key', async () => {
+  const calls = []
+  const createdPayment = payment({
+    id: 77,
+    cuentaCorrienteId: null,
+    pedidoId: 42,
+    comprobanteId: null,
+    declaranteUsuarioId: null,
+    comprobanteTipoMime: null,
+    comprobanteBytes: null,
+    estadoDocumental: 'PENDIENTE',
+    estado: 'PENDIENTE',
+    monto: '125.00',
+    montoUsd: null,
+    observaciones: 'Pago directo',
+  })
+  const api = {
+    get: async (url, config) => {
+      calls.push({ method: 'GET', url, config })
+      return { data: { data: { items: [createdPayment], paginaSiguiente: null } } }
+    },
+    post: async (url, body, config) => {
+      calls.push({ method: 'POST', url, body, config })
+      return { data: { data: createdPayment, meta: { replay: false } } }
+    },
+  }
+  const {
+    createAdminOrderPayment,
+    findPaymentByIdempotencyKey,
+    listAdminPaymentsForOrder,
+    paymentRegistrationNotice,
+  } = service(api)
+  const key = '8f1f2a10-6f4a-4c4e-9f51-53a3b0b32554'
+  const signal = new AbortController().signal
+
+  const page = await listAdminPaymentsForOrder(42, signal)
+  assert.equal(page.items.length, 1)
+  assert.equal(findPaymentByIdempotencyKey(page, createdPayment.claveIdempotencia)?.id, 77)
+  assert.equal(findPaymentByIdempotencyKey(page, key), null)
+
+  const result = await createAdminOrderPayment({
+    pedidoId: 42,
+    monto: '125.00',
+    moneda: 'USD',
+    metodoPago: 'TRANSFERENCIA',
+    referencia: 'TRF-42',
+    observaciones: 'Pago directo',
+  }, key, signal)
+  assert.equal(result.payment.id, 77)
+  assert.equal(result.replay, false)
+  assert.match(paymentRegistrationNotice(result.payment), /Pago #77 registrado por el servidor/)
+  assert.match(paymentRegistrationNotice(result.payment), /estado PENDIENTE/)
+  assert.match(paymentRegistrationNotice(result.payment), /No se acreditó automáticamente/)
+
+  assert.deepEqual(calls[0], {
+    method: 'GET',
+    url: '/admin/pagos',
+    config: { params: { pagina: 1, pedidoId: 42 }, signal },
+  })
+  assert.deepEqual(calls[1], {
+    method: 'POST',
+    url: '/admin/pagos',
+    body: {
+      pedidoId: 42,
+      cuentaCorrienteId: null,
+      monto: '125.00',
+      moneda: 'USD',
+      metodoPago: 'TRANSFERENCIA',
+      estado: 'PENDIENTE',
+      comprobante: 'TRF-42',
+      observaciones: 'Pago directo',
+    },
+    config: { signal, headers: { 'Idempotency-Key': key } },
+  })
+
+  calls.length = 0
+  await createAdminOrderPayment({
+    pedidoId: 42,
+    monto: '125.00',
+    moneda: 'ARS',
+    metodoPago: 'TRANSFERENCIA',
+    referencia: '   ',
+    observaciones: '   ',
+  }, key, signal)
+  assert.deepEqual(calls[0].body, {
+    pedidoId: 42,
+    cuentaCorrienteId: null,
+    monto: '125.00',
+    moneda: 'ARS',
+    metodoPago: 'TRANSFERENCIA',
+    estado: 'PENDIENTE',
+  })
+
+  await assert.rejects(
+    createAdminOrderPayment({
+      pedidoId: 42, monto: '0.00', moneda: 'USD', metodoPago: 'TRANSFERENCIA',
+    }, key, signal),
+    /mayor a cero/,
+  )
+  await assert.rejects(
+    createAdminOrderPayment({
+      pedidoId: 42, monto: '1.00', moneda: 'USD', metodoPago: 'TRANSFERENCIA',
+    }, 'no-es-uuid', signal),
+    /UUID v4/,
+  )
 })
 
 test('usa el DTO exacto del backend y conserva la Idempotency-Key en acreditación', async () => {

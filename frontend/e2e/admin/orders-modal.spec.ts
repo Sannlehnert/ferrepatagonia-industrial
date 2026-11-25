@@ -24,6 +24,15 @@ test.describe('Task #277 — Admin Orders Modal: Prevención de carrera y foco a
       });
     });
 
+    // Mock del listado de pagos registrados que consulta el detalle del pedido.
+    await page.route(/\/api\/admin\/pagos(\?.*)?$/, async route => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ data: { items: [], paginaSiguiente: null } }),
+      });
+    });
+
     // Mock del listado administrativo
     await page.route(/\/api\/admin\/pedidos(\?.*)?$/, async route => {
       if (route.request().method() === 'GET') {

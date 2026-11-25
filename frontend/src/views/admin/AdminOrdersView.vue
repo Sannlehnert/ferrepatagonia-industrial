@@ -5,6 +5,8 @@ import { useRoute } from 'vue-router'
 import AdminOrderStatusBadge from '@/components/AdminOrderStatusBadge.vue'
 import AdminOrderReceiptSummary from '@/components/AdminOrderReceiptSummary.vue'
 import AdminOrdersPagination from '@/components/AdminOrdersPagination.vue'
+import AdminOrderPaymentDialog from '@/components/AdminOrderPaymentDialog.vue'
+import AdminPaymentAccreditationDialog from '@/components/AdminPaymentAccreditationDialog.vue'
 import OrderFinancialStatusBadge from '@/components/OrderFinancialStatusBadge.vue'
 import { useAuthStore } from '@/stores/auth'
 import { usePrivateAccountRead } from '@/composables/usePrivateAccountRead'
@@ -16,6 +18,17 @@ import {
   getAdminOrders,
   updateAdminOrderStatus,
 } from '@/services/adminOrderService'
+import {
+  canAccredit,
+  documentLabel,
+  financialLabel,
+  formatPaymentMoney,
+  listAdminPaymentsForOrder,
+  paymentRegistrationNotice,
+  paymentUpdatedFeedback,
+  type AdminPayment,
+  type AdminPaymentPage,
+} from '@/services/adminPaymentService'
 import { onRealtime } from '@/services/realtime'
 import { resolveOrderCommercialState } from '@/utils/payment'
 import type {
@@ -33,6 +46,7 @@ const identity = () => `${auth.user?.id}:${auth.rol}:${auth.sessionVersion}`
 
 const list = usePrivateAccountRead<AdminOrderListResponse>(identity, allowed)
 const detail = usePrivateAccountRead<AdminOrderDetail>(identity, allowed)
+const orderPayments = usePrivateAccountRead<AdminPaymentPage>(identity, allowed)
 
 // Filtros
 const searchInput = ref('')
@@ -48,6 +62,9 @@ const nextStatusSelection = ref<AdminOrderOperationalStatus | ''>('')
 const currentModalOpeningId = ref(0)
 const savingOpeningId = ref<number | null>(null)
 const statusFeedback = ref<{ text: string; error: boolean } | null>(null)
+const showPaymentRegistration = ref(false)
+const accreditationPaymentId = ref<number | null>(null)
+const paymentFeedback = ref<{ text: string; error: boolean } | null>(null)
 
 // Trazabilidad y contención de foco accesible (H-02)
 let lastTriggerElement: HTMLElement | null = null
@@ -64,6 +81,12 @@ let deferredOrderReconcileTimer: ReturnType<typeof setTimeout> | undefined
 
 const ordersPage = computed(() => list.data.value)
 const selectedOrder = computed(() => detail.data.value)
+const selectedOrderPayments = computed(() => orderPayments.data.value?.items ?? [])
+const canRegisterPayment = computed(() => {
+  const order = selectedOrder.value
+  if (!order || selectedOrderId.value !== order.idPedido || !allowed()) return false
+  return order.origen === 'REAL' && order.modalidadPago === 'TRANSFERENCIA' && !order.estado.startsWith('DEMO_')
+})
 const visibleRange = computed(() => {
   const page = ordersPage.value
   if (!page || !page.items.length) return '0 resultados'
@@ -247,6 +270,10 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
   showModal.value = true
   statusFeedback.value = null
   nextStatusSelection.value = ''
+  showPaymentRegistration.value = false
+  accreditationPaymentId.value = null
+  paymentFeedback.value = null
+  orderPayments.reset()
 
   await nextTick()
   if (thisOpening !== currentModalOpeningId.value) return
@@ -261,6 +288,9 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
   if (order && order.idPedido === orderId && order.estadosPermitidos.length > 0) {
     nextStatusSelection.value = order.estadosPermitidos[0] ?? ''
   }
+  if (order && order.idPedido === orderId && order.modalidadPago === 'TRANSFERENCIA') {
+    void loadOrderPayments(orderId)
+  }
 
   await nextTick()
   if (modalCloseBtn.value) {
@@ -270,11 +300,56 @@ async function openOrderDetailModal(orderId: number, triggerEvent?: Event) {
   }
 }
 
+function loadOrderPayments(orderId: number, keepData = false) {
+  if (!allowed() || selectedOrderId.value !== orderId) return
+  return orderPayments.load(signal => listAdminPaymentsForOrder(orderId, signal), { keepData })
+}
+
+function reloadOrderPayments() {
+  const orderId = selectedOrderId.value
+  if (orderId !== null) void loadOrderPayments(orderId, true)
+}
+
+function openPaymentRegistration() {
+  if (!allowed() || !canRegisterPayment.value) return
+  paymentFeedback.value = null
+  showPaymentRegistration.value = true
+}
+
+function closePaymentRegistration() {
+  showPaymentRegistration.value = false
+}
+
+function onPaymentCreated(payment: AdminPayment) {
+  paymentFeedback.value = { text: paymentRegistrationNotice(payment), error: false }
+  reloadOrderPayments()
+}
+
+function onPaymentUpdated(payment: AdminPayment) {
+  paymentFeedback.value = { text: paymentUpdatedFeedback(payment), error: false }
+  reloadOrderPayments()
+  const orderId = selectedOrderId.value
+  if (orderId !== null) void refreshOpenOrderDetail(orderId)
+}
+
+function openPaymentAccreditation(payment: AdminPayment) {
+  if (!allowed() || !canAccredit(payment)) return
+  accreditationPaymentId.value = payment.id
+}
+
+function closePaymentAccreditation() {
+  accreditationPaymentId.value = null
+}
+
 function closeModal() {
   currentModalOpeningId.value++
   showModal.value = false
   selectedOrderId.value = null
+  showPaymentRegistration.value = false
+  accreditationPaymentId.value = null
+  paymentFeedback.value = null
   detail.reset()
+  orderPayments.reset()
   if (lastTriggerElement) {
     lastTriggerElement.focus()
     lastTriggerElement = null
@@ -512,6 +587,7 @@ onRealtime(change => {
     (change.reconnect || externalOrderIds.includes(currentId) || change.receipts || change.payments)
   ) {
     void refreshOpenOrderDetail(currentId)
+    if (change.reconnect || change.payments) void loadOrderPayments(currentId, true)
   }
 })
 
@@ -524,8 +600,12 @@ watch(
     resetRealtimeTracking()
     list.reset()
     detail.reset()
+    orderPayments.reset()
     showModal.value = false
     selectedOrderId.value = null
+    showPaymentRegistration.value = false
+    accreditationPaymentId.value = null
+    paymentFeedback.value = null
     searchInput.value = ''
     statusInput.value = ''
     paymentModeInput.value = ''
@@ -871,6 +951,79 @@ onBeforeUnmount(() => {
                   show-explanation
                 />
               </div>
+
+              <div v-if="selectedOrder.modalidadPago === 'TRANSFERENCIA'" class="mt-4 border-t border-slate-200 pt-3">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <span class="block font-semibold text-[#0B2438]">Pagos registrados del pedido</span>
+                    <span class="block text-xs text-slate-500">
+                      Un pago directo se acredita contra la cobertura del pedido. No genera ABONO en cuenta corriente.
+                    </span>
+                  </div>
+                  <button
+                    v-if="canRegisterPayment"
+                    type="button"
+                    class="box-border min-h-11 shrink-0 rounded-md border border-[#145A8D] bg-[#145A8D] px-4 text-sm font-semibold text-white hover:bg-[#103A5C] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+                    @click="openPaymentRegistration"
+                  >
+                    Registrar pago
+                  </button>
+                </div>
+
+                <p v-if="orderPayments.loading.value && !orderPayments.data.value" role="status" class="m-0 mt-3 text-xs text-slate-500">
+                  Consultando pagos registrados…
+                </p>
+                <div v-else-if="orderPayments.error.value" class="mt-3 rounded-md border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+                  <p role="alert" class="m-0 mb-2">No pudimos consultar los pagos registrados del pedido.</p>
+                  <button
+                    type="button"
+                    class="box-border min-h-11 cursor-pointer rounded-md border border-[#145a8d] bg-white px-3 font-[inherit] text-xs font-semibold text-[#145a8d]"
+                    @click="reloadOrderPayments"
+                  >
+                    Reintentar consulta
+                  </button>
+                </div>
+                <p v-else-if="selectedOrderPayments.length === 0" role="status" class="m-0 mt-3 text-xs text-slate-500">
+                  Todavía no hay pagos registrados para este pedido.
+                </p>
+                <div v-else role="region" aria-label="Pagos registrados del pedido" class="mt-3">
+                  <ul class="m-0 list-none divide-y divide-slate-200 rounded-md border border-slate-200 p-0">
+                    <li
+                      v-for="payment in selectedOrderPayments"
+                      :key="payment.id"
+                      class="flex flex-col gap-2 p-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div class="min-w-0 space-y-1">
+                        <p class="m-0 font-semibold text-[#0B2438]">
+                          Pago #{{ payment.id }} · {{ formatPaymentMoney(payment.monto, payment.moneda) }}
+                        </p>
+                        <p class="m-0 text-slate-600">
+                          {{ financialLabel(payment.estado) }} · {{ documentLabel(payment.estadoDocumental) }}
+                        </p>
+                        <p v-if="payment.montoUsd" class="m-0 text-slate-600">
+                          Acreditado: {{ formatPaymentMoney(payment.montoUsd, 'USD') }}
+                        </p>
+                      </div>
+                      <button
+                        v-if="canAccredit(payment)"
+                        type="button"
+                        class="box-border min-h-11 shrink-0 cursor-pointer rounded-md border border-[#b45309] bg-white px-3 font-[inherit] text-xs font-semibold text-[#92400e] hover:bg-amber-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145a8d]"
+                        :aria-label="`Acreditar pago ${payment.id}`"
+                        @click="openPaymentAccreditation(payment)"
+                      >
+                        Acreditar pago
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+                <p
+                  v-if="paymentFeedback"
+                  role="status"
+                  class="m-0 mt-3 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs font-semibold text-emerald-800 [overflow-wrap:anywhere]"
+                >
+                  {{ paymentFeedback.text }}
+                </p>
+              </div>
             </div>
 
             <!-- Líneas de Artículos -->
@@ -912,6 +1065,23 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+
+    <AdminOrderPaymentDialog
+      v-if="showPaymentRegistration && selectedOrder"
+      :key="`order-payment-${selectedOrder.idPedido}`"
+      :order="selectedOrder"
+      :existing-payments="selectedOrderPayments"
+      @close="closePaymentRegistration"
+      @created="onPaymentCreated"
+    />
+
+    <AdminPaymentAccreditationDialog
+      v-if="accreditationPaymentId !== null"
+      :key="`order-accredit-${accreditationPaymentId}`"
+      :payment-id="accreditationPaymentId"
+      @close="closePaymentAccreditation"
+      @updated="onPaymentUpdated"
+    />
   </section>
 </template>
 
