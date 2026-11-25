@@ -1,0 +1,25 @@
+=== integradas ===
+2:31:47 AM [vite] (client) [console.warn] [Vue Router warn]: Unexpected error when starting the router: AxiosError: Request failed with status code 500
+  4 skipped
+  401 passed (10.5m)
+=== receipts/payments/payment-actions/fer19 ===
+database.query.failed
+  11 passed (26.1s)
+  3 passed (14.6s)
+  23 passed (50.8s)
+database.query.failed
+database.query.failed
+  15 passed (25.6s)
+=== production ===
+  3 passed (2.1s)
+  2 passed (2.6s)
+=== demo ===
+# tests 17
+# pass 17
+# fail 0
+# skipped 0
+  1 passed (1.9m)
+=== catalog browser ===
+# tests 1
+# pass 1
+# fail 0

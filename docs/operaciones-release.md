@@ -335,3 +335,29 @@ resolución:
   antes de tratarlo como decisión aprobada.
 - Completar la evidencia release: SHA candidato definitivo y su corrida CI,
   revisión humana, respaldo restaurable y responsables de despliegue/rollback.
+
+## Preparación del release final #356 — 25/11/2026
+
+> **Registro nuevo.** No reemplaza los cortes históricos anteriores. El merge
+> final a `main` todavía no se realizó.
+
+- `develop` inicial: `e46843cfc6ca04b1d0a8bd01e76ded563eabcfa9`.
+- `main` inicial: `4a1b12d0b32bbb42645eaab2954f5a9606be9e37`.
+- Rama candidata: `release/356-final-preparation`.
+- Merge de reconciliación: `af88617a8dd304e2cf5ca3c642e1b5478c7fe1a1`
+  (padres `develop` y `main`; `main` queda íntegramente incorporado).
+- Documentación funcional: `faf10d80125df6c4aedb6fe6296d3ed0ee8136e9`.
+- El SHA final del candidato es el HEAD de la rama después de incorporar
+  `docs/356/README.md` y su evidencia; se informa en el PR. El SHA definitivo de
+  `main` se registrará recién después del merge real.
+- Instalación limpia verificada: 26 tablas, 13 triggers, 1 vista FER-17, 6
+  migraciones, 8 categorías, 100 productos activos, 100 SKU únicos, 100 imágenes
+  y 100 precios de referencia sintéticos.
+- CI local equivalente: backend 1423 unitarias + 4 modos del worker, 792
+  integraciones, 195 pasos extra; frontend 411; E2E 401 integradas + perfiles;
+  auditorías sin vulnerabilidades. El CI remoto del candidato queda pendiente de
+  publicar la rama.
+- Limitaciones: el smoke de crédito usó evidencia local marcada; no se
+  fabricaron cotizaciones ni precios comerciales. La protección de ramas no se
+  pudo consultar con API anónima.
+- Evidencia, riesgos y estado de limpieza: [docs/356/README.md](356/README.md).

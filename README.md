@@ -294,12 +294,17 @@ Crear una credencial MariaDB exclusiva con privilegios mínimos y guardarla
 
 ```bash
 PRICE_VERIFICATION_PASSWORD="$(node -e "console.log(require('node:crypto').randomBytes(24).toString('hex'))")"
-docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uferrepatagonia -pferrepatagonia_dev_only ferrepatagonia_dev -e "CREATE USER IF NOT EXISTS 'ferre_precio_verificador'@'%' IDENTIFIED BY '${PRICE_VERIFICATION_PASSWORD}'; GRANT SELECT ON ferrepatagonia_dev.PRODUCTO TO 'ferre_precio_verificador'@'%'; GRANT SELECT ON ferrepatagonia_dev.USUARIO TO 'ferre_precio_verificador'@'%'; GRANT SELECT, INSERT, UPDATE ON ferrepatagonia_dev.PRECIO_USD_EVIDENCIA TO 'ferre_precio_verificador'@'%'; GRANT SELECT, INSERT ON ferrepatagonia_dev.FER17_PRECIO_EVENTO TO 'ferre_precio_verificador'@'%'; GRANT SELECT ON ferrepatagonia_dev.FER17_AUDITORIA_TRIGGERS TO 'ferre_precio_verificador'@'%'; FLUSH PRIVILEGES;"
+docker compose exec -T mariadb mariadb --default-character-set=utf8mb4 -uroot -proot_dev_only ferrepatagonia_dev -e "CREATE USER IF NOT EXISTS 'ferre_precio_verificador'@'%' IDENTIFIED BY '${PRICE_VERIFICATION_PASSWORD}'; GRANT SELECT ON ferrepatagonia_dev.PRODUCTO TO 'ferre_precio_verificador'@'%'; GRANT SELECT ON ferrepatagonia_dev.USUARIO TO 'ferre_precio_verificador'@'%'; GRANT SELECT, INSERT, UPDATE ON ferrepatagonia_dev.PRECIO_USD_EVIDENCIA TO 'ferre_precio_verificador'@'%'; GRANT SELECT, INSERT ON ferrepatagonia_dev.FER17_PRECIO_EVENTO TO 'ferre_precio_verificador'@'%'; GRANT SELECT ON ferrepatagonia_dev.FER17_AUDITORIA_TRIGGERS TO 'ferre_precio_verificador'@'%'; FLUSH PRIVILEGES;"
 cat >> backend/.env <<EOF
 PRICE_VERIFICATION_DB_USER=ferre_precio_verificador
 PRICE_VERIFICATION_DB_PASSWORD=$PRICE_VERIFICATION_PASSWORD
 EOF
 ```
+
+El usuario `root` y su clave `root_dev_only` son exclusivos del Compose local y
+públicos en este repositorio; no se reutilizan fuera de desarrollo. La credencial
+operativa `ferrepatagonia` no tiene privilegio `CREATE USER`, por eso este paso
+usa `root` solo para crear el verificador y otorgar permisos mínimos.
 
 No volver a ejecutar el `cat >>` en una instalación existente: duplicaría las
 variables. Si se omiten ambas, la API arranca pero la verificación administrativa
@@ -354,7 +359,9 @@ cambia el puerto de Vite, actualizar `APP_PUBLIC_ORIGIN` y reiniciar la API.
 
 ### 12. Asociar las imágenes de los 100 SKU
 
-Con ambos servidores activos y las variables del ADMIN exportadas:
+Con ambos servidores activos y las variables del ADMIN exportadas. Si se abrió
+una terminal nueva, volver a exportar `FERREPATAGONIA_LOCAL_DIR`,
+`DEMO_ADMIN_EMAIL`, `DEMO_ADMIN_PASSWORD` y `ADMIN_ID` como en el paso 7:
 
 ```bash
 node data/demo-catalog/asociar-fotos.cjs http://127.0.0.1:5173 --catalogo docs/309/catalogo-maestro.csv
@@ -401,13 +408,13 @@ curl -s "http://127.0.0.1:3000/api/catalogo?page=1&limit=100"
 ```
 
 La salud debe responder HTTP `200` con `{"api":"ok","database":"ok"}`; el
-catálogo debe informar `pagination.total: 100`, 100 productos y `imagen` en cada
+catálogo debe informar `data.pagination.total: 100`, 100 productos y `imagen` en cada
 ficha. El catálogo público mantiene el contrato histórico
 `precio: null`/`PENDIENTE_DEFINICION`; los importes se consultan por el motor de
 precios. Sustituir `PRODUCT_ID` por un `id` devuelto por el catálogo:
 
 ```bash
-curl -s -X POST http://127.0.0.1:3000/api/precios -H "Content-Type: application/json" -d '{"moneda":"USD","productos":[{"productoId":PRODUCT_ID,"cantidad":1}]}'
+curl -s -X POST http://127.0.0.1:3000/api/precios -H "Content-Type: application/json" -H "Origin: http://127.0.0.1:5173" -d '{"moneda":"USD","productos":[{"productoId":PRODUCT_ID,"cantidad":1}]}'
 ```
 
 La respuesta debe incluir `estadoPrecio: "DEFINIDO"`, `precioComprable: true`,

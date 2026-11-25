@@ -52,6 +52,10 @@
   vencimientos, declaración idempotente con comprobante propio, historial de
   revisión y acreditación, seguridad de sesión y evidencia responsive.
 
+- [Preparación del release final (#356)](356/README.md): reconciliación
+  `develop`/`main`, instalación limpia con 100 productos, evidencia SQL/API,
+  smoke local, CI equivalente y SHA candidato.
+
 - [Plan E2E de flujos de negocio y seguridad (T-S7-19.1)](s7-19/T-S7-19.1-plan-e2e.md):
   matriz P0/P1/P2, cobertura existente frente a brechas, catálogo maestro de
   100 SKU separado de la demo sintética de 904, checkout de cuenta corriente

@@ -1,0 +1,4 @@
+productos_visibles
+100
+auditoria_visible
+4
